@@ -21,7 +21,9 @@
     "halting": 0.001
   },
   "data": {
-    "jsonl_path": "dummy.jsonl",
+    "train_path": "../data/train.jsonl",
+    "val_path": "../data/val.jsonl",
+    "test_path": "../data/test.jsonl",    
     "max_val": 1e6,
     "pad_value": 0.0
   },

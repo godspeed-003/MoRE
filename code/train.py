@@ -80,7 +80,10 @@ def load_config(path: str = "config.json") -> dict:
     cfg["loss_weights"].setdefault("halting", 0.001)
 
     cfg.setdefault("data", {})
-    cfg["data"].setdefault("jsonl_path", "dummy.jsonl")
+    cfg["data"].setdefault("train_path", "../data/train.jsonl")
+    cfg["data"].setdefault("val_path", "../data/val.jsonl")
+    cfg["data"].setdefault("test_path", "../data/test.jsonl")
+    cfg["data"].setdefault("jsonl_path", cfg["data"]["train_path"])
     cfg["data"].setdefault("max_val", 1e6)
     cfg["data"].setdefault("pad_value", 0.0)
 
@@ -557,26 +560,42 @@ def train(cfg: dict, run_epochs: int | None = None):
     print(f"[Train] Device: {device}")
 
     # ---- Dataset -------------------------------------------------------
-    dataset = MoREDataset(
-        jsonl_path=dc["jsonl_path"],
+    train_ds = MoREDataset(
+        jsonl_path=dc.get("train_path", dc.get("jsonl_path")),
         seq_len=seq_len,
         max_val=dc["max_val"],
         pad_value=dc["pad_value"],
     )
-    n_val   = max(1, int(len(dataset) * val_split))
-    n_train = len(dataset) - n_val
-    if n_train < 1:
-        n_train = len(dataset)
-        n_val   = 0
 
-    if n_val > 0:
-        train_ds, val_ds = random_split(
-            dataset, [n_train, n_val],
-            generator=torch.Generator().manual_seed(42),
+    val_ds = None
+    val_path = dc.get("val_path")
+    if val_path and os.path.exists(val_path):
+        print(f"[Dataset] Using validation set: {val_path}")
+        val_ds = MoREDataset(
+            jsonl_path=val_path,
+            seq_len=seq_len,
+            max_val=dc["max_val"],
+            pad_value=dc["pad_value"],
         )
+        n_train = len(train_ds)
+        n_val = len(val_ds)
     else:
-        train_ds = dataset
-        val_ds   = None
+        print("[Dataset] Validation file not found, falling back to random split.")
+        dataset = train_ds
+        n_val = max(1, int(len(dataset) * val_split))
+        n_train = len(dataset) - n_val
+        if n_train < 1:
+            n_train = len(dataset)
+            n_val = 0
+        if n_val > 0:
+            train_ds, val_ds = random_split(
+                dataset,
+                [n_train, n_val],
+                generator=torch.Generator().manual_seed(42),
+            )
+        else:
+            train_ds = dataset
+            val_ds = None
 
     # Use num_workers=0 to avoid multiprocessing overhead on small datasets
     train_loader = DataLoader(
