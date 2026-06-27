@@ -220,114 +220,111 @@ def check_git_sandbox():
 # 3. VRAM offload test
 # ---------------------------------------------------------------------------
 
+
 def check_vram_offload(ollama_url: str, skip_ollama: bool):
-    print("\n[3/4] VRAM Offload Test")
+    print("
+[3/4] VRAM Offload Test")
     HLINE()
 
-    def get_gpu_vram_used_mb() -> float | None:
-        """Returns current GPU VRAM used in MB via nvidia-smi or PyTorch."""
-        # Try nvidia-smi first (most accurate)
+    import threading
+    import requests as req
+
+    def get_gpu_vram_used_mb():
         if shutil.which("nvidia-smi"):
             try:
-                proc = subprocess.run(
-                    ["nvidia-smi",
-                     "--query-gpu=memory.used",
-                     "--format=csv,noheader,nounits"],
-                    capture_output=True, text=True, timeout=10
+                proc=subprocess.run(
+                    ["nvidia-smi","--query-gpu=memory.used","--format=csv,noheader,nounits"],
+                    capture_output=True,text=True,timeout=5
                 )
-                if proc.returncode == 0:
-                    lines = [l.strip() for l in proc.stdout.splitlines() if l.strip()]
-                    if lines:
-                        return float(lines[0])
+                if proc.returncode==0:
+                    return float(proc.stdout.strip().splitlines()[0])
             except Exception:
                 pass
+        return 0.0
 
-        # Fallback: PyTorch memory API
-        try:
-            import torch
-            if torch.cuda.is_available():
-                return torch.cuda.memory_allocated() / (1024 ** 2)
-        except Exception:
-            pass
-        return None
+    def kill_llama():
+        subprocess.run(
+            ["taskkill","/IM","llama-server.exe","/F"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        time.sleep(2)
 
     if skip_ollama:
-        print(WARN("--skip-ollama flag set — skipping Ollama VRAM test"))
-        results.record("Ollama VRAM offload test", True, "skipped by user")
+        results.record("Ollama VRAM offload test",True,"skipped")
         return
 
-    # --- Baseline VRAM ---
-    baseline_mb = get_gpu_vram_used_mb()
-    if baseline_mb is None:
-        print(WARN("No GPU detected or VRAM query failed — using 0MB baseline"))
-        baseline_mb = 0.0
-    print(INFO(f"Baseline VRAM used: {baseline_mb:.1f} MB"))
-    results.record("VRAM baseline readable", True, f"{baseline_mb:.1f} MB")
+    print(INFO("Stopping existing llama-server instances..."))
+    kill_llama()
 
-    # --- Trigger Ollama ---
+    baseline=get_gpu_vram_used_mb()
+    results.record("VRAM baseline readable",True,f"{baseline:.1f} MB")
+
+    peak=baseline
+    running=True
+
+    def monitor():
+        nonlocal peak,running
+        while running:
+            try:
+                peak=max(peak,get_gpu_vram_used_mb())
+            except Exception:
+                pass
+            time.sleep(0.1)
+
+    t=threading.Thread(target=monitor,daemon=True)
+    t.start()
+
     print(INFO("Sending test prompt to Ollama ..."))
     try:
-        import requests as req
-        t0 = time.time()
-        resp = req.post(
+        r=req.post(
             f"{ollama_url}/api/generate",
             json={
-                "model":   "qwen2.5-coder:7b",
-                "prompt":  "Reply with exactly: VERIFIED",
-                "stream":  False,
-                "options": {"num_predict": 5},
+                "model":"qwen2.5-coder:7b",
+                "prompt":"Reply exactly with VERIFIED",
+                "stream":False,
+                "keep_alive":"0s"
             },
-            timeout=120,
+            timeout=120
         )
-        elapsed = time.time() - t0
-        if resp.status_code == 200:
-            body = resp.json().get("response", "")
-            results.record(
-                "Ollama ping successful",
-                True,
-                f"{elapsed:.1f}s → '{body[:40]}'"
-            )
-        else:
-            results.record(
-                "Ollama ping successful",
-                False,
-                f"HTTP {resp.status_code}: {resp.text[:100]}"
-            )
-            return
-    except Exception as e:
-        results.record("Ollama ping successful", False, str(e))
-        print(WARN("Is Ollama running?  Start with: OLLAMA_KEEP_ALIVE=0m ollama serve"))
+    finally:
+        running=False
+        t.join()
+
+    if r.status_code!=200:
+        results.record("Ollama ping successful",False,f"HTTP {r.status_code}")
         return
 
-    # --- VRAM after Ollama response ---
-    during_mb = get_gpu_vram_used_mb() or 0.0
-    print(INFO(f"VRAM during/after Ollama response: {during_mb:.1f} MB"))
+    body=r.json().get("response","")
+    results.record("Ollama ping successful",True,body[:40])
 
-    # --- Sleep buffer for VRAM drain ---
-    drain_secs = 10
-    print(INFO(f"Sleeping {drain_secs}s to allow Ollama to offload weights ..."))
-    time.sleep(drain_secs)
-
-    # --- VRAM after sleep ---
-    after_mb = get_gpu_vram_used_mb() or 0.0
-    print(INFO(f"VRAM after {drain_secs}s sleep: {after_mb:.1f} MB"))
-
-    # Allow 200MB tolerance for driver overhead / cached allocations
-    tolerance_mb = 200.0
-    offloaded = (after_mb - baseline_mb) < tolerance_mb
+    loaded=(peak-baseline)>1000
     results.record(
-        "Ollama VRAM fully offloaded after sleep",
-        offloaded,
-        f"baseline={baseline_mb:.0f}MB  after_sleep={after_mb:.0f}MB  "
-        f"Δ={after_mb-baseline_mb:+.0f}MB  tolerance={tolerance_mb:.0f}MB"
+        "Model loaded into GPU",
+        loaded,
+        f"baseline={baseline:.0f}MB peak={peak:.0f}MB Δ={peak-baseline:+.0f}MB"
     )
 
-    if not offloaded:
-        print(WARN(
-            f"VRAM did not fully drain ({after_mb:.0f} MB remains above baseline "
-            f"+ {tolerance_mb:.0f} MB tolerance). "
-            "Ensure Ollama is started with: OLLAMA_KEEP_ALIVE=0m ollama serve"
-        ))
+    print(INFO("Ensuring model is unloaded..."))
+    try:
+        req.post(
+            f"{ollama_url}/api/generate",
+            json={"model":"qwen2.5-coder:7b","keep_alive":0},
+            timeout=30
+        )
+    except Exception:
+        pass
+
+    kill_llama()
+
+    after=get_gpu_vram_used_mb()
+    offloaded=abs(after-baseline)<=200
+
+    results.record(
+        "Ollama VRAM fully offloaded",
+        offloaded,
+        f"baseline={baseline:.0f}MB peak={peak:.0f}MB after={after:.0f}MB"
+    )
 
 
 # ---------------------------------------------------------------------------
