@@ -222,8 +222,7 @@ def check_git_sandbox():
 
 
 def check_vram_offload(ollama_url: str, skip_ollama: bool):
-    print("
-[3/4] VRAM Offload Test")
+    print("[3/4] VRAM Offload Test")
     HLINE()
 
     import threading
