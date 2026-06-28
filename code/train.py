@@ -377,7 +377,8 @@ class MoREWrapper(nn.Module):
             active_mask[stop_global] = False
 
             # Penalise late halting — encourage early exit when possible
-            total_halt_loss = total_halt_loss + halt_probs.mean() * 0.01
+            #total_halt_loss = total_halt_loss + halt_probs.mean() * 0.01
+            total_halt_loss = total_halt_loss + active_mask.float().mean() * 0.05
 
         # --- Compute average recursion depth ----------------------------
         exit_steps   = (depth_exits * torch.arange(
@@ -454,6 +455,7 @@ class MoREModel(nn.Module):
             total_halt_loss : scalar
             depth_exits     : [B, max_depth]  (from the last block)
             avg_depth       : scalar float (from the last block)
+            expert_idx_last  : list of routing indices from the last block
         """
         # [B, seq_len] → [B, 1, d_model]
         h = self.input_proj(x).unsqueeze(1)
@@ -462,13 +464,15 @@ class MoREModel(nn.Module):
         total_halt_loss = torch.tensor(0.0, device=x.device)
         depth_exits_last = None
         avg_depth_last   = None
+        expert_idx_last  = None
 
         for block in self.blocks:
-            h, b_loss, h_loss, depth_exits, _, avg_depth = block(h)
+            h, b_loss, h_loss, depth_exits, block_expert_idx, avg_depth = block(h)
             total_bal_loss  = total_bal_loss  + b_loss
             total_halt_loss = total_halt_loss + h_loss
             depth_exits_last = depth_exits
             avg_depth_last   = avg_depth
+            expert_idx_last  = block_expert_idx
 
         # [B, 1, d_model] → [B, d_model]
         h = h.squeeze(1)
@@ -483,6 +487,7 @@ class MoREModel(nn.Module):
             total_halt_loss,
             depth_exits_last,
             avg_depth_last,
+            expert_idx_last,
         )
 
 
@@ -650,6 +655,9 @@ def train(cfg: dict, run_epochs: int | None = None):
         epoch_start  = time.perf_counter()
         total_tokens = 0
         depth_hist   = torch.zeros(mc["max_depth"])
+        
+        # Track absolute expert counts across all batches for this entire epoch
+        epoch_expert_counts = torch.zeros(mc["num_experts"], device=device)
 
         for batch_idx, (x, family, depth, target) in enumerate(train_loader):
             x, family, target = (
@@ -664,7 +672,16 @@ def train(cfg: dict, run_epochs: int | None = None):
                 reg_out, cls_out,
                 bal_loss, halt_loss,
                 depth_exits, avg_depth,
+                batch_expert_idx,  # Unpack the new 7th variable here
             ) = model(x)
+
+            # Accumulate the expert assignments directly inside the batch loop
+            if batch_expert_idx is not None:
+                for idx_tensor in batch_expert_idx:
+                    for e in range(mc["num_experts"]):
+                        epoch_expert_counts[e] += (idx_tensor == e).sum().float()
+
+            # ... Keep the rest of the loss computation and backprop code exactly the same ...
 
             # --- Losses -------------------------------------------------
             # 1. Primary regression loss
@@ -710,7 +727,7 @@ def train(cfg: dict, run_epochs: int | None = None):
                     x_v, fam_v, tgt_v = (
                         x_v.to(device), fam_v.to(device), tgt_v.to(device)
                     )
-                    reg_v, cls_v, b_v, h_v, _, _ = model(x_v)
+                    reg_v, cls_v, b_v, h_v, _, _, _ = model(x_v)
                     l_v = F.mse_loss(reg_v.squeeze(-1), tgt_v)
                     val_total += l_v.item() * x_v.shape[0]
                     val_n     += x_v.shape[0]
@@ -724,14 +741,12 @@ def train(cfg: dict, run_epochs: int | None = None):
         depth_total = depth_hist.sum().clamp(min=1.0)
         depth_frac  = (depth_hist / depth_total).tolist()
 
-        # Load entropy from depth_exits (proxy; full per-step calc only in val)
-        # We re-use the last batch's depth_exits for the epoch log
-        if depth_exits is not None:
-            load_counts = depth_exits.sum(dim=1).float()   # tokens per step
-            load_probs  = load_counts / load_counts.sum().clamp(min=1.0)
-            load_entropy = -(load_probs * torch.log(load_probs + 1e-8)).sum().item()
+        # Calculate true Shannon entropy from our accumulated epoch selections
+        if epoch_expert_counts.sum() > 0:
+            true_probs = epoch_expert_counts / epoch_expert_counts.sum().clamp(min=1.0)
+            load_entropy = -(true_probs * torch.log(true_probs + 1e-8)).sum().item()
         else:
-            load_entropy = float("nan")
+            load_entropy = 0.0
 
         # ---- W&B logging -----------------------------------------------
         log_dict = {
