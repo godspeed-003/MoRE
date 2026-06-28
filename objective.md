@@ -1,14 +1,94 @@
-# Target Objective: Fix MoE Routing Collapse in MoRE Architecture
+# Objective: Improve the MoRE Architecture
 
-## Current State Analysis
-- The model successfully converges (validation loss drops beautifully under 0.02).
-- The Mixture of Recursions (MoR) halting framework is fully operational (average recursion depth stabilizes dynamically around 1.5 steps).
-- CRITICAL DEFECT: The `train/expert_load_entropy` has collapsed to 0.0, indicating that a single expert is processing all tokens. The other 6 experts are completely dead.
+The goal of the autoresearch system is NOT to minimize validation loss alone.
 
-## Your Goal Tonight
-Modify `train.py` or `config.json` to maximize `train/expert_load_entropy` toward a target floor of > 1.2, while ensuring that `val/loss` continues to steadily decrease under 0.02.
+The goal is to discover architectural modifications that improve the routing behaviour of Mixture of Recursive Experts while preserving predictive performance.
 
-## Suggested Hypotheses to Test via the 5-Minute Subprocess Loop:
-1. Increase the loss weight of the auxiliary balancing component (`routing_balance` inside `config.json` or the cross-entropy multiplier in `train.py`) to heavily penalize single-expert dominance.
-2. Introduce a localized temperature scaling variable or a small Gaussian noise factor to the router logits during the training phase to actively encourage exploration across all 7 operation channels.
-3. Switch the router's optimization parameters or implement a tiny routing label smoothing factor to prevent early softargmax collapse.
+The baseline architecture has already converged after a full 50-epoch run.
+
+Each automated experiment performs only a 5-epoch proxy evaluation on a deterministic 10% subset of the dataset.
+
+The purpose of this proxy is to determine whether a proposed architectural modification deserves a full training run.
+
+--------------------------------------------------------
+
+PRIMARY OBJECTIVE
+
+Prevent expert collapse.
+
+Target:
+
+expert_entropy > baseline
+
+Never accept routing collapse.
+
+--------------------------------------------------------
+
+SECONDARY OBJECTIVE
+
+Healthy recursion.
+
+Preferred range:
+
+1.5 <= avg_depth <= 3.0
+
+Reject
+
+avg_depth == 1
+
+or
+
+avg_depth == max_depth
+
+--------------------------------------------------------
+
+THIRD OBJECTIVE
+
+Maintain expert diversity.
+
+Minimize
+
+max_pairwise_cosine_similarity
+
+Never allow experts to become identical.
+
+--------------------------------------------------------
+
+FOURTH OBJECTIVE
+
+Increase early convergence speed.
+
+Compare the loss slope across the first five epochs.
+
+A steeper decrease is preferred even if the final loss is not yet optimal.
+
+--------------------------------------------------------
+
+LAST OBJECTIVE
+
+Reduce validation loss.
+
+Validation loss is important but must never be improved by sacrificing routing quality.
+
+--------------------------------------------------------
+
+Allowed modifications
+
+- routing loss weights
+- halting loss
+- dropout
+- router temperature
+- router noise
+- label smoothing
+- routing regularization
+- expert implementation
+- gating implementation
+
+Avoid changing
+
+- dataset
+- evaluation procedure
+- logging
+- metric definitions
+
+Always produce one small modification per iteration.
