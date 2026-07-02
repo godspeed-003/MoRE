@@ -1,0 +1,21 @@
+[Epoch 001/25] task=0.0758  step_route=2.6112  bal=3.5641  halt=0.0638  val=0.0639  route_acc=0.7346  entropy=1.835  cos=0.005  tok/s=311
+[Epoch 002/25] task=0.0658  step_route=2.2991  bal=3.4373  halt=0.0324  val=0.0481  route_acc=0.7086  entropy=1.834  cos=0.004  tok/s=355
+[Epoch 003/25] task=0.0674  step_route=2.0527  bal=6.0100  halt=0.0479  val=0.0689  route_acc=0.6763  entropy=1.730  cos=0.005  tok/s=342
+Traceback (most recent call last):
+  File "C:\Users\Hp\Downloads\MoRE\MoRE-comp\code\train.py", line 1525, in <module>
+    train(cfg, run_epochs=args.epochs)
+  File "C:\Users\Hp\Downloads\MoRE\MoRE-comp\code\train.py", line 1333, in train
+    ) = model(x_v, sm_v, se_v)
+  File "C:\Users\Hp\anaconda3\envs\more_env\lib\site-packages\torch\nn\modules\module.py", line 1736, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "C:\Users\Hp\anaconda3\envs\more_env\lib\site-packages\torch\nn\modules\module.py", line 1747, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "C:\Users\Hp\Downloads\MoRE\MoRE-comp\code\train.py", line 749, in forward
+    ) = block(h, step_mask, step_experts)
+  File "C:\Users\Hp\anaconda3\envs\more_env\lib\site-packages\torch\nn\modules\module.py", line 1736, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "C:\Users\Hp\anaconda3\envs\more_env\lib\site-packages\torch\nn\modules\module.py", line 1747, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "C:\Users\Hp\Downloads\MoRE\MoRE-comp\code\train.py", line 590, in forward
+    if emask.any():
+KeyboardInterrupt

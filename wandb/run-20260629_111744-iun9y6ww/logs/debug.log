@@ -1,0 +1,25 @@
+2026-06-29 11:17:44,398 INFO    MainThread:9092 [wandb_setup.py:_flush():81] Current SDK version is 0.28.0
+2026-06-29 11:17:44,398 INFO    MainThread:9092 [wandb_setup.py:_flush():81] Configure stats pid to 9092
+2026-06-29 11:17:44,398 INFO    MainThread:9092 [wandb_setup.py:_flush():81] Loading settings from environment variables
+2026-06-29 11:17:44,398 INFO    MainThread:9092 [wandb_init.py:setup_run_log_directory():725] Logging user logs to C:\Users\Hp\Desktop\MoRE\wandb\run-20260629_111744-iun9y6ww\logs\debug.log
+2026-06-29 11:17:44,398 INFO    MainThread:9092 [wandb_init.py:setup_run_log_directory():726] Logging internal logs to C:\Users\Hp\Desktop\MoRE\wandb\run-20260629_111744-iun9y6ww\logs\debug-internal.log
+2026-06-29 11:17:44,412 INFO    MainThread:9092 [wandb_init.py:init():768] calling init triggers
+2026-06-29 11:17:44,412 INFO    MainThread:9092 [wandb_init.py:init():773] wandb.init called with sweep_config: {}
+config: {'d_model': 256, 'num_experts': 7, 'max_depth': 7, 'num_blocks': 2, 'dropout': 0.1, 'lr': 0.001, 'weight_decay': 0.0001, 'batch_size': 128, 'seq_len': 64, 'epochs': 1, 'val_split': 0.1, 'grad_clip': 1.0, 'subset_fraction': 1.0, 'subset_seed': 42, 'task': 1.0, 'routing_balance': 0.1, 'halting': 0.001, 'train_path': 'C:\\Users\\Hp\\Desktop\\MoRE\\data\\train.jsonl', 'val_path': 'C:\\Users\\Hp\\Desktop\\MoRE\\data\\val.jsonl', 'test_path': 'C:\\Users\\Hp\\Desktop\\MoRE\\data\\test.jsonl', 'max_val': 1000000, 'pad_value': 0.0, 'jsonl_path': 'C:\\Users\\Hp\\Desktop\\MoRE\\data\\train.jsonl', '_wandb': {}}
+2026-06-29 11:17:44,413 INFO    MainThread:9092 [wandb_init.py:init():816] starting backend
+2026-06-29 11:17:44,413 INFO    MainThread:9092 [wandb_init.py:init():831] sending inform_init request
+2026-06-29 11:17:47,071 INFO    MainThread:9092 [wandb_init.py:init():836] backend started and connected
+2026-06-29 11:17:47,138 INFO    MainThread:9092 [wandb_init.py:init():906] updated telemetry
+2026-06-29 11:17:47,207 INFO    MainThread:9092 [wandb_init.py:init():929] communicating run to backend with 90.0 second timeout
+2026-06-29 11:17:47,863 INFO    MainThread:9092 [wandb_init.py:init():974] starting run threads in backend
+2026-06-29 11:17:47,982 INFO    MainThread:9092 [wandb_run.py:_console_start():2523] atexit reg
+2026-06-29 11:17:47,982 INFO    MainThread:9092 [wandb_run.py:_redirect():2373] redirect: wrap_raw
+2026-06-29 11:17:47,983 INFO    MainThread:9092 [wandb_run.py:_redirect():2442] Wrapping output streams.
+2026-06-29 11:17:47,983 INFO    MainThread:9092 [wandb_run.py:_redirect():2465] Redirects installed.
+2026-06-29 11:17:47,990 INFO    MainThread:9092 [wandb_init.py:init():1012] run started, returning control to user process
+2026-06-29 11:17:47,993 INFO    MainThread:9092 [wandb_watch.py:_watch():69] Watching
+2026-06-29 11:20:37,130 INFO    MainThread:9092 [wandb_run.py:_finish():2285] finishing run vedantkorade-mumbai-university/micro-MoRE-fastsearch/iun9y6ww
+2026-06-29 11:20:37,131 INFO    MainThread:9092 [wandb_run.py:_atexit_cleanup():2490] got exitcode: 0
+2026-06-29 11:20:37,132 INFO    MainThread:9092 [wandb_run.py:_restore():2472] restore
+2026-06-29 11:20:37,132 INFO    MainThread:9092 [wandb_run.py:_restore():2478] restore done
+2026-06-29 11:20:41,362 INFO    MainThread:9092 [wandb_run.py:_footer_sync_info():3895] logging synced files

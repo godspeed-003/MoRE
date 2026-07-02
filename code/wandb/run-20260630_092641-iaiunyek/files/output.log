@@ -1,0 +1,9 @@
+[Epoch 001/10] task=0.0529  bal=42.8853  halt=0.1838  val=0.0405  entropy=1.799  cos=0.024  tok/s=434
+[Epoch 002/10] task=0.0410  bal=41.8502  halt=0.1941  val=0.0353  entropy=1.793  cos=0.048  tok/s=462
+[Epoch 003/10] task=0.0361  bal=41.6238  halt=0.2308  val=0.0293  entropy=1.794  cos=0.076  tok/s=418
+[Epoch 004/10] task=0.0304  bal=41.5567  halt=0.2493  val=0.0444  entropy=1.793  cos=0.093  tok/s=444
+[Epoch 005/10] task=0.0278  bal=41.5143  halt=0.2372  val=0.0236  entropy=1.792  cos=0.107  tok/s=417
+[Epoch 006/10] task=0.0233  bal=41.5242  halt=0.2364  val=0.0261  entropy=1.787  cos=0.118  tok/s=418
+[Epoch 007/10] task=0.0220  bal=41.4773  halt=0.2294  val=0.0189  entropy=1.791  cos=0.125  tok/s=422
+[Epoch 008/10] task=0.0174  bal=41.4774  halt=0.2247  val=0.0171  entropy=1.788  cos=0.129  tok/s=401
+[Epoch 009/10] task=0.0155  bal=41.4648  halt=0.2034  val=0.0159  entropy=1.788  cos=0.130  tok/s=386

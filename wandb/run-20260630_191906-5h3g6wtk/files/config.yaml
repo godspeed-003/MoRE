@@ -1,0 +1,107 @@
+_wandb:
+    value:
+        cli_version: 0.28.0
+        e:
+            689anl9ki8yc6t6l7uv9hz89aq5sod60:
+                args:
+                    - --config
+                    - code/fast_config.json
+                    - --epochs
+                    - "5"
+                codePath: code\train.py
+                codePathLocal: code\train.py
+                cpu_count: 8
+                cpu_count_logical: 16
+                cudaVersion: "13.1"
+                disk:
+                    /:
+                        total: "1023178436608"
+                        used: "208221093888"
+                email: vedantkorade@gmail.com
+                executable: C:\Users\Hp\anaconda3\envs\more_env\python.exe
+                git:
+                    commit: 944d26a6bd86ab6bee74b4b9282e7cd86d296d91
+                    remote: https://github.com/godspeed-003/MoRE.git
+                gpu: NVIDIA GeForce RTX 4060 Laptop GPU
+                gpu_count: 1
+                gpu_nvidia:
+                    - architecture: Ada
+                      cudaCores: 3072
+                      memoryTotal: "8585740288"
+                      name: NVIDIA GeForce RTX 4060 Laptop GPU
+                      uuid: GPU-f81c61b6-642b-7b9d-a910-34276d11e719
+                host: DESKTOP-1OH84V8
+                memory:
+                    total: "16415322112"
+                os: Windows-10-10.0.26200-SP0
+                program: C:\Users\Hp\Desktop\MoRE\code\train.py
+                python: CPython 3.10.20
+                root: C:\Users\Hp\Desktop\MoRE
+                startedAt: "2026-06-30T13:49:06.172012Z"
+                writerId: 689anl9ki8yc6t6l7uv9hz89aq5sod60
+        m: []
+        python_version: 3.10.20
+        t:
+            "1":
+                - 1
+            "2":
+                - 1
+            "3":
+                - 1
+                - 2
+                - 16
+                - 61
+            "4": 3.10.20
+            "5": 0.28.0
+            "8":
+                - 3
+            "10":
+                - 20
+            "12": 0.28.0
+            "13": windows-amd64
+batch_size:
+    value: 128
+d_model:
+    value: 256
+dropout:
+    value: 0.1
+epochs:
+    value: 5
+grad_clip:
+    value: 1
+halting:
+    value: 0.001
+jsonl_path:
+    value: C:\Users\Hp\Desktop\MoRE\data\train.jsonl
+lr:
+    value: 0.001
+max_depth:
+    value: 7
+max_val:
+    value: 1000000
+num_blocks:
+    value: 2
+num_experts:
+    value: 7
+pad_value:
+    value: 0
+routing_balance:
+    value: 0.05
+seq_len:
+    value: 64
+subset_fraction:
+    value: 0.1
+subset_seed:
+    value: 42
+task:
+    value: 1
+test_path:
+    value: C:\Users\Hp\Desktop\MoRE\data\test.jsonl
+train_path:
+    value: C:\Users\Hp\Desktop\MoRE\data\train.jsonl
+val_path:
+    value: C:\Users\Hp\Desktop\MoRE\data\val.jsonl
+val_split:
+    value: 0.1
+weight_decay:
+    value: 0.0001

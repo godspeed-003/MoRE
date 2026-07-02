@@ -1,0 +1,7 @@
+[Epoch 001/5] task=0.0393  bal=0.3876  halt=0.2674  val=0.0267  entropy=0.038  cos=0.005  tok/s=1065
+[Epoch 002/5] task=0.0254  bal=0.0080  halt=0.2735  val=0.0217  entropy=-0.000  cos=0.005  tok/s=1085
+[Epoch 003/5] task=0.0211  bal=0.0043  halt=0.2646  val=0.0199  entropy=-0.000  cos=0.005  tok/s=1059
+[Epoch 004/5] task=0.0183  bal=0.0038  halt=0.3196  val=0.0167  entropy=-0.000  cos=0.005  tok/s=1042
+[Epoch 005/5] task=0.0175  bal=0.0038  halt=0.3277  val=0.0161  entropy=-0.000  cos=0.005  tok/s=1090
+
+[Train] Complete. Best val_loss = 0.016081

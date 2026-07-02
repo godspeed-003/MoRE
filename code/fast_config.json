@@ -3,23 +3,25 @@
     "d_model": 256,
     "num_experts": 7,
     "max_depth": 7,
+    "max_steps": 7,
+    "step_feat_dim": 12,
     "num_blocks": 2,
     "dropout": 0.1
   },
   "training": {
-    "lr": 0.003,
+    "lr": 0.001,
     "weight_decay": 0.0001,
     "batch_size": 128,
-    "seq_len": 64,
     "epochs": 5,
     "val_split": 0.1,
     "grad_clip": 1.0,
-    "subset_fraction": 0.10,
+    "subset_fraction": 0.1,
     "subset_seed": 42
   },
   "loss_weights": {
     "task": 1.0,
-    "routing_balance": 0.01,
+    "routing_balance": 0.05,
+    "step_routing": 0.5,
     "halting": 0.001
   },
   "data": {

@@ -400,12 +400,14 @@ def check_dummy_pass():
             f.write(json.dumps(r) + "\n")
     results.record("Synthetic JSONL dataset created", True, f"{len(records)} records")
 
-    # --- Write a tiny config for 2 epochs -------------------------------
+    # --- Write a tiny config for 2 epochs (v2 — per-step tokenisation) ----
     dummy_cfg = {
         "model": {
             "d_model": 64,
             "num_experts": 7,
             "max_depth": 3,
+            "max_steps": 7,          # number of step-tokens per program
+            "step_feat_dim": 12,     # features per step-token row
             "num_blocks": 1,
             "dropout": 0.0,
         },
@@ -413,7 +415,6 @@ def check_dummy_pass():
             "lr": 1e-3,
             "weight_decay": 1e-4,
             "batch_size": 8,
-            "seq_len": 16,
             "epochs": 2,
             "val_split": 0.2,
             "grad_clip": 1.0,
@@ -422,6 +423,7 @@ def check_dummy_pass():
             "task": 1.0,
             "routing_balance": 0.01,
             "halting": 0.001,
+            "step_routing": 0.5,     # per-step oracle CE loss weight
         },
         "data": {
             "jsonl_path": "dummy.jsonl",
