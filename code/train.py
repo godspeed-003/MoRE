@@ -379,7 +379,7 @@ class MoEBlock(nn.Module):
         # at 0.1 and can grow or shrink. Applied only during training so that
         # inference is deterministic. Breaks early argmax lock-in without
         # changing the Top-1 hard-routing design.
-        self.router_noise_scale = nn.Parameter(torch.ones(1) * 0.1)
+        self.router_noise_scale = nn.Parameter(torch.tensor(0.1))
 
     def forward(self, x: torch.Tensor):
         """
@@ -401,11 +401,8 @@ class MoEBlock(nn.Module):
         router_probs = F.softmax(router_logits, dim=-1)         # [N, E]
         expert_idx   = torch.argmax(router_probs, dim=-1)       # [N]
 
-        out = torch.zeros_like(x)
-        for i, expert in enumerate(self.experts):
-            mask = (expert_idx == i)
-            if mask.any():
-                out[mask] = expert(x[mask])
+        expert_outputs = torch.stack([expert(x) for expert in self.experts], dim=1)
+        out = (router_probs.unsqueeze(-1) * expert_outputs).sum(dim=1)
 
         # --- Two-term balance loss -------------------------------------------
         # Term 1 – Soft entropy: gradient always present via softmax, but blind
@@ -428,11 +425,7 @@ class MoEBlock(nn.Module):
         load       = load / load.sum().clamp(min=1.0)                    # [E]
         switch_aux = self.num_experts * (load.detach() * avg_probs).sum()
 
-        # Sign fix: entropy_term - switch_aux
-        # When subtracted from total_loss this becomes:
-        #   -entropy_term (maximise, want uniform soft probs) ✓
-        #   +switch_aux   (minimise, penalise hard collapse)  ✓
-        balance_loss = entropy_term - switch_aux
+        balance_loss = -entropy_term + switch_aux
 
         # Return router_logits (pre-softmax, after noise) so callers can
         # apply oracle CE directly on the router — much shorter gradient path
@@ -471,11 +464,13 @@ class MoREWrapper(nn.Module):
         max_depth: int = 7,
         num_experts: int = 7,
         dropout: float = 0.1,
+        fixed_depth: bool = False,
     ):
         super().__init__()
         self.max_depth   = max_depth
         self.num_experts = num_experts
         self.d_model     = d_model
+        self.fixed_depth = fixed_depth
 
         self.moe_block = MoEBlock(num_experts, d_model, dropout)
 
@@ -574,7 +569,7 @@ class MoREWrapper(nn.Module):
             # MoREWrapper depth loop via step_cls_head.
             if flat_experts is not None:
                 active_oracle = flat_experts[active_positions]    # [N_active]
-                valid_oracle  = active_oracle >= 0
+                valid_oracle  = (active_oracle >= 0) & (active_oracle < self.num_experts)
                 if valid_oracle.any():
                     oracle_routing_ce = oracle_routing_ce + F.cross_entropy(
                         router_logits[valid_oracle], active_oracle[valid_oracle]
@@ -592,10 +587,13 @@ class MoREWrapper(nn.Module):
             halt_probs = torch.sigmoid(halt_logits)                 # [N_active]
 
             # Force exit at the last allowed depth
-            if depth == self.max_depth:
-                stop_local = torch.ones(N_active, dtype=torch.bool, device=x.device)
+            if self.fixed_depth:
+                stop_local = torch.zeros(N_active, dtype=torch.bool, device=x.device) if depth < self.max_depth else torch.ones(N_active, dtype=torch.bool, device=x.device)
             else:
-                stop_local = halt_probs > 0.5                        # [N_active]
+                if depth == self.max_depth:
+                    stop_local = torch.ones(N_active, dtype=torch.bool, device=x.device)
+                else:
+                    stop_local = halt_probs > 0.5                        # [N_active]
 
             # ---- 5. Lock in exiting tokens ----------------------------
             stop_global = active_positions[stop_local]               # indices in [N]
@@ -668,6 +666,7 @@ class MoREModel(nn.Module):
         max_depth: int = 7,
         num_blocks: int = 2,
         dropout: float = 0.1,
+        fixed_depth: bool = False,
     ):
         super().__init__()
         self.d_model     = d_model
@@ -683,7 +682,7 @@ class MoREModel(nn.Module):
 
         # Stack of MoRE blocks
         self.blocks = nn.ModuleList([
-            MoREWrapper(d_model, max_depth, num_experts, dropout)
+            MoREWrapper(d_model, max_depth, num_experts, dropout, fixed_depth)
             for _ in range(num_blocks)
         ])
 
@@ -696,12 +695,12 @@ class MoREModel(nn.Module):
         )
 
         # Whole-program auxiliary classification head (whole-program family)
-        self.cls_head = nn.Linear(d_model, num_experts)
+        self.cls_head = nn.Linear(d_model, 7)
 
         # Per-token step classification head — applied per-step token BEFORE
         # pooling.  Supervised by per-step oracle labels (step_routing_ce loss).
         # This teaches the router: ADD token → Expert 0, MULT → Expert 1, etc.
-        self.step_cls_head = nn.Linear(d_model, num_experts)
+        self.step_cls_head = nn.Linear(d_model, 7)
 
     def forward(
         self,
@@ -1168,6 +1167,7 @@ def train(cfg: dict, run_epochs: int | None = None):
         max_depth=mc["max_depth"],
         num_blocks=mc["num_blocks"],
         dropout=mc["dropout"],
+        fixed_depth=mc.get("fixed_depth", False),
     ).to(device)
 
     total_params = sum(p.numel() for p in model.parameters())
@@ -1184,6 +1184,7 @@ def train(cfg: dict, run_epochs: int | None = None):
     # ---- W&B -----------------------------------------------------------
     wandb.init(
         project=log["wandb_project"],
+        name=log.get("run_name"),
         config={**mc, **tc, **lw, **dc},
         reinit=True,
     )
@@ -1263,15 +1264,15 @@ def train(cfg: dict, run_epochs: int | None = None):
             #    (b) step_cls CE on step_cls_head(h): longer path but helps separate
             #        representations so the router's linear classifier is feasible.
             valid_mask   = step_experts.reshape(-1) >= 0                # [B*S]
-            step_logits  = step_cls_out.reshape(-1, mc["num_experts"])[valid_mask]
+            step_logits  = step_cls_out.reshape(-1, 7)[valid_mask]
             step_targets = step_experts.reshape(-1)[valid_mask]
             step_cls_loss = (
                 F.cross_entropy(step_logits, step_targets)
                 if step_logits.shape[0] > 0
                 else torch.tensor(0.0, device=device)
             )
-            # Blend: oracle CE (0.7) is primary; step_cls CE (0.3) is secondary
-            step_routing_loss = 0.7 * oracle_routing_ce + 0.3 * step_cls_loss
+            # Blend: oracle CE (0.01) is secondary; step_cls CE (0.3) is primary
+            step_routing_loss = 0.01 * oracle_routing_ce + 0.3 * step_cls_loss
 
             # 4. Routing balance + halting (halt weight linearly warmed up)
             current_step += 1
@@ -1279,14 +1280,20 @@ def train(cfg: dict, run_epochs: int | None = None):
                 target_halt_weight,
                 target_halt_weight * (current_step / warmup_steps)
             )
+            noise_reg_loss = 0.001 * sum((block.moe_block.router_noise_scale ** 2) for block in model.blocks)
             total_loss = (
                 lw["task"]              * (task_loss + 0.5 * cls_loss)
                 + lw["step_routing"]   * step_routing_loss    # per-step oracle CE (direct)
-                - lw["routing_balance"] * bal_loss            # maximise entropy, minimise collapse
+                + lw["routing_balance"] * bal_loss            # maximise entropy, minimise collapse
                 + current_halt_weight   * halt_loss           # encourage early exit
+                + noise_reg_loss
             )
 
             total_loss.backward()
+            router_grad = model.blocks[0].moe_block.router.weight.grad
+            if batch_idx == 0:
+                noise_scales = [f"{b.moe_block.router_noise_scale.item():.4f}" for b in model.blocks]
+                print(f"[Epoch {epoch:03d} Batch 0] Router grad norm: {router_grad.norm().item():.6f} | Noise scales: {noise_scales}")
             nn.utils.clip_grad_norm_(model.parameters(), grad_clip)
             optimizer.step()
 
@@ -1314,12 +1321,12 @@ def train(cfg: dict, run_epochs: int | None = None):
             val_total = 0.0
             val_n     = 0
             confusion = torch.zeros(
-                mc["num_experts"], mc["num_experts"], dtype=torch.float64
+                7, 7, dtype=torch.float64
             )
             op_depth_sum   = torch.zeros(NUM_OP_TYPES, dtype=torch.float64)
             op_depth_count = torch.zeros(NUM_OP_TYPES, dtype=torch.float64)
-            family_depth_sum   = torch.zeros(mc["num_experts"], dtype=torch.float64)
-            family_depth_count = torch.zeros(mc["num_experts"], dtype=torch.float64)
+            family_depth_sum   = torch.zeros(7, dtype=torch.float64)
+            family_depth_count = torch.zeros(7, dtype=torch.float64)
 
             with torch.no_grad():
                 for x_v, sm_v, se_v, so_v, fam_v, _, tgt_v in val_loader:
@@ -1500,6 +1507,24 @@ def train(cfg: dict, run_epochs: int | None = None):
             )
 
     print(f"\n[Train] Complete. Best val_loss = {best_val_loss:.6f}")
+    
+    # Save final run metrics to a JSON file for automated analysis
+    final_metrics_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "final_run_metrics.json")
+    try:
+        serializable_log = {}
+        for k, v in log_dict.items():
+            if hasattr(v, "item"):
+                serializable_log[k] = v.item()
+            elif isinstance(v, (int, float, str, bool, list, dict)):
+                serializable_log[k] = v
+            else:
+                serializable_log[k] = str(v)
+        serializable_log["best_val_loss"] = best_val_loss
+        with open(final_metrics_path, "w") as f:
+            json.dump(serializable_log, f, indent=2)
+    except Exception as e:
+        print(f"[WARN] Failed to write final_run_metrics.json: {e}")
+
     wandb.finish()
     return best_val_loss
 
@@ -1518,10 +1543,23 @@ if __name__ == "__main__":
         "--epochs", type=int, default=None,
         help="Override epochs from config (used for diagnostic runs)"
     )
+    parser.add_argument("--blocks", type=int, default=None)
+    parser.add_argument("--batch_size", type=int, default=None)
+    parser.add_argument("--seed", type=int, default=None)
+    parser.add_argument("--run_name", type=str, default=None)
     args = parser.parse_args()
 
     try:
         cfg = load_config(args.config)
+        if args.blocks is not None:
+            cfg["model"]["num_blocks"] = args.blocks
+        if args.batch_size is not None:
+            cfg["training"]["batch_size"] = args.batch_size
+        if args.seed is not None:
+            cfg["training"]["subset_seed"] = args.seed
+            cfg["data"]["subset_seed"] = args.seed
+        if args.run_name is not None:
+            cfg["logging"]["run_name"] = args.run_name
         train(cfg, run_epochs=args.epochs)
     except Exception as e:
         print(f"\n[FATAL] Training failed: {e}", file=sys.stderr)

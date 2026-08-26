@@ -1,0 +1,13 @@
+[Epoch 001 Batch 0] Router grad norm: 0.691574 | Noise scales: ['0.1000']
+[Epoch 001/5] task=0.1588  step_route=0.1233  bal=-0.9043  halt=0.0000  val=0.0159  route_acc=0.1642  entropy=1.912  cos=0.009  tok/s=7354
+[Epoch 002 Batch 0] Router grad norm: 0.164730 | Noise scales: ['0.0395']
+[Epoch 002/5] task=0.0141  step_route=0.0260  bal=-0.9528  halt=0.0000  val=0.0124  route_acc=0.1691  entropy=1.923  cos=0.011  tok/s=7594
+[Epoch 003 Batch 0] Router grad norm: 0.244980 | Noise scales: ['0.0145']
+wandb: WARNING Artifact "run-usvqn64d-paperop_avg_recursion_depth_table-JMCp2g" already exists with the same content. No new version will be created.
+[Epoch 003/5] task=0.0111  step_route=0.0232  bal=-0.9525  halt=0.0000  val=0.0094  route_acc=0.1654  entropy=1.929  cos=0.013  tok/s=7795
+[Epoch 004 Batch 0] Router grad norm: 0.115245 | Noise scales: ['0.0061']
+[Epoch 004/5] task=0.0090  step_route=0.0215  bal=-0.9574  halt=0.0000  val=0.0079  route_acc=0.1785  entropy=1.929  cos=0.014  tok/s=8037
+[Epoch 005 Batch 0] Router grad norm: 0.184085 | Noise scales: ['0.0062']
+[Epoch 005/5] task=0.0073  step_route=0.0208  bal=-0.9579  halt=0.0000  val=0.0069  route_acc=0.3327  entropy=1.930  cos=0.014  tok/s=7957
+
+[Train] Complete. Best val_loss = 0.006884

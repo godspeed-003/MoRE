@@ -1,0 +1,21 @@
+{"time":"2026-08-23T17:49:09.8234577+05:30","level":"INFO","msg":"wandb-core"}
+{"time":"2026-08-23T17:49:09.8239973+05:30","level":"INFO","msg":"stream: starting","core version":"0.28.0"}
+{"time":"2026-08-23T17:49:10.4147573+05:30","level":"INFO","msg":"stream: created new stream","id":"w15x3bgp"}
+{"time":"2026-08-23T17:49:10.4147573+05:30","level":"INFO","msg":"handler: started"}
+{"time":"2026-08-23T17:49:10.4170253+05:30","level":"INFO","msg":"stream: started"}
+{"time":"2026-08-23T17:49:10.4170253+05:30","level":"INFO","msg":"sender: started"}
+{"time":"2026-08-23T17:49:10.4170253+05:30","level":"INFO","msg":"writer: started","stream_id":"w15x3bgp"}
+{"time":"2026-08-23T17:49:12.6833196+05:30","level":"INFO","msg":"filestream: sending request","total_files":1,"console_offset":0,"console_lines":1}
+{"time":"2026-08-23T17:49:13.2537636+05:30","level":"INFO","msg":"filestream: request sent","status":"200 OK"}
+{"time":"2026-08-23T17:49:27.6828566+05:30","level":"INFO","msg":"filestream: sending request","total_files":4,"history_offset":0,"history_lines":1,"events_offset":0,"events_lines":2,"console_offset":0,"console_lines":3,"uploaded_len":6}
+{"time":"2026-08-23T17:49:28.7724383+05:30","level":"INFO","msg":"filestream: request sent","status":"200 OK"}
+{"time":"2026-08-23T17:49:42.6890724+05:30","level":"INFO","msg":"filestream: sending request","total_files":4,"history_offset":1,"history_lines":2,"events_offset":2,"events_lines":2,"console_offset":3,"console_lines":5,"uploaded_len":8}
+{"time":"2026-08-23T17:49:43.3154468+05:30","level":"INFO","msg":"filestream: request sent","status":"200 OK"}
+{"time":"2026-08-23T17:49:52.9369533+05:30","level":"INFO","msg":"fileTransfer: Close: file transfer manager closed"}
+{"time":"2026-08-23T17:49:52.9423841+05:30","level":"INFO","msg":"filestream: sending request","total_files":3,"history_offset":3,"history_lines":3,"console_offset":8,"console_lines":5,"uploaded_len":11,"complete":true,"exit_code":0}
+{"time":"2026-08-23T17:49:54.0350075+05:30","level":"INFO","msg":"filestream: request sent","status":"200 OK"}
+{"time":"2026-08-23T17:49:54.0378452+05:30","level":"INFO","msg":"handler: operation stats","stats":{}}
+{"time":"2026-08-23T17:49:54.0478359+05:30","level":"INFO","msg":"stream: finishing up"}
+{"time":"2026-08-23T17:49:54.0483453+05:30","level":"INFO","msg":"handler: closed"}
+{"time":"2026-08-23T17:49:54.0489967+05:30","level":"INFO","msg":"sender: closed"}
+{"time":"2026-08-23T17:49:54.0489967+05:30","level":"INFO","msg":"stream: all finished"}

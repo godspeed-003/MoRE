@@ -1,0 +1,27 @@
+
+[FATAL] Training failed: CUDA error: device-side assert triggered
+CUDA kernel errors might be asynchronously reported at some other API call, so the stacktrace below might be incorrect.
+For debugging consider passing CUDA_LAUNCH_BLOCKING=1
+Compile with `TORCH_USE_CUDA_DSA` to enable device-side assertions.
+
+Traceback (most recent call last):
+  File "c:\Users\Hp\Desktop\Waste\MoRE\code\train.py", line 1545, in <module>
+    train(cfg, run_epochs=args.epochs)
+  File "c:\Users\Hp\Desktop\Waste\MoRE\code\train.py", line 1243, in train
+    ) = model(x, step_mask, step_experts)
+  File "C:\Users\Hp\anaconda3\envs\more_env\lib\site-packages\torch\nn\modules\module.py", line 1736, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "C:\Users\Hp\anaconda3\envs\more_env\lib\site-packages\torch\nn\modules\module.py", line 1747, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "c:\Users\Hp\Desktop\Waste\MoRE\code\train.py", line 748, in forward
+    ) = block(h, step_mask, step_experts)
+  File "C:\Users\Hp\anaconda3\envs\more_env\lib\site-packages\torch\nn\modules\module.py", line 1736, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "C:\Users\Hp\anaconda3\envs\more_env\lib\site-packages\torch\nn\modules\module.py", line 1747, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "c:\Users\Hp\Desktop\Waste\MoRE\code\train.py", line 585, in forward
+    if emask.any():
+RuntimeError: CUDA error: device-side assert triggered
+CUDA kernel errors might be asynchronously reported at some other API call, so the stacktrace below might be incorrect.
+For debugging consider passing CUDA_LAUNCH_BLOCKING=1
+Compile with `TORCH_USE_CUDA_DSA` to enable device-side assertions.

@@ -1,0 +1,44 @@
+{
+  "os": "Windows-10-10.0.26200-SP0",
+  "python": "CPython 3.10.20",
+  "startedAt": "2026-08-25T08:49:36.694449Z",
+  "args": [
+    "--config",
+    "c:\\Users\\Hp\\Desktop\\Waste\\MoRE\\code\\config_moe_50e.json"
+  ],
+  "program": "c:\\Users\\Hp\\Desktop\\Waste\\MoRE\\code\\train.py",
+  "codePath": "code\\train.py",
+  "codePathLocal": "train.py",
+  "git": {
+    "remote": "https://github.com/godspeed-003/MoRE.git",
+    "commit": "2642a92fb513be2ee0ee40e01f900f355eb6064a"
+  },
+  "email": "rshisode607@gmail.com",
+  "root": "c:\\Users\\Hp\\Desktop\\Waste\\MoRE\\code",
+  "host": "OMEN-AYAN",
+  "executable": "C:\\Users\\Hp\\anaconda3\\envs\\more_env\\python.exe",
+  "cpu_count": 8,
+  "cpu_count_logical": 16,
+  "gpu": "NVIDIA GeForce RTX 4060 Laptop GPU",
+  "gpu_count": 1,
+  "disk": {
+    "/": {
+      "total": "1023093501952",
+      "used": "291873456128"
+    }
+  },
+  "memory": {
+    "total": "16415322112"
+  },
+  "gpu_nvidia": [
+    {
+      "name": "NVIDIA GeForce RTX 4060 Laptop GPU",
+      "memoryTotal": "8585740288",
+      "cudaCores": 3072,
+      "architecture": "Ada",
+      "uuid": "GPU-f81c61b6-642b-7b9d-a910-34276d11e719"
+    }
+  ],
+  "cudaVersion": "13.1",
+  "writerId": "uin9mayh5bgw7wq2fu2a21uh81o3zdf1"
+}

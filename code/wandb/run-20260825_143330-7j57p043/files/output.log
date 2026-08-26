@@ -1,0 +1,112 @@
+[Epoch 001 Batch 0] Router grad norm: 3.597450 | Noise scales: ['0.1000']
+[Epoch 001/50] task=0.0652  step_route=0.6874  bal=-3.8310  halt=0.1078  val=0.0250  route_acc=0.0448  entropy=1.928  cos=0.006  tok/s=5332
+[Epoch 002 Batch 0] Router grad norm: 0.149365 | Noise scales: ['0.0628']
+[Epoch 002/50] task=0.0164  step_route=0.6988  bal=-4.7669  halt=0.1078  val=0.0164  route_acc=0.0462  entropy=1.933  cos=0.007  tok/s=5822
+[Epoch 003 Batch 0] Router grad norm: 0.346536 | Noise scales: ['0.0384']
+[34m[1mwandb[0m: [33mWARNING[0m Artifact "run-7j57p043-paperop_avg_recursion_depth_table-9JJPyg" already exists with the same content. No new version will be created.
+[Epoch 003/50] task=0.0139  step_route=0.7122  bal=-4.7532  halt=0.1078  val=0.0116  route_acc=0.0339  entropy=1.934  cos=0.008  tok/s=5818
+[Epoch 004 Batch 0] Router grad norm: 0.114534 | Noise scales: ['0.0247']
+[Epoch 004/50] task=0.0119  step_route=0.7207  bal=-4.7669  halt=0.1078  val=0.0097  route_acc=0.0359  entropy=1.935  cos=0.009  tok/s=5860
+[Epoch 005 Batch 0] Router grad norm: 0.189992 | Noise scales: ['0.0139']
+[Epoch 005/50] task=0.0105  step_route=0.7246  bal=-4.7312  halt=0.1078  val=0.0117  route_acc=0.0424  entropy=1.935  cos=0.011  tok/s=5970
+[Epoch 006 Batch 0] Router grad norm: 0.355599 | Noise scales: ['0.0043']
+[Epoch 006/50] task=0.0089  step_route=0.7248  bal=-4.7691  halt=0.1078  val=0.0082  route_acc=0.0435  entropy=1.933  cos=0.011  tok/s=5680
+[Epoch 007 Batch 0] Router grad norm: 0.207277 | Noise scales: ['-0.0022']
+[Epoch 007/50] task=0.0092  step_route=0.7208  bal=-4.7512  halt=0.1078  val=0.0353  route_acc=0.0314  entropy=1.930  cos=0.014  tok/s=6022
+[Epoch 008 Batch 0] Router grad norm: 6.251727 | Noise scales: ['0.0043']
+[34m[1mwandb[0m: [33mWARNING[0m Artifact "run-7j57p043-paperop_avg_recursion_depth_table-9JJPyg" already exists with the same content. No new version will be created.
+[Epoch 008/50] task=0.0214  step_route=0.7482  bal=-4.4557  halt=0.1078  val=0.0165  route_acc=0.0393  entropy=1.936  cos=0.026  tok/s=5864
+[Epoch 009 Batch 0] Router grad norm: 0.282748 | Noise scales: ['-0.0083']
+[Epoch 009/50] task=0.0108  step_route=0.7212  bal=-4.7825  halt=0.1078  val=0.0090  route_acc=0.0378  entropy=1.937  cos=0.028  tok/s=5796
+[Epoch 010 Batch 0] Router grad norm: 0.175452 | Noise scales: ['-0.0032']
+[Epoch 010/50] task=0.0079  step_route=0.7246  bal=-4.8065  halt=0.1078  val=0.0080  route_acc=0.0332  entropy=1.933  cos=0.028  tok/s=5778
+[Epoch 011 Batch 0] Router grad norm: 0.119626 | Noise scales: ['-0.0055']
+[Epoch 011/50] task=0.0072  step_route=0.7267  bal=-4.8073  halt=0.1078  val=0.0074  route_acc=0.0336  entropy=1.932  cos=0.028  tok/s=5849
+[Epoch 012 Batch 0] Router grad norm: 0.090672 | Noise scales: ['-0.0075']
+[Epoch 012/50] task=0.0067  step_route=0.7217  bal=-4.8004  halt=0.1078  val=0.0068  route_acc=0.0450  entropy=1.932  cos=0.028  tok/s=5639
+[Epoch 013 Batch 0] Router grad norm: 0.197264 | Noise scales: ['0.0005']
+[34m[1mwandb[0m: [33mWARNING[0m Artifact "run-7j57p043-paperop_avg_recursion_depth_table-9JJPyg" already exists with the same content. No new version will be created.
+[Epoch 013/50] task=0.0055  step_route=0.7236  bal=-4.8000  halt=0.1077  val=0.0047  route_acc=0.0355  entropy=1.932  cos=0.029  tok/s=5797
+[Epoch 014 Batch 0] Router grad norm: 0.154578 | Noise scales: ['-0.0004']
+[Epoch 014/50] task=0.0050  step_route=0.7248  bal=-4.8019  halt=0.1078  val=0.0045  route_acc=0.0374  entropy=1.929  cos=0.029  tok/s=5913
+[Epoch 015 Batch 0] Router grad norm: 0.210046 | Noise scales: ['0.0013']
+[Epoch 015/50] task=0.0042  step_route=0.7282  bal=-4.8115  halt=0.1078  val=0.0045  route_acc=0.0395  entropy=1.928  cos=0.029  tok/s=5802
+[Epoch 016 Batch 0] Router grad norm: 0.253282 | Noise scales: ['0.0032']
+[Epoch 016/50] task=0.0042  step_route=0.7303  bal=-4.8076  halt=0.1078  val=0.0040  route_acc=0.0379  entropy=1.928  cos=0.030  tok/s=5626
+[Epoch 017 Batch 0] Router grad norm: 0.147820 | Noise scales: ['0.0019']
+[Epoch 017/50] task=0.0036  step_route=0.7331  bal=-4.8296  halt=0.1078  val=0.0030  route_acc=0.0362  entropy=1.925  cos=0.030  tok/s=5778
+[Epoch 018 Batch 0] Router grad norm: 0.195929 | Noise scales: ['0.0023']
+[34m[1mwandb[0m: [33mWARNING[0m Artifact "run-7j57p043-paperop_avg_recursion_depth_table-9JJPyg" already exists with the same content. No new version will be created.
+[Epoch 018/50] task=0.0034  step_route=0.7341  bal=-4.8203  halt=0.1078  val=0.0041  route_acc=0.0360  entropy=1.926  cos=0.031  tok/s=5958
+[Epoch 019 Batch 0] Router grad norm: 0.134036 | Noise scales: ['0.0047']
+[Epoch 019/50] task=0.0033  step_route=0.7346  bal=-4.8261  halt=0.1078  val=0.0029  route_acc=0.0360  entropy=1.925  cos=0.031  tok/s=5871
+[Epoch 020 Batch 0] Router grad norm: 0.109051 | Noise scales: ['0.0044']
+[Epoch 020/50] task=0.0032  step_route=0.7358  bal=-4.8284  halt=0.1078  val=0.0029  route_acc=0.0475  entropy=1.925  cos=0.031  tok/s=5960
+[Epoch 021 Batch 0] Router grad norm: 0.149001 | Noise scales: ['0.0050']
+[Epoch 021/50] task=0.0029  step_route=0.7328  bal=-4.8354  halt=0.1078  val=0.0029  route_acc=0.0387  entropy=1.924  cos=0.032  tok/s=5890
+[Epoch 022 Batch 0] Router grad norm: 0.159433 | Noise scales: ['-0.0004']
+[Epoch 022/50] task=0.0028  step_route=0.7341  bal=-4.8329  halt=0.1078  val=0.0023  route_acc=0.0497  entropy=1.924  cos=0.032  tok/s=5881
+[Epoch 023 Batch 0] Router grad norm: 0.159574 | Noise scales: ['0.0014']
+[34m[1mwandb[0m: [33mWARNING[0m Artifact "run-7j57p043-paperop_avg_recursion_depth_table-9JJPyg" already exists with the same content. No new version will be created.
+[Epoch 023/50] task=0.0027  step_route=0.7335  bal=-4.8399  halt=0.1078  val=0.0024  route_acc=0.0356  entropy=1.924  cos=0.032  tok/s=5978
+[Epoch 024 Batch 0] Router grad norm: 0.090228 | Noise scales: ['0.0031']
+[Epoch 024/50] task=0.0026  step_route=0.7355  bal=-4.8428  halt=0.1078  val=0.0022  route_acc=0.0375  entropy=1.923  cos=0.032  tok/s=5975
+[Epoch 025 Batch 0] Router grad norm: 0.121691 | Noise scales: ['0.0045']
+[Epoch 025/50] task=0.0025  step_route=0.7336  bal=-4.8453  halt=0.1078  val=0.0023  route_acc=0.0377  entropy=1.923  cos=0.033  tok/s=5877
+[Epoch 026 Batch 0] Router grad norm: 0.082415 | Noise scales: ['-0.0014']
+[Epoch 026/50] task=0.0024  step_route=0.7336  bal=-4.8426  halt=0.1078  val=0.0023  route_acc=0.0377  entropy=1.923  cos=0.033  tok/s=5882
+[Epoch 027 Batch 0] Router grad norm: 0.070027 | Noise scales: ['-0.0021']
+[Epoch 027/50] task=0.0024  step_route=0.7333  bal=-4.8447  halt=0.1078  val=0.0021  route_acc=0.0369  entropy=1.922  cos=0.033  tok/s=5936
+[Epoch 028 Batch 0] Router grad norm: 0.132930 | Noise scales: ['-0.0004']
+[34m[1mwandb[0m: [33mWARNING[0m Artifact "run-7j57p043-paperop_avg_recursion_depth_table-9JJPyg" already exists with the same content. No new version will be created.
+[Epoch 028/50] task=0.0023  step_route=0.7356  bal=-4.8503  halt=0.1078  val=0.0022  route_acc=0.0387  entropy=1.921  cos=0.033  tok/s=6008
+[Epoch 029 Batch 0] Router grad norm: 0.076193 | Noise scales: ['-0.0003']
+[Epoch 029/50] task=0.0023  step_route=0.7319  bal=-4.8469  halt=0.1078  val=0.0023  route_acc=0.0446  entropy=1.922  cos=0.033  tok/s=5956
+[Epoch 030 Batch 0] Router grad norm: 0.114815 | Noise scales: ['-0.0020']
+[Epoch 030/50] task=0.0022  step_route=0.7324  bal=-4.8506  halt=0.1078  val=0.0019  route_acc=0.0489  entropy=1.922  cos=0.034  tok/s=5821
+[Epoch 031 Batch 0] Router grad norm: 0.181856 | Noise scales: ['-0.0007']
+[Epoch 031/50] task=0.0021  step_route=0.7333  bal=-4.8485  halt=0.1078  val=0.0020  route_acc=0.0478  entropy=1.922  cos=0.034  tok/s=5986
+[Epoch 032 Batch 0] Router grad norm: 0.113625 | Noise scales: ['-0.0018']
+[Epoch 032/50] task=0.0021  step_route=0.7362  bal=-4.8509  halt=0.1078  val=0.0020  route_acc=0.0504  entropy=1.922  cos=0.034  tok/s=5990
+[Epoch 033 Batch 0] Router grad norm: 0.065113 | Noise scales: ['0.0017']
+[34m[1mwandb[0m: [33mWARNING[0m Artifact "run-7j57p043-paperop_avg_recursion_depth_table-9JJPyg" already exists with the same content. No new version will be created.
+[Epoch 033/50] task=0.0021  step_route=0.7347  bal=-4.8531  halt=0.1078  val=0.0019  route_acc=0.0387  entropy=1.921  cos=0.034  tok/s=5685
+[Epoch 034 Batch 0] Router grad norm: 0.103063 | Noise scales: ['0.0040']
+[Epoch 034/50] task=0.0020  step_route=0.7339  bal=-4.8529  halt=0.1078  val=0.0020  route_acc=0.0477  entropy=1.922  cos=0.034  tok/s=5903
+[Epoch 035 Batch 0] Router grad norm: 0.062778 | Noise scales: ['0.0028']
+[Epoch 035/50] task=0.0020  step_route=0.7329  bal=-4.8525  halt=0.1078  val=0.0020  route_acc=0.0393  entropy=1.921  cos=0.034  tok/s=5846
+[Epoch 036 Batch 0] Router grad norm: 0.142176 | Noise scales: ['0.0009']
+[Epoch 036/50] task=0.0020  step_route=0.7349  bal=-4.8510  halt=0.1078  val=0.0020  route_acc=0.0388  entropy=1.922  cos=0.034  tok/s=5982
+[Epoch 037 Batch 0] Router grad norm: 0.150996 | Noise scales: ['0.0000']
+[Epoch 037/50] task=0.0019  step_route=0.7355  bal=-4.8497  halt=0.1077  val=0.0019  route_acc=0.0403  entropy=1.922  cos=0.034  tok/s=5994
+[Epoch 038 Batch 0] Router grad norm: 0.079952 | Noise scales: ['-0.0005']
+[34m[1mwandb[0m: [33mWARNING[0m Artifact "run-7j57p043-paperop_avg_recursion_depth_table-9JJPyg" already exists with the same content. No new version will be created.
+[Epoch 038/50] task=0.0019  step_route=0.7337  bal=-4.8517  halt=0.1077  val=0.0018  route_acc=0.0566  entropy=1.922  cos=0.034  tok/s=5869
+[Epoch 039 Batch 0] Router grad norm: 0.144547 | Noise scales: ['-0.0003']
+[Epoch 039/50] task=0.0018  step_route=0.7334  bal=-4.8550  halt=0.1078  val=0.0019  route_acc=0.0520  entropy=1.921  cos=0.034  tok/s=5975
+[Epoch 040 Batch 0] Router grad norm: 0.125361 | Noise scales: ['0.0001']
+[Epoch 040/50] task=0.0018  step_route=0.7335  bal=-4.8519  halt=0.1078  val=0.0019  route_acc=0.0419  entropy=1.922  cos=0.035  tok/s=5658
+[Epoch 041 Batch 0] Router grad norm: 0.123836 | Noise scales: ['-0.0001']
+[Epoch 041/50] task=0.0018  step_route=0.7337  bal=-4.8516  halt=0.1078  val=0.0018  route_acc=0.0425  entropy=1.922  cos=0.034  tok/s=5976
+[Epoch 042 Batch 0] Router grad norm: 0.068171 | Noise scales: ['0.0005']
+[Epoch 042/50] task=0.0018  step_route=0.7344  bal=-4.8582  halt=0.1078  val=0.0018  route_acc=0.0398  entropy=1.921  cos=0.034  tok/s=5939
+[Epoch 043 Batch 0] Router grad norm: 0.072904 | Noise scales: ['0.0002']
+[34m[1mwandb[0m: [33mWARNING[0m Artifact "run-7j57p043-paperop_avg_recursion_depth_table-9JJPyg" already exists with the same content. No new version will be created.
+[Epoch 043/50] task=0.0018  step_route=0.7349  bal=-4.8516  halt=0.1078  val=0.0018  route_acc=0.0430  entropy=1.922  cos=0.034  tok/s=5886
+[Epoch 044 Batch 0] Router grad norm: 0.143291 | Noise scales: ['0.0002']
+[Epoch 044/50] task=0.0017  step_route=0.7349  bal=-4.8557  halt=0.1078  val=0.0018  route_acc=0.0428  entropy=1.921  cos=0.034  tok/s=5839
+[Epoch 045 Batch 0] Router grad norm: 0.074545 | Noise scales: ['-0.0000']
+[Epoch 045/50] task=0.0017  step_route=0.7349  bal=-4.8596  halt=0.1078  val=0.0018  route_acc=0.0403  entropy=1.921  cos=0.034  tok/s=5734
+[Epoch 046 Batch 0] Router grad norm: 0.059779 | Noise scales: ['-0.0001']
+[Epoch 046/50] task=0.0017  step_route=0.7350  bal=-4.8562  halt=0.1078  val=0.0018  route_acc=0.0406  entropy=1.921  cos=0.034  tok/s=5694
+[Epoch 047 Batch 0] Router grad norm: 0.050265 | Noise scales: ['-0.0000']
+[Epoch 047/50] task=0.0017  step_route=0.7346  bal=-4.8566  halt=0.1078  val=0.0018  route_acc=0.0403  entropy=1.922  cos=0.034  tok/s=5922
+[Epoch 048 Batch 0] Router grad norm: 0.054358 | Noise scales: ['-0.0000']
+[34m[1mwandb[0m: [33mWARNING[0m Artifact "run-7j57p043-paperop_avg_recursion_depth_table-9JJPyg" already exists with the same content. No new version will be created.
+[Epoch 048/50] task=0.0017  step_route=0.7346  bal=-4.8570  halt=0.1078  val=0.0018  route_acc=0.0403  entropy=1.921  cos=0.034  tok/s=5956
+[Epoch 049 Batch 0] Router grad norm: 0.057916 | Noise scales: ['-0.0000']
+[Epoch 049/50] task=0.0017  step_route=0.7346  bal=-4.8582  halt=0.1078  val=0.0018  route_acc=0.0402  entropy=1.921  cos=0.034  tok/s=5636
+[Epoch 050 Batch 0] Router grad norm: 0.035923 | Noise scales: ['-0.0000']
+[Epoch 050/50] task=0.0017  step_route=0.7349  bal=-4.8611  halt=0.1078  val=0.0018  route_acc=0.0403  entropy=1.921  cos=0.034  tok/s=5888
+
+[Train] Complete. Best val_loss = 0.001778

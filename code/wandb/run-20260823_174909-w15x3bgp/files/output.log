@@ -1,0 +1,13 @@
+[Epoch 001 Batch 0] Router grad norm: 0.455672 | Noise scales: ['0.1000']
+[Epoch 001/5] task=0.0385  step_route=0.1509  bal=-0.9255  halt=0.0000  val=0.0164  route_acc=0.2434  entropy=1.904  cos=0.011  tok/s=12118
+[Epoch 002 Batch 0] Router grad norm: 0.101531 | Noise scales: ['0.0244']
+[Epoch 002/5] task=0.0165  step_route=0.0294  bal=-0.9583  halt=0.0000  val=0.0151  route_acc=0.1653  entropy=1.927  cos=0.015  tok/s=14085
+[Epoch 003 Batch 0] Router grad norm: 0.088922 | Noise scales: ['0.0095']
+wandb: WARNING Artifact "run-w15x3bgp-paperop_avg_recursion_depth_table-VQovSQ" already exists with the same content. No new version will be created.
+[Epoch 003/5] task=0.0133  step_route=0.0261  bal=-0.9508  halt=0.0000  val=0.0118  route_acc=0.1865  entropy=1.937  cos=0.018  tok/s=13871
+[Epoch 004 Batch 0] Router grad norm: 0.119728 | Noise scales: ['0.0049']
+[Epoch 004/5] task=0.0121  step_route=0.0247  bal=-0.9500  halt=0.0000  val=0.0111  route_acc=0.2534  entropy=1.938  cos=0.019  tok/s=13705
+[Epoch 005 Batch 0] Router grad norm: 0.094425 | Noise scales: ['0.0021']
+[Epoch 005/5] task=0.0112  step_route=0.0241  bal=-0.9499  halt=0.0000  val=0.0106  route_acc=0.1685  entropy=1.939  cos=0.019  tok/s=14045
+
+[Train] Complete. Best val_loss = 0.010646

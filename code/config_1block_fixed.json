@@ -1,0 +1,39 @@
+{
+  "model": {
+    "d_model": 256,
+    "num_experts": 7,
+    "max_depth": 7,
+    "max_steps": 7,
+    "step_feat_dim": 12,
+    "num_blocks": 1,
+    "dropout": 0.1
+  },
+  "training": {
+    "lr": 1e-3,
+    "weight_decay": 1e-4,
+    "batch_size": 768,
+    "epochs": 50,
+    "val_split": 0.5,
+    "grad_clip": 1.0
+  },
+  "loss_weights": {
+    "task": 1.0,
+    "routing_balance": 0.05,
+    "step_routing": 0.0,
+    "halting": 0.001
+  },
+  "data": {
+    "train_path": "../data/train.jsonl",
+    "val_path": "../data/val.jsonl",
+    "test_path": "../data/test.jsonl",
+    "max_val": 1e6,
+    "pad_value": 0.0,
+    "subset_fraction": 0.5,
+    "subset_seed": 42
+  },
+  "logging": {
+    "wandb_project": "micro-MoRE-poc",
+    "log_interval": 1,
+    "run_name": "1block_fixed_baseline"
+  }
+}

@@ -1,0 +1,1 @@
+{"columns":["operation","avg_recursion_depth"],"data":[["AND",1.0],["MOD",1.0],["NOT",1.0],["OR",1.0],["POW",1.0],["XOR",1.0],["DIV",1.1191749427043545],["MULT",1.132061628760088],["ADD",7.0],["MAX",7.0],["MEDIAN",7.0],["MIN",7.0],["SHIFT_L",7.0],["SHIFT_R",7.0],["SORT",7.0],["SUB",7.0]]}

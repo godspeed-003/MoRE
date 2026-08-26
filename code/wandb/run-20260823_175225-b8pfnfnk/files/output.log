@@ -1,0 +1,12 @@
+[Epoch 001 Batch 0] Router grad norm: 6.956794 | Noise scales: ['0.1000']
+[Epoch 001/5] task=0.0302  step_route=0.0703  bal=-4.4356  halt=0.0185  val=0.0245  route_acc=0.1087  entropy=1.941  cos=0.024  tok/s=826
+[Epoch 002 Batch 0] Router grad norm: 0.679664 | Noise scales: ['0.0055']
+[Epoch 002/5] task=0.0160  step_route=0.0208  bal=-5.1124  halt=0.0132  val=0.0142  route_acc=0.1187  entropy=1.937  cos=0.028  tok/s=857
+[Epoch 003 Batch 0] Router grad norm: 1.259776 | Noise scales: ['-0.0054']
+[Epoch 003/5] task=0.0119  step_route=0.0196  bal=-5.4020  halt=0.0148  val=0.0118  route_acc=0.4083  entropy=1.940  cos=0.032  tok/s=828
+[Epoch 004 Batch 0] Router grad norm: 1.416172 | Noise scales: ['-0.0071']
+[Epoch 004/5] task=0.0089  step_route=0.0195  bal=-6.0791  halt=0.0163  val=0.0080  route_acc=0.1241  entropy=1.940  cos=0.033  tok/s=755
+[Epoch 005 Batch 0] Router grad norm: 0.321636 | Noise scales: ['0.0025']
+[Epoch 005/5] task=0.0071  step_route=0.0194  bal=-6.4205  halt=0.0172  val=0.0067  route_acc=0.1259  entropy=1.940  cos=0.033  tok/s=736
+
+[Train] Complete. Best val_loss = 0.006705

@@ -1,0 +1,17 @@
+metric,value
+best_val_loss,0.002285
+val_loss_epoch_50,0.002292
+throughput_sequences_sec,2097.0136
+throughput_tokens_sec,14679.0953
+gpu_memory_mb,416.33
+forward_pass_time_sec,0.126529
+backward_pass_time_sec,0.063442
+avg_recursion_depth,2.8023
+expert_load_entropy,1.6837
+expert_load/expert_0_pct,18.2623
+expert_load/expert_1_pct,5.6270
+expert_load/expert_2_pct,7.9695
+expert_load/expert_3_pct,26.6777
+expert_load/expert_4_pct,18.0732
+expert_load/expert_5_pct,23.2574
+expert_load/expert_6_pct,0.1328

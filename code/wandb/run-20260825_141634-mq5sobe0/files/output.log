@@ -1,0 +1,4 @@
+[Epoch 001 Batch 0] Router grad norm: 8.769927 | Noise scales: ['0.1000']
+[Epoch 001/1] task=0.0838  step_route=0.6472  bal=-0.7725  halt=0.0390  val=0.0291  route_acc=0.0015  entropy=1.915  cos=0.004  tok/s=5481
+
+[Train] Complete. Best val_loss = 0.029150

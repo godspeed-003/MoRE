@@ -1,0 +1,25 @@
+2026-08-23 18:00:12,449 INFO    MainThread:30532 [wandb_setup.py:_flush():81] Current SDK version is 0.28.0
+2026-08-23 18:00:12,449 INFO    MainThread:30532 [wandb_setup.py:_flush():81] Configure stats pid to 30532
+2026-08-23 18:00:12,449 INFO    MainThread:30532 [wandb_setup.py:_flush():81] Loading settings from environment variables
+2026-08-23 18:00:12,452 INFO    MainThread:30532 [wandb_init.py:setup_run_log_directory():725] Logging user logs to c:\Users\Hp\Desktop\Waste\MoRE\code\wandb\run-20260823_180012-ly7h47ii\logs\debug.log
+2026-08-23 18:00:12,452 INFO    MainThread:30532 [wandb_init.py:setup_run_log_directory():726] Logging internal logs to c:\Users\Hp\Desktop\Waste\MoRE\code\wandb\run-20260823_180012-ly7h47ii\logs\debug-internal.log
+2026-08-23 18:00:12,452 INFO    MainThread:30532 [wandb_init.py:init():768] calling init triggers
+2026-08-23 18:00:12,452 INFO    MainThread:30532 [wandb_init.py:init():773] wandb.init called with sweep_config: {}
+config: {'d_model': 256, 'num_experts': 7, 'max_depth': 7, 'max_steps': 7, 'step_feat_dim': 12, 'num_blocks': 1, 'dropout': 0.1, 'fixed_depth': False, 'lr': 0.001, 'weight_decay': 0.0001, 'batch_size': 256, 'epochs': 5, 'val_split': 0.5, 'grad_clip': 1.0, 'subset_fraction': 1.0, 'subset_seed': 42, 'task': 1.0, 'routing_balance': 0.05, 'step_routing': 0.5, 'halting': 0.001, 'train_path': 'c:\\Users\\Hp\\Desktop\\Waste\\MoRE\\data\\train.jsonl', 'val_path': 'c:\\Users\\Hp\\Desktop\\Waste\\MoRE\\data\\val.jsonl', 'test_path': 'c:\\Users\\Hp\\Desktop\\Waste\\MoRE\\data\\test.jsonl', 'max_val': 1000000.0, 'pad_value': 0.0, 'jsonl_path': 'c:\\Users\\Hp\\Desktop\\Waste\\MoRE\\data\\train.jsonl', '_wandb': {}}
+2026-08-23 18:00:12,452 INFO    MainThread:30532 [wandb_init.py:init():816] starting backend
+2026-08-23 18:00:12,452 INFO    MainThread:30532 [wandb_init.py:init():831] sending inform_init request
+2026-08-23 18:00:13,232 INFO    MainThread:30532 [wandb_init.py:init():836] backend started and connected
+2026-08-23 18:00:13,274 INFO    MainThread:30532 [wandb_init.py:init():906] updated telemetry
+2026-08-23 18:00:13,341 INFO    MainThread:30532 [wandb_init.py:init():929] communicating run to backend with 90.0 second timeout
+2026-08-23 18:00:14,033 INFO    MainThread:30532 [wandb_init.py:init():974] starting run threads in backend
+2026-08-23 18:00:14,237 INFO    MainThread:30532 [wandb_run.py:_console_start():2523] atexit reg
+2026-08-23 18:00:14,237 INFO    MainThread:30532 [wandb_run.py:_redirect():2373] redirect: wrap_raw
+2026-08-23 18:00:14,238 INFO    MainThread:30532 [wandb_run.py:_redirect():2442] Wrapping output streams.
+2026-08-23 18:00:14,238 INFO    MainThread:30532 [wandb_run.py:_redirect():2465] Redirects installed.
+2026-08-23 18:00:14,241 INFO    MainThread:30532 [wandb_init.py:init():1012] run started, returning control to user process
+2026-08-23 18:00:14,244 INFO    MainThread:30532 [wandb_watch.py:_watch():69] Watching
+2026-08-23 18:03:53,101 INFO    MainThread:30532 [wandb_run.py:_finish():2285] finishing run rshisode607-government-college-of-engineering-aurangabad/micro-MoRE-poc/ly7h47ii
+2026-08-23 18:03:53,102 INFO    MainThread:30532 [wandb_run.py:_atexit_cleanup():2490] got exitcode: 0
+2026-08-23 18:03:53,103 INFO    MainThread:30532 [wandb_run.py:_restore():2472] restore
+2026-08-23 18:03:53,103 INFO    MainThread:30532 [wandb_run.py:_restore():2478] restore done
+2026-08-23 18:04:01,906 INFO    MainThread:30532 [wandb_run.py:_footer_sync_info():3895] logging synced files
