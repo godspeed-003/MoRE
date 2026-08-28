@@ -1,11 +1,19 @@
 {
+  "dataset_version": "more6-v1-seed42-n70000-3c1087b6aad9",
+  "generator_script": "script.py",
+  "generator_commit": "e5b0f6df0ecc53e70e52baf424277a570fd29718",
+  "seed": 42,
   "total": 70000,
   "splits": {
     "train": 59500,
     "val": 5250,
     "test": 5250
   },
-  "seed": 42,
+  "sha256": {
+    "train": "d9ecb9a6638ffe34f799ca6423984cbf4f7c26f4c6fcfb286f5936eefc0324e5",
+    "val": "189dd7a87825d4e9a7bb43e3ccedfb9745f979b33c4e7bfb7b173d0745fa0a0a",
+    "test": "2a88633f6bc83d66c83cfa95ded44d885d369a780853ed0f0ec8ecfd723e41d1"
+  },
   "train_frac": 0.85,
   "val_frac": 0.075,
   "test_frac": 0.075,
@@ -17,5 +25,180 @@
     "E5": 0.06,
     "E6": 0.18,
     "E7": 0.4
+  },
+  "family_label_redefinition": {
+    "rule": "The generator's E7 slot is the multi-operation CHAIN family, not a seventh expert. Canonical MoRE has exactly six experts (E1-E6) and routes PER STEP, so a chain's steps are routed to E1-E6 individually. Its 0.40 mass is therefore REDEFINED, not dropped: these records are emitted with family='MIXED' and no whole-program expert label. Dropping them instead would delete every program of depth 4-7 and make adaptive-depth allocation unmeasurable, which is the phenomenon under study.",
+    "generator_slot": "E7",
+    "emitted_family_label": "MIXED",
+    "mass": 0.4,
+    "whole_program_family_index": -1
+  },
+  "family_counts": {
+    "train": {
+      "E1": 3614,
+      "E2": 5954,
+      "E3": 8335,
+      "E4": 3548,
+      "E5": 3574,
+      "E6": 10791,
+      "MIXED": 23684
+    },
+    "val": {
+      "E1": 308,
+      "E2": 516,
+      "E3": 742,
+      "E4": 343,
+      "E5": 316,
+      "E6": 893,
+      "MIXED": 2132
+    },
+    "test": {
+      "E1": 278,
+      "E2": 530,
+      "E3": 723,
+      "E4": 309,
+      "E5": 310,
+      "E6": 916,
+      "MIXED": 2184
+    }
+  },
+  "operation_counts": {
+    "train": {
+      "ADD": 11488,
+      "AND": 9920,
+      "DIV": 14691,
+      "MAX": 17223,
+      "MEDIAN": 17238,
+      "MIN": 17220,
+      "MOD": 20780,
+      "MULT": 14589,
+      "NOT": 9098,
+      "OR": 9909,
+      "POW": 20734,
+      "SHIFT_L": 11262,
+      "SHIFT_R": 11431,
+      "SORT": 17290,
+      "SUB": 11517,
+      "XOR": 10060
+    },
+    "val": {
+      "ADD": 973,
+      "AND": 950,
+      "DIV": 1311,
+      "MAX": 1502,
+      "MEDIAN": 1524,
+      "MIN": 1481,
+      "MOD": 1853,
+      "MULT": 1302,
+      "NOT": 798,
+      "OR": 860,
+      "POW": 1811,
+      "SHIFT_L": 1078,
+      "SHIFT_R": 985,
+      "SORT": 1498,
+      "SUB": 1022,
+      "XOR": 895
+    },
+    "test": {
+      "ADD": 1017,
+      "AND": 866,
+      "DIV": 1363,
+      "MAX": 1616,
+      "MEDIAN": 1620,
+      "MIN": 1525,
+      "MOD": 1857,
+      "MULT": 1321,
+      "NOT": 816,
+      "OR": 889,
+      "POW": 1883,
+      "SHIFT_L": 1023,
+      "SHIFT_R": 1013,
+      "SORT": 1531,
+      "SUB": 984,
+      "XOR": 891
+    }
+  },
+  "depth_counts": {
+    "train": {
+      "1": 7061,
+      "2": 11038,
+      "3": 8606,
+      "4": 12168,
+      "5": 8860,
+      "6": 5846,
+      "7": 5921
+    },
+    "val": {
+      "1": 627,
+      "2": 974,
+      "3": 759,
+      "4": 1042,
+      "5": 802,
+      "6": 509,
+      "7": 537
+    },
+    "test": {
+      "1": 590,
+      "2": 917,
+      "3": 734,
+      "4": 1103,
+      "5": 811,
+      "6": 543,
+      "7": 552
+    }
+  },
+  "raw_value_range": [
+    -69590625000000.0,
+    3290093750000000.0
+  ],
+  "split_overlap_program_keys": {
+    "train|val": 0,
+    "train|test": 0,
+    "val|test": 0
+  },
+  "unique_programs": {
+    "train": 59500,
+    "val": 5250,
+    "test": 5250
+  },
+  "input_feature_definition": "Per step, one row of `step_feat_dim` floats holding ONLY that step's numeric arguments, each clamped to +/-max_val and divided by max_val. The step result is excluded (it equals the regression target for the final step). The oracle expert index is excluded. Operation identity is supplied separately as `step_ops` and consumed by an embedding over operations. Consequently the feature row is independent of num_experts and is bit-identical for MoE / MoR / MoRE.",
+  "target_definition": "record['output'], mean-reduced if it is a list, clamped to +/-max_val and divided by max_val.",
+  "trivial_baselines": {
+    "_note": "The MSE floor on the normalised target. A model result is only meaningful if it beats all three. Produced by code/audit_leakage.py; full measurements in runs/gate1_audit.json.",
+    "predict_zero_mse": 0.08185325438240797,
+    "predict_train_mean_mse": 0.08091428118506187,
+    "best_single_feature_copy_mse": 0.081853254382408,
+    "best_single_feature_copy_slot": 8,
+    "val_target_variance": 0.08089896003319526,
+    "train_target_mean": 0.03480587930881292
+  },
+  "gate1_audit": {
+    "checks_passed": 8,
+    "checks_total": 8,
+    "split_overlap_counts": {
+      "test|train": 0,
+      "test|val": 0,
+      "train|val": 0
+    },
+    "result_mutation_feature_changes": 0,
+    "expert_permutation_feature_changes": 0,
+    "input_parity_slot0_range_by_num_experts": {
+      "1": [
+        -1.0,
+        1.0
+      ],
+      "5": [
+        -1.0,
+        1.0
+      ],
+      "6": [
+        -1.0,
+        1.0
+      ]
+    },
+    "target_coincides_with_an_argument_fraction": {
+      "val": 0.334476,
+      "train": 0.335429
+    }
   }
 }

@@ -1,0 +1,2 @@
+epoch	train_task_loss	val_loss	expert_entropy_normalized	avg_depth	mean_cos_sim	max_cos_sim	routing_accuracy
+1	0.084502	0.077667	0.9997	2.21	0.0060	0.0122	0.3983

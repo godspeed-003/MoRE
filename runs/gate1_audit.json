@@ -1,0 +1,207 @@
+{
+  "checks": [
+    {
+      "name": "A0. result mutation actually changed the targets (test is not vacuous)",
+      "passed": true,
+      "detail": "368/400 targets changed"
+    },
+    {
+      "name": "A. no step result reaches the input (mutation leaves features identical)",
+      "passed": true,
+      "detail": "400 records mutated; 0 feature change(s). Pre-fix every record's features changed."
+    },
+    {
+      "name": "B0. expert permutation actually relabelled the experts (not vacuous)",
+      "passed": true,
+      "detail": "400/400 records changed step_experts"
+    },
+    {
+      "name": "B. no oracle expert label in the input (permutation leaves features identical)",
+      "passed": true,
+      "detail": "0/400 records changed features. Pre-fix slot 0 was expert_id/(E-1), so all would change."
+    },
+    {
+      "name": "B2. no low-cardinality slot maps 1:1 onto the expert label",
+      "passed": true,
+      "detail": "offending slots []; majority-class rate 0.3026"
+    },
+    {
+      "name": "C. input features bit-identical across E = 1 / 5 / 6",
+      "passed": true,
+      "detail": "200 records x 3 expert counts; slot-0 ranges {1: [-1.0, 1.0], 5: [-1.0, 1.0], 6: [-1.0, 1.0]}; 0 mismatch(es)"
+    },
+    {
+      "name": "D. no (op, args, result) program overlap across splits",
+      "passed": true,
+      "detail": "{'test|train': 0, 'test|val': 0, 'train|val': 0}"
+    },
+    {
+      "name": "E. copy baseline is no longer free (>= predict-train-mean)",
+      "passed": true,
+      "detail": "copy 0.081853 vs predict-mean 0.080914; pre-fix copy was 0.000000"
+    }
+  ],
+  "measurements": {
+    "result_mutation_records": 400,
+    "result_mutation_feature_changes": 0,
+    "result_mutation_targets_changed": 368,
+    "val_records": 5250,
+    "val_records_with_target_in_input": 1756,
+    "val_target_in_input_fraction": 0.334476,
+    "val_worst_slot": 0,
+    "val_worst_slot_fraction": 0.160571,
+    "val_per_slot_target_hits": [
+      843,
+      454,
+      577,
+      448,
+      407,
+      341,
+      299,
+      292,
+      288,
+      288,
+      288,
+      288
+    ],
+    "train_records": 59500,
+    "train_records_with_target_in_input": 19958,
+    "train_target_in_input_fraction": 0.335429,
+    "train_worst_slot": 0,
+    "train_worst_slot_fraction": 0.168958,
+    "train_per_slot_target_hits": [
+      10053,
+      4858,
+      6242,
+      5084,
+      4451,
+      3741,
+      3234,
+      3190,
+      3138,
+      3138,
+      3138,
+      3138
+    ],
+    "expert_permutation_records": 400,
+    "expert_permutation_feature_changes": 0,
+    "expert_permutation_label_changes": 400,
+    "low_cardinality_slot_table": [
+      {
+        "slot": 0,
+        "distinct_values": 3923,
+        "purity": 0.510356
+      },
+      {
+        "slot": 1,
+        "distinct_values": 2133,
+        "purity": 0.557779
+      },
+      {
+        "slot": 2,
+        "distinct_values": 2011,
+        "purity": 0.478103
+      },
+      {
+        "slot": 3,
+        "distinct_values": 1834,
+        "purity": 0.409716
+      },
+      {
+        "slot": 4,
+        "distinct_values": 1595,
+        "purity": 0.341934
+      },
+      {
+        "slot": 5,
+        "distinct_values": 1119,
+        "purity": 0.302626
+      },
+      {
+        "slot": 6,
+        "distinct_values": 273,
+        "purity": 0.302626
+      },
+      {
+        "slot": 7,
+        "distinct_values": 142,
+        "purity": 0.302626
+      },
+      {
+        "slot": 8,
+        "distinct_values": 1,
+        "purity": 0.302626
+      },
+      {
+        "slot": 9,
+        "distinct_values": 1,
+        "purity": 0.302626
+      },
+      {
+        "slot": 10,
+        "distinct_values": 1,
+        "purity": 0.302626
+      },
+      {
+        "slot": 11,
+        "distinct_values": 1,
+        "purity": 0.302626
+      }
+    ],
+    "oracle_majority_class_rate": 0.302626,
+    "expert_step_counts": {
+      "0": 1995,
+      "1": 2613,
+      "2": 3664,
+      "3": 3503,
+      "4": 2063,
+      "5": 6005
+    },
+    "parity_records_checked": 200,
+    "parity_slot0_range_by_num_experts": {
+      "1": [
+        -1.0,
+        1.0
+      ],
+      "5": [
+        -1.0,
+        1.0
+      ],
+      "6": [
+        -1.0,
+        1.0
+      ]
+    },
+    "parity_mismatches": [],
+    "train_unique_programs": 59500,
+    "val_unique_programs": 5250,
+    "test_unique_programs": 5250,
+    "split_overlap_counts": {
+      "test|train": 0,
+      "test|val": 0,
+      "train|val": 0
+    },
+    "n_train": 59500,
+    "n_val": 5250,
+    "train_target_mean": 0.03480587930881292,
+    "val_target_variance": 0.08089896003319526,
+    "baseline_predict_zero_mse": 0.08185325438240797,
+    "baseline_predict_train_mean_mse": 0.08091428118506187,
+    "baseline_best_single_feature_copy_mse": 0.081853254382408,
+    "baseline_copy_best_slot": 8,
+    "baseline_copy_mse_per_slot": [
+      0.106125183,
+      0.082724686,
+      0.082333034,
+      0.081926955,
+      0.082032896,
+      0.081955946,
+      0.081853259,
+      0.081853256,
+      0.081853254,
+      0.081853254,
+      0.081853254,
+      0.081853254
+    ]
+  }
+}

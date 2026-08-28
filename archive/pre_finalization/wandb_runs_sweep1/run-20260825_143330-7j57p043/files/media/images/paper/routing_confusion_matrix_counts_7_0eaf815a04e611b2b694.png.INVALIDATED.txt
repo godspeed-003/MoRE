@@ -1,0 +1,12 @@
+INVALIDATED FOR SCIENTIFIC COMPARISON
+Reason: confirmed target leakage and/or broken halting/routing implementation.
+
+Applies to: routing_confusion_matrix_counts_7_0eaf815a04e611b2b694.png
+
+This measurement file is preserved byte-for-byte as evidence and is
+NOT modified. It is invalid for scientific comparison: it was
+produced by a pipeline with confirmed target leakage, an untrained
+halting mechanism, dense (not Top-1) routing, and a balance loss
+that dominated and scaled with depth.
+
+Do not load this file into any results table, figure, or baseline.

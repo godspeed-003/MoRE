@@ -1,0 +1,226 @@
+# CLAUDE.md — MoRE Repository Operating Rules
+
+**Authority.** This file is the working contract for all agent work in this
+repository. It condenses three governing documents, which remain authoritative
+in case of any conflict:
+
+| Document | Role |
+|---|---|
+| [plan.md](plan.md) | The execution plan. Phases 0–11, gates, immediate step order. |
+| [updated_rules.md](updated_rules.md) | Architectural and scientific constraints. Non-negotiable. |
+| [updated_objective.md](updated_objective.md) | What is being tested and what counts as success. |
+
+Read [ARCHITECTURE.md](ARCHITECTURE.md) first for codebase orientation — repo
+layout, the one-engine/three-modes design (and why there is no `moe/` or `mor/`
+folder), the data contract, gate status, and the current known-defect list. It is
+descriptive; the three documents above remain authoritative.
+
+Superseded and **not** to be used: `archive/pre_finalization/sweep_results/rules.md`,
+`archive/pre_finalization/sweep_results/objective.md`, and every result in
+`archive/`. In particular the old primary criterion `expert_entropy > baseline`
+is void — high entropy is a load-balance diagnostic only.
+
+Task tracking: [TASKS.md](TASKS.md). Do not tick a box without the stated
+technical verification actually passing.
+
+Change history: [changelog.md](changelog.md) — one entry per completed task, each
+naming the code location to open when that area misbehaves. **Append an entry
+whenever you complete a task**, and consult it before changing routing, halting,
+the loss assembly or the metric layer: it records the traps already hit there
+(guards landing in dead code, label checks running before override resolution,
+sentinels reported as measurements).
+
+---
+
+## 1. Terminology — never conflate these
+
+- **MoE** — multiple independent expert FFNs, learned **Top-1 sparse** token
+  routing. Answers *which computation module?*
+- **MoR** — one shared block reused across recursion steps with adaptive
+  halting. Answers *how much computation?*
+- **MoRE** — a token is routed to a specialized expert, and that expert's
+  weights are recursively reused for an adaptive number of steps. Answers both.
+
+Do not collapse "which expert" and "how much depth" in variable names,
+comments, plots, or claims.
+
+---
+
+## 2. Hard architectural constraints
+
+**Routing.** Canonical MoE/MoRE path is `Linear router -> softmax -> argmax ->
+dispatch to that expert only -> optional multiply by the selected gate prob`.
+Dense evaluate-all-and-blend may exist **only** as an explicitly labelled
+"MoRE – Dense Routing Ablation" and must never become the canonical path.
+
+**Expert independence.** Experts are independent FFNs. No cross-expert
+communication or expert-specific skips except as a labelled ablation.
+
+**Weight sharing.** The *same* block parameters at every recursion depth. Depth
+is computation through time, not a stack of depth-specific networks.
+
+**Halting.** Differentiable ACT / Universal-Transformer style. Required:
+learned per-step halt probability; early exit for active tokens; halted states
+frozen and not recomputed; forced exit at max depth; a differentiable
+ponder/recursion cost; **a real gradient reaching the halt parameters.** A
+boolean threshold may drive dispatch, but the objective must keep a
+differentiable path to the halt head.
+
+**Balance loss.** Required to discourage collapse; must never become the
+primary objective. Must be **normalized so its magnitude does not grow with
+recursion depth or block count**. Report the entropy term and the Switch-style
+auxiliary term separately. Never tune blindly toward maximal entropy.
+
+**Expert count.** Canonical is **six**: `E1 ADD/SUB`, `E2 MULT/DIV`,
+`E3 MOD/POW`, `E4 LOGIC`, `E5 SHIFT`, `E6 SORT/STAT`. The E7 catch-all is
+removed. No hard-coded 7-class heads. All tensor dims derive from
+`num_experts`; all labels derive from one family manifest; an unmapped
+operation must **raise**, never fall back.
+
+**Router noise.** Canonical default `router_noise = none`. Noise variants are
+ablations only. Do not add router z-loss to canonical. The old L2-on-trainable-
+noise-scale is not a proven fix and must not be described as one.
+
+---
+
+## 3. Input integrity — prohibited in the canonical representation
+
+```text
+expert_id / family_id as a numerical input feature
+oracle routing class encoded into an input slot
+the regression target (final answer / step result) embedded in input features
+```
+
+Operation *identity* is legitimate task information — encode it as an operation
+embedding, not as the oracle expert index. Oracle labels stay available for
+diagnostics and labelled oracle-routing experiments only.
+
+**Input features must be bit-identical across MoE, MoR and MoRE for the same
+record.** This is a testable invariant, not an aspiration.
+
+---
+
+## 4. Metric rules
+
+- **Never** report `total_loss` as the primary quality metric. Track `task_loss`,
+  `classification_loss`, `routing_balance_loss`, `entropy_term`,
+  `switch_aux_term`, `halting_loss`/`ponder_cost`, `routing_supervision_loss`,
+  and `weighted_total_loss` separately.
+- **Primary predictive metric: validation task loss.** A negative weighted total
+  is not automatically a bug but is never evidence of quality.
+- **Routing accuracy** is authoritatively `mean(predicted_expert == oracle_expert)`
+  over exactly the tokens the confusion matrix uses. The confusion diagonal
+  fraction must equal it within tolerance. Also report per-family
+  precision/recall, macro accuracy, **Hungarian-matched accuracy**, AMI, and
+  cluster purity — expert indices carry no semantic identity, so
+  permutation-invariant metrics are mandatory.
+- **Entropy** is reported normalized: `H / log(E)`. For `E = 1` entropy is
+  `N/A`, never `0` used as a comparative score.
+- **Cosine similarity**: report mean *and* max pairwise when `E > 1`. Phrase as
+  "consistent with differentiated parameterizations" — **not** "proves
+  orthogonality".
+- **Depth**: report average depth, per-operation average depth, absolute and
+  relative **depth allocation error**, early-exit rate, forced-exit rate. Call
+  it *depth allocation error*, never "compute efficiency", unless real FLOPs are
+  in the metric.
+- **No sentinel value may be reported as a measurement.** `-1`, `0.0`
+  placeholders, etc. must be `N/A`.
+- Do not claim the model "discovers intrinsic mathematical complexity". Correct
+  phrasing: *the model learns to allocate recursion depth in accordance with the
+  predefined operation-complexity curriculum.*
+
+---
+
+## 5. Reproducibility, provenance and output layout
+
+- Seeds `42, 43, 44, 45, 46`; report **mean ± std**. One favourable seed is
+  never evidence.
+- Global seeding is required (`torch`, `numpy`, `random`, CUDA), not just the
+  `random_split` generator.
+- **Per-run output directories only** — `runs/<experiment_id>/` with
+  `config.json`, `resolved_config.json`, `metrics.json`, `results.tsv`,
+  `checkpoint.pt`, `stdout.log`. Never write global `best_model.pt`,
+  `results.tsv`, `final_run_metrics.json`, `*_results.csv`. Enforced by
+  [code/run_context.py](code/run_context.py).
+- Every canonical W&B run records the full provenance list in
+  `updated_rules.md` §9 (`experiment_id`, `experiment_group`, `architecture`,
+  `variant`, `seed`, `dataset_version`, `train_split_version`,
+  `code_git_commit`, `config_hash`, all shape/optimizer fields, `resolved
+  epochs`, `resolved subset_fraction`).
+- W&B metric keys must not contain `/` inside a label (it creates spurious
+  nesting). Use `E1_ADD_SUB`, not `E1 ADD/SUB`.
+- Run names: `phaseB_MoE_seed42`, `phaseB_MoR_seed42`, `phaseB_MoRE_seed42`.
+- Never hand-copy numbers into a results table. The exporter must refuse to mix
+  dataset versions or config hashes and must emit `N/A` rather than fabricate.
+
+**The proxy guard.** `code/canonical_spec.json` is the single frozen definition
+of "canonical". A run may only declare `experiment_group = canonical_phase_b` if
+it matches that spec exactly, uses the full dataset, and names a seed from the
+frozen set. While any spec field is `null` the guard refuses every canonical
+claim — that is deliberate, not a bug.
+
+---
+
+## 6. Experimental integrity
+
+- **No proxy run enters the headline table.** A proxy is anything with a
+  non-canonical epoch count, subset fraction, dataset version, batch protocol,
+  loss configuration, or architecture.
+- No table may mix configurations unless explicitly labelled an ablation with
+  the varying field named.
+- No causal claim without an experiment that isolates the variable.
+- Do not alter the architecture to obtain a favourable result. If an
+  improvement is found, preserve the original run and add the change as an
+  explicit variant.
+- **Archive, never delete, evidence.**
+- Prohibited: post-hoc favourable subsets; changing depth labels after the fact;
+  putting oracle routing in the main model; hiding parameter mismatches;
+  treating high entropy as proof of specialization; treating low cosine
+  similarity as proof of orthogonality; merging proxy and canonical runs; tuning
+  until the desired conclusion appears.
+
+---
+
+## 7. When a test or gate fails
+
+From `plan.md` §20, in order:
+
+1. **STOP.**
+2. **Report the failure** — plainly, with the actual output.
+3. **Identify the cause.**
+4. **Fix it.**
+5. **Re-run the gate.**
+
+Never revert a correctness fix because the old number looked better. Never
+proceed past a failing gate.
+
+---
+
+## 8. Outcome honesty
+
+Three outcomes are all scientifically valid and none may be optimized toward:
+
+- **A** — MoRE retains/approaches baseline quality with stable specialization,
+  adaptive depth, and low seed variance.
+- **B** — MoRE is not lowest-loss but shows a stable, interpretable combination
+  of specialization and adaptive recursion that neither component alone gives.
+- **C** — once leakage, halting, routing and objective bugs are fixed, MoRE
+  gives no meaningful advantage or fails to learn adaptive computation.
+
+**Outcome C must be reported honestly.** The objective is to learn what the
+architecture does, not what we want it to do. Distinguish measured facts from
+interpretation everywhere.
+
+---
+
+## 9. Repository conventions
+
+- Python interpreter: `C:\Users\Hp\anaconda3\envs\more_env\python.exe`
+  (torch 2.5.1 + CUDA). Anaconda base and `C:\Python314` lack `torch`.
+- Shell is Git Bash on Windows; the working directory persists between calls —
+  **use absolute paths.**
+- One training system with an explicit `architecture = moe | mor | more` mode.
+  Do **not** create parallel `run_moe.py` / `run_mor.py` implementations.
+- Exploratory sweep drivers live in `automated/` and must never launch canonical
+  runs. `archive/` holds invalidated history; re-stamp it with
+  `python archive/mark_invalidated.py`.

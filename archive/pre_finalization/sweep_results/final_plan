@@ -1,3 +1,13 @@
+> **INVALIDATED FOR SCIENTIFIC COMPARISON**
+>
+> Reason: confirmed target leakage and/or broken halting/routing implementation.
+>
+> Retained as research history only. Superseded by `plan.md`,
+> `updated_rules.md`, `updated_objective.md`. Nothing in this file may
+> be cited, exported, or used as a baseline for scientific comparison.
+
+---
+
 
 This is the master blueprint for your Mixture of Recursive Experts (MoRE) micro-PoC. We have consolidated your PyTorch implementation, the comprehensive Weights & Biases (W&B) metrics, the automated training loop, and the dataset strategy into a single, cohesive plan designed to run perfectly on your local 8GB GPU.
 

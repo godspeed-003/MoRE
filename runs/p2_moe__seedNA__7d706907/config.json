@@ -1,0 +1,47 @@
+{
+  "model": {
+    "d_model": 256,
+    "num_experts": 6,
+    "max_depth": 1,
+    "max_steps": 7,
+    "step_feat_dim": 12,
+    "num_blocks": 2,
+    "dropout": 0.1,
+    "routing_mode": "top1_sparse",
+    "adaptive_halting": false
+  },
+  "training": {
+    "lr": 0.001,
+    "weight_decay": 0.0001,
+    "batch_size": 128,
+    "epochs": 50,
+    "val_split": 0.1,
+    "grad_clip": 1.0,
+    "subset_fraction": 1.0,
+    "subset_seed": 42
+  },
+  "loss_weights": {
+    "task": 1.0,
+    "routing_balance": 0.05,
+    "step_routing": 0.5,
+    "halting": 0.0
+  },
+  "data": {
+    "train_path": "C:\\Users\\Hp\\Desktop\\Waste\\MoRE\\data\\train.jsonl",
+    "val_path": "C:\\Users\\Hp\\Desktop\\Waste\\MoRE\\data\\val.jsonl",
+    "test_path": "C:\\Users\\Hp\\Desktop\\Waste\\MoRE\\data\\test.jsonl",
+    "max_val": 1000000.0,
+    "pad_value": 0.0,
+    "dataset_version": "more6-v1-seed42-n70000-3c1087b6aad9",
+    "train_split_version": "fixed-file-splits-v1",
+    "jsonl_path": "C:\\Users\\Hp\\Desktop\\Waste\\MoRE\\data\\train.jsonl",
+    "subset_fraction": 1.0,
+    "subset_seed": 42
+  },
+  "logging": {
+    "wandb_project": "micro-MoRE-poc",
+    "log_interval": 10,
+    "run_name": "phaseB_moe"
+  },
+  "architecture": "moe"
+}

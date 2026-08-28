@@ -1,3 +1,9 @@
+# INVALIDATED FOR SCIENTIFIC COMPARISON
+# Reason: confirmed target leakage and/or broken halting/routing implementation.
+#
+# Retained as research history only. Do not run against the canonical
+# pipeline; paths and assumptions here predate plan.md Phase 0.
+
 ###correlation.py
 # Group your evaluation dataset by difficulty. For example:
 

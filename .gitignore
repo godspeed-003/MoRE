@@ -1,0 +1,46 @@
+# --- Python -----------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*.egg-info/
+.ipynb_checkpoints/
+.venv/
+venv/
+
+# --- Weights & Biases -------------------------------------------------------
+# Live W&B run payloads are large and machine-written. Provenance lives in
+# runs/<experiment_id>/resolved_config.json (which records wandb_run_id), so
+# nothing scientific is lost by not tracking these.
+wandb/
+code/wandb/
+!archive/**/wandb_runs_*/
+
+# --- Per-run output directories (plan.md 2.2) -------------------------------
+# runs/<experiment_id>/ IS the canonical record, so the small provenance and
+# metric files ARE tracked (updated_rules.md 9: every figure must be traceable
+# to exact run IDs). Only the large or regenerable payloads are excluded.
+runs/**/checkpoint.pt
+runs/**/*.pt
+runs/**/stdout.log
+
+# --- Model checkpoints outside the archive ----------------------------------
+# The two archived checkpoints are already tracked as evidence and are
+# unaffected by this rule.
+*.pt
+!archive/**/*.pt
+
+# --- Global output filenames that Phase 0 abolished -------------------------
+# Listed so a stray legacy write is never committed by accident.
+/best_model.pt
+/results.tsv
+/final_run_metrics.json
+/sweep_results.csv
+/1block_results.csv
+/2block_results.csv
+code/best_model.pt
+code/results.tsv
+code/final_run_metrics.json
+
+# --- Editor / OS ------------------------------------------------------------
+.DS_Store
+Thumbs.db
+*.swp

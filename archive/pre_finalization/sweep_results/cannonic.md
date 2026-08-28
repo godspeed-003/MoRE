@@ -1,3 +1,13 @@
+> **INVALIDATED FOR SCIENTIFIC COMPARISON**
+>
+> Reason: confirmed target leakage and/or broken halting/routing implementation.
+>
+> Retained as research history only. Superseded by `plan.md`,
+> `updated_rules.md`, `updated_objective.md`. Nothing in this file may
+> be cited, exported, or used as a baseline for scientific comparison.
+
+---
+
 # Canonical Research Records: MoRE (Mixture of Recursive Experts)
 
 This document is the single canonical reference file containing all empirical results, hyperparameters, training walkthroughs, and logs generated during the development of the **Mixture of Recursive Experts (MoRE)** architecture. Use this data as the source of truth when writing the research paper.

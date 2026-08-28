@@ -1,3 +1,13 @@
+> **INVALIDATED FOR SCIENTIFIC COMPARISON**
+>
+> Reason: confirmed target leakage and/or broken halting/routing implementation.
+>
+> Retained as research history only. Superseded by `plan.md`,
+> `updated_rules.md`, `updated_objective.md`. Nothing in this file may
+> be cited, exported, or used as a baseline for scientific comparison.
+
+---
+
 # Objective: Improve the MoRE Architecture
 
 The goal of the autoresearch system is NOT to minimize validation loss alone.

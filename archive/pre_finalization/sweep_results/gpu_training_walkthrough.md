@@ -1,3 +1,13 @@
+> **INVALIDATED FOR SCIENTIFIC COMPARISON**
+>
+> Reason: confirmed target leakage and/or broken halting/routing implementation.
+>
+> Retained as research history only. Superseded by `plan.md`,
+> `updated_rules.md`, `updated_objective.md`. Nothing in this file may
+> be cited, exported, or used as a baseline for scientific comparison.
+
+---
+
 # Walkthrough: Renting GPUs and Training MoRE on Language Data (Student Budget Guide)
 
 This walkthrough provides a step-by-step guide to adapting the **Mixture of Recursive Experts (MoRE)** architecture for auto-regressive language modeling (next-token prediction), renting cheap hourly GPUs, and training a standard publication-size model on a student budget.

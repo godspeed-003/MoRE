@@ -1,3 +1,13 @@
+> **INVALIDATED FOR SCIENTIFIC COMPARISON**
+>
+> Reason: confirmed target leakage and/or broken halting/routing implementation.
+>
+> Retained as research history only. Superseded by `plan.md`,
+> `updated_rules.md`, `updated_objective.md`. Nothing in this file may
+> be cited, exported, or used as a baseline for scientific comparison.
+
+---
+
 # SYSTEM DIRECTIVE: MoRE (Mixture of Recursive Experts) Architecture Rules
 
 ## 0. Primary Objective

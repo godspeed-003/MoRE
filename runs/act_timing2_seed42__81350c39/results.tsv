@@ -1,0 +1,4 @@
+epoch	train_task_loss	val_loss	expert_entropy_normalized	avg_depth	mean_cos_sim	max_cos_sim	routing_accuracy	routing_hungarian_acc	routing_ami
+1	0.087533	nan	0.9119	2.22	-0.0002	0.0047	N/A	N/A	N/A
+2	0.076455	nan	0.9120	2.33	-0.0004	0.0037	N/A	N/A	N/A
+3	0.073704	0.070379	0.8695	2.41	-0.0004	0.0033	0.6133	0.6133	0.5773

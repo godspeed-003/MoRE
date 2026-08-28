@@ -25,11 +25,23 @@ Within each family, 20 % of samples are simple (1 op) and
 
 import random
 import json
+import hashlib
+import subprocess
+from collections import Counter
 import math
 import statistics
 import argparse
 from pathlib import Path
 from typing import Any
+import sys
+
+# The Windows console defaults to cp1252 and cannot encode the report glyphs
+# below; without this, generation completes and then dies while printing.
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
 
 # ──────────────────────────────────────────────
 # CONFIG
@@ -51,6 +63,17 @@ FAMILY_WEIGHTS = {
     "E7": 0.40,   # CHAIN (multi-op)  — depth 4-7
 }
 assert abs(sum(FAMILY_WEIGHTS.values()) - 1.0) < 1e-9, "Weights must sum to 1"
+
+# Emitted family label per generator slot. The generator's "E7" slot produces
+# multi-operation CHAIN programs; canonical MoRE has six experts and routes per
+# step, so a chain has no single expert family. Its mass is redefined as MIXED
+# rather than dropped -- dropping it would remove every depth 4-7 program and
+# make adaptive-depth allocation unmeasurable (plan.md 3.4).
+FAMILY_OUTPUT_LABEL = {
+    "E1": "E1", "E2": "E2", "E3": "E3",
+    "E4": "E4", "E5": "E5", "E6": "E6",
+    "E7": "MIXED",
+}
 
 INT_RANGE   = (-1000, 1000)   # operand sampling range
 LIST_LEN    = (2, 8)          # list length for E6
@@ -510,6 +533,45 @@ def build_family_schedule(total: int, weights: dict) -> dict[str, int]:
     return counts
 
 
+def _program_key(example: dict) -> str:
+    """
+    Identity of a program: its exact (op, args, result) sequence.
+
+    Used to guarantee global uniqueness, which in turn guarantees zero
+    cross-split overlap. The pre-Phase-1 dataset had 22 programs shared between
+    test and train and 14 between train and val, which inflates any reported
+    validation score (plan.md 3.5).
+    """
+    return json.dumps(
+        [[s.get("op"), s.get("args"), s.get("result")]
+         for s in example.get("steps", [])],
+        sort_keys=True, separators=(",", ":"),
+    )
+
+
+def _sha256(path: Path) -> str:
+    h = hashlib.sha256()
+    with path.open("rb") as f:
+        for chunk in iter(lambda: f.read(1 << 20), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def _generator_identifier() -> str:
+    """Git commit of the repository, so a dataset is traceable to its generator."""
+    try:
+        out = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=str(Path(__file__).resolve().parent),
+            capture_output=True, text=True, timeout=10,
+        )
+        if out.returncode == 0:
+            return out.stdout.strip()
+    except Exception:
+        pass
+    return "unknown"
+
+
 def split_and_save(
     examples: list[dict],
     out_dir: str,
@@ -530,6 +592,7 @@ def split_and_save(
         "test": examples[n_train + n_val:],
     }
 
+    split_paths = {}
     for split_name, rows in splits.items():
         if fmt == "jsonl":
             split_path = output_dir / f"{split_name}.jsonl"
@@ -540,21 +603,111 @@ def split_and_save(
             split_path = output_dir / f"{split_name}.json"
             with split_path.open("w") as f:
                 json.dump(rows, f, indent=2)
+        split_paths[split_name] = split_path
         print(f"  Saved {split_name:5s} -> {split_path} ({len(rows):,} rows)")
 
+    # ---- Manifest (plan.md 3.4) ------------------------------------------
+    hashes = {k: _sha256(p) for k, p in split_paths.items()}
+    combined = hashlib.sha256(
+        "".join(hashes[k] for k in sorted(hashes)).encode()
+    ).hexdigest()
+    dataset_version = f"more6-v1-seed{seed}-n{n_total}-{combined[:12]}"
+
+    # Overlap must be zero by construction; assert it rather than trust it.
+    key_sets = {k: {_program_key(e) for e in v} for k, v in splits.items()}
+    overlaps = {
+        "train|val":  len(key_sets["train"] & key_sets["val"]),
+        "train|test": len(key_sets["train"] & key_sets["test"]),
+        "val|test":   len(key_sets["val"] & key_sets["test"]),
+    }
+    if any(overlaps.values()):
+        raise RuntimeError(
+            f"Cross-split program overlap detected: {overlaps}. Generation is "
+            "supposed to reject duplicate programs globally."
+        )
+
+    def _counts(rows, key):
+        c = Counter()
+        for r in rows:
+            c[r.get(key)] += 1
+        return dict(sorted(c.items(), key=lambda kv: str(kv[0])))
+
+    def _op_counts(rows):
+        c = Counter()
+        for r in rows:
+            for s in r.get("steps", []):
+                c[s.get("op")] += 1
+        return dict(sorted(c.items()))
+
+    # Raw value range actually present in the data (the tokenizer's own
+    # normalisation constant lives in the model config, not here).
+    lo, hi = math.inf, -math.inf
+    for r in examples:
+        for s in r.get("steps", []):
+            vals = []
+            for a in s.get("args", []):
+                vals.extend(a if isinstance(a, list) else [a])
+            res = s.get("result")
+            vals.extend(res if isinstance(res, list) else [res])
+            for v in vals:
+                if isinstance(v, (int, float)):
+                    lo, hi = min(lo, float(v)), max(hi, float(v))
+
     meta = {
+        "dataset_version": dataset_version,
+        "generator_script": Path(__file__).name,
+        "generator_commit": _generator_identifier(),
+        "seed": seed,
         "total": n_total,
         "splits": {k: len(v) for k, v in splits.items()},
-        "seed": seed,
+        "sha256": hashes,
         "train_frac": TRAIN_FRAC,
         "val_frac": VAL_FRAC,
         "test_frac": TEST_FRAC,
         "family_weights": FAMILY_WEIGHTS,
+        "family_label_redefinition": {
+            "rule": (
+                "The generator's E7 slot is the multi-operation CHAIN family, "
+                "not a seventh expert. Canonical MoRE has exactly six experts "
+                "(E1-E6) and routes PER STEP, so a chain's steps are routed to "
+                "E1-E6 individually. Its 0.40 mass is therefore REDEFINED, not "
+                "dropped: these records are emitted with family='MIXED' and no "
+                "whole-program expert label. Dropping them instead would delete "
+                "every program of depth 4-7 and make adaptive-depth allocation "
+                "unmeasurable, which is the phenomenon under study."
+            ),
+            "generator_slot": "E7",
+            "emitted_family_label": FAMILY_OUTPUT_LABEL["E7"],
+            "mass": FAMILY_WEIGHTS["E7"],
+            "whole_program_family_index": -1,
+        },
+        "family_counts": {k: _counts(v, "family") for k, v in splits.items()},
+        "operation_counts": {k: _op_counts(v) for k, v in splits.items()},
+        "depth_counts": {k: _counts(v, "depth") for k, v in splits.items()},
+        "raw_value_range": [lo if lo != math.inf else None,
+                            hi if hi != -math.inf else None],
+        "split_overlap_program_keys": overlaps,
+        "unique_programs": {k: len(v) for k, v in key_sets.items()},
+        "input_feature_definition": (
+            "Per step, one row of `step_feat_dim` floats holding ONLY that step's "
+            "numeric arguments, each clamped to +/-max_val and divided by max_val. "
+            "The step result is excluded (it equals the regression target for the "
+            "final step). The oracle expert index is excluded. Operation identity "
+            "is supplied separately as `step_ops` and consumed by an embedding "
+            "over operations. Consequently the feature row is independent of "
+            "num_experts and is bit-identical for MoE / MoR / MoRE."
+        ),
+        "target_definition": (
+            "record['output'], mean-reduced if it is a list, clamped to "
+            "+/-max_val and divided by max_val."
+        ),
     }
     meta_path = output_dir / "dataset_meta.json"
     with meta_path.open("w") as f:
         json.dump(meta, f, indent=2)
     print(f"  Metadata -> {meta_path}")
+    print(f"  dataset_version = {dataset_version}")
+    print(f"  split overlap   = {overlaps}")
 
 
 def generate_dataset(
@@ -581,7 +734,9 @@ def generate_dataset(
 
     examples     = []
     verify_fails = 0
+    duplicates   = 0
     retry_limit  = 10
+    seen_keys    = set()
 
     for family, count in schedule.items():
         gen = GENERATORS[family]
@@ -602,6 +757,19 @@ def generate_dataset(
                 if not verify(ex):
                     verify_fails += 1
                     continue
+            # Global uniqueness: a program may appear at most once in the whole
+            # dataset, which makes cross-split overlap impossible by
+            # construction rather than by luck (plan.md 3.5).
+            key = _program_key(ex)
+            if key in seen_keys:
+                duplicates += 1
+                continue
+            seen_keys.add(key)
+            # The generator's E7 slot is the multi-op CHAIN family, not a
+            # seventh expert; it is emitted under its redefined label. See the
+            # family_label_redefinition block in dataset_meta.json.
+            ex["family"] = FAMILY_OUTPUT_LABEL.get(family, family)
+            ex["generator_family_slot"] = family
             ex["id"] = f"{family}_{produced:06d}"
             examples.append(ex)
             produced += 1
@@ -612,22 +780,26 @@ def generate_dataset(
     print(f"\n✓  Generated {len(examples):,} verified examples")
     if verify_fails:
         print(f"   (Discarded {verify_fails:,} examples that failed correctness check)")
+    if duplicates:
+        print(f"   (Rejected {duplicates:,} duplicate programs to guarantee no cross-split overlap)")
 
     print(f"\nSaving train/val/test splits to: {Path(out_dir)}")
     split_and_save(examples, out_dir=out_dir, fmt=fmt, seed=seed)
 
     # Quick distribution sanity check
-    from collections import Counter
     dist = Counter(e["family"] for e in examples)
+    label = FAMILY_OUTPUT_LABEL
     avg_depth = {}
     for fam in FAMILY_WEIGHTS:
-        depths = [e["depth"] for e in examples if e["family"] == fam]
+        depths = [e["depth"] for e in examples
+                  if e["family"] == label.get(fam, fam)]
         avg_depth[fam] = sum(depths) / len(depths) if depths else 0
 
     print("\nFinal distribution:")
     print(f"  {'Family':<8} {'Count':>8}  {'Avg Depth':>10}")
     for fam in FAMILY_WEIGHTS:
-        print(f"  {fam:<8} {dist[fam]:>8}  {avg_depth[fam]:>10.2f}")
+        emitted = label.get(fam, fam)
+        print(f"  {emitted:<8} {dist[emitted]:>8}  {avg_depth[fam]:>10.2f}")
 
 
 # ──────────────────────────────────────────────

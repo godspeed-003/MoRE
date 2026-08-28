@@ -1,0 +1,49 @@
+{
+  "seeds": [
+    42,
+    43,
+    44
+  ],
+  "epochs": 20,
+  "blocks": 1,
+  "batch_size": 768,
+  "supervision_weight": 0.1,
+  "summary": {
+    "pure_act": {
+      "n": 3,
+      "val_mu": 0.06367619065017927,
+      "val_sd": 0.00028336611580550186,
+      "alloc_mu": 1.024747117717042,
+      "alloc_sd": 0.0592467522189494,
+      "spread_mu": 0.4519031614346427,
+      "spread_sd": 0.043751827882578746,
+      "align": [
+        0.6084981205783079,
+        -0.4278121460321339,
+        0.4312380522909596
+      ],
+      "align_mu": 0.20397467561237784,
+      "align_sd": 0.5542754044291199,
+      "depth_mu": 2.291595141092936
+    },
+    "supervised_curriculum": {
+      "n": 3,
+      "val_mu": 0.06395293628743716,
+      "val_sd": 0.0001896848308565591,
+      "alloc_mu": 0.44513298341861135,
+      "alloc_sd": 0.011656255503545652,
+      "spread_mu": 0.9829461966811571,
+      "spread_sd": 0.0835277695216914,
+      "align": [
+        0.973412092864011,
+        0.9726955714950014,
+        0.9261302944253851
+      ],
+      "align_mu": 0.9574126529281325,
+      "align_sd": 0.027093685903525042,
+      "depth_mu": 2.057304859161377
+    }
+  },
+  "decision": "pure_act",
+  "reason": "the val-task-loss gap does not exceed seed noise, and pure_act is the default winner on ties (rule 3): only an unsupervised run supports the adaptive-computation claim"
+}

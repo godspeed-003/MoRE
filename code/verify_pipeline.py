@@ -46,6 +46,15 @@ def _c(text: str, code: str) -> str:
         return f"\033[{code}m{text}\033[0m"
     return text
 
+# The Windows console defaults to cp1252, which cannot encode the box-drawing
+# and check glyphs below; without this the harness dies in its own banner
+# before running a single check.
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+
 PASS  = lambda s: _c(f"  ✓ PASS  {s}", "32")
 FAIL  = lambda s: _c(f"  ✗ FAIL  {s}", "31")
 WARN  = lambda s: _c(f"  ⚠ WARN  {s}", "33")
@@ -356,7 +365,27 @@ def check_dummy_pass():
         shutil.rmtree(tmpdir, ignore_errors=True)
         return
     shutil.copy(TRAIN_SRC, os.path.join(tmpdir, "train.py"))
-    results.record("train.py found and copied", True)
+    # train.py is a thin entry point; the implementation is the `more/` package
+    # (config, families, data, model, metrics, engine, run_context). The package
+    # must be copied whole, and run_context reads canonical_spec.json from the
+    # directory ABOVE the package -- i.e. the sandbox root -- so the sandbox
+    # mirrors code/ exactly.
+    CODE_DIR = os.path.dirname(os.path.abspath(TRAIN_SRC)) or os.getcwd()
+    pkg_src = os.path.join(CODE_DIR, "more")
+    if not os.path.isdir(pkg_src):
+        results.record("more/ package found", False, f"'{pkg_src}' missing")
+        shutil.rmtree(tmpdir, ignore_errors=True)
+        return
+    shutil.copytree(pkg_src, os.path.join(tmpdir, "more"),
+                    ignore=shutil.ignore_patterns("__pycache__"))
+    for dep in ("canonical_spec.json",):
+        dep_src = os.path.join(CODE_DIR, dep)
+        if not os.path.exists(dep_src):
+            results.record(f"{dep} found", False, f"'{dep_src}' missing")
+            shutil.rmtree(tmpdir, ignore_errors=True)
+            return
+        shutil.copy(dep_src, os.path.join(tmpdir, dep))
+    results.record("train.py + more/ package found and copied", True)
 
     # --- Generate 30 synthetic JSONL records ----------------------------
     import random, math
@@ -445,10 +474,12 @@ def check_dummy_pass():
     env["WANDB_SILENT"] = "true"
 
     # --- Run train.py subprocess ----------------------------------------
-    print(INFO("Launching: python train.py --config config.json --epochs 2"))
+    print(INFO("Launching: python train.py --architecture more "
+               "--config config.json --epochs 2"))
     t0   = time.time()
     proc = subprocess.run(
-        [sys.executable, "train.py", "--config", "config.json", "--epochs", "2"],
+        [sys.executable, "train.py", "--architecture", "more",
+         "--config", "config.json", "--epochs", "2"],
         cwd=tmpdir,
         capture_output=True,
         text=True,
@@ -503,9 +534,45 @@ def check_dummy_pass():
         "found" if loss_mentioned else "not found"
     )
 
-    # --- Check 4: results.tsv written with correct columns -------------
-    results_tsv = os.path.join(tmpdir, "results.tsv")
-    tsv_exists  = os.path.exists(results_tsv)
+    # --- Check 4: per-run directory written with the required artefacts ----
+    # Phase 0 (plan.md 2.2): outputs live in runs/<experiment_id>/, not in
+    # fixed global filenames. run_context puts RUNS_ROOT one level above the
+    # directory holding train.py, which here is the sandbox's parent.
+    runs_root = os.path.join(os.path.dirname(os.path.abspath(tmpdir)), "runs")
+    run_dirs = []
+    if os.path.isdir(runs_root):
+        run_dirs = [
+            os.path.join(runs_root, d) for d in os.listdir(runs_root)
+            if os.path.isdir(os.path.join(runs_root, d))
+        ]
+        run_dirs.sort(key=lambda p: os.path.getmtime(p), reverse=True)
+
+    results.record(
+        "runs/<experiment_id>/ directory created",
+        bool(run_dirs),
+        f"runs_root={runs_root}, found {len(run_dirs)}"
+    )
+
+    run_dir = run_dirs[0] if run_dirs else None
+    results_tsv = os.path.join(run_dir, "results.tsv") if run_dir else ""
+
+    if run_dir:
+        # plan.md 2.2 mandates exactly these artefacts per run.
+        for artefact in ("config.json", "resolved_config.json", "metrics.json",
+                         "results.tsv", "checkpoint.pt", "stdout.log"):
+            results.record(
+                f"run dir contains {artefact}",
+                os.path.exists(os.path.join(run_dir, artefact)),
+                os.path.basename(run_dir)
+            )
+        # No global output filenames may reappear next to train.py.
+        for forbidden in ("best_model.pt", "results.tsv", "final_run_metrics.json"):
+            results.record(
+                f"no global {forbidden} written",
+                not os.path.exists(os.path.join(tmpdir, forbidden))
+            )
+
+    tsv_exists = bool(results_tsv) and os.path.exists(results_tsv)
     results.record("results.tsv file created", tsv_exists)
 
     if tsv_exists:
@@ -559,6 +626,8 @@ def check_dummy_pass():
 
     # Cleanup
     shutil.rmtree(tmpdir, ignore_errors=True)
+    if run_dir:
+        shutil.rmtree(run_dir, ignore_errors=True)
     print(INFO(f"Temp directory removed: {tmpdir}"))
 
 
