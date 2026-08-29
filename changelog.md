@@ -1182,3 +1182,2542 @@ choice, not data, which is why a low correlation is a fact about the model rathe
 than a fact about mathematics. If a longer canonical run changes this picture,
 the number to recompute first is the per-seed correlation, not the allocation
 error.
+
+
+---
+
+## T6.8 — the per-family table became permutation-invariant, so an unsupervised router can finally be read
+
+**The problem.** T6.3 had already established the rule that expert indices carry
+no semantic identity, and it added Hungarian accuracy, AMI and purity — all
+permutation-invariant scalars. But the *per-family* breakdown (precision, recall,
+F1 per operation family) was still computed under the **identity** mapping:
+family `E3_MOD_POW` was scored against expert index 3. For a supervised router
+that is correct, because supervision pins the numbering. For an unsupervised
+router it is meaningless — the router may have learned a clean MOD/POW expert and
+numbered it 5, in which case the identity table reports recall 0.0 for a family
+the model actually separates. That is exactly the number a reader would quote as
+"MoRE fails on MOD/POW", and it would be an artefact of numbering.
+
+**What changed.** The metric layer now emits two per-family tables side by side.
+`per_family` keeps the identity mapping and is explicitly labelled as
+interpretable only when `step_routing` supervised the index. `per_family_matched`
+applies `hungarian_assignment` **first** and then computes precision / recall /
+F1 / support per family, and records which expert each family was matched to
+(`matched_expert`). A scalar `matched_macro_recall` accompanies it, alongside the
+pre-existing identity `macro_recall`. The same pair is flattened into the W&B key
+space as `val/routing_{precision,recall,f1}_matched/<FAMILY>` beside the
+unmatched keys, and the nested block's `note` field states in words which table
+to report for which regime.
+
+**Why both are kept rather than replacing one.** The gap between the two tables is
+itself the evidence. Identity macro-recall 0.126 against matched macro-recall
+0.418 on the same run *is* the finding "a partition exists, arbitrarily
+numbered". Deleting the identity table would remove the contrast; deleting the
+matched table (the state before T6.8) makes the finding unreportable. Regression
+tests pin invariance directly: relabelling the predicted expert indices by an
+arbitrary permutation must leave every matched quantity unchanged while the
+identity quantities move.
+
+**Where to look if this needs revisiting.** The computation is in
+[code/more/metrics.py](code/more/metrics.py) — the Hungarian assignment is solved
+there (no scipy in this environment, so the assignment is solved directly) and
+consumed by both tables. The writer that flattens the nested block into
+`metrics.json` and W&B keys is in
+[code/more/engine.py](code/more/engine.py). The invariance tests are in
+[code/test_phase6_routing_metrics.py](code/test_phase6_routing_metrics.py).
+**Practical consequence for comparisons:** any run produced before T6.8 has
+`per_family` but no `per_family_matched` and no `matched_macro_recall`, so it
+cannot be placed in a table beside a current run — the two arms would sit on
+different metric layers. This is the reason the T10.H family-supervision ablation
+retrains its own baseline arm instead of reusing the T8.0b runs.
+
+---
+
+## T7.2 — one command now runs all five correctness gates, and an empty gate fails
+
+**The problem.** Gates 1–5 existed as eight separate test files that had to be
+remembered and run by hand. Nothing tied them together, so "the gates pass" was
+an assertion about whatever someone last ran, and a suite that silently stopped
+asserting anything would look identical to a suite that passed.
+
+**What changed.** `code/run_correctness_suite.py` runs all eight suites grouped
+into the five gates, counts the `[PASS]` / `[FAIL]` / `[SKIP]` markers each one
+emits, prints a per-gate table, and exits non-zero if any gate fails. Current
+state: **347 checks, 347 pass, 0 fail, exit 0.**
+
+Three design decisions, each forced by a defect rather than chosen for style.
+*Subprocess per suite*, because the suites mutate global RNG state and
+`torch.backends` flags; imported into one process they contaminate each other and
+the failure looks like a model bug. *Fixed, non-alphabetical order*, because
+`test_gate5.py` reads the run directory that `test_phase6_provenance.py`
+produces — alphabetical ordering happens to work today and would break silently
+if a file were renamed. *A gate that counted zero assertions FAILS* with verdict
+`EMPTY`, never passes.
+
+That third rule exists because the runner's own first version reported "0 checks
+… PASS" for gates 1–4: its marker regex was anchored at column 0 while the Phase
+2–5 suites indent their markers, so it matched nothing and called that success.
+This is the same defect class as reporting a sentinel as a measurement — an
+absence of evidence rendered as evidence — and it is the one the whole T6.4/T6.5
+line of work was about.
+
+**Where to look if this needs revisiting.**
+[code/run_correctness_suite.py](code/run_correctness_suite.py); the `GATES` dict
+is the gate→file mapping and the `MARKER` regex is the counter. If a new suite is
+added it must be registered in `GATES` or it will not run, and if a suite changes
+its marker format the count will drop to zero and the gate will fail loudly
+rather than pass quietly. Run it before ticking any gate box and before any
+canonical launch.
+
+---
+
+## T8.0b — canonical routing supervision is OFF, and the router does partition the operation space without it
+
+**The decision that had to be made before the spec could freeze.** `config.json`
+shipped `loss_weights.step_routing = 0.5`, and that term is built as
+`0.01 * oracle_routing_ce + 0.3 * step_cls_loss` where `oracle_routing_ce` is a
+cross-entropy **directly on the router logits** against the oracle expert index.
+Every routing number measured before this task was therefore measured with the
+router being told the answer: raw accuracy, Hungarian accuracy, AMI and purity all
+sat at ~1.0 and the recovered assignment was the identity permutation. Freezing
+the spec at 0.5 would have frozen a headline specialization claim that measures
+the supervision signal rather than the architecture.
+
+**Method.** Two arms, `step_routing` 0.0 vs 0.5, everything else matched — MoRE,
+`pure_act` halting (the T8.0a selection, so the two decisions are not confounded),
+20 epochs, 1 block, batch 768, seeds 42/43/44, same dataset and splits. The
+reading rules were fixed in the driver docstring **before** any run, including
+what "no partition" and "a real partition under relabelling" would each look like
+numerically, and including a rule that a collapsed router (everything to one
+expert) is a different failure from an arbitrarily-numbered partition and must not
+be reported as the same thing.
+
+**Result.** Removing the oracle **costs 0.000155** val task loss against a seed
+std of 0.000428 — inside noise, with the unsupervised arm marginally ahead. So
+supervision buys nothing on the primary metric while making AMI 0.9992 true by
+construction. In the unsupervised arm the Hungarian assignment differs on every
+seed (`[4,0,5,1,3,2]`, `[5,3,4,1,0,2]`, `[0,1,4,5,3,2]`) while Hungarian accuracy
+stays at **0.5147 ± 0.0047** and AMI at 0.4940 against chance 0.167 — a real
+partition recovered under relabelling, which is the publishable form of the
+result. `step_routing = 0.5` is retained as the labelled T10.E oracle-routing
+ablation and may never share a table with canonical runs.
+
+**The honesty constraint this created.** `step_routing = 0.0` removes the *direct*
+routing supervision. It does **not** make the system unsupervised:
+`loss_weights.family_cls = 0.5` still trains `cls_head` on the same oracle family
+label, read off disk from the same hand-written manifest. So the claim must read
+*"specialization emerges without direct routing supervision, under whole-program
+family supervision"* — never as unsupervised expert discovery. T10.H exists to
+measure how much of the 0.5147 that remaining term accounts for.
+
+**Where to look if this needs revisiting.**
+[automated/routing_supervision_decision.py](automated/routing_supervision_decision.py)
+holds the pre-registered rules, the protocol and the report; `--report-only`
+re-derives the table from the existing `runs/routedec_*` directories without
+retraining, and the machine-readable summary is
+`automated/routing_supervision_result.json`. The term itself is assembled in
+[code/more/engine.py](code/more/engine.py) (`step_routing_loss`) and the oracle
+index it trains against comes from `families.OP_TO_EXPERT` via
+[code/more/data.py](code/more/data.py). If a routing number ever comes back at
+~1.0 on a canonical run, check `provenance.routing_supervision_weight` first — at
+0.0 that number would mean a label leak, not a result.
+
+---
+
+## T8.3 — the second-largest term in the objective stopped being an undeclared literal
+
+**The problem.** `engine.py`'s loss assembly contained a bare `0.5 * cls_loss`.
+That term — a 6-way cross-entropy on `cls_head(pooled)` against the whole-program
+family label — was the second-largest contributor to `total_loss`, and it appeared
+in **no** config file, **no** provenance block, **no** results table and **no**
+ablation label. It could not be varied from the command line, could not be
+reported, and could not be turned off to find out what it was doing. Worse,
+`cls_loss` was never accumulated per epoch either, so it was not even logged as a
+separate loss component — a direct violation of the rule that every loss term is
+tracked separately and `total_loss` is never the headline number.
+
+**Why it matters scientifically, not just tidiness.** That label is **external
+annotation, not self-supervision**: `data/script.py` stamps a `"family"` string
+into every JSONL record at generation time, `more/families.py:FAMILY_TO_IDX` is a
+hand-written manifest, and `more/data.py` reads `rec.get("family")` straight off
+disk. Proof that it is model-independent: the label histogram is byte-identical at
+`num_experts = 6` and `num_experts = 1`. So an undeclared 0.5-weighted oracle
+signal was shaping the shared trunk representation that the router reads, in every
+run in the project's history, while the write-up would have described the routing
+result as emerging without supervision.
+
+**What changed.** The literal became `loss_weights.family_cls`, declared in
+`config.json`, overridable by `--family_cls`, defaulted defensively in the engine
+*into `cfg` itself* so the value reaches `resolved_config.json` rather than being
+supplied silently at the point of use (the exact failure mode the literal had),
+recorded in both provenance blocks as `family_cls_weight` and
+`family_supervision_enabled`, pinned in `canonical_spec.json:enforced_fields` at
+0.5, checked by the Gate 0 guard, accumulated per epoch as
+`train/classification_loss`, and labelled by `resolve_variant` — `0.0` resolves to
+`no_family_supervision`, any other non-canonical value to `family_cls_<v>`, so an
+ablation run can never be tabled as canonical. The new term sits at the same
+position inside the `lw["task"]` factor as the literal did, so at 0.5 the
+objective is numerically unchanged.
+
+**Where to look if this needs revisiting.** The assembly is in
+[code/more/engine.py](code/more/engine.py) (`total_loss`), the default and the
+variant labelling in [code/more/config.py](code/more/config.py), the CLI override
+and its refuse-don't-ignore validation in [code/more/cli.py](code/more/cli.py),
+the guard field in [code/more/run_context.py](code/more/run_context.py), and the
+freeze — recorded as **INHERITED, not selected** — in
+[code/canonical_spec.json](code/canonical_spec.json). If a future run's routing
+metrics change unexpectedly, `provenance.family_cls_weight` is now the first field
+to read; before T8.3 there was nothing to read.
+
+---
+
+## T8.1 / T8.2 — the canonical configuration is frozen, the parameter budget is matched to 0.12%, and the default run is finally canonical
+
+**T8.1, the smoke.** Two epochs of each architecture at seed 42 on the full
+dataset, with every metric read by hand out of `metrics.json` rather than off the
+console. MoE 3,201,555 params / val task 0.071424; MoR 3,197,710 / 0.071318; MoRE
+3,201,555 / 0.072134. No NaN, no numeric sentinel. All three report
+`evals_per_token = 1.0` (sparse Top-1, not dense), `overflow_rate = 0.0`,
+`routing_mode = top1_sparse`, `router_noise = none`, `halt_target_mode =
+pure_act`, `variant = canonical`. MoR emits no routing quantity as a number and
+every depth metric as one; MoE, at `max_depth 1`, emits every depth metric as
+`"N/A"` because they are constants there. A re-run at an explicit `--seed 42`
+reproduced `val_loss 0.071318` to all digits.
+
+Against the trivial baselines computed on the real split: predict-train-mean MSE
+0.080914, predict-median and predict-zero 0.081853. All three architectures clear
+all three, so the criterion passes — **but only by ~12% at 2 epochs and ~21% at 20
+epochs (R² ≈ 0.215 against predict-the-mean)**. That is a modest fraction of
+target variance and must be stated plainly rather than presented as strong
+regression performance. It also means the three architectures' task losses sit in
+a narrow band, which is precisely why seed variance is reported beside every one
+of them.
+
+**Four defects the smoke caught, which is what a smoke is for.** MoR's flat
+`val/routing_*` keys were **absent** from `metrics.json` instead of `"N/A"`, even
+though the nested block writes `"N/A"` specifically so the field list is
+architecture-independent — absence is a third convention and mixing three
+conventions in one file breaks any consumer. `test_gate5.py`'s
+`train/ponder_cost > 0.0` check raised `TypeError` whenever the newest
+routing-bearing run was MoE (which correctly writes `"N/A"` at `max_depth 1`), so
+the gate's verdict depended on which architecture happened to run last; the run
+selector now requires both routing and depth. Check G5.2b accepted mere absence
+where it must require the string. And the console epoch line printed MoR
+`bal=1.0000` and MoE `halt=1.0000` while the artifact wrote `"N/A"` for both —
+`1.0000` beside MoRE's `−0.6128` reads as "MoR is maximally imbalanced", so both
+now route through the same `_na()` renderer the artifact uses. Correctness suite
+after the fixes: 347/347, exit 0.
+
+**T8.2, the freeze, and the parameter budget.** Two structural rules replaced
+filling fields by hand: whatever `apply_architecture` varies per architecture
+belongs in `architecture_variants` (a null there blocks only that architecture);
+whatever is shared belongs in `enforced_fields` (a null there blocks *all*
+canonical runs, which is the intended direction of failure). `mor.ffn_mult` was
+resolved to **24** and `enforced_fields.family_cls_weight` to 0.5, and
+`config.json` was made literal and complete in the same commit — before this, the
+defaults file said `num_blocks 2` / `batch_size 128` against the spec's frozen
+`1` / `768`, so the *default* run was silently a proxy and only an explicitly
+overridden run could ever be canonical.
+
+`ffn_mult = 24` equalises **total FFN hidden width**, not the per-FFN multiplier:
+MoR has one FFN where MoRE has six, so 24 = 4 × 6 is principled rather than
+fitted. Measured: 4 → 571,150 (82.2% short), 23 → 3,066,382 (4.22%), **24 →
+3,197,710 (0.120%)**, 25 → 3,329,038 (3.98%). The residual 0.120% is the router
+plus the six per-expert halt heads MoR does not have and is irreducible by any
+integer multiplier — that is the unavoidable difference T9.2 requires be stated,
+and it favours MoRE by 3,845 parameters, far too small to explain any task-loss
+difference. `ffn_mult = 4` survives as the labelled T10.I under-budgeted arm.
+
+Gate 0 measured: `canonical_phase_b` **accepted** for all three architectures at
+defaults (MoR was refused before, on the null `ffn_mult`), and refused for
+`--family_cls 0.0`, `--ffn_mult 4`, `--epochs 2` and `--seed 99`, each with the
+field and the required value named in the refusal.
+
+**What the frozen values actually rest on — do not flatten this in the paper.**
+`halting_mode` and `step_routing_weight` come from controlled 3-seed experiments
+(T8.0a, T8.0b). `d_model`, `lr` and `weight_decay` are **validated-stable but
+never swept** — 12 completed 20-epoch runs converge to ≈ 0.0635 without
+divergence, and `frozen_by` says so in those words; no width, lr or weight-decay
+sweep has ever been run under the corrected Top-1 / ACT / normalized-balance
+regime. `family_cls_weight` is weaker still: inherited from a code literal. The
+rest follow from `plan.md` or `updated_rules.md` by rule.
+
+**Where to look if this needs revisiting.**
+[code/canonical_spec.json](code/canonical_spec.json) is the frozen contract and
+its `frozen_by` / `architecture_variants_frozen_by` blocks record *why* each value
+holds — read those before quoting any hyperparameter as tuned.
+[code/config.json](code/config.json) is the defaults file and must be changed in
+the same commit as the spec or the guard will refuse every canonical run. The
+guard itself and the per-architecture stamping are in
+[code/more/run_context.py](code/more/run_context.py) and
+[code/more/config.py](code/more/config.py) (`apply_architecture`). If a canonical
+run is unexpectedly refused, the refusal message names the field; if one is
+unexpectedly *accepted*, the bug is in `_effective()` not exposing that field to
+the guard, which is how `family_cls` stayed invisible until T8.3.
+
+---
+
+## T10.H — Family-supervision ablation: how much of the expert partition does the oracle family label actually own?
+
+**The question.** Canonical MoRE sets `step_routing = 0.0`, so nothing trains the
+router on the oracle expert index directly. But `family_cls = 0.5` still trains
+`cls_head` on the whole-program family label read off a hand-written manifest —
+the same label the routing metrics are scored against. So the honest claim after
+T8.0b was hedged: *specialization emerges without direct routing supervision,
+under whole-program family supervision*. That hedge names an unmeasured quantity.
+T10.H measures it by turning the term off.
+
+**Method.** `automated/family_cls_ablation.py` trains six MoRE runs — two arms
+(`family_cls = 0.5`, `family_cls = 0.0`) × seeds 42/43/44 — at 20 epochs,
+1 block, batch 768, `pure_act`, `step_routing = 0.0`. Three design decisions
+matter for anyone re-reading the numbers later:
+
+1. **Both arms are trained fresh on one code state.** The obvious shortcut was to
+   reuse the T8.0b `routedec` runs as the baseline. They are inadmissible twice
+   over: they predate T8.3 (no `family_cls` key in their resolved config), and —
+   the disqualifying one — they predate T6.8, so they carry only the identity-
+   mapped `per_family` table and no `per_family_matched` / `matched_macro_recall`.
+   Comparing them against a current run would put the two arms on **different
+   metric layers**, and the matched table is precisely the evidence being argued
+   over. A missing metric in one arm is not a matched comparison.
+2. **Jobs are interleaved by seed**, so a sweep killed halfway still has both
+   arms at every completed seed rather than three baselines and no ablation.
+3. **The decision rule was written into the module docstring before any run** —
+   four pre-registered readings, including "if the partition falls to chance the
+   family label owns all of it and truly-unsupervised discovery is Outcome C" and
+   an explicit *do not round the retained fraction up*.
+
+**Result — the partition survives with no oracle label in the objective.**
+Hungarian accuracy 0.5147 ± 0.0047 with the term, **0.4300 ± 0.0293 without it**,
+against chance 0.167; AMI 0.4940 → 0.3568; purity 0.5881 → 0.5041. That is
+**~76% of the above-chance partition retained**, so the family CE contributes
+roughly a quarter of it and is not what creates it. Removing it costs nothing
+measurable on the primary metric: −0.000100 against a seed std of 0.000428, i.e.
+inside noise. No expert collapsed in either arm (load entropy 0.954 / 0.980), and
+the Hungarian assignment differs on every seed in both arms — stable accuracy
+under a different relabelling each time is the evidence of a real partition;
+identical assignments at ~1.0 would have meant a supervised index instead.
+
+**What this changes and what it does not.** It does **not** reselect the canonical
+value: `family_cls = 0.5` stays frozen in `canonical_spec.json`, both arms are
+`experiment_group = exploratory` 20-epoch proxies, and no number above may enter
+the headline table. What it does is convert a hedge into a measurement. Canonical
+rows keep the "under whole-program family supervision" phrasing, and the stronger
+sentence — *the partition does not require any oracle-derived label* — is now
+available as a labelled ablation with a number attached.
+
+**A cross-check worth keeping.** The fresh `family_cls = 0.5` seed-42 run
+reproduced the T8.0b run's `val/task_loss` to **0.000e+00** at tol 1e-9
+(0.064011740289 both). Two refactors sat between them — T8.3 moving `family_cls`
+out of the loss assembly into config, and T6.8 adding the matched metric layer —
+and neither perturbed the objective. If a future refactor of the loss assembly or
+metric layer breaks that equality, this is the run pair to diff against.
+
+**Where to look if this needs revisiting.** The driver is
+[automated/family_cls_ablation.py](automated/family_cls_ablation.py); its
+`MATCH_FIELDS` / `MATCH_MODEL` lists are what proves only one field differed (54
+comparisons, 0 mismatches), and `read_matching()` now refuses to report a pass
+when it compared zero fields — the same "absence is not a pass" defect class as
+the correctness suite's `EMPTY` verdict. The weight itself lives in
+`loss_weights.family_cls` in [code/config.json](code/config.json), is applied in
+[code/more/engine.py](code/more/engine.py), and is stamped into provenance as
+`family_cls_weight`; read that field first when a routing number looks surprising.
+Machine-readable result: `automated/family_cls_ablation_result.json`. One cosmetic
+artefact: the captured console banner reads "T10.F" because the process was
+launched before the T10.F→T10.H rename landed on disk — the source and all future
+runs print T10.H.
+
+---
+
+## T9.0 — Comparison protocol fixed before the canonical matrix launched
+
+**What was wrong.** `logging.log_interval` was 10, and the same field gates
+*validation* at `engine.py:629` (`epoch % log_interval == 0 or epoch == epochs`).
+So a 20-epoch run measured val exactly twice, and the 50-epoch canonical runs
+would have measured it six times. On top of that, "best epoch by val loss" over
+two candidates on a still-descending curve always returns the last epoch — the
+checkpoint-selection rule and "just take the final model" were operationally the
+same thing, and nothing in the repo said which one was intended.
+
+**How it was found.** Reading the T10.H `results.tsv` files rather than only their
+`metrics.json`. Eight of twenty rows per run held `nan` in the `val_loss` column.
+Those were unevaluated epochs, not failures, but they made the val curve
+unreadable. Between the only two measured points val fell **−0.002010 ± 0.000443**
+with the same sign in all six runs — roughly 4.7× the seed std, so validation was
+still improving at the end of training and the coarse cadence was hiding the curve
+rather than summarising it.
+
+**What changed.** `log_interval` 10 → 2 in `config.json`, and the defensive
+`setdefault` in `config.py` moved to 2 in the same commit — a default that
+disagrees with canonical is precisely the trap T8.3 hit with `family_cls`. The
+protocol itself is now recorded in a new non-enforced `protocol` block in
+`canonical_spec.json`: `val_interval`, `checkpoint_selection`
+(*lowest `val/task_loss` among evaluated epochs, no early stopping, full epoch
+count every run, argmin taken post hoc*), the parameter-budget policy with its
+0.120% residual, the seed-reporting rule, and the primary-metric floor. It sits
+outside `enforced_fields` deliberately: the Gate 0 guard does not check these, but
+the protocol audit requires them written down somewhere other than a changelog
+entry. `results.tsv` also now writes the string `"N/A"` for an unevaluated epoch
+instead of `nan`, matching `metrics.json` — nothing was ever *reported* as a
+measurement (the `isnan` guard kept it out of `best_val_loss`), but two
+conventions for "no number here" inside one run directory is what a plotting
+script misreads as a diverged loss.
+
+**Why this had to happen before Phase 9 and not after.** `log_interval` is not in
+`enforced_fields`, so changing it does not break the T8.2 freeze — but it *does*
+change `config_hash`. Changed partway through the matrix it would have produced
+two hash groups that may never share a table (CLAUDE.md §5), silently splitting
+the headline comparison in half.
+
+**Verified.** Correctness suite **347/347, exit 0** after the edits. A 4-epoch
+MoRE smoke (`t90_valcadence_check_seed42__d167dc3d`) confirmed both behaviours:
+val measured at epochs 2 and 4, `"N/A"` written at epochs 1 and 3, and
+`experiment_group = exploratory` because 4 ≠ the frozen 50 — the guard refusing a
+short run is the guard working.
+
+**Where to look if this needs revisiting.** The gate is one condition at
+[code/more/engine.py:629](code/more/engine.py:629); the TSV renderer is ~350 lines
+below it; the value lives in `logging.log_interval` in
+[code/config.json](code/config.json) with its default at
+[code/more/config.py:172](code/more/config.py:172). If a future run shows a
+suspiciously sparse val curve, that condition is the only thing controlling it.
+The written protocol is `canonical_spec.json:protocol` — read it before quoting
+any comparison rule as established.
+
+---
+
+## T9.1 — The canonical Phase-B matrix: driver and the 50-epoch correction
+
+**A correction that changes how every earlier number must be labelled.** The
+frozen canonical epoch count is **50**, not 20. Every multi-seed run this project
+has produced so far — T8.0a's ACT decision, T8.0b's routing-supervision decision,
+the T8.1 smokes, the six T10.H family-supervision runs — is a **20-epoch proxy**.
+They were all correctly stamped `experiment_group = exploratory` by the guard, so
+nothing was mislabelled on disk, but the distinction has to survive into the
+paper: those runs decided *design questions* under a matched protocol, and none of
+them is a headline row.
+
+**The driver.** `code/run_phase9_matrix.py`, deliberately in `code/` and not
+`automated/` — CLAUDE.md §9 bars `automated/` from launching canonical runs. Four
+rules are fixed in its docstring before the first run:
+
+1. **No CLI overrides beyond `--architecture`, `--seed`, `--run_name`,
+   `--experiment_group`.** Every other field must be *inherited* from
+   `config.json` so the Gate 0 guard can compare it against the spec. A driver
+   that passes `--epochs` is asserting the value instead of inheriting it, and one
+   typo becomes a proxy wearing a canonical label. `--experiment_group` is the
+   exception that proves the rule: it is not a config value, it is the canonical
+   *claim* the guard adjudicates. Omitting it cost 1.6 hours of compute — see the
+   next entry.
+2. **Admissibility is read from provenance, not from the exit code.** Each run
+   must show `experiment_group = canonical_phase_b`, `variant = canonical` and
+   `seed_declared = True`; anything else is recorded as a problem and excluded
+   from the aggregate rather than quietly averaged in.
+3. **Architecture-inapplicable metrics aggregate to `N/A`.** `mean_std()` skips
+   the string `"N/A"` and returns `None`, which prints as `N/A`. One extra
+   suppression was needed: MoE emits `train/avg_recursion_steps` as the float
+   `1.0`, which is a restatement of `max_depth = 1`, not a measurement — beside
+   MoRE's 2.13 it would read as a comparison of learned depths. Suppressed in the
+   driver, not in `engine.py`, so no existing run's `metrics.json` changes meaning.
+4. **Every number is mean ± std over five seeds, and the report does not rank the
+   architectures.** Each pairwise gap is printed beside the larger of the two
+   arms' seed stds and labelled `RESOLVED` (≥ 2×) or `inside seed noise`. The
+   three architectures are known to sit in a narrow band, so this is the only
+   honest way to present the primary comparison.
+
+The driver also cross-checks that `config_hash` is *constant within* each
+architecture (a seed must not change the config) while differing *across* them,
+and refuses to call an invariant check passed when it compared zero fields — the
+same "absence is not a pass" rule as the correctness suite's `EMPTY` verdict.
+Jobs are interleaved by seed, so a matrix interrupted halfway holds all three
+architectures at every completed seed instead of five MoE runs with nothing to
+compare against. Runs already on disk are skipped, which makes a ~4-hour matrix
+survive an interrupted session.
+
+**Where to look if this needs revisiting.** `SCALARS` in
+[code/run_phase9_matrix.py](code/run_phase9_matrix.py) is the exact metric-key
+list, and it was validated against a real `metrics.json` before launch — one key
+(`total_params`) turned out to live in provenance rather than metrics and is now
+read from there. If the matrix reports a whole column as `N/A`, suspect a renamed
+metric key there before suspecting the runs. Machine-readable output:
+`code/phase9_matrix_result.json`, whose `clean` flag is false whenever any of the
+15 runs was excluded.
+
+
+## T9.1a — The undeclared-group defect: six perfectly-canonical runs stamped `exploratory`
+
+**The failure.** The first launch of the T9.1 matrix ran for ~1.6 hours and
+produced five complete 50-epoch runs (moe/mor/more at seed 42, moe/mor at seed 43)
+plus one killed mid-training. Every one of them is inadmissible as a headline row.
+The launch banner said it out loud on run 1 — `[Run] experiment_group=
+exploratory` — and provenance confirmed it: `variant: canonical`,
+`seed_declared: True`, `resolved_epochs: 50`, `resolved_batch_size: 768`,
+`resolved_subset_fraction: 1.0`, and `experiment_group: exploratory`. Every
+*enforced* field matched the frozen spec. The single field the exporter filters on
+said "proxy".
+
+**The cause, and why no guard caught it.** `--experiment_group` is a CLI flag with
+`default=None` ([code/more/cli.py:107](code/more/cli.py:107)). The Gate 0 guard
+`assert_not_silent_proxy` reads the claim from `resolved["logging"]
+["experiment_group"]` ([code/more/run_context.py:256](code/more/run_context.py:256));
+when that is not `canonical_phase_b` it **returns
+`NONCANONICAL_GROUP_DEFAULT` with no error and no refusal.** That is deliberate
+design, not a bug: exploratory work must stay cheap, so an undeclared run is
+simply stamped exploratory. The consequence is a failure mode Gate 0 *cannot*
+catch by construction — a run can satisfy every enforced field and still be a
+proxy, because the group is a **claim the launcher makes**, not a value the guard
+derives. My driver's Rule 1 ("no CLI overrides") had classified the flag as an
+override and omitted it.
+
+**The guard was never broken.** Verified in-process before touching anything:
+setting `provenance.experiment_group` returns `exploratory` (wrong input path);
+setting `logging.experiment_group` alone refuses with *seed is not set* (the seed
+is read from `provenance.seed`, [run_context.py:181](code/more/run_context.py:181));
+setting `logging.experiment_group = 'canonical_phase_b'` **and**
+`provenance.seed = 42` returns `'canonical_phase_b'` for moe, mor and more at
+config defaults. The declaration was the only thing missing.
+
+**The fix, in two parts.** `launch()` now passes `--experiment_group
+canonical_phase_b`. And `find_dir()` gained `canonical_only`, used on the resume
+path: without it an `exploratory` directory would keep satisfying the skip check,
+so the failure would become **permanent** — the driver would skip that pair
+forever and report it as excluded on every subsequent invocation. That second half
+matters more than the first; a resumable driver can cache its own bugs.
+
+**Archived, not re-stamped.** The six directories are at
+`archive/t9_1_undeclared_group_runs/` with an `INVALIDATED.md` recording what they
+are and why. Editing `experiment_group` onto a finished `resolved_config.json`
+would manufacture a canonical label that no guard ever adjudicated — precisely the
+silent proxy the guard exists to prevent. A group is declared at launch and
+validated by the guard, never written onto a finished run (CLAUDE.md §5, §6).
+
+**Where to look if this recurs.** Read the *launch banner*, not the config: the
+line `[Run] experiment_group=` on the first run of any canonical batch is the
+cheapest possible check, and it appears within ~60 seconds. If it says
+`exploratory`, kill the batch immediately. Any new canonical driver must pass
+`--experiment_group canonical_phase_b`; this belongs in the pre-Phase-7 audit as a
+protocol defect rather than a code defect.
+
+
+## T9.1b — The matrix landed 15/15, and the one thing it flagged was its own verification rule
+
+**The matrix ran.** All 15 canonical runs completed with exit 0 in **236 min**
+(3.9 h), matching the ~4 h estimate. Per-run wall clock: MoE ≈ 7.7 min, MoR ≈ 13.4
+min, MoRE ≈ 25.8 min — MoRE is ~3.4× MoE because it recurses *and* routes.
+All 15 admitted: `experiment_group = canonical_phase_b`, `variant = canonical`,
+`seed_declared = True`, and **168 invariant provenance comparisons with 0
+mismatches** across the 12 protocol fields.
+
+**But the driver exited 1 with three problems**, one per architecture:
+
+```
+moe: 5 distinct config_hash values across seeds -- seeds must not change the config
+```
+
+**The predicate was wrong, not the runs.** `config_hash()`
+([run_context.py:82](code/more/run_context.py:82)) hashes the whole config minus
+`provenance` and `logging`. `--seed` is written into `data.subset_seed` **and**
+`training.subset_seed`, which are inside that. So config_hash differs across the
+five seeds of one architecture *by construction* — indeed the 8-char hash is the
+run-directory suffix, which is why `phaseB_moe_seed42__c35fe8b6` and
+`phaseB_moe_seed43__33afa654` never collide. I checked what actually differs by
+diffing the hashed portion of the five `resolved_config.json` files field by
+field: exactly two fields, `data.subset_seed` and `training.subset_seed`, and
+nothing else. And `resolved_subset_fraction = 1.0` on all 15 runs, so
+`subset_seed` provably **could not have changed the data** in this matrix.
+
+**A test had been asserting the opposite and passing.** `test_phase6_provenance.py`
+T6.7b read *"two seeds of one experiment share a config_hash, so the exporter can
+average them instead of refusing to mix hashes"* — while varying only
+`logging.run_name`. It never exercised the claim it made, so it passed while the
+claim was false. This is the same defect class as the guard landing in dead code
+and the `EMPTY` verdict: **a check that cannot fail is not a check.**
+
+**Resolution, and what was deliberately *not* changed.** `config_hash()` is
+untouched. `subset_seed` genuinely selects a different data subset whenever
+`subset_fraction < 1.0`, so dropping it from the hash would let two different
+datasets share one identity — a worse defect than the one being fixed, and it
+would silently change the hash of every future run, breaking comparability with
+these 15. Instead the *predicate* was corrected to ask the question that actually
+matters:
+
+- `scientific_config()` reduces a run to the hashed config **minus the seed
+  fields**, flattened to dotted paths.
+- `seed_blind_diff()` reports the differing **field paths** across an
+  architecture's five seeds, not two opaque hashes. `moe / mor / more` all report
+  `identical`.
+- Fewer than 2 admitted runs is itself a problem — absence is not a pass.
+- The report now prints both: config_hash per architecture (expected to differ by
+  architecture *and* seed) and the seed-blind identity verdict.
+
+T6.7b was rewritten into four honest assertions: the run label is outside the hash;
+changing the **real** seed *does* change the hash (so the matrix may not verify
+seeds by hash); two seeds are identical once the seed is factored out; and the
+seed-blind comparison still catches a real change (`lr 0.001 → 0.002`). Re-run:
+**350/350 checks, all five gates PASS** (up from 347 — the three new assertions).
+The matrix re-aggregated `--report-only` to **exit 0, no problems**, with no run
+re-executed.
+
+**Where to look if this needs revisiting.** `SEED_KEYS` in
+[code/run_phase9_matrix.py](code/run_phase9_matrix.py) is the list of config paths
+the seed is allowed to write into. If a future change routes the seed into a new
+field, the matrix will report `seeds disagree on a non-seed config field -- <path>`
+and naming that path in `SEED_KEYS` is the fix — *after* confirming the field
+really is seed plumbing and not a configuration difference. If a real exporter is
+ever written, it must compare seed-blind too; comparing raw `config_hash` would
+refuse to average the five seeds it exists to average.
+
+
+## T9.1c — What the canonical matrix actually measured (the headline result)
+
+**This is the first table in the project's history that is allowed in the paper.**
+15 runs, 50 epochs, full dataset, seeds 42–46, `experiment_group =
+canonical_phase_b`, 0 protocol mismatches. Every number is mean ± std over five
+seeds. Machine-readable: `code/phase9_matrix_result.json`.
+
+| arch | `val/task_loss` | `best_val_loss` | R² vs floor | params |
+|---|---|---|---|---|
+| MoE | 0.063260 ± 0.000137 | 0.062819 ± 0.000173 | 0.2182 | 3,201,555 |
+| MoR | **0.062706 ± 0.000100** | 0.062527 ± 0.000047 | 0.2250 | 3,197,710 |
+| MoRE | 0.063186 ± 0.000223 | 0.062892 ± 0.000193 | 0.2191 | 3,201,555 |
+
+Floor (predict the train mean on the real val split) = 0.080914.
+
+**The primary comparison, read against seed noise:**
+
+| gap | value | vs larger seed std | reading |
+|---|---|---|---|
+| MoRE − MoE | −0.000074 | 0.33× | **inside seed noise** |
+| MoRE − MoR | +0.000481 | 2.16× | resolved |
+| MoE − MoR | +0.000554 | 4.04× | resolved |
+
+**This is Outcome C on the primary metric, and it is reported as such.** MoR — one
+shared block, one expert, no routing at all — has the lowest validation task loss,
+and its margin over both MoE and MoRE clears 2× the larger seed std. MoRE is
+indistinguishable from MoE. Adding six specialized experts to a recursive block
+did **not** improve prediction; it cost 0.000481 in val loss and 3.8× in
+throughput. Two honest caveats in the other direction: the gap is ~0.8% of the
+loss and every architecture beats the predict-the-mean floor by only ~22%, so all
+three are weak models of this task and the ranking is a ranking among weak models;
+and MoR carries 3,845 *fewer* parameters, so the residual 0.120% budget difference
+favours the two arms that lost.
+
+**Routing does partition the operation space, without any oracle label in the
+objective** (`routing_supervision_weight = 0.0`):
+
+| metric | MoE | MoRE |
+|---|---|---|
+| Hungarian-matched accuracy | 0.5004 ± 0.0501 | 0.5258 ± 0.0547 |
+| AMI | 0.5132 ± 0.0758 | 0.4907 ± 0.0659 |
+| purity | 0.5715 ± 0.0563 | 0.6047 ± 0.0552 |
+| matched macro recall | 0.5133 ± 0.0493 | 0.5491 ± 0.0881 |
+| raw accuracy | 0.2016 ± 0.1411 | 0.1629 ± 0.1668 |
+
+Hungarian ≈ 0.51–0.53 against chance 0.167 with AMI ≈ 0.49–0.51: **a real
+partition, arbitrarily numbered.** That is exactly the raw ≪ Hungarian signature
+`results_exp.md` says to read as permutation, not failure — and the huge raw std
+(±0.14, ±0.17) is the permutation itself varying by seed, which is why raw accuracy
+must never be quoted alone. MoRE and MoE partition about equally well; specialization
+is not what separates them.
+
+**Adaptive depth is measured but is not tracking the curriculum:**
+
+| metric | MoR | MoRE |
+|---|---|---|
+| avg recursion steps | 2.0169 ± 0.0191 | 2.0642 ± 0.0520 |
+| depth allocation error (abs) | 0.9509 ± 0.0159 | 1.0055 ± 0.1033 |
+| early-exit rate | 0.9998 ± 0.0005 | 0.9998 ± 0.0002 |
+| forced-exit rate | 0.0002 ± 0.0005 | 0.0002 ± 0.0002 |
+
+Halting is alive (99.98% of tokens exit early, forced exit ≈ 0), but average depth
+sits at ~2.0 of `max_depth` for both, and an absolute allocation error of ~1.0 step
+means depth is **not** aligned with the predefined operation-complexity curriculum.
+Consistent with the earlier ACT decision experiment. The correct phrasing remains
+*the model allocates recursion depth, but not in accordance with the curriculum* —
+not "discovers intrinsic complexity".
+
+**Sparsity and cost.** `dispatch/evals_per_token = 1.0000 ± 0.0000` for all three,
+which is the Top-1 sparse-dispatch invariant holding exactly. Throughput 8485 ± 324
+(MoE) / 4574 ± 637 (MoR) / 2225 ± 246 (MoRE) tokens/s — a machine-specific
+engineering observation on one RTX 4060 Laptop, never an architectural efficiency
+claim. Diagnostics: load entropy ≈ 0.988 and per-token router entropy ≈ 0.997 are
+**balance, not specialization** (a near-uniform router); max pairwise cosine 0.051
+(MoE) / 0.073 (MoRE) is *consistent with differentiated parameterizations*, not
+proof of orthogonality.
+
+**Where to look if this needs revisiting.** The 15 directories are
+`runs/phaseB_{moe,mor,more}_seed4{2..6}__*`, each with `resolved_config.json`,
+`metrics.json`, `results.tsv` and `stdout.log`. `code/phase9_matrix_result.json`
+carries the aggregate with a `clean` flag. To re-derive the table without
+retraining: `python run_phase9_matrix.py --report-only`. Do not merge these rows
+with any pre-T6.8 run, any 20-epoch run (T8.0a/T8.0b/T10.H), or any Phase-10
+ablation arm — different epoch count or different loss configuration.
+
+---
+
+## T10.0a — Two defects that would have quietly corrupted the Phase 10 table
+
+Both found while preparing Phase 10, both fixed before any ablation ran.
+
+**`train.py --help` crashed.** `ValueError: unsupported format character ')'`. Two
+literal `%` signs in the `--ffn_mult` help text at `code/more/cli.py:96–105`
+("0.12%", "82.2% short") were passed through argparse's `%`-formatting. Escaped to
+`%%`. Trivial to fix, but worth an entry for what it *concealed*: because `--help`
+raised, nobody had ever read the flag list end to end, and the list turns out to
+have no flag for `fixed_depth`, `router_noise` or `routing_mode`. Three of the five
+Phase 10 arms vary a field that cannot be set from the command line at all. That is
+why the driver generates a per-arm config file and passes `--config` instead of
+building a flag string — a design decision that came directly out of a broken
+help message.
+
+**A 2-block run printed `variant = canonical`.** `resolve_variant` in
+`code/more/config.py` tagged deviations in `routing_mode`, `router_noise`,
+`fixed_depth`, `step_routing` and `ffn_mult`, but not `num_blocks`. The Gate 0
+guard already refuses a `canonical_phase_b` *claim* from a 2-block run —
+`num_blocks` is in `canonical_spec.json:enforced_fields` — so nothing unsafe could
+enter the headline table. But `variant` is the string an **ablation** table prints,
+and Phase 10's whole job is to print one row per deviation. Without the tag the
+T10.C row would have been labelled identically to the baseline row it was meant to
+be compared against. Fixed additively: `CANONICAL_NUM_BLOCKS = 1` is named as a
+constant and `resolve_variant` appends `num_blocks_{n}` when it differs. Canonical
+is 1, so all 15 T9.1 runs still resolve to `canonical` and nothing already on disk
+changed meaning.
+
+Verified all six Phase 10 configurations now label distinctly: `canonical`,
+`fixed_depth`, `num_blocks_2`, `router_noise_fixed_annealed`, `oracle_routing`,
+`routing_dense_blend`.
+
+**Where to look if labels look wrong.** `resolve_variant` in
+`code/more/config.py` is the single place a deviation becomes a printable name. It
+validates nothing — see T10.0 below for what that cost.
+
+---
+
+## T10.0b — CLAUDE.md §10: two audiences, two registers
+
+Not a code change; a documentation contract, added because agent output was being
+written at one altitude for two different readers.
+
+**The problem.** Files in this repository are read by the next agent, months later,
+trying to work out why a guard exists or what a metric key means. Chat messages are
+read by a researcher deciding whether to spend six GPU-hours. The same prose cannot
+serve both. Reporting `stdout.log carried 281 copies of "_histc_cuda does not have
+a deterministic implementation"` into a chat message spends the reader's working
+memory on a build detail and crowds out the decision they actually have to make —
+the register in which the `cls_loss` debate and the MoR findings were discussed.
+
+**The rule.** `CLAUDE.md §10` now states: full engineering depth — `file:line`
+references, exact metric keys, verbatim failure output, rejected alternatives,
+provenance detail — in **files** (changelog, TASKS.md, code comments and docstrings,
+ARCHITECTURE.md, results_exp.md, the paper). In **chat**: the finding first, then
+its implication for the architecture or the paper, the cost, and the decision
+needed. Leave out log lines, stack traces, config paths, hashes and directory names
+unless the user is about to act on them. Results tables in chat are welcome — they
+*are* the finding. Implementation tables are not.
+
+The section closes with an explicit ceiling-not-default clause: when the user asks
+a mechanism question, answer it at full depth.
+
+**Where to look.** `CLAUDE.md §10`, with a worked ✗/✓ contrast on the
+`log_interval` fix.
+
+---
+
+## T10.0 — The Phase 10 ablation driver: one field, proved by construction
+
+`automated/phase10_ablations.py`. Five arms, each removing or perturbing exactly
+one mechanism of canonical MoRE, against the canonical MoRE runs from T9.1.
+
+**Why the questions changed.** T9.1 came back Outcome C on the primary metric: MoR
+(one shared block, no routing) has the lowest val task loss, and MoRE is
+indistinguishable from MoE. So Phase 10 is no longer asking *how much does MoRE win
+by* — it is asking *which of MoRE's two mechanisms is doing anything at all*. The
+arms, in the order the driver runs them (highest scientific value first, so a batch
+killed halfway has answered the important questions):
+
+| task | arm | field changed | question |
+|---|---|---|---|
+| T10.F | `dense_routing` | `model.routing_mode` `top1_sparse → dense_blend` | does Top-1 sparse dispatch cost anything against evaluate-all-and-blend? |
+| T10.B | `fixed_depth` | `model.fixed_depth` `False → True` | does learned adaptive halting beat a constant depth, given the ~1.0-step allocation error T9.1 measured? |
+| T10.E | `routing_supervision` | `loss_weights.step_routing` `0.0 → 0.5` | does supervising the router with the oracle expert index improve the *task* metric, or only the routing metric? |
+| T10.D | `router_noise` | `model.router_noise` `none → fixed_annealed` | does exploration noise change the partition or the loss? |
+| T10.C | `two_blocks` | `model.num_blocks` `1 → 2` | does a second recursive block help, varying *only* `num_blocks`? |
+
+`num_blocks` last on purpose: the old 1-vs-2-block headline moved three factors at
+once and is uninterpretable. This is the run that makes that claim decidable.
+
+**`--config`, not flags.** Each arm is a full config file under
+`automated/phase10_configs/`, generated from `code/config.json` with one leaf
+changed. `write_arm_configs()` reads the file back, flattens it, and asserts the
+diff against the canonical MoRE base is *exactly* that leaf — so a future edit to
+`config.json` or to `load_config_defaults` that makes an arm differ in two places
+raises before any GPU time is spent, instead of producing a two-factor "ablation"
+that reads as one-factor in the table. Three of the five fields have no CLI flag
+(T10.0a), and a config file has the further advantage of being diffable on disk.
+
+**The base config is materialized, not raw.** `routing_mode`, `router_noise` and
+`fixed_depth` are absent from `config.json` and appear only via `setdefault` inside
+`load_config_defaults`. A diff against the raw file would show an *addition* for
+those three arms and a value *change* for the other two — two different kinds of
+evidence. `materialized_base()` runs the same loader the trainer runs, so all five
+fields are present and every arm is provably a one-value change from a stated
+value. `fixed_depth` needed one more step: it exists only as a bare literal default
+(`mc.get("fixed_depth", False)` at `more/engine.py:210` and `more/config.py:321`),
+in no config file and in no provenance block — the same defect class T8.3 surfaced
+with the `0.5` `family_cls` literal. `IMPLICIT_DEFAULTS` fills it on both sides of
+every comparison so *absent* and *the canonical value* are one thing.
+
+**The intent check and the outcome check are different claims.** Between the config
+file and the model sit `load_config_defaults`, `apply_architecture`,
+`resolve_overrides` and `enforce_routing_mode`, any of which can stamp a second
+field. So `one_field_check()` re-runs the comparison on `resolved_config.json` —
+what actually trained — seed-blind and label-blind, and requires the differing set
+to be exactly the intended leaf. Validated against the smoke runs, where it
+correctly reported `training.epochs: baseline 50 vs arm 1` as an unintended second
+difference. This is the check that makes the table's one-factor claim true.
+
+**The baseline is reused, and that is guarded three ways.** The T9.1 canonical MoRE
+runs (seeds 42–46) are the baseline arm rather than being re-trained — legitimate
+only because nothing in the model has changed since, the T10.H lesson being that two
+arms must not straddle a code change. `verify_baseline_state()` enforces it:
+
+1. *Retroactive, source.* No file in `more/{model,engine,data}.py` may be newer than
+   the oldest baseline run's `metrics.json`.
+2. *Retroactive, artefact.* Today's `config.json`, resolved through the trainer's own
+   loader, must equal what every baseline run recorded in `resolved_config.json`.
+   This is the check that matters for the plumbing files — `config.py`, `cli.py`,
+   `run_context.py` are deliberately **not** mtime-checked, because a label-only edit
+   (T10.0a's `num_blocks_2` tag) cannot change what trains and refusing on it would
+   make the guard cry wolf. Comparing the artefact proves the configuration is
+   unchanged regardless of how the loader was edited, which a source hash cannot show.
+3. *Prospective.* A sha256 fingerprint of all six sources is pinned on first launch
+   (`automated/phase10_code_fingerprint.json`) and re-checked on every later one, so
+   an edit landing *between two ablation arms* is caught even though it postdates the
+   baseline.
+
+Ablation arms use seeds 42–44 and the baseline mean is restricted to the **same
+three seeds** so the n matches; the 5-seed value is printed beside it for reference.
+
+**The reading rule, fixed before any run.** `|arm − baseline| ≥ 2 ×` the largest
+available seed std, same as T9.1 Rule 4. One refinement: the 3-seed baseline subset's
+std is ~4.5× *smaller* than the 5-seed std (0.000050 vs 0.000223 on
+`val/task_loss`) — three draws under-sample the seed spread, and taking the smaller
+number would make every gap look more resolved than it is. So the mean is compared
+at matched n=3 while the noise yardstick admits all five seeds. Below 2× the verdict
+is `inside seed noise`, which supports **no** claim in either direction — not "a
+small improvement", not "no effect".
+
+**Not canonical, by construction.** No arm passes `--experiment_group`, so every one
+is stamped `exploratory` and excluded from the headline. That is correct — an
+ablation is by definition not the frozen spec — and it is done by omission rather
+than by relying on the Gate 0 guard's refusal, because relying on an error path for
+correctness is how T9.1a happened.
+
+**Absence is not a pass.** A report run before anything has trained used to print
+the clean verdict *"every completed arm differs in exactly one field"* — true and
+worthless, since zero arms were checked. `collect()` now records that as a problem.
+Same defect class as the T9.1b assertion that could not fail.
+
+**What the 1-epoch smoke test caught.** All five arms were run for one epoch before
+committing the batch. `router_noise` had been declared as `"gaussian"`, which does
+not exist — `more/model.py:71` defines `ROUTER_NOISE_MODES = ("none",
+"fixed_annealed", "trainable")` and the `MoEBlock` constructor raised. The failure
+mode worth recording is not the typo: `resolve_variant` had already produced the
+label `router_noise_gaussian` without complaint, because it string-formats whatever
+it is handed and validates nothing. The label layer will happily name a
+configuration that cannot run. The driver now validates enum fields against
+`more.model`'s own tuples at config-generation time (`LEGAL_VALUES`), so the two
+cannot drift apart. `fixed_annealed` was chosen over `trainable` deliberately:
+CLAUDE.md §2 records that the L2-on-trainable-noise-scale mechanism is not a proven
+fix, so ablating `trainable` would confound router noise with unproven machinery.
+On the real batch this would have surfaced after two completed arms, roughly two
+hours in. Smoke directories are archived at `archive/t10_smoke_1epoch/` with an
+`INVALIDATED.md`; at `epochs = 1` they are proxies in the strictest sense and may
+never appear in any table.
+
+**Cost, sized from the smoke throughput.** ≈6.4 h for 5 arms × 3 seeds: dense
+routing 17.7 min/run, routing supervision 19.6, fixed depth 24.6, router noise 26.0,
+two blocks 41.0. Note dense routing came out *faster* than Top-1 sparse — the
+workload is launch-overhead-bound (T9.1c: 0–30% GPU utilisation at ~2 W), so
+evaluating all six experts as one batched matmul can cost less wall clock than
+gathering and scattering for one. A hypothesis to confirm on the real arm, not a
+result: one epoch on a downclocked laptop GPU is not a throughput measurement.
+
+**Where to look if a Phase 10 row looks wrong.** `automated/phase10_ablations.py`
+is the whole driver; `automated/phase10_configs/<arm>.json` is the exact
+configuration that trained, each carrying its own `_README` naming the sole
+deviation; `automated/phase10_ablations_result.json` carries the aggregate and the
+problem list. To re-derive the table without retraining:
+`python automated/phase10_ablations.py --report-only`. To verify the one-field claim
+without running anything: `--configs-only`. Arms already on disk are skipped, so an
+interrupted batch resumes.
+
+---
+
+## T10.1 — What the ablations measured: neither of MoRE's two mechanisms is earning its place
+
+> **CORRECTED by T11.0a.** Every `± std` and every verdict first written in this
+> entry came from a population std (÷n) instead of the sample std (÷n−1), which
+> understates the spread 22% at n=3 and inflated the `2 × std` ratios by the same
+> 22%. **Both RESOLVED verdicts below were artifacts and are now `inside seed
+> noise` (1.88× and 1.94×).** The tables in this entry have been corrected in
+> place; the reasoning that did not depend on the loss threshold is unchanged.
+> Read T11.0a before quoting any number from here.
+
+
+15 runs (5 arms × seeds 42–44), 50 epochs, against the canonical MoRE arm from T9.1
+restricted to the same three seeds. `automated/phase10_ablations_result.json`.
+Driver reported no problems: every arm's `resolved_config.json` differs from the
+baseline's in exactly the intended leaf, and all arms share one code state.
+
+### Primary metric — `val/task_loss`
+
+| arm | field changed | val/task_loss | verdict (2× seed std rule) |
+|---|---|---|---|
+| canonical MoRE | — | 0.063290 ± 0.000061 | baseline (5-seed: 0.063186 ± 0.000249) |
+| fixed_depth | `model.fixed_depth` `False → True` | 0.062822 ± 0.000108 | inside seed noise, **1.88×** |
+| routing_supervision | `loss_weights.step_routing` `0.0 → 0.5` | 0.063772 ± 0.000166 | inside seed noise, **1.94×** |
+| dense_routing | `model.routing_mode` `top1_sparse → dense_blend` | 0.063687 ± 0.000426 | inside seed noise, 0.93× |
+| router_noise | `model.router_noise` `none → fixed_annealed` | 0.063363 ± 0.000399 | inside seed noise, 0.18× |
+| two_blocks | `model.num_blocks` `1 → 2` | 0.063258 ± 0.000423 | inside seed noise, 0.08× |
+
+**No arm resolves on the primary metric.** Two came within 6% of the threshold and
+were originally mis-read as resolved (see the banner above). The scientifically
+important consequence is not "nothing happened" — it is that **`val/task_loss` on
+this dataset cannot discriminate any of these five mechanisms at n=3**, which is a
+statement about the benchmark's resolving power and belongs in the paper as such.
+The findings that survive live in the *non-loss* metrics below, where several arms
+move by many multiples of the seed std.
+
+
+### T10.B — adaptive halting costs no measurable accuracy, and saves 3.4× the depth
+
+`fixed_depth = True` runs every token to `max_depth = 7`
+(`train/avg_recursion_steps = 7.0000 ± 0.0000`, `halt/forced_exit_rate = 1.0`,
+`depth/allocation_error_abs = 5.8850` — the error is large *by construction* here
+and carries no information, since a constant 7 cannot track a 2–4 curriculum). It
+lands 0.000468 below canonical MoRE at **1.88×** the seed std — under the
+pre-registered threshold, so it **supports no claim of superiority.**
+
+**The direction this points has reversed relative to the first reading, and the
+reversal matters.** With the threshold not crossed, the defensible statement is:
+*canonical MoRE reaches the same task loss as a fixed 7-step schedule while
+spending 2.05 steps — a 3.4× reduction in recursion compute for no measurable
+quality cost.* That is what adaptive computation is supposed to buy, and it is a
+positive result for the halting machinery's *efficiency*.
+
+What it is **not** is evidence that the halting *policy* is good. T10.J (below)
+shows depth anywhere in 2.0–2.5 gives the same loss, and
+`depth/allocation_error_abs ≈ 1.0 step` says the policy does not track the
+complexity curriculum. So the compute saving is real, and the allocation rule is
+still unvalidated: a constant 2 would plausibly do as well, and no arm run so far
+excludes that. **That is the arm to run if one more is affordable** —
+`max_depth = 2` fixed, which isolates "is adaptive allocation worth anything over
+a small constant" and is the one question this phase left genuinely open.
+
+For the same reason the earlier MoR comparison must be softened: fixed-depth MoRE
+(0.062822 ± 0.000108) sits 1.04× the seed std from canonical MoR
+(0.062706 ± 0.000112), and canonical MoRE itself is 1.93× from MoR — both inside
+noise. Recorded as an informal observation and NOT as a table row (different n,
+different experiment group, CLAUDE.md §6). MoRE is not measurably worse than MoR
+on this benchmark; the earlier "MoRE loses to MoR" reading was the same std
+artifact.
+
+
+### T10.E — perfect routing buys nothing
+
+`loss_weights.step_routing = 0.5` supervises the router against the family manifest.
+It works exactly as intended and drives every routing metric to its ceiling:
+
+| metric | canonical MoRE | routing_supervision |
+|---|---|---|
+| `routing/hungarian_accuracy` | 0.5538 ± 0.0468 | **1.0000 ± 0.0000** |
+| `routing/ami` | 0.5092 | **1.0000** |
+| `routing/cluster_purity` | 0.6224 | **1.0000** |
+| `routing/matched_macro_recall` | 0.5712 | **1.0000** |
+| `routing/accuracy` (raw, index-aligned) | 0.0790 | **1.0000** |
+| `val/task_loss` | 0.063290 | 0.063772 (**1.94×, inside noise**) |
+
+Raw accuracy rising 0.0790 → 1.0000 while Hungarian rises 0.5538 → 1.0000 is the
+expected signature: supervision pins expert *indices* to families, so the arbitrary
+permutation that the unsupervised router is free to choose disappears. This is also
+the cleanest available confirmation that the Hungarian layer added in T6.3 is sound —
+the two accuracies coincide exactly when and only when the permutation is identity.
+
+Balance moves the other way: `routing/load_entropy` 0.9860 → 0.9518 and
+`loss/entropy_term` 0.9985 → 0.8208, i.e. supervision makes the load *less* uniform,
+because the family distribution in the dataset is not uniform. Nothing is collapsing;
+the balance loss is simply no longer the thing choosing the assignment.
+
+**The consequence for the paper's premise, which survives the correction.** A routing
+head that is 100% correct about operation family produces **no better** task loss
+than one that is 8% correct — the point estimate is worse, at 1.94× the seed std, so
+"hurts" is not supportable but "buys nothing" is, and the effect on the routing
+metrics is a 12-σ move against a 1.9-σ move on loss. Whatever the router contributes,
+it is not identifying the operation family. The specialization story cannot be the
+mechanism, because handing the mechanism to the model for free changes the primary
+metric not at all. Combined with T8.3 (`cls_loss` coefficient found to be 0.0 in
+canon) this is two independent results saying supervised family identity is not the
+useful signal.
+
+
+### T10.F — Top-1 sparsity buys nothing at this scale, and costs wall clock
+
+`dense_blend` evaluates all six experts and blends by gate probability
+(`compute/expert_evals_per_token` 1.0 → **6.0**). Task loss is indistinguishable
+(0.93×), and it is **1.40× faster** in wall clock (2912 ± 145 vs 2073 ± 170 tok/s) —
+confirming on the real arm the hypothesis the 1-epoch smoke test raised
+(`archive/t10_smoke_1epoch/INVALIDATED.md`): the loop is launch-overhead-bound, so
+one batched six-expert matmul beats a gather/scatter for one expert. Routing quality
+*degrades* under dense (Hungarian 0.5538 → 0.4963, purity 0.6224 → 0.5404), which is
+consistent with a blend having no pressure to commit to an expert.
+
+The arm never risked being mislabelled as MoE: `enforce_routing_mode` refuses any
+`dense_blend` run whose label lacks `dense_routing_ablation`, so its run name is
+`t10_more_dense_routing_ablation_seed{42,43,44}`.
+
+### T10.D and T10.C — the two flattest results in the phase
+
+`router_noise = fixed_annealed` (0.18× seed std) changes nothing measurable, which
+supports keeping `router_noise = none` as canonical — the current default was chosen
+on principle in T4, and this is the first evidence that the choice is also empirically
+free.
+
+`num_blocks = 2` is the flattest arm in the entire phase at **0.08× the seed std**,
+while carrying **1.99× the parameters** (6,358,553 vs 3,201,555) and running at 0.77×
+the throughput (1587 ± 153 tok/s). Two things follow:
+
+1. **The model is not capacity-limited.** Doubling parameters produces a change 11×
+   smaller than seed noise. Any future "make the model bigger to go faster / do
+   better" proposal now has a measured answer, and a capacity sweep is a low-value
+   experiment.
+2. **The old confounded 1-vs-2-block headline is finally decidable.** Pre-T6.8 runs
+   varied block count alongside other fields, so that comparison never isolated the
+   variable. Isolated, the second recursive block does nothing.
+
+### Cost and provenance
+
+~6.1 h of GPU time against a 6.4 h estimate, in two phases: 10 runs / 222 min, then
+`t10_more_router_noise_seed43` died 0.5 min in with exit `3221226505`
+(0xC0000409, STATUS_STACK_BUFFER_OVERRUN) immediately after W&B setup and with no
+Python traceback. The `[STOP]` guard halted the batch as designed rather than
+continuing with a hole in the matrix. Judged transient — seed 42 of the same arm had
+completed clean in 28.4 min — the dead directory was archived to
+`archive/t10_crashed_runs/` rather than deleted, and the driver's
+`find_arm_dir()`/`[plan]` logic resumed with `5 run(s) to launch, 10 already on disk`.
+All five completed exit 0 in 142 min. If that exit code recurs on a *specific* arm
+rather than randomly, suspect the W&B init path, not the model.
+
+Every arm is `experiment_group = exploratory` by omission of `--experiment_group`,
+never by relying on the guard's error path (which is how T9.1a was invalidated).
+No Phase 10 run may enter the headline table; these are ablations and are labelled as
+such, with the varying field named per arm.
+
+**Where to look.** Driver and arm table: `automated/phase10_ablations.py`
+(`ARMS`, `rule4()`, `one_field_check()`). Aggregate numbers:
+`automated/phase10_ablations_result.json`. Per-arm intent: the `_README` key in each
+`automated/phase10_configs/*.json`. Halting mechanics if the fixed-depth result needs
+re-examining: `more/engine.py:210` (`fixed_depth` read) and the ponder-cost assembly
+in the same file.
+
+---
+
+## T10.J — The ponder coefficient is exonerated, and the benchmark cannot see depth
+
+> **CORRECTED by T11.0a** (population-vs-sample std, see that entry). The original
+> title of this entry was "*the halt head is the defect*" — that conclusion depended
+> on T10.B's fixed-depth arm being a resolved improvement, which it is not. Numbers
+> and conclusion below are the corrected ones.
+
+
+3 seeds × 50 epochs, `loss_weights.halting` `0.001 → 0.0001` (10× weaker), nothing
+else changed. Same driver, same baseline, same reading rule. ~85 min.
+
+This arm exists because T10.B could not distinguish two very different claims. Fixed
+depth beat learned halting, but fixed depth also raised the compute budget 3.4×, so
+"adaptive computation does not work here" and "our ponder cost is mis-weighted" both
+predicted that result. **The reading was pre-registered in the arm's docstring before
+any seed ran** (`automated/phase10_ablations.py`, `ARMS` entry `T10.J`):
+
+> *if `avg_recursion_steps` rises from ~2.05 toward `max_depth` and `val/task_loss`
+> moves to the fixed_depth number (0.062822), the ACT objective was mis-weighted [...]
+> If depth rises but loss does not follow, the halt head is not learning anything
+> useful and Outcome C stands for the depth half of the architecture.*
+
+| metric | canonical MoRE | ponder ×0.1 | fixed depth | change |
+|---|---|---|---|---|
+| `train/avg_recursion_steps` | 2.0524 ± 0.0749 | **2.5120 ± 0.0876** | 7.0000 | **+0.46, ≈5.2× seed std — real** |
+| `val/task_loss` | 0.063290 ± 0.000061 | 0.063630 ± 0.000473 | 0.062822 | **0.72× seed std — flat** |
+| `halt/forced_exit_rate` | 0.0003 ± 0.0003 | 0.0104 ± 0.0089 | 1.0000 | ~35× but still ~1% |
+| `halt/early_exit_rate` | 0.9997 | 0.9896 ± 0.0089 | 0.0000 | still exits early ~99% |
+
+**The second branch fired.** Depth responded to the coefficient — the move is ~5.2×
+the seed std, so the halt head *is* sensitive to the penalty and the gradient path
+into it is live (which independently re-confirms the T6 halting-gradient fix). But a
+10× cut released only 0.46 of the 4.95 steps separating canonical MoRE from the
+fixed-depth budget, and task loss did not move at all. So the ponder cost is not what
+pins depth near 2: relax it by an order of magnitude and the model still chooses ~2.5
+steps, and choosing those extra 0.46 steps buys nothing measurable.
+
+**Conclusion for the paper, as revised by T11.0a.** Read together with the corrected
+T10.B — where a fixed 7-step schedule is *also* indistinguishable on loss — the
+finding is not "the halt head fails" but something sharper and more troublesome:
+**task loss on this benchmark is flat in recursion depth over the whole range
+2.0 → 7.0.** Three points now say so (2.05, 2.51, 7.00). A depth-allocation policy
+therefore cannot be evaluated on this task at all, in either direction: the halting
+machinery demonstrably works (depth responds to its cost term at 5.2σ), and the
+benchmark cannot tell a good allocation from a bad one. `depth/allocation_error_abs
+≈ 1.0` remains the only evidence about allocation *quality*, and it says the policy
+does not track the complexity curriculum.
+
+That is the honest claim, and it is a claim about the experimental design as much as
+the architecture: **testing adaptive computation needs a task whose loss is sensitive
+to depth.** This one is not, so MoRE's depth half is untestable here rather than
+refuted. Any follow-up should first establish depth sensitivity in the baseline —
+e.g. `max_depth = 2` fixed vs 7 fixed — before another halting variant is trained.
+
+
+**Why no `halting = 0.0` arm.** Considered and rejected; the reason is already in the
+T10.J docstring: at zero there is no pressure to exit at all, so the arm either drifts
+to `max_depth` and re-measures T10.B, or it does not, and either way the dose-response
+between 0.001 and 0.0001 has already shown the coefficient's influence is small
+relative to the 4.95-step gap. Spending ~1.4 h of GPU to place a third point on a
+curve whose slope is already known does not change any claim in the paper.
+
+Side observation, **not** a claim: this arm has the best unsupervised routing numbers
+in the phase (Hungarian 0.5654 ± 0.0500, purity 0.6495 ± 0.0117, AMI 0.5409 ± 0.0315
+vs canonical 0.5538 / 0.6224 / 0.5092) — all inside seed noise, so it supports
+nothing, but if a future arm needs a hypothesis, "more recursion steps give the router
+more chances to differentiate" is the one to test.
+
+**Where to look.** Arm definition and pre-registered reading: the `T10.J` entry in
+`ARMS`, `automated/phase10_ablations.py`. Config: `automated/phase10_configs/ponder_cost_low.json`.
+Runs: `runs/t10_more_ponder_cost_low_seed{42,43,44}__*`. Launcher log:
+`automated/phase10_ponder_launch.log`. If the halt head is ever reworked, the
+regression to beat is 2.5120 steps at 0.063630 — an improvement must move depth
+*and* loss together.
+
+---
+
+## T11.0a — The reporting layer used a population std, and it changed four verdicts
+
+Found while auditing the comparison protocol before Phase 11 (audit item 3), by
+recomputing the matrix independently with `statistics.stdev` and getting different
+ratios than the driver printed.
+
+**The defect.** `mean_std()` in both reporting drivers computed
+`sqrt(Σ(x−m)² / n)` — the *population* standard deviation. The seeds are a sample
+from the run-to-run distribution, so the unbiased estimator is `n−1`. Dividing by
+`n` understates the spread by **22% at n=3** and **12% at n=5**
+(`√(n/(n−1))` = 1.2247, 1.1180). Every verdict in this project is read against a
+`|gap| ≥ 2 × std` threshold, so a 22% understated std inflates every ratio by 22%
+and manufactures resolutions the data does not support.
+
+Two things make it unambiguously a bug rather than a defensible convention choice:
+
+1. **The repo already had a convention, and the reporting layer broke it.**
+   `automated/act_decision.py:181`, `automated/family_cls_ablation.py:230` and
+   `automated/routing_supervision_decision.py:203` all divide by `len(vals) - 1`.
+   Only the two drivers whose output was destined for the paper —
+   `code/run_phase9_matrix.py` and `automated/phase10_ablations.py` — divided by
+   `len`. So the ACT decision, the family-supervision decision and the
+   routing-supervision decision were all read on the unbiased estimator, and the
+   canonical matrix and the ablation phase were not.
+2. **The bias is in the one direction this project cannot afford** — it only ever
+   turns "inside noise" into "RESOLVED", never the reverse.
+
+**Fixed** in both files: `/(len(nums) - 1)`, with `n < 2 → std = None` rather than
+`0.0`, because a single seed has no spread and `0.0` reads as "perfectly
+reproducible" (CLAUDE.md §4, no sentinel as a measurement). `fmt()` prints
+`± N/A(n=1)`; `rule4()` and `gap_reading()` filter `None` out of the yardstick and
+return *cannot judge* if nothing is left. Both reports were regenerated from the
+run directories — no number was edited by hand.
+
+### Four verdicts changed
+
+| comparison | was | now |
+|---|---|---|
+| T9.1 `more − mor` | 2.16× — **RESOLVED, MoR better** | **1.93× — inside seed noise** |
+| T10.B fixed_depth | 2.10× — **RESOLVED, better** | **1.88× — inside seed noise** |
+| T10.E routing_supervision | 2.16× — **RESOLVED, worse** | **1.94× — inside seed noise** |
+| T10.J depth response | 6.4× | 5.2× (still resolved) |
+
+`moe − mor` at 3.62× (was 4.04×) and every "inside noise" verdict are unaffected.
+
+**Consequence for the paper.** The canonical matrix now contains **exactly one
+resolved difference**: MoR beats MoE by 0.000554, 3.62× the larger seed std. MoRE is
+statistically indistinguishable from *both* single-mechanism baselines
+(`more − moe` 0.30×, `more − mor` 1.93×). The previously-headline claim that MoRE
+loses to MoR does not survive, and neither does either Phase 10 resolution. This is
+Outcome C in the strict sense of CLAUDE.md §8 and must be reported as such.
+
+### Second finding: the verdicts are also sensitive to the checkpoint-selection rule
+
+`metrics.json` carries two candidate primary numbers and the protocol never declared
+which one is canonical:
+
+- `val/task_loss` — the **final-epoch** (epoch 50) validation task loss. This is the
+  number every report in this repository has used.
+- `best_val_loss` — the **minimum** over the 25 validated epochs
+  (`engine.py:951-953`), and the epoch at which `checkpoint.pt` was written.
+
+Both are pure task loss (`engine.py:942-950`: `val_loss` is `F.mse_loss` on the
+regression head with no auxiliary term), so this is *not* a total-loss contamination
+issue. It is a selection issue:
+
+| arch | last-epoch (reported) | best-val (checkpoint) |
+|---|---|---|
+| MoE | 0.063260 ± 0.000153 | 0.062819 ± 0.000194 |
+| MoR | 0.062706 ± 0.000112 | 0.062527 ± 0.000052 |
+| MoRE | 0.063186 ± 0.000249 | 0.062892 ± 0.000216 |
+
+| comparison | last-epoch | best-val |
+|---|---|---|
+| `moe − mor` | **3.62× RESOLVED** | 1.51× inside noise |
+| `more − mor` | 1.93× inside noise | 1.69× inside noise |
+| `more − moe` | 0.30× inside noise | 0.33× inside noise |
+
+**Under best-val selection nothing in the canonical matrix resolves at all.** The
+one surviving claim in the paper depends on a protocol choice that was never
+declared, which is precisely the class of defect that invalidates a comparison.
+
+**Ruling, and why.** **Last-epoch is canonical.** `best_val_loss` is a
+minimum-of-25 order statistic, so it is biased downward by an amount that scales
+with each architecture's *per-epoch validation noise* — and that noise is not
+matched across architectures (MoR's best-val std is 0.000052 against MoE's
+0.000194). Selecting on it therefore mixes "how good is this model" with "how noisy
+is its validation curve", which is a confound; last-epoch under a fixed 50-epoch
+budget with no early stopping is the same unbiased estimator for all three arms.
+Every number already reported uses it, so nothing is re-derived by this ruling —
+it is now *declared* rather than implicit.
+
+**Disclosure the paper must carry**: `checkpoint.pt` is the best-val checkpoint and
+is therefore **not** the model whose metrics are reported. Fixing that would mean
+re-running all 15 canonical runs (~5 h) to also save a final-epoch checkpoint; the
+cheaper and equally honest course is to state it, report both columns, and note
+that the two orderings differ. Recorded here so the discrepancy is never discovered
+by a reader instead of by us.
+
+**Where to look.** `code/run_phase9_matrix.py:mean_std` and
+`automated/phase10_ablations.py:mean_std` (both carry the full rationale in the
+docstring now). Checkpoint rule: `code/more/engine.py:942-953`. Regenerated
+aggregates: `code/phase9_matrix_result.json`,
+`automated/phase10_ablations_result.json`. If a future driver reports `± std`, it
+must divide by `n−1`; grep for `/ len(nums)` before trusting any new report.
+
+---
+
+## T11.0b — The blocking pre-Phase-11 audit: the protocol is sound, the reading rule was not
+
+**What the task was.** Discharge the five open items of the standing pre-Phase-11
+audit directive before the T11.1 exporter is allowed to emit paper numbers:
+(3) the comparison protocol and parameter matching, (4) every paper metric,
+(5) dataset and feature leakage, (6) contradictions across the governing
+documents, (7) the full regression suite. Output: `PHASE11_AUDIT.md`.
+
+**The headline, and it reverses two earlier conclusions.** Nothing measured in
+this project turned out to be wrong. The *reading rule* was. Every verdict ever
+produced here compared a difference of means against `max(std_a, std_b)` — one
+arm's per-seed spread — and called the difference real at `≥ 2 ×`. That is not
+the standard error of a difference. The correct denominator at n = 5 per arm is
+`sqrt(s_a²/n_a + s_b²/n_b)`, roughly √n smaller: for MoRE − MoR the driver
+printed "1.93 × seed std, inside noise" for a gap that is **3.94 standard
+errors**. The heuristic was suppressing real differences, and the T11.0a ddof fix
+(≈1.12× in the other direction) did not come close to cancelling it.
+
+**What replaced it.** Not a new `k`. With five matched seeds per arm the pooled
+values can be split C(10,5) = 252 ways, so the null distribution is enumerable
+and the **exact two-sided randomization test** is available: deterministic, no
+normality assumption, no threshold to choose, and it is what a reviewer asks for.
+Implemented once, in `code/seed_stats.py`, so the exporter and every future
+driver share it instead of each rolling its own `mean_std`. The module also
+returns `min_p = 1/C(n_a+n_b, n_a)` — the design's resolution floor — because a
+p-value sitting *at* that floor means "as extreme as this many seeds can show",
+which is a different statement from "significant" and must not be conflated.
+
+**Consequence 1 — the canonical matrix has two real differences, not one.**
+MoR beats MoE (p = 0.0079) *and* MoR beats MoRE (p = 0.0159); MoRE and MoE are
+indistinguishable (p = 0.659). Since MoE and MoRE are parameter-identical **to
+the unit** (3,201,555 both), that third comparison is the clean isolation of
+recursion, and recursion contributes nothing. The reading: adding expert routing
+on top of recursion recovers nothing recursion alone gives, and costs relative to
+recursion alone. Effect sizes are large (|d| 2.1–4.1) but the magnitudes are
+small — MoR's edge over MoRE is 0.00048, **2.7 % of the variance the models
+explain**. All three facts go in the paper together.
+
+**Consequence 2 — two Phase 10 arms resolve after all.** `dense_routing` is
+significantly *worse* than Top-1 sparse (+0.000500, p = 0.0179), which supports
+the canonical routing choice on quality as well as on its 6× dispatch cost. And
+routing supervision **hurts** (+0.000585, d = 2.77, p = 0.0179): driving the
+router to perfect family assignment — Hungarian accuracy, AMI, purity and matched
+macro-recall all exactly 1.0000 ± 0.0000 — makes task loss significantly worse.
+The T11.0a retraction of "perfect routing hurts" down to "buys nothing" was
+itself an artifact of the reading rule and is **withdrawn**; the stronger claim
+holds. Both arms sit exactly at the n = 3 floor (1/56 = 0.0179), so neither
+survives Bonferroni across six arms — the n = 3 design cannot support a
+multiplicity-corrected claim at all, and seeds 45–46 on these two arms (4 runs,
+≈2.8 h) would drop the floor to 0.004 and fix that.
+
+**Item 3 — the comparison protocol passes, and more cleanly than expected.**
+Flattening the three seed-42 resolved configs gives 44 fields of which **36 are
+bit-identical**; the 8 that differ are `architecture`, `run_name`, `num_experts`,
+`max_depth`, `adaptive_halting`, `ffn_mult`, and the two loss weights whose terms
+are undefined for the arm that zeroes them (`halting` for MoE, `routing_balance`
+for MoR). **No free hyperparameter differs between arms** — same `lr`,
+`weight_decay`, `dropout`, `batch_size`, `epochs`, `d_model`, `num_blocks`,
+`grad_clip`, both data versions, `log_interval`, and the remaining loss weights.
+
+Parameter counts were re-derived by instantiating `MoREModel` from each run's own
+recorded model block and summing `named_parameters()`; all three match the
+`provenance.total_params` the run wrote at train time. MoE 3,201,555 /
+MoR 3,197,710 / MoRE 3,201,555. MoE == MoRE exactly because `adaptive_halting`
+is not a constructor argument — the six halt heads are allocated in MoE too and
+merely receive no gradient, so MoE carries 1,542 params (0.048 %) of dead weight
+and the recursion-isolating comparison is exactly matched. The MoR gap of 3,845
+(0.120 %) decomposes completely: **1,285** halt heads (6 × 257 vs 1 × 257),
+**1,280** router (256 × 6 vs 256 × 1), and **1,280 that the frozen note in
+`canonical_spec.json` omits** — a bias-count difference, 6 × (1024 + 256) = 7,680
+biases against 1 × (6144 + 256) = 6,400. The weight matrices match exactly
+(6 × 2 × 256 × 1024 = 2 × 256 × 6144); only the biases cannot, at any integer
+`ffn_mult`. Crucially the gap runs *against* the result — MoR wins with fewer
+parameters — so MoRE's loss cannot be blamed on capacity. Also disclosed: MoR's
+256-parameter router is vestigial (softmax over one logit is identically 1.0).
+
+**Item 4 — two Rule 4 violations, both in the reporting layer only.** MoE emits
+`halt/early_exit_rate = "N/A"` (correct) but `halt/early_exits = 0.0` and
+`halt/forced_exits = 224450.0` as numbers: with `max_depth = 1` the code counts
+every single-step token as a forced exit, so a reader sees "MoE never exits
+early", which reads as a finding about halting behaviour MoE does not have. The
+guard at `engine.py:875` is `if _tot_exits > 0`, which is true for MoE, and the
+applicability layer that stamps `"N/A"` covers `halt/*_rate` but not
+`halt/*_exits` — the same shape as every past defect in this repo where the guard
+was on the wrong quantity. Second: `train/halting_supervision_loss = 0.0` in all
+15 runs, because `engine.py:814` divides the accumulator by `n_batches`
+unconditionally while canonical never computes the term. `0.0` for a loss invites
+"the curriculum objective was satisfied perfectly". Both must become `"N/A"`, and
+`test_phase3_halting.py:626` / `test_gate5.py:156` must be relaxed to accept
+`"N/A"` or they will fail the fix. Not defects: `dispatch/overflow_*` (real, with
+`capacity_policy = no_capacity_limit` recorded beside it) and
+`dispatch/router_noise_scale` (canonical noise is genuinely none).
+
+Also from item 4, two scoping problems the exporter must handle. **50 keys are
+absent rather than `"N/A"`** for the arm they do not apply to — 24 per-family
+routing metrics, 5 `expert_load` slots, the Hungarian assignment and collapsed-expert
+count (all MoR), and `depth_dist/step_{2..7}_pct` (MoE) — so absent must map to
+N/A and never to 0.0, or MoR shows zero per-family recall. And **no run records
+R²**: `canonical_spec.json` freezes `primary_metric_floor = 0.080914` but nothing
+joins it, so the paper would print 0.0632 against no scale. Against the floor all
+three architectures explain **21.8–22.7 %** of target variance and the entire
+between-architecture spread is **3.1 % of what they explain** — the single most
+important piece of context in the results section.
+
+**Item 4, continued — what the depth distribution says.** Read off the raw
+metrics for the first time in this audit, and it is the sharpest negative result
+in the project: **96.51 % of MoRE tokens exit at exactly step 2** (step 1 0.005 %,
+step 3 2.85 %, steps 4–7 together 0.64 %), and per-operation average depth spans
+only **1.999 (SORT) to 2.112 (AND) — 0.11 steps across sixteen operations** whose
+curriculum target depths span **1–4**, not 1–7: `families.OP_TARGET_DEPTH` assigns
+1 to eight operations (ADD SUB AND OR XOR NOT SHIFT_L SHIFT_R), 2 to four
+(MULT DIV MAX MIN), 3 to two (MOD POW) and 4 to two (MEDIAN SORT). The 7 is
+`model.max_depth`, the configuration's ceiling, and no operation ever targets it —
+an earlier draft of this entry conflated the two. The corrected table sharpens the
+reading rather than softening it. The target mean is **1.875**, and the model's
+constant ≈2.05 is essentially that mean: the halt head is performing
+*unconditional mean prediction*. That also explains the magnitude of
+`depth/allocation_error_abs = 1.010` exactly — a constant-at-the-mean predictor on
+this skewed table gives a mean absolute error of ≈0.90, and because half the
+operations want depth 1, almost all of that error is **over-computation on the
+easy operations**, not under-computation on the hard ones. So the cost of the
+failure is wasted compute, not lost accuracy on MEDIAN/SORT. The honest statement is that
+**the halting mechanism learned a constant depth of 2, not an adaptive policy.**
+It is not broken — T10.J moved depth to 2.51 by scaling the ponder coefficient, so
+gradient does reach the halt head — it simply has no incentive to differentiate,
+because 1 vs 2 vs 7 steps makes no measurable difference to loss on this
+benchmark. Separately: the 2.05 figure everyone quotes is
+`train/avg_recursion_steps`, a **training-time** mean; there is no
+`val/avg_recursion_steps`, and dropout is on in training and off in eval, so the
+depth claims must either be relabelled "training-time" or a validation-pass depth
+metric must be added.
+
+**Item 5 — leakage passes 8/8, three of them non-vacuity controls.** Mutating the
+step result changes 368/400 targets and **0** input features; permuting expert
+labels changes 400/400 `step_experts` and **0** input features; no low-cardinality
+slot maps 1:1 onto the expert label (majority-class rate 0.303); input features
+are **bit-identical across E = 1 / 5 / 6**, which is the `updated_rules.md` §3
+invariant that licenses comparing MoR against MoE/MoRE at all; zero
+`(op, args, result)` overlap across all three split pairs. Residual
+target-equals-an-argument coincidence is 33.45 % of val records and is inherent —
+MAX/MIN/MEDIAN/SORT return an argument — and is made safe by the control that the
+best single-feature copy scores 0.081853, *worse* than predicting the train mean
+(0.080914). Pre-fix those figures were 100 % and 0.000000.
+
+**Item 6 — the load-bearing contradiction: the frozen checkpoint rule is not the
+rule that was used.** `canonical_spec.json → protocol.checkpoint_selection`
+freezes "lowest `val/task_loss` among evaluated epochs" and every report used the
+**final epoch** instead. The frozen note itself said the T10.H agreement between
+the two "is a measurement, not a guarantee, and must be re-checked on the matrix"
+— re-checked here, and **it fails**: all 15 canonical runs diverge (MoRE seed 42,
+0.063307 final vs 0.063097 best). Both are pure `F.mse_loss`, so this is
+selection, not contamination; `best_val_loss` is a minimum over 25 validated
+epochs whose downward bias scales with each arm's validation-curve noise, and that
+noise is *not* matched (MoR 0.000052 vs MoE 0.000194), which is why last-epoch is
+the better rule. **But amending a frozen field is the researcher's call, not the
+auditor's**, so `PHASE11_AUDIT.md` §7.1 reports the matrix under both. The
+reassuring result: the qualitative conclusion is **identical under both rules** —
+MoR beats MoE (p 0.0079 / 0.0397) and beats MoRE (p 0.0159 / 0.0079), MoRE ≈ MoE
+(p 0.659 / 0.611) — so this is a declaration problem, not a scientific one. Either
+way the paper must disclose that **`checkpoint.pt` is not the model whose metrics
+are reported**.
+
+Three smaller item-6 findings: the frozen `seed_reporting` rule is **1 ×** std
+while practice used 2 ×, and read literally the frozen text states a *necessary*
+condition, so 2 × was a defensible but undeclared strengthening sitting exactly
+where the MoRE − MoR result lives. `subset_fraction`, `routing_mode` and
+`router_noise` are absent from `config.json` and supplied by defaults that happen
+to match the spec, so `resolved_config.json:_README`'s claim that every enforced
+field "holds the same value here" is overstated for three of eighteen.
+`canonical_spec.json` has **no null fields**, so the proxy guard is armed and all
+15 runs earned `experiment_group = canonical_phase_b` through it.
+
+**Retracted from an earlier audit note:** `num_experts`, `max_depth`,
+`num_blocks`, `d_model`, `lr`, `weight_decay` and `routing_balance` were listed as
+"provenance gaps". They are not. They are absent from the `provenance` sub-block
+but recorded at the top level of the same `resolved_config.json` **and** in W&B,
+because `engine.py:277` builds `wandb_config = {**mc, **tc, **lw, **dc}` before
+adding the provenance fields. `updated_rules.md` §9 asks that the W&B run record
+them; it does.
+
+**The weakest link, disclosed:** all 15 canonical runs carry
+`code_git_commit = f7166b4` *and* `code_git_dirty = true`, so the recorded commit
+does not pin the code that trained them. The 15 share one code state with each
+other and the 18 Phase 10 runs share one with each other, but neither is
+recoverable from git alone. Commit the tree, or ship content fingerprints for the
+canonical matrix the way `automated/phase10_code_fingerprint.json` does.
+
+**Failure tracing.** If a future report calls a difference "inside noise" and it
+looks too clean, check whether the driver used `code/seed_stats.py:perm_test` or
+rolled its own `k × std`: the latter is ~√n too conservative. If a p-value equals
+`min_p` exactly, the design is at its resolution floor and the answer is more
+seeds, not a stronger claim. If MoE shows a numeric early/forced-exit count, the
+fix at `engine.py:875` did not land. If a results table shows `0.0` for a MoR
+per-family recall, the exporter is mapping absent to zero instead of N/A. If the
+headline loss numbers ever shift by ~0.0004 with no code change, someone switched
+between `val/task_loss` and `best_val_loss`.
+
+**Where to look.** `PHASE11_AUDIT.md` (all seven items, with the 12-row
+required-action table at §8). New shared statistics module:
+`code/seed_stats.py` — `perm_test`, `se_of_difference`, `mean_std`, and the
+resolution-floor table in its docstring. Metric defects:
+`code/more/engine.py:875` (exit counts) and `:814`
+(`halting_supervision_loss`). Frozen protocol fields:
+`code/canonical_spec.json → protocol` (`checkpoint_selection`,
+`seed_reporting`, `parameter_budget_note`, `primary_metric_floor`). Leakage
+controls: `code/audit_leakage.py`.
+
+**Verified by.** `code/run_correctness_suite.py` → **350/350 checks pass**,
+Gates 1–5 (19 + 31 + 27 + 130 + 143), 152.8 s, no failures or skips.
+`code/audit_leakage.py` → **8/8**. `code/seed_stats.py` reproduces the §7.1
+table from the run directories, and its N/A paths return `None` rather than 0.0
+at n = 1 and for all-`"N/A"` inputs. Every number in `PHASE11_AUDIT.md` was
+recomputed from `runs/*/metrics.json` and `runs/*/resolved_config.json` in this
+audit — nothing was copied from a prior report or changelog entry.
+
+---
+
+## T11.0c — Landing the audit's blocking fixes: the protocol is amended, the reading rule is now the only reading rule
+
+**What this task did.** `T11.0b` diagnosed; this entry is the repair. Eight of the
+twelve required actions in `PHASE11_AUDIT.md` §8 are closed here. Two (the
+exporter's absent→N/A mapping and its R²/floor columns) are deferred to **T11.1**
+because the exporter does not exist yet, and two are held pending the researcher's
+decision. The audit document was also renamed `PRE_PHASE7_AUDIT.md` →
+`PHASE11_AUDIT.md`; the old name predated the phase renumbering and was actively
+misleading about which gate the document blocks. All four referring files were
+updated in step.
+
+**The frozen protocol was amended, deliberately and with the reasoning recorded.**
+`canonical_spec.json:protocol.checkpoint_selection` moved from
+`"lowest val/task_loss among evaluated epochs"` to `"final epoch"`. This is the one
+change in this entry that alters a *frozen* field, so the note beside it carries the
+full argument rather than a pointer: `best_val_loss` is a **minimum over ~13
+evaluated epochs**, an order statistic whose downward bias grows with the arm's
+per-epoch validation noise — and that noise is **not matched across arms**
+(per-seed std: MoR 0.000052, MoRE 0.000216, MoE 0.000194). Selecting on it hands
+the noisiest architecture the largest free improvement, which is a selection bias
+that *varies by architecture*, the one kind a three-way comparison cannot absorb.
+Last-epoch is noisier per run but unbiased and identically defined for all three.
+The old rule's own note had required re-checking, on the matrix, whether the argmin
+coincided with the final epoch as it had on the six 20-epoch T10.H runs; it does
+not — all 15 canonical runs diverge — which is what forced the choice. **Verified
+harmless to every finding:** all three pairwise verdicts are identical under both
+rules, so this changes the declared protocol, not a result. `best_val_loss` stays
+in `metrics.json` as a secondary column.
+
+**`protocol.seed_reporting` was amended too, and this is the more consequential
+one.** It had frozen "a difference smaller than the seed std is not a difference".
+That sentence is the `k × std` rule, and the rule is wrong in its denominator, so
+freezing it froze the defect. Replaced with the exact randomization test, with the
+derivation and the resolution-floor table (0.0040 at 5v5, 0.0179 at 3v5, 0.0500 at
+3v3) written into `seed_reporting_note`, including the explicit prohibition on the
+paired sign-flip variant (minimum two-sided p = 2/32 = 0.0625, can never reach
+α = 0.05) and the standing requirement to print `min_p` next to every p.
+
+**`protocol.parameter_budget_note` gained the component it was missing.** The
+0.120 % MoR deficit now decomposes in the file as 1,285 halt heads + 1,280 router +
+**1,280 FFN biases**, with the arithmetic shown: six experts carry
+6 × (1024 + 256) = 7,680 bias parameters against MoR's 6,144 + 256 = 6,400, while
+the weight *matrices* match to the parameter (6 × 2 × 256 × 1024 = 2 × 256 × 6144).
+The bias term is irreducible at any integer `ffn_mult`, and the whole gap runs
+*against* the headline result. The note also now records that MoE and MoRE are
+parameter-identical **to the unit** (3,201,555), because `adaptive_halting` is not
+a `MoREModel` constructor argument, so the six halt heads are allocated under
+`architecture = moe` as well and simply never receive gradient — which is what makes
+MoRE-vs-MoE the exactly-matched isolation of recursion.
+
+**Two Rule 4 violations closed in `engine.py`.**
+- `halt/forced_exits` and `halt/early_exits` were **absent from the N/A list at
+  `engine.py:1053`** while the four derived rates were in it, so a MoE
+  `metrics.json` carried a real integer forced-exit count beside
+  `halt/forced_exit_rate = "N/A"`. A count is as much a halting measurement as a
+  rate, and emitting it invites an exporter to divide it by itself and re-derive
+  the very rate the block refuses to state. Both keys added to that tuple.
+- `train/halting_supervision_loss` was written **unconditionally** at
+  `engine.py:814`, so all 15 canonical runs recorded `0.0` for a term that was
+  never accumulated (canonical has `loss_weights.halting_supervision = 0.0`).
+  `0.0` there is indistinguishable from "supervised, and predicted depths matched
+  the curriculum exactly" — opposite meanings, one rendering. Now gated on
+  `halting_supervision_enabled` (the *flag*, not the value), so a genuinely
+  converged zero still prints as a number.
+
+**The two tests the audit flagged needed no change** — checked rather than assumed.
+`test_gate5.py:156` asserts *presence* of the loss-component keys, and `"N/A"` is
+present; `test_phase3_halting.py:626` greps `engine.py`'s **source text** for the
+key strings, which are still there. Correctness suite re-run after all edits:
+**350/350, 5/5 gates PASS.**
+
+**`automated/phase10_ablations.py` was rewired to the shared statistics module.**
+Its local `mean_std` and its `rule4` (the `2 × std` reading rule) are gone; both now
+delegate to `code/seed_stats.py`, so this driver, `run_phase9_matrix.py` and the
+future exporter cannot drift on what "significant" means. Three design changes came
+with it:
+- The **seed set is per-arm and discovered from disk** (`arm_seeds()`), because
+  `dense_routing` and `routing_supervision` were extended to seeds 45–46 while the
+  other four arms stay at n=3. A constant would have let a partially-completed
+  extension compare an n=4 arm as though it were n=3.
+- The **baseline is no longer restricted to the arm's seeds.** This was tried first
+  and discarded: a randomization test does not require `n_a == n_b`, and matching
+  threw away two valid baseline draws while collapsing the floor from 1/56 = 0.0179
+  to 1/20 = 0.0500 — at which *no* arm can reach α = 0.05. The constraint that
+  motivated matched n was the old rule's single-arm-std yardstick, and it left with
+  the rule.
+- An arm at fewer than the five frozen seeds now **raises a `problems` entry
+  naming its own resolution floor**, so a p sitting *at* the floor can never be
+  read as clearing a Bonferroni correction.
+
+**Verified:** `--report-only` reproduces `PHASE11_AUDIT.md` §7.2 exactly —
+`dense_routing` p = 0.0179 (d +1.43, AT FLOOR), `routing_supervision` p = 0.0179
+(d +2.77, AT FLOOR), `fixed_depth` 0.1250, `ponder_cost_low` 0.1607,
+`router_noise` 0.4107, `two_blocks` 0.7500.
+
+**The depth-curriculum range was wrong in the T11.0b entry and is corrected.**
+Targets span **1–4**, not 1–7: `families.OP_TARGET_DEPTH` assigns 1 to eight
+operations, 2 to four, 3 to two, 4 to two. The 7 is `model.max_depth`, a ceiling no
+operation targets. This *sharpens* the finding. Target mean is **1.875**, the
+model's learned constant is **≈2.05**, so the halt head is doing unconditional
+**mean prediction** — and that reproduces `depth/allocation_error_abs = 1.010`
+arithmetically (a constant at the mean gives ≈0.90 MAE on this skewed table).
+Because eight of sixteen operations want depth 1, essentially all of the error is
+**over-computation on easy operations**, not under-computation on MEDIAN/SORT. The
+cost of the failure is wasted compute, not lost accuracy.
+
+**Still open, and deliberately not actioned here.**
+- **Item 9, `code_git_dirty: true` on all 15 canonical runs.** Committing the tree
+  retroactively defines "the code the paper's numbers came from", so it is not an
+  unattended action.
+- **T10.D `trainable` / T10.G batch size.** Recommended for closure by *narrowing
+  the task's scope in writing* rather than by GPU: CLAUDE.md §2 records the
+  L2-on-trainable-noise-scale mechanism as unproven, so that arm would vary two
+  things at once, and batch size moves throughput rather than a claim. Not written
+  in yet — narrowing a pre-registered scope is a scientific decision.
+- **Item 10** (three absent `config.json` literals) held until the seed-45/46 runs
+  finish: writing them mutates `config_hash` and the one-field diff check compares
+  live arms against the canonical baselines.
+- **Item 11** (delete the dead `metrics.evaluate_paper_metrics`, 109 lines,
+  unreferenced, unpack expects 11 values where the model returns 13) held for the
+  same reason — the remaining arms import `metrics.py` on launch.
+
+**Failure tracing.** If a Phase 10 verdict looks wrong, the test itself is
+`code/seed_stats.py:perm_test` and the arm/baseline vectors are assembled in
+`phase10_ablations.py:collect()`; the per-arm `primary` dict records `arm_seeds`,
+`baseline_seeds`, `n_perms` and `min_p`, so a suspicious p can be re-derived by
+hand. If a MoE metrics file shows a halting number that should be N/A, the list is
+`engine.py:1053`. If a checkpoint-selection number disagrees with a report, the
+declared rule is `canonical_spec.json:protocol.checkpoint_selection` and its note
+explains which column is primary.
+
+**Where to look.** `code/canonical_spec.json` (`protocol` block: three amended
+fields, each with its reasoning in the adjacent `_note`); `code/more/engine.py`
+(`:814` supervision gating, `:1053` halting N/A list);
+`automated/phase10_ablations.py` (`arm_seeds`, `rule4`, `collect`);
+`code/seed_stats.py` (unchanged, now the single source);
+`PHASE11_AUDIT.md` (renamed, §8 action table).
+
+**Verified by.** `run_correctness_suite.py` 350/350, 5/5 gates PASS, after all
+edits. `canonical_spec.json` re-parsed as JSON. `phase10_ablations.py
+--report-only` reproduces the audit's §7.2 p-values to the digit.
+
+---
+
+## T11.0d — The framing ruling, and three tasks closed without running them
+
+**What this task did.** Recorded two researcher decisions that shape everything
+Phase 11 writes, and closed three Phase 10 tasks — two by narrowing their written
+scope, one by scoping it down to a 1-epoch guard test. No GPU was spent and no
+measurement changed. This entry exists because both decisions are the kind that
+look arbitrary six months later unless the reasoning is on disk.
+
+**A new TASKS.md marker: `[✗]` — closed WITHOUT running it.** The legend had `[x]`,
+`[~]`, `[ ]`, `[!]` and no way to say "we decided not to do this, and here is why".
+The absence mattered: T10.D and T10.G had been sitting at `[ ]` with explanatory
+prose, which is indistinguishable from a backlog item nobody got to. `[✗]` means the
+scope was deliberately narrowed with the reason inline. It is not a failure and not
+a silent drop. **Never convert a `[✗]` to `[x]`** — if the arm is later run it gets
+a new task, so the original decision stays legible.
+
+**T10.D `[✗]` — the `trainable` router-noise arm will not be run.** What was
+measured stands: `none → fixed_annealed` is not significant, exact p = 0.4107, so
+the canonical `router_noise = none` chosen on principle at T4 is also empirically
+free. The third arm is refused because it **cannot answer the question the task is
+named for**: CLAUDE.md §2 records the L2-on-trainable-noise-scale mechanism as
+unproven, so a `trainable` run varies the noise schedule *and* introduces that
+machinery simultaneously. Neither outcome would be attributable — a win could not
+be credited to trainable noise, a loss could not be blamed on it. A one-field
+ablation whose one field is two fields is not a one-field ablation. T10.D's written
+scope is now "none vs fixed-annealed", and the paper says the trainable variant was
+excluded by design, not that it was tried and failed.
+
+**T10.G `[✗]` — neither supplementary sweep will be run.** The capacity half is
+already answered by T10.C (`num_blocks 1 → 2`, ~2× recursive parameters): not
+significant, p = 0.7500. Doubling the model changes nothing measurable, so a wider
+capacity sweep would spend GPU re-deriving a null at more points. Batch size is
+closed on different grounds — it moves **throughput, not a claim**, and it cannot
+enter the headline table at all because `enforced_fields.batch_size = 768` is
+frozen, so any other value is non-canonical by definition. With a single consumer
+laptop GPU as the binding constraint, wall-clock spent characterising throughput is
+wall-clock not spent on arms that ask something about MoRE.
+
+**T10.I scoped to a 1-epoch proxy.** Its `Verify` clause — "run resolves to
+`variant = ffn_mult_4` and the Gate 0 guard refuses `canonical_phase_b`" — is a
+statement about the **guard**, and the guard fires in
+`run_context.assert_not_silent_proxy()` before the first optimizer step. One epoch
+discharges it as completely as fifty, at ~1/50 the GPU. The *scientific* question
+(what MoR does at 82% under budget) is not needed, because the parameter-budget
+defence is already stronger without it: canonical MoR wins on `val/task_loss` with
+**fewer** parameters than MoRE (3,197,710 vs 3,201,555), so MoR's result cannot be
+attributed to capacity, and an under-budgeted arm would answer a question nobody
+asked. The proxy must be stamped `experiment_group = exploratory`, must never appear
+in a loss table, and doubles as the negative test T11.1 needs for the exporter's
+refusal path.
+
+**THE FRAMING RULING — recorded in full at `TASKS.md` T11.2, binding on T11.2,
+T11.3 and the paper draft.** The corrected reading rule turned Phase 9 from "one
+resolved difference" into "MoR beats both MoE and MoRE", and that invites a framing
+the paper must not take. The ruling, in five parts:
+
+1. **The subject of the paper is MoRE.** MoR outperforming it is a result *within*
+   the paper, not the thesis. "MoR is good" is not a contribution — recursive
+   depth-sharing is established prior work. The novelty is the composition of
+   learned expert routing with adaptive recursive reuse.
+2. **Do not restructure around MoR because it won.** Rewriting the subject to match
+   whichever arm scored best is choosing a conclusion after seeing the data. The
+   comparison is reported at full strength and then *interpreted*, not promoted.
+3. **MoR's win is confounded three ways, and each is a limitation on the
+   CONCLUSION, not an excuse for MoRE.** (a) **Scale** — 3.2 M parameters,
+   `d_model = 256`, one block, one RTX 4060 Laptop. Six experts of width 1024 each
+   see ~1/6 of the tokens where MoR's single width-6144 FFN sees all of them, so at
+   this width partitioning may cost more than specialisation buys; nothing wider was
+   tested. (b) **The dataset** — `more6-v1` is synthetic and custom, generated by
+   `data/script.py` with Python's `random` over 16 hand-chosen operations and a
+   hand-authored depth curriculum, so both MoRE mechanisms are asked to discover
+   structure placed there by construction, on a difficulty profile we chose. All
+   three architectures explain only 21.8–22.7% of target variance against the
+   frozen floor 0.080914, and the whole between-architecture spread is ~3% of that —
+   a regime where the task, not the architecture, binds. (c) **The evaluation** — a
+   single scalar regression loss at one fixed split, 5 seeds, 50 epochs, one
+   optimizer setting frozen as VALIDATED-STABLE rather than swept per architecture.
+   A metric rewarding only final-answer accuracy is structurally incapable of
+   crediting interpretable routing or per-input compute allocation, which is what
+   MoRE is for.
+4. **Do not downplay MoRE, and do not inflate it.** The negative findings are
+   reported plainly — recursion adds nothing at matched parameters; the halt head
+   learned an unconditional ≈2 steps against a target mean of 1.875. What must not
+   happen is presenting those as settled properties of the architecture when the
+   compute ceiling is the honest reason the design space went unexplored: one laptop
+   GPU, so no width sweep, no per-architecture tuning, no larger `d_model`, no
+   second dataset. The negative result stands as *what was observed at this scale*
+   (CLAUDE.md §8, Outcome C).
+5. **Register.** Measured facts stay visibly separated from interpretation, and the
+   confounds live in the limitations section with their own evidence rather than as
+   hedging beside individual numbers.
+
+**Git policy, recorded so it is not re-litigated.** No commit and no push until all
+experiments have run and results are logged, i.e. until the repository is ready for
+paper writing. This closes `PHASE11_AUDIT.md` §8 item 9 as **deferred, not
+ignored**: the 15 canonical runs carry `code_git_dirty: true`, so
+`code_git_commit` does not yet identify the code that produced them, and the fix is
+a single commit at the end of Phase 11 whose hash is then written into the results
+files. Until then, provenance for those runs rests on `config_hash` plus
+`resolved_config.json`, and the results document must say so.
+
+**Failure tracing.** If a Phase 11 document reads as a paper about MoR, or if a
+limitation has quietly become an excuse, the binding text is the five-part ruling at
+`TASKS.md` T11.2 — it is the authority, this entry is the record of why. If a `[✗]`
+task is questioned, its inline paragraph carries the argument; the legend at the top
+of `TASKS.md` defines the marker.
+
+**Where to look.** `TASKS.md` (legend, T10.D, T10.G, T10.I, T11.2 framing ruling);
+`PHASE11_AUDIT.md` §8 item 9 (git provenance, now deferred by policy);
+`code/canonical_spec.json:enforced_fields.batch_size` (why a batch-size sweep can
+never be canonical).
+
+**Verified by.** Documentation-only task — no code path changed, so no gate was
+re-run. `TASKS.md` marker counts after the edit: 8 `[ ]`, 2 `[✗]`, and the T10.I
+entry still `[ ]` pending its 1-epoch proxy run.
+
+## T11.1 — The results exporter: 15 rows admitted, 105 directories refused, and no number typed by hand
+
+Every results table this project produced before today was assembled by reading
+`metrics.json` and typing. That is how `archive/pre_finalization/` came to hold
+tables that mixed a 3-epoch proxy with a 20-epoch run, printed a `0.0` placeholder
+as a measurement, and quoted an `expert_entropy` from a run whose dataset version
+no longer exists. None of that was dishonesty; it was transcription.
+`code/export_results.py` removes the transcription step. It is now the only
+sanctioned path from a run directory to a number in a table, a figure or the paper.
+
+**What it does, in the order the rules bind.**
+
+*Admission (Rule 1).* A directory becomes a row only if it certifies itself:
+`provenance.experiment_group == canonical_phase_b`, `variant == canonical`,
+`seed_declared == True`, `resolved_seed` in `canonical_spec.json:seed_set`, and
+`dataset_version` / `train_split_version` equal to the spec's enforced values. The
+primary metric must be present and numeric. Of **120** directories under `runs/`,
+**15 admitted and 105 refused**, each refusal recorded with the field that failed
+and written into section 5 of the Markdown. Refusals are part of the result: an
+exporter that silently skipped them would be indistinguishable from one that found
+nothing wrong.
+
+*Consistency (Rule 2).* Admitted rows must share one `dataset_version`, one
+`train_split_version` and one `code_git_commit`; no `(architecture, seed)` cell may
+appear twice; and within an architecture the non-seed config fields must be
+bit-identical. Any violation aborts with exit 2 and writes nothing — a table that
+silently spans two dataset versions is worse than no table, because it looks
+finished. The seed-blind check is the dangerous one to get wrong in either
+direction: raw `config_hash` cannot do it (the seed is inside the hash, so all five
+seeds of an arm hash differently by construction), so the comparison runs over a
+dotted-path flatten of `resolved_config.json` minus an explicit exclusion list
+(`SEED_KEYS`). That list is load-bearing and each entry is justified in place: the
+seed itself, names that embed the seed, `data.subset_seed` / `training.subset_seed`
+(the same two `run_phase9_matrix.py:134` excludes), and per-run identity/timestamps.
+An over-broad list would let a real config difference through, which is this
+check's only failure mode. The first run of the exporter did exactly that in
+reverse — it reported all 15 runs as config-divergent because `logging.run_name`,
+`provenance.run_name` and `provenance.seed` were not yet excluded. The check
+failing loudly on its own first invocation is the behaviour we want.
+
+*Absent vs "N/A" vs 0.0 (Rule 3, audit item 5).* 130 scalar keys in the union
+across admitted runs — the union, never the intersection, because taking the
+intersection would make the architecture-inapplicable slots vanish from the table,
+which reads as "not measured" rather than "does not apply". **550 cells export as
+`N/A`**: keys absent for an architecture (MoE has no `depth_dist/step_2..7_pct`;
+MoR has no per-expert load, no per-family precision/recall/f1 or their `_matched`
+variants, no collapse count, no Hungarian assignment), keys where `engine.py`
+itself wrote the string `N/A`, and the four MoE depth constants suppressed at the
+table boundary. `n_na` and `n_bool` are aggregate columns, not footnotes, so a mean
+over 3 of 5 seeds cannot look like a mean over 5. Non-scalar metrics (confusion
+matrix, Hungarian assignment vector) are not table cells but are carried in
+`results.json` under each run's `metrics_nonscalar` rather than dropped, and
+section 3 says so.
+
+*Verdicts (Rule 4).* Pairwise comparisons come from `seed_stats.perm_test` only,
+and every p-value is exported beside `min_p`. Reproduces `run_phase9_matrix.py` to
+the digit: MoRE−MoE p=0.6587 (d −0.36), MoRE−MoR p=0.0159 (d +2.49), MoE−MoR
+p=0.0079 (d +4.13), floor 0.0040. The primary metric is read under the amended
+`protocol.checkpoint_selection` — **last epoch** — and `best_val_loss` is exported
+as an explicitly labelled secondary column so the selection-bias argument stays
+checkable without ever being the headline.
+
+*Audit item 6.* R² is **derived here and stored nowhere**:
+`1 − val/task_loss / primary_metric_floor` against the frozen 0.080914. MoE 0.2182,
+MoR 0.2250, MoRE 0.2191. It is in the headline table because it is the single most
+important piece of context for reading the matrix, and the piece most easily lost
+when a table shows six decimals of loss and nothing else.
+
+*Ablations are ingested, not re-derived.* `automated/phase10_ablations_result.json`
+owns arm discovery, per-arm seed sets and per-arm resolution floors; reimplementing
+that here would create a second definition of the ablation table, which is the exact
+failure this module exists to prevent. The arms land in a separately headed
+`EXPLORATORY, NOT CANONICAL` section that names its own reading rule and floor, and
+are never merged into sections 1–2 (CLAUDE.md §6).
+
+**Outputs.** `results/results.csv` (long format, one row per run, provenance then
+every metric — deliberately contains no aggregates and no verdicts, so it cannot
+encode a reading rule and a reviewer can re-analyse from it),
+`results/results_aggregate.csv` (one row per metric × architecture with `n_numeric`,
+`n_na`, `n_bool`), `results/results.json` (raw per-seed vectors beside every
+aggregate, so a stale aggregate cannot outlive the numbers it came from), and
+`results/results_tables.md` (five sections, tables grouped mechanically by
+metric-key prefix rather than by a curated list — a curated list is a place to
+quietly drop an unflattering number). Read-only with respect to `runs/`.
+
+**Verify clause, passed.** `runs/phaseB_moe__seedNA__f83aa42f` — the invalidated
+undeclared-group run with `provenance.architecture = None` — yields
+`experiment_group='exploratory' != 'canonical_phase_b'` in the refusal list and no
+row, and does not raise. Every admission path returns a reason string rather than
+propagating an exception, because a refusal that arrives as a traceback is an
+outage, not a refusal, and would be indistinguishable from "there were no bad runs".
+
+**Also landed here: audit item 2 is now complete.** `run_phase9_matrix.py` no longer
+carries its own statistics. Its `mean_std` (`:183`) delegates to `seed_stats`, and
+its `gap_reading` (`:202`) is now the exact randomization test. That change forced a
+signature change: the old function took the two aggregate dicts and compared
+`|gap|` to `max(std_a, std_b)`, whereas a permutation test needs the individual
+draws — so `aggregate()` now stores a `raw` per-seed vector beside every aggregate
+and `report()` passes `agg[x]['raw'][...]` instead of `agg[x]['metrics'][...]`. The
+docstring records why the superseded rule was wrong *in the direction of silence*:
+`max(std_a, std_b)` is one arm's seed spread, not the standard error of a
+difference, so at five seeds per arm it was ~√5 too conservative and printed
+`more − mor` as "1.93× the larger seed std → inside seed noise" when the gap is
+3.94 standard errors, exact p = 0.0159. A too-conservative rule feels safe, which is
+why it went unexamined for the whole project. The module docstring's Rule 4 and the
+report's trailing prose were rewritten to match; the report now prints
+`p`, `min_p`, the permutation count and an `AT-FLOOR` marker.
+
+**Failure tracing.** If an expected run is missing from a table, look at section 5
+of `results/results_tables.md` or `refusals` in `results.json` — the reason names
+the field. If the exporter aborts, the message names which of the four consistency
+invariants broke. If a number in the paper disagrees with a run directory,
+regenerate rather than edit: nothing in `results/` is hand-maintained. If a new
+metric appears as `N/A` for every architecture, check whether `engine.py` writes it
+as a string; if it appears as `N/A` for one architecture only, that is Rule 3
+working. If a legitimate config field starts tripping the seed-blind check, do not
+extend `SEED_KEYS` reflexively — that check is the only thing standing between a
+config sweep and a seed std.
+
+**Where to look.** `code/export_results.py` (`admit` for admission,
+`consistency_errors` for the four invariants, `cell` for the single N/A boundary,
+`aggregate` / `pairwise` for the statistics, `_write_md_tail` for sections 3–5);
+`code/seed_stats.py` for every statistic; `code/canonical_spec.json:protocol` for
+the primary metric, checkpoint rule and floor; `code/run_phase9_matrix.py:183,202`
+for the rewired reading rule.
+
+**Verified by.** `python code/export_results.py --check` (15 admitted, 105 refused,
+all consistency invariants pass); the full export writes four files; pairwise
+p-values identical to `run_phase9_matrix.py --report-only`; correctness suite
+**350/350, 5 gates PASS** after the matrix-driver rewiring.
+
+## T10.E / T10.F extension — seeds 45–46 landed, and both significant ablation arms are now Bonferroni-robust
+
+The researcher's decision at the T11.0b audit was to make the two significant
+Phase 10 arms survive a multiple-comparison correction rather than leave them
+sitting on the resolution floor. `dense_routing` and `routing_supervision` were
+run at seeds 45 and 46 (four runs, ~54 min wall clock each pair on the RTX 4060
+Laptop), taking both arms from 3-vs-5 to 5-vs-5.
+
+**Result: both survive.** The floor drops from 1/C(8,3) = 0.0179 to
+1/C(10,5) = 0.0040, and both arms land at **p = 0.0079** against a Bonferroni
+threshold of 0.05/6 = **0.0083** — clearing it by 0.0004.
+
+| arm | n | gap vs canonical MoRE | Cohen d | p (exact) | floor | Bonferroni |
+|---|---|---|---|---|---|---|
+| `routing_supervision` (T10.E) | 5v5 | +0.000565 | +2.89 | 0.0079 | 0.0040 | survives |
+| `dense_routing` (T10.F) | 5v5 | +0.000529 | +1.90 | 0.0079 | 0.0040 | survives |
+
+Both are still *worse* than canonical MoRE, and the direction, effect sizes and
+mechanism stories are unchanged from n=3 — only the resolution improved. So the two
+architectural choices CLAUDE.md §2 fixes on principle are now supported on the
+primary metric at corrected significance: **Top-1 sparse dispatch beats
+evaluate-all-and-blend**, and **supervising the router toward the oracle family
+index actively trades against the task** even though it drives every routing metric
+to exactly 1.0000.
+
+**A margin of 0.0004 must be printed, not inferred.** `rule4()` in
+`automated/phase10_ablations.py` previously appended a Bonferroni note only in the
+AT-FLOOR case, which was adequate when every significant arm was hopeless against
+the corrected threshold. Now that two arms clear it narrowly, the note is emitted
+for every significant arm and states the direction explicitly — `survives Bonferroni
+at 6 arms (alpha=0.0083)` or `fails …` — with the arm count and alpha taken from
+`len(ARMS)` rather than written as a literal, so adding a seventh arm re-derives the
+threshold instead of silently invalidating the sentence. The exporter's section 4
+carries the same column.
+
+**One trap worth recording.** The result JSON written when the background launch
+finished was in the OLD format (`primary` absent, `n=3`, no per-arm test), because
+the launcher process had been started *before* the T11.0c driver rewrite and was
+still running the previously-imported module in memory. The stale file was
+faithfully ingested by the exporter, which then published a 3-seed ablation table
+alongside a 5-seed canonical one. **After any long background launch whose driver
+source changed mid-flight, re-run `--report-only` before trusting the result JSON,
+and re-run the exporter after it.** The file's own `generated` timestamp is the
+tell; the code fingerprint pinned across arms does not catch this, because the arms
+themselves were fine — it was the *reporting* that was stale.
+
+**Failure tracing.** Arm p-values, floors and Bonferroni verdicts:
+`automated/phase10_ablations.py:rule4` and `collect()` (per-arm seed discovery via
+`arm_seeds()`, which reads the disk rather than a constant, so new seeds are picked
+up with no code change). The published tables: `results/results_tables.md` §4 and
+`results/results.json:ablations_exploratory`, both regenerated by
+`code/export_results.py`.
+
+**Verified by.** `python automated/phase10_ablations.py --report-only` (all six arms,
+n printed per arm, no problems reported: every arm still differs from the canonical
+baseline in exactly one config leaf, verified on the `resolved_config.json` that
+actually trained, and all arms share one code fingerprint); exporter re-run and
+section 4 regenerated from the fresh JSON.
+
+## T10.I — The under-budgeted MoR arm, discharged by a 1-epoch proxy because its question is about the guard
+
+T10.I asks what MoR looks like at MoRE's *per-FFN* multiplier (`ffn_mult = 4`)
+rather than at the multiplier that equalises total FFN hidden width
+(`ffn_mult = 24`, canonical). Its `Verify` clause, read literally, is a statement
+about the **guard**, not about task loss: *the run resolves to `variant =
+ffn_mult_4` and Gate 0 refuses `canonical_phase_b` for it.* Both facts are settled
+in `run_context.assert_not_silent_proxy()` before the first optimizer step, so a
+1-epoch run answers it as completely as fifty would at ~1/50 the GPU. The
+researcher's ruling at T11.0d scoped the task accordingly.
+
+**Why the 50-epoch science was not needed.** The scientific question — what MoR does
+at 82% under budget — would exist to defend the parameter budget against a reviewer
+who suspects MoR won on capacity. That defence is already stronger without the arm:
+canonical MoR achieves the **lowest** `val/task_loss` with **fewer** parameters than
+MoRE (3,197,710 vs 3,201,555, −0.120%). The budget residual runs *against* the
+result, so an under-budgeted arm answers a question nobody is asking.
+
+**Half 1 — the variant resolves.** `runs/t10i_mor_ffn_mult_4_proxy_seed42__f2e3e60d`,
+1 epoch, ~1 min: `provenance.variant = ffn_mult_4`, `model.ffn_mult = 4`,
+`total_params = 571,150`. That is the 567k-class count, **82.2% short** of MoRE, which
+confirms `--ffn_mult` reaches the model rather than only the config file. Stamped
+`experiment_group = exploratory`, `resolved_epochs = 1`. Its `val = 0.0733` is
+recorded as evidence the run trained and is **not a measurement**; the run may never
+appear in a loss table.
+
+**Half 2 — Gate 0 refuses the canonical claim.** The same command with
+`--experiment_group canonical_phase_b` is refused before the first optimizer step and
+enumerates all three violations independently rather than stopping at the first:
+`epochs: canonical requires 50, run has 1`; `ffn_mult: canonical mor requires 24,
+run has 4`; and `variant='ffn_mult_4' -- this run has at least one ablation active,
+so it may not claim experiment_group='canonical_phase_b'`. No run directory is
+created. The third is the check this task exercises: even at 50 epochs with every
+other enforced field canonical, the variant tag alone blocks the claim, which is
+what makes "label it as the ablation it is" enforceable rather than a convention.
+
+**One thing this run does NOT cover.** It was expected to double as the exporter's
+variant-path negative test. It does not: the exporter checks `experiment_group`
+first, so the proxy refuses on `experiment_group='exploratory' !=
+'canonical_phase_b'` and the variant check never executes. The ordering is right —
+the group is the canonical *claim*, and a run that makes no claim needs no further
+examination — but it means no directory under `runs/` exercises the exporter's
+variant branch, and none ever will while Gate 0 refuses that combination at launch.
+That branch is defence in depth against a future hand-edited provenance block, not a
+path with live coverage. Recorded here so nobody later reads the branch as tested.
+
+**Failure tracing.** The refusal text and its three checks:
+`code/more/run_context.py:assert_not_silent_proxy()`, reading
+`code/canonical_spec.json:enforced_fields` and `architecture_variants`. If a future
+ablation is silently admitted to a canonical table, that function and the
+`variant != canonical` clause inside it are the first place to look. The exporter's
+independent second line of defence: `code/export_results.py:admit()`.
+
+**Verified by.** Both commands above, run back to back on the same interpreter;
+provenance read from the written `resolved_config.json`, not from stdout; exporter
+re-run (15 admitted, 106 refused — the new proxy is refusal 106).
+
+---
+
+## T11.1 (extension) — Depth on held-out data: the metric every depth claim needed and no run had
+
+**What was wrong.** Every depth number this project has ever reported was
+accumulated inside the *training* loop. `depth/allocation_error_abs` and
+`depth/allocation_error_rel` are written at `engine.py:974` from `expected_depth`
+tensors reduced at `engine.py:608`, inside the batch loop, i.e. under dropout, on
+training data, with the halt head being updated between batches;
+`train/avg_recursion_steps` and the whole `halt/*` block are the same. The sentence
+the paper wants to write — CLAUDE.md §4's sanctioned phrasing, "the model learns to
+allocate recursion depth in accordance with the predefined operation-complexity
+curriculum" — is a claim about the *trained* model on *held-out* data. A
+training-time average over the final epoch is not a measurement of that. Nothing in
+the repo measured it. This was audit item 7, and it was the last non-cosmetic item
+open before Phase 11 proper.
+
+**Methodology.** Two halves, deliberately kept separate.
+
+*Half one, for every future run.* `engine.py`'s validation pass already called
+`model(x_v, sm_v, se_v, so_v)` and unpacked `val_expected_depth, val_halt_stats`
+into names it never used — the quantities were computed on the val set and thrown
+away every epoch. The accumulation is now wired: `val/avg_recursion_steps`,
+`val/depth_allocation_error_abs`, `val/depth_allocation_error_rel`,
+`val/forced_exit_rate`, `val/early_exit_rate`, `val/mean_remainder`. Cost: zero
+extra forward passes. The depth block sits *before* the
+`if first_route is None or depth_exits is None: continue` guard, which matters —
+MoR has `first_route = None` and would otherwise have been skipped for a metric it
+genuinely has. `depth_allocation_error` is the same helper the training loop calls,
+so the two passes cannot acquire different definitions. The training-time keys are
+untouched: these are two different measurements of two different things, not a
+correction of one by the other, and a reader who finds both in one table needs both
+to still be there.
+
+*Half two, for the 37 runs that already exist.* Re-training the canonical matrix
+for a metric that requires no training would have cost hours of GPU for nothing, so
+`code/eval_val_depth.py` recovers the same quantities offline from each run's saved
+`checkpoint.pt`, writing a `val_depth_offline.json` sidecar into the run directory.
+`metrics.json` is never modified — it is the artifact of the run, and a number
+computed weeks later by a different script does not belong inside it. Model
+reconstruction mirrors `engine.py:202` field for field (including the `fixed_depth`,
+`routing_mode`, `router_noise`, `ffn_mult` and `num_families` defaults); the val
+loader mirrors `engine.py:194`; data paths resolve against `code/`, not cwd, because
+that is what `../data/val.jsonl` in a `resolved_config.json` means.
+
+**The caveat that had to be printed, not implied.** `checkpoint.pt` is the
+*best-validation-loss* checkpoint, while the canonical primary metric is *last
+epoch*. The offline depth numbers therefore describe the same run at a different
+point in training than the headline loss. Rather than bury that, `measured_at:
+"best_val_checkpoint"` is written into every sidecar, `results_tables.md` §2b states
+it in the section header and again in prose ("a depth figure and a loss figure from
+this document may not be captioned as coming from one model state"), and
+`results.json` carries `offline_depth_note`. Anyone assembling a figure caption from
+these files is told twice.
+
+**What it changed scientifically.** On held-out data, MoRE spends significantly more
+depth than MoR (2.3531 ± 0.1087 vs 2.1283 ± 0.0188 steps; +0.2248, d = +2.88,
+p = 0.0079, floor 0.0040) while its absolute depth allocation error is
+statistically indistinguishable (0.9940 ± 0.1054 vs 0.9423 ± 0.0266; +0.0517,
+d = +0.67, **p = 0.3571**), and its relative error is significantly *worse*
+(0.6934 ± 0.0931 vs 0.5939 ± 0.0225; +0.0995, p = 0.0159). The extra recursion buys
+no better agreement with the curriculum. Both architectures early-exit essentially
+always (≥ 0.9986), so nothing is being forced at `max_depth`. The T10.J arm reads
+the same way on held-out data: the 10× lower ponder coefficient raised depth
+2.3810 → 2.7721 and made allocation error *worse* (1.0282 → 1.1495) while the task
+loss did not follow (p = 0.1607) — precisely the pre-registered branch "if depth
+rises but loss does not follow, the halt head is not learning anything useful and
+Outcome C stands for the depth half."
+
+**Why the numbers are ingested and not quoted.** `export_results.py` folds the
+sidecar into each admitted row under its `val_offline/` prefix (`admit()`, beside
+the `prov/total_params` injection), aggregates it like any other scalar, prints
+§2b, and emits `pairwise_offline_depth` as a *separate* block from `pairwise` so no
+consumer can iterate one list and silently mix a last-epoch loss test with a
+best-checkpoint depth test. `phase10_ablations.py` folds it in at `metrics_of()`
+and prints its own held-out depth group. Neither rediscovers the arms or recomputes
+the statistic; there is still exactly one definition of each.
+
+**Failure tracing.** If a held-out depth number looks wrong: `val/*` keys come from
+the accumulation block in `engine.train()`'s validation pass (declared as
+`val_depth_log` next to `paper_log_dict`, merged into `log_dict` right after it);
+`val_offline/*` keys come from `code/eval_val_depth.py:evaluate`. If a `val_offline`
+number disagrees with the matching `val` number for the same run, the most likely
+cause is not a bug but the checkpoint: one is the best-val model, the other the
+last-epoch model. If MoE shows anything other than `N/A`, the `adaptive` gate in
+`evaluate()` (`max_depth > 1 and adaptive_halting and not fixed_depth`) has been
+weakened — at `max_depth = 1` a zero there reads as perfect allocation, which is the
+sentinel-as-measurement failure CLAUDE.md §4 forbids. If a sidecar is missing,
+nothing breaks: the keys are absent, which the exporter's absent-vs-N/A boundary
+already renders as `N/A`, and §2b says outright that until the sidecars exist every
+depth number in the document is training-time and any held-out claim is unsupported.
+
+**Where to look.** `code/eval_val_depth.py` (offline harness, module docstring
+carries the caveat); `engine.py` validation pass (live accumulation, and the N/A
+list for `max_depth ≤ 1` that now covers the six `val/*` twins);
+`code/export_results.py` `OFFLINE_DEPTH_KEYS` / `_write_md_depth`;
+`automated/phase10_ablations.py` `SCALARS` + `metrics_of` + `SECONDARY`.
+
+**Verified by.** Three 1-epoch smoke runs (MoRE real values, MoR real values, MoE
+all six keys `N/A`); `run_correctness_suite.py` **350/350, 5/5 gates PASS** after
+the deletion below; `eval_val_depth.py` 15/15 canonical + 22/22 Phase 10 arm
+sidecars written; exporter re-run (15 admitted, 137 keys, 580 N/A cells) and
+`phase10_ablations.py --report-only` re-run, both agreeing with the hand-checked
+permutation tests to the digit.
+
+---
+
+## T11.1 (extension) — Audit items 10 and 11, and the deletion of `evaluate_paper_metrics`
+
+**Audit item 10 — three fields `config.json` claimed to hold and did not.**
+`canonical_spec.json:enforced_fields` pins 18 fields, and `config.json:_README` says
+"every field that `canonical_spec.json:enforced_fields` pins now holds the same
+value here". For `model.routing_mode`, `model.router_noise` and
+`data.subset_fraction` the value was not there to hold: `load_config()` supplied
+them from code defaults that happened to match the spec. The claim was true of the
+*resolved* config and false of the file's own text. All three are now written out
+literally.
+
+*Why this was safe to land at the end of the project, and how that was checked.*
+The obvious objection is that editing `config.json` mutates `config_hash` and
+therefore breaks comparability with the 15 completed canonical runs. It does not:
+`config_hash()` hashes the *resolved* config (`run_context.py:82`), and
+`load_config()` injects those three defaults before the hash is taken, so the
+default config hashes to `b7b17489cdc2` both before and after the edit — verified
+directly. What *did* move the hash was an earlier draft of this change that also
+added explanatory lines to the `_README` list: `config_hash()` strips only
+`provenance` and `logging`, so **the prose in `config.json` is inside the hash**,
+and `_README` is present in every `resolved_config.json` on disk. That is worth
+knowing before anyone reformats a comment in that file. The explanation lives here
+instead, and the `_README` text is byte-identical to what the 15 runs recorded.
+`halting_mode` remains absent from both files by design — `resolve_halting_mode()`
+(`code/more/config.py:410`) derives it, and that helper is the guard's own source,
+so there is nothing to duplicate.
+
+**Audit item 11 — the stale T10.J pre-registration.** Already annotated in place at
+`automated/phase10_ablations.py:101`: the pre-registration text stands verbatim,
+with a bracketed correction stating that the 2.10× was a population-std artifact,
+that the corrected figure is 1.88×, and that under the exact randomization test
+T10.B is p = 0.125, i.e. not significant. Confirmed present and left alone — a
+pre-registration that gets rewritten after the fact is no longer a
+pre-registration. `TASKS.md`'s reference to the T8.0b driver was pointing at
+`automated/routing_supervision.py`, which does not exist; corrected to
+`automated/routing_supervision_decision.py`.
+
+**The deletion.** `metrics.evaluate_paper_metrics` (109 lines) is gone, along with
+its import at `engine.py:31`. It was a second implementation of the validation-pass
+metric accumulation, referenced by nothing — `engine.py` imported it and never
+called it — and its `model(...)` unpack expected 11 return values while
+`MoREModel` returns 13, so calling it would have raised rather than provided a
+second opinion. Every number in every run directory came from the inline loop in
+`engine.train()`. A comment now stands where the function was, naming the four
+helpers to reuse (`routing_accuracy_from_confusion`,
+`permutation_invariant_routing_metrics`, `compute_token_exit_depths`,
+`depth_allocation_error`) so that the next person wanting an offline harness
+reuses the live definitions instead of forking them again. The reason this matters
+is recorded earlier in this file: the last time two copies existed, a tolerance
+guard was added to the copy that never ran.
+
+**Failure tracing.** If a canonical run is suddenly refused by the Gate 0 guard
+after someone edits `config.json`, compare `_effective(resolved)`
+(`run_context.py:162`) against `canonical_spec.json:enforced_fields` — that pairing,
+not the file text, is what the guard reads. If `config_hash` changes without any
+scientific field changing, look for an edit to `_README`.
+
+**Where to look.** `code/config.json` (`model.routing_mode`, `model.router_noise`,
+`data.subset_fraction`); `code/more/run_context.py:82` (`config_hash`, and what it
+does *not* strip); `code/more/metrics.py` (the note where the dead function was);
+`automated/phase10_ablations.py:101` (the annotated pre-registration).
+
+**Verified by.** `config_hash(load_config('config.json'))` = `b7b17489cdc2` before
+and after; `_effective()` vs `enforced_fields` mismatch list empty;
+`run_correctness_suite.py` **350/350, 5/5 gates PASS** after the deletion.
+
+---
+
+## T11.1 (extension) — ARCHITECTURE.md brought back in sync with the repository
+
+**Why this counts as a defect and not housekeeping.** `CLAUDE.md` tells every
+incoming agent to read `ARCHITECTURE.md` *first*. It had drifted to a pre-Phase-8
+state, so the first thing a new agent learned was wrong in ways that would change
+its decisions:
+
+- parameter counts **6,359,069 / 1,098,259** — the pre-T8.3 figures, off by 2× and
+  3× respectively, and they were the basis of a "the comparison is not
+  parameter-matched" defect entry that has since been resolved to a 0.12% gap;
+- `loss_weights.routing_balance = 0.05` and `step_routing = 0.5` presented as the
+  architecture-defining weights, when canonical is 0.001 and **0.0** — an agent
+  reading that would have concluded the router is oracle-supervised, which is the
+  opposite of the truth and would have made every routing number in the repo look
+  broken rather than unsupervised;
+- module line counts from the refactor (`engine.py` 594, `model.py` 501) against
+  1280 and 1076 now, and a repo map missing eleven files including every gate test,
+  `seed_stats.py`, `export_results.py` and `results/`;
+- a status section ending at Phase 6 with "Next: the controlled ACT decision
+  experiment, then freezing `canonical_spec.json`, then the final matrix" — all
+  three long since done;
+- `evaluate_paper_metrics` described as "retained but marked UNUSED in-source",
+  written before the deletion recorded above;
+- Gate 0 described as still refusing every canonical claim because five
+  `enforced_fields` entries were `null`, when the spec has been frozen since
+  Phase 8 and 15 runs have been admitted through it.
+
+**Methodology.** Every replacement number was read out of a generated artifact, not
+out of another document: `results/results_aggregate.csv` for the canonical table and
+the routing/depth aggregates, `code/canonical_spec.json` for the frozen fields and
+the `architecture_variants` blocks, `automated/family_cls_ablation_result.json` for
+the retained-fraction figures, `wc -l` for the line counts, and a fresh
+`run_correctness_suite.py` for the gate counts. Where an old number was a *finding*
+rather than a stale transcription — the 1-epoch reference tables, the T6.x closure
+counts — it is marked superseded and kept, not deleted, per `CLAUDE.md` §6.
+
+**What was added, and why each addition is load-bearing.**
+
+- **§5, "The canonical router is UNSUPERVISED: `step_routing = 0.0`."** The most
+  consequential thing about this repo's routing numbers is that no loss term tells
+  the router which expert is correct. Without that stated up front,
+  `val/routing_accuracy = 0.163 ± 0.186` (a std larger than the mean) reads as a
+  broken router instead of as an arbitrary index assignment, and the mandatory
+  permutation-invariant metrics look optional. The section names the three to read
+  instead, with their values.
+- **The `family_cls` disclosure.** `loss_weights.family_cls = 0.5` was *inherited*
+  into the spec rather than selected, and it is the only term carrying family
+  information. The ablation says the partition survives without it (76% of
+  Hungarian, 72% of AMI, 80% of purity retained; task loss unmoved) — so the honest
+  claim is "mostly not an artifact of the label", not "fully unsupervised".
+- **§5a's three-prefix depth table** (`train/` vs `val/` vs `val_offline/`) with the
+  best-val-checkpoint caveat, plus the held-out matrix. This is the distinction the
+  entry above exists to protect; a document that lists depth numbers without the
+  prefix invites exactly the conflation.
+- **§10's canonical result** with the exact p-values and the three framing confounds
+  (scale, dataset, evaluation) stated as limitations on the *conclusion*. The
+  framing ruling is recorded in `TASKS.md` under T11.2; repeating its substance here
+  keeps an agent from "discovering" MoR's win and restructuring around it.
+- **§3's read-side call graph.** The write side was documented and the read side was
+  not, which is how a hand-copied number gets into a table. There is one definition
+  of admissible (`export_results.admit`) and one of significant
+  (`seed_stats.perm_test`).
+- **§6's reading rule** (exact randomization test, sample std, resolution floor
+  `1/C(n_a+n_b, n_a)`, and the fact that a 3-seed arm cannot clear α = 0.0083).
+- **§7's single command.** Gate counts were quoted per-subsection and had all
+  drifted upward as the suites grew. The section now leads with
+  `run_correctness_suite.py`'s table and says outright that the historical
+  per-subsection counts are lower and should not be quoted.
+
+**Failure tracing.** If a number in `ARCHITECTURE.md` disagrees with `results/`,
+`results/` wins — it is generated and the document is written. If it disagrees with
+`canonical_spec.json` about what is enforced, the spec wins. The document is
+descriptive by its own first paragraph; `plan.md`, `updated_rules.md` and
+`updated_objective.md` remain authoritative on conflict.
+
+**Where to look.** `ARCHITECTURE.md` §1 (architecture-defining field table +
+`ffn_mult` budget), §2 (repo map), §3 (both call graphs), §5 (`step_routing`,
+`family_cls`), §5a (depth prefixes + held-out matrix), §6 (reading rule), §7 (gate
+table), §10 (canonical result, arm roster, defect list).
+
+**Verified by.** `run_correctness_suite.py` **350/350, 5/5 gates PASS**;
+`smoke_test.py` ALL TESTS PASSED; `verify_pipeline.py` 35/35. Stale-reference sweep:
+`grep -rn "evaluate_paper_metrics"` now returns only the in-source deletion note,
+one historical mention in a `metrics.py` docstring marked as deleted, and the
+TASKS.md/changelog history.
+
+---
+
+## T10 (extension) — `fixed_depth` ablation extended to seeds 45–46; the arm that ignores the halting mechanism entirely fits best
+
+**Why this arm and not the other three.** Three Phase 10 arms were still at n=3
+(`router_noise`, `two_blocks`, `ponder_cost_low`). Only `fixed_depth` was worth GPU
+time, and the reason is a resolution argument rather than a hunch: the exact
+two-sided randomization test in `code/seed_stats.py` cannot return a p below
+`2 / C(8,3) = 0.0357` at 3-vs-5, and the Phase 10 family-wise threshold is
+Bonferroni α = 0.05/6 = **0.0083**. At n=3 `fixed_depth` sat at p = 0.125 with
+d = −1.90 — the largest effect of any arm and the *only* one pointing in the
+direction that would falsify the halting claim — yet it could not have reached
+significance at any effect size whatsoever. That is a measurement floor, not a
+null result, and it is the only kind of "insignificant" finding that more seeds can
+legitimately move. The other three arms were left at n=3 and are reported as
+direction-only.
+
+**Result at n=5.** `val/task_loss` **0.062886 ± 0.000143** vs canonical MoRE
+0.063186 ± 0.000249. Gap **−0.000301** (se 0.000128), **d = −1.48, p = 0.0476**,
+resolution floor now 0.0040. Nominally significant; **fails Bonferroni**. Reported
+in `results/results.md` §11.3 as exactly that, with both thresholds named — a
+p of 0.0476 against a family-wise α of 0.0083 is not a positive finding and must
+never be quoted as one. `best_val_loss` agrees in direction
+(0.062715 ± 0.000166 vs 0.062892 ± 0.000216), which matters because the two
+statistics are computed at *different model states* and could have disagreed.
+
+**The finding that reshaped §19.** Forcing all 7 recursion steps for every token
+costs nothing measurable in wall clock: **2198 ± 274 vs 2225 ± 274 records/sec**,
+indistinguishable, despite 3.4× the recursion steps actually executed. So the
+learned halting mechanism bought neither quality nor throughput on this task at
+this scale. Combined with the §9.1 null model and the `ponder_cost_low` arm, that is
+three independent lines converging on Outcome C for the adaptive-depth half of the
+architecture — and this one is the strongest, because it is a direct intervention
+rather than a comparison against a baseline policy.
+
+**The metric that had to be reinterpreted.** `depth/allocation_error_abs` for this
+arm is **5.8850 ± 0.0002**, necessarily so: every token sits at depth 7 against a
+token-weighted curriculum target mean of 2.1082. The arm that is *maximally wrong*
+about the curriculum fits the task *best*. `results/results.md` §15.13 now treats
+`depth_allocation_error` as agreement-with-a-hand-authored-assumption, not as
+correctness, and that reading is propagated to §9, §11.3 and §19. This is the
+single most important interpretive change in Phase 10 and it came from an ablation
+that was expected to be a formality.
+
+**The trap: a canonical-guard "failure" that was the guard working.** Launching
+seeds 45–46 tripped the proxy guard, and the instinct — the wrong one — is to relax
+the guard. The guard was correct: an ablation arm is not `canonical_phase_b`, and
+`fixed_depth` declares `experiment_group = t10_ablation` with
+`variant = fixed_depth`. Nothing in `code/canonical_spec.json` or
+`code/more/run_context.py` was weakened. This is recorded because a future agent
+adding a seed to an ablation will hit the identical message and must reach for the
+declaration, not the guard.
+
+**The trap: verifying that a resumed launcher reproduces the original arm.** Seeds
+45–46 were launched months of edits after seeds 42–44, so the arm's config identity
+had to be proven unchanged rather than assumed. Method: a 1-epoch run at an existing
+seed under the current launcher, then a seed-blind config comparison against the
+stored `resolved_config.json` of the original run. The seed-blind flattening is
+required because `config_hash` includes the seed by construction
+(`code/more/run_context.py:82–99` strips only `provenance` and `logging`), so the
+five seeds of any arm hash differently and hash equality is the wrong test. Without
+this step a silent config drift between seed 42 and seed 46 would have been reported
+as seed variance.
+
+**Failure tracing.** If `fixed_depth` ever reports a depth number other than `N/A`,
+the halting bypass has stopped being a bypass — `code/eval_val_depth.py` deliberately
+emits `N/A` for every depth key on this arm because there is no halting distribution
+to measure, while still emitting `offline/val_task_loss`. A numeric depth there means
+the arm is no longer what its name says. If the n=5 verdict moves, re-check that the
+arm's five run directories are the ones named below and that none is a re-run.
+
+**Where to look.** `automated/phase10_ablations.py` (arm definitions, `--report-only`
+regeneration, per-arm baseline seed-count matching);
+`automated/phase10_ablations_result.json` (the verdict table, PROBLEMS list now 3
+entries rather than 4); `code/seed_stats.py` (`mean_std`, exact randomization test,
+`min_p`); `code/eval_val_depth.py` (the `N/A` policy); the five run directories
+`runs/t10_more_fixed_depth_seed{42..46}__{5bcde9fd,66a417f3,ba544f66,be64ebdc,557b8dcf}`.
+
+**Verified by.** Both new runs completed 50 epochs (`results.tsv` 51 lines each,
+`metrics.json` present, `val_depth_offline.json` written with depth keys `N/A` and
+`offline/val_task_loss` populated). `automated/phase10_ablations.py --report-only`
+regenerated the verdict table with `fixed_depth` at n=5. `run_correctness_suite.py`
+**350/350, 5/5 gates PASS** after the extension.
+
+---
+
+## T11 (new tool) — `code/depth_null_model.py`: the missing null for the adaptive-depth claim
+
+**The gap this closes.** Every adaptive-depth number in the project was previously
+reported against the hand-authored curriculum target only: average depth,
+per-operation depth, `depth_allocation_error_abs/_rel`, early-exit and forced-exit
+rates. All of those answer "how far is the model from the curriculum". None answers
+the question that decides whether *adaptivity* exists: **would a policy that ignores
+its input entirely do better?** A model can post a respectable allocation error while
+being, in effect, a constant. Without this null the sentence "the model learns to
+allocate recursion depth in accordance with the predefined operation-complexity
+curriculum" is unfalsifiable.
+
+**Method.** Sweep a constant depth `c` over the held-out split, score
+`mean |c − target|` against the same token-level targets and the same tokens the
+model metrics use, and take the minimum. Best constant is **c = 2.00 at abs error
+0.8703**. Both recursive arms lose to it: MoR 0.9423 ± 0.0266 (**+8.3% worse**, 5/5
+seeds lose) and MoRE 0.9940 ± 0.1054 (**+14.2% worse**, 5/5 seeds lose). The
+per-seed unanimity matters more than the means — it removes the possibility that one
+bad seed carries the result.
+
+**Token-weighted, not per-operation-type.** The curriculum mean over the 16 operation
+*types* is 1.8750, but depth metrics are token-level and the operation mix in the
+split is not uniform, so the correct comparison mean is the **token-weighted 2.1082**
+(`curriculum_mean_token_weighted` in the output). Using 1.8750 would shift the null's
+optimum and understate how close the models already are to constant behaviour. This
+is the same units trap that has bitten the throughput and entropy metrics elsewhere
+in this project: the aggregation weight is part of the metric definition.
+
+**What this null can and cannot conclude.** Because `|·|` is convex, beating the
+model with a single constant rules out depth variation that is *aligned* with the
+curriculum. It does **not** distinguish "no structure" from "structure misaligned
+with the curriculum" — a model could vary its depth informatively along some axis the
+curriculum does not encode and still lose to a constant. `results/results.md` §9.1
+states this limitation in the same breath as the result, and §15.13 carries the
+complementary point that the curriculum itself is not independently validated by
+task performance.
+
+**Failure tracing.** If the best constant is ever reported as something other than
+≈2.00, check the target mean first — a best constant near 1.9 means the script has
+reverted to unweighted per-operation-type targets, and a best constant near 7 means
+it is reading a fixed-depth arm's directories. If the model arms suddenly *beat* the
+null, confirm the sidecars being read are `val_depth_offline.json` (held-out) and not
+training-time `depth/` keys; the training-time distribution is measured at a
+different model state and is not comparable.
+
+**Where to look.** `code/depth_null_model.py` (sweep + token weighting),
+`results/depth_null_model.json` (`curriculum_mean_token_weighted`, best `c`, per-arm
+per-seed comparison), `code/eval_val_depth.py` (produces the held-out sidecars this
+consumes), `results/results.md` §9.1 (result + convexity limitation), §15.13 (the
+curriculum-is-an-assumption point).
+
+**Verified by.** `python depth_null_model.py` reproduces c = 2.00 / 0.8703 and the
+5/5-seeds-lose count for both arms; the per-arm means it prints match
+`results/results.json` for MoR and MoRE to the digits quoted in §9.1.
+
+---
+
+## T11.2 — `results/results.md`: the 19-section results narrative
+
+**What it is.** 1,625 lines, §1–§19 per `plan.md` §15, written *over* the generated
+artifacts rather than alongside them. No number was typed from a log or a chat
+transcript; each is copied from `results/results.csv` / `.json` /
+`results_tables.md`, `results/seed_stats.json`, `runs/*/val_depth_offline.json`,
+`automated/phase10_ablations_result.json`,
+`automated/family_cls_ablation_result.json`, `results/depth_null_model.json` or
+`results/bench_capacity.log`. §16 is the manifest that names the producing script for
+each. Register is enforced by an explicit MEASUREMENT / INTERPRETATION / HYPOTHESIS
+convention declared in the preamble and applied inline, so a reader can always see
+which sentences are load-bearing.
+
+**The headline it had to carry.** MoR 0.062706 ± 0.000112 beats MoE
+(d = 4.13, p = 0.0079) and beats MoRE (d = 2.49, p = 0.0159); MoRE vs MoE is
+unresolved (d = −0.36, p = 0.6587). That last contrast is the one that isolates the
+composition, because MoE *is* MoRE at `max_depth = 1` with identical parameter
+tensors. §1 and §19 therefore report Outcome C for the composition, Outcome C for
+adaptive depth on three independent lines (§9.1 null model, §11.3 `fixed_depth`,
+§11.5 `ponder_cost_low`), and B-leaning-but-not-clean for specialization — because
+MoE shows the same partition strength with no recursion at all, so specialization
+cannot be credited to the composition either.
+
+**The context every architecture number is set in.** All three arms explain only
+**21.8–22.5%** of held-out target variance against the predict-the-mean floor. The
+entire between-architecture spread is ~3% of what any single arm explains. §6 states
+this before the comparisons, because a reader who sees the significance stars first
+will over-read a difference that is small relative to how much of the task is
+unexplained by every arm.
+
+**Two sections that did not exist when the task was written.** §9.1 (the null model,
+above) and §13, which reports the capacity microbenchmark and then **rejects its own
+width sweep**: `d_model = 512` timed at 72.47 ms/step against 256 at 143.88 ms/step,
+which violates the benchmark's own printed invariant that a wider model can never
+finish sooner. Cause is laptop-GPU clock ramp under too few warmup iterations. Only
+the batch sweep is kept, and it is a clean launch-bound signature — batch 96→6144
+(64×) costs 2.5× wall clock per step, ms per step-token falling monotonically
+162.37 → 6.40. §13 also records that `batch_size` is a hashed config field, so the
+canonical runs must **not** be re-run at a larger batch to exploit that headroom.
+
+**The trap: a unit error that nearly published a ~70× fabrication.** §13.3 was about
+to compare the microbenchmark's 37,395 tok/s against training's ~2,225 tok/s. The two
+are different units. `code/more/engine.py:615` accumulates `total_tokens += bs` and
+`:621` divides by elapsed, so training throughput is **records/sec**;
+`code/bench_capacity.py:94` sets `tokens = batch * STEPS`, so the benchmark reports
+**step-tokens/sec**. Like-for-like is 37,395 ÷ 7 = **5,342 records/s** against the
+`fixed_depth` arm's 2,198 records/s — a real ~2.4× gap, not 70×. The reconciliation is
+written into §13.3 itself so the trap is documented where the next reader will hit it.
+
+**The trap: baselines are seed-count-matched, so one baseline metric has two correct
+values.** `automated/phase10_ablations.py` prints a baseline column matched to each
+arm's seed count. Canonical MoRE held-out abs depth allocation error is therefore
+1.0282 ± 0.1320 over seeds 42–44 and 0.9940 ± 0.1054 over all five — both correct.
+Three n=5 arms in an early §11 draft were compared against the 3-seed column. Fixed,
+and §11's design section now opens with a "read the baseline numbers carefully"
+paragraph so the two-valued baseline cannot read as a contradiction.
+
+**Two other corrections made before publication.** §16 originally claimed the
+exporter requires one `config_hash` per architecture — false, since the seed is inside
+the hash, so all 15 canonical runs hash differently by construction; the real check is
+the seed-blind config comparison plus duplicate-`(architecture, seed)` detection and
+single-`dataset_version`/`train_split_version`/`code_git_commit` checks. §12
+originally said no run exists above 3.2 M params, which the 6,358,553-param
+`two_blocks` arm falsifies; corrected to *no trained run at a larger FFN width*, with
+`two_blocks` named and the reason it does not fill the gap (it adds a block rather
+than widening the FFN, and it is MoRE, not MoR).
+
+**Failure tracing.** If a number in `results.md` disagrees with `results/*.csv|json`,
+the generated artifact wins and the prose is stale — regenerate with
+`export_results.py` and re-check the section. If a section quotes a figure with no
+producing script named in §16, treat it as unverified. If the exporter's admitted
+count drops below 15, a provenance field regressed; the refusal reasons are recorded
+per directory and a refusal is the tool working.
+
+**Where to look.** `results/results.md` §6 (main table + variance context), §9.1
+(null model), §11.1–§11.7 (six Phase 10 arms + the `family_cls` proxy), §13.3 (the
+throughput unit reconciliation), §15.1–§15.13 (failure cases, including §15.8 the
+undisclosed `family_cls` term, §15.9 depth and loss measured at different model
+states, §15.13 the curriculum-as-assumption point), §16 (run manifest + script
+provenance), §17/§18 (claims supported vs not), §19 (verdict).
+
+**Verified by.** `grep -nE "<!--CHUNK|TODO|TBD|PLACEHOLDER|XXX" results/results.md`
+returns nothing; all 19 section headings present. Derived artifacts regenerated after
+the `fixed_depth` extension: `export_results.py` scanned 129 directories, admitted 15,
+refused 114, 137 metric keys in union, 580 cells `N/A`, consistency line clean.
+`run_correctness_suite.py` **350/350, 5/5 gates PASS**; `verify_pipeline.py` 35/35;
+`smoke_test.py` ALL TESTS PASSED.
+
+---
+
+## T11.3 — `README.md` rewritten; invalidated numbers named as invalidated rather than deleted
+
+**Why this was urgent.** `README.md` was the only document in the repository still
+*publishing* pre-audit results as current, and it is the first file any reader opens.
+Its §2–§3 tables predated the leakage audit, the provenance guard and the
+permutation-invariant routing metrics, and its §1.4 asserted that L2 regularization
+prevents `router_noise_scale` from collapsing to 0 — the opposite of what an L2
+penalty does.
+
+**Removed as invalidated:** the `0.002320` validation loss and the "87.26% reduction",
+the `25,470 tok/s` table, expert load entropy quoted against `ln(7)` (canonical is six
+experts, and entropy is reported normalized as `H / log(E)`), "simple ops halt at 1.03
+steps / complex at 6.68 steps" — directly contradicted by measurement, which puts
+93–97% of tokens at exactly 2 steps in *both* recursive arms — the oracle-routing
+weight `0.01` (canonical `step_routing = 0.0`, the router is unsupervised), the
+L2-prevents-noise-collapse claim, the "fewer than 7 experts / fallback expert"
+language (the E7 catch-all is removed and an unmapped operation must raise), and
+`python run_sweeps.py` writing `sweep_results.csv` — that path does not exist under
+`code/` and that filename is a banned global output.
+
+**The decision worth recording: named, not erased.** Deleting those figures would
+have satisfied the task's verification ("no invalidated number remains") while
+violating "archive, never delete, evidence" — and would have left a reader who
+remembers the old README with no way to learn that it was wrong. README §5 therefore
+lists the old numbers **explicitly as invalidated**, each with the reason it is not
+comparable to the current table (proxy runs, 7-expert config, dense
+evaluate-all-and-blend routing, pre-leakage-audit, pre-guard,
+pre-permutation-invariant-metrics). Nothing there is presented as a result, so both
+constraints hold. §5 additionally names the two claims that *inverted* rather than
+merely aged: dense evaluate-all-and-blend went from "the fix for blocked router
+gradients" to a labelled ablation that measures significantly worse than canonical
+Top-1 sparse (§11.1), and the L2-on-trainable-noise-scale claim is withdrawn outright.
+
+**Guardrails shipped with the numbers.** §4 carries the metric-reading rules inline —
+never quote `total_loss`; normalized entropy is a load-balance diagnostic that a
+router ignoring its input maximizes, so it cannot show specialization; raw routing
+accuracy is uninformative under an unsupervised router (its seed std exceeds its mean),
+quote Hungarian-matched/AMI/purity; low cosine similarity is "consistent with
+differentiated parameterizations", never proof of orthogonality; "depth allocation
+error", never "compute efficiency"; no sentinel is a measurement. A reader who never
+opens CLAUDE.md still cannot misread §1. §1 also states the specialization result
+together with the fact that supervising the router drives every routing metric to
+exactly 1.0000 ± 0.0000 *while making task loss significantly worse*, so routing
+quality is never quotable as evidence of architectural quality.
+
+**Failure tracing.** If a README number disagrees with `results/results.md`, the
+README is stale — it is hand-written prose over the same artifacts and has no
+generator. If a figure from the §5 invalidated list ever reappears outside §5, the
+rewrite has regressed; those exact strings are the ones to grep for.
+
+**Where to look.** `README.md` §1 (headline finding, main table, depth null-model
+table, "What bounds all of this"), §2 (repo layout), §3 (verified commands), §4
+(metric-reading rules), §5 (invalidated history + the two inversions);
+`results/results.md` is the source for every figure in §1.
+
+**Verified by.** 98 → 203 lines. Every command published in §3 was executed from
+`code/` first (`run_correctness_suite.py`, `export_results.py`, `depth_null_model.py`,
+`eval_val_depth.py --glob 'phaseB_*'`, `../automated/phase10_ablations.py
+--report-only`), and the flag names were checked against `code/more/cli.py` and
+`code/train.py`. Cross-check of §1 against `results/results.json`: task losses, R²
+values (0.2182 / 0.2250 / 0.2191 → the range is 21.8–22.5%, not the 22.7% carried in
+an earlier draft), parameter counts and all six Phase 10 verdicts match.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

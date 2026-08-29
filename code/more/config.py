@@ -133,6 +133,23 @@ def load_config_defaults(cfg: dict | None = None) -> dict:
     # supervision pushes it toward the target -- so they must never be summed
     # into one opaque number. 0.0 by default because supervision is off.
     cfg["loss_weights"].setdefault("halting_supervision", 0.0)
+    # T8.3: the whole-program family classification term. Was a bare `0.5`
+    # literal inside engine.py's total_loss expression -- `lw["task"] *
+    # (task_loss + 0.5 * cls_loss)` -- so it appeared in no config, no
+    # provenance block and no results table, while being the second-largest
+    # term in the objective. Two consequences: the paper could not state the
+    # objective it actually optimized, and the term could not be ablated without
+    # editing source (which produces an unlabelled variant, forbidden by
+    # CLAUDE.md 6).
+    #
+    # It is EXTERNAL SUPERVISION, not self-supervision: the targets are the
+    # "family": "E1".."E6" string literals that data/script.py stamps into every
+    # JSONL record at generation time, mapped through the hand-written
+    # families.py:FAMILY_TO_IDX manifest. Verified independent of the model --
+    # the label histogram is byte-identical at num_experts=6 and num_experts=1.
+    # Canonical value is the historical 0.5 so every completed run is
+    # reproducible; 0.0 is the T10.H no-family-supervision ablation.
+    cfg["loss_weights"].setdefault("family_cls", 0.5)
 
     cfg.setdefault("data", {})
     # An explicitly configured single-file dataset (`jsonl_path`) must win over
@@ -152,7 +169,15 @@ def load_config_defaults(cfg: dict | None = None) -> dict:
 
     cfg.setdefault("logging", {})
     cfg["logging"].setdefault("wandb_project", "micro-MoRE-poc")
-    cfg["logging"].setdefault("log_interval", 10)
+    # T9.0: log_interval also gates VALIDATION (engine.py: `epoch %
+    # log_interval == 0 or epoch == epochs`), so it is a protocol field, not a
+    # cosmetic one. At the old value of 10 a 20-epoch run measured val twice, and
+    # "best epoch by val loss" was a choice between two candidates -- which on a
+    # still-falling curve always returns the last epoch, making checkpoint
+    # selection indistinguishable from "take the final model". This default must
+    # stay equal to config.json's value: a defensive default that disagrees with
+    # canonical is exactly the trap T8.3 hit with family_cls.
+    cfg["logging"].setdefault("log_interval", 2)
 
     # T5.3 (plan.md 7.3): ONE source of truth for the subset keys.
     #
@@ -248,6 +273,28 @@ CANONICAL_RUN_PREFIX = "phaseB"
 # the deviations that are actually active. A new ablation must be added here or
 # it will silently be reported as canonical.
 CANONICAL_VARIANT = "canonical"
+# T8.3. The canonical weight of the whole-program family-classification term.
+# 0.5 is the value every run in this repository has used since the term was
+# written as a literal inside engine.py's total_loss; it is frozen at that value
+# so the field's introduction changes no number, and 0.0 is the labelled T10.H
+# ablation that measures how much of the routing partition it is responsible for.
+CANONICAL_FAMILY_CLS_WEIGHT = 0.5
+
+# T10.C. Canonical recursive-block count. Frozen at 1 in canonical_spec.json's
+# enforced_fields; named here so resolve_variant can LABEL a deviation instead of
+# letting a 2-block run print `variant = canonical` in an ablation table.
+CANONICAL_NUM_BLOCKS = 1
+
+# T8.3. Canonical FFN multiplier per architecture -- the ONE place the
+# parameter-budget policy is written, imported by resolve_variant here and
+# mirrored in canonical_spec.json's architecture_variants (which the Gate 0 guard
+# enforces). MoE/MoRE: 4, unchanged since the field existed. MoR: 24, i.e. 4 x 6,
+# so MoR's single shared FFN receives the total hidden width of MoRE's six
+# experts. That is a principled construction rather than a fitted one, and it
+# lands the budgets within 0.12% (571,150 -> 3,197,710 against MoRE's 3,201,555),
+# inside T9.2's 5% bound. MoR at 4 remains available as the labelled
+# under-budgeted small baseline.
+CANONICAL_FFN_MULT = {"moe": 4, "mor": 24, "more": 4}
 
 
 def resolve_variant(cfg: dict) -> str:
@@ -273,6 +320,17 @@ def resolve_variant(cfg: dict) -> str:
 
     if mc.get("fixed_depth", False):
         tags.append("fixed_depth")
+
+    # T10.C: num_blocks is an ENFORCED field, so the Gate 0 guard already refuses
+    # a canonical_phase_b claim from a 2-block run. But `variant` is what an
+    # ablation TABLE prints, and without this tag a 2-block run read
+    # `variant = canonical` -- a run that differs from canonical in a pinned
+    # architectural field, wearing the canonical label in the one place a reader
+    # looks. Additive only: canonical num_blocks is 1, so the 15 T9.1 runs are
+    # unaffected and their variant stays `canonical`.
+    num_blocks = int(mc.get("num_blocks", CANONICAL_NUM_BLOCKS))
+    if num_blocks != CANONICAL_NUM_BLOCKS:
+        tags.append(f"num_blocks_{num_blocks}")
 
     # Supervised depth curriculum vs pure ACT. MoE is excluded: it runs at
     # max_depth 1, where there is no depth to allocate, so "pure ACT" would be a
@@ -304,6 +362,36 @@ def resolve_variant(cfg: dict) -> str:
     # ablation the routing half of the paper turns on.
     if float(lw.get("step_routing", 0.0)) != 0.0:
         tags.append("oracle_routing")
+
+    # T8.3. The family-classification weight, lifted out of engine.py's
+    # total_loss where it was a bare 0.5 literal. CANONICAL_FAMILY_CLS_WEIGHT is
+    # the historical value, so every run made before the field existed still
+    # resolves to "canonical"; a run that turns the term off is the T10.H
+    # ablation and must be labelled, because "MoRE discovers operation families"
+    # is a different claim depending on whether a 6-way family cross-entropy was
+    # in the objective.
+    if float(lw.get("family_cls", CANONICAL_FAMILY_CLS_WEIGHT)) \
+            != CANONICAL_FAMILY_CLS_WEIGHT:
+        if float(lw.get("family_cls", CANONICAL_FAMILY_CLS_WEIGHT)) == 0.0:
+            tags.append("no_family_supervision")
+        else:
+            tags.append(
+                f"family_cls_{float(lw['family_cls']):g}".replace(".", "p"))
+
+    # T8.3. ffn_mult is architecture-scoped: canonical MoE/MoRE are 4, canonical
+    # MoR is 24 (4 x 6 -- MoR's single FFN is given the total hidden width of
+    # MoRE's six experts, which is what makes the parameter budgets comparable to
+    # 0.12%). A deviation must therefore be judged against the run's OWN
+    # architecture, not against a single shared number. MoR at ffn_mult 4 is the
+    # deliberately under-budgeted small baseline; it is a legitimate ablation and
+    # gets a label rather than being refused silently.
+    arch = str((cfg.get("provenance", {}) or {}).get("architecture")
+               or cfg.get("architecture") or "").lower()
+    if arch in CANONICAL_FFN_MULT:
+        want_fm = CANONICAL_FFN_MULT[arch]
+        got_fm = int(mc.get("ffn_mult", 4))
+        if want_fm is not None and got_fm != want_fm:
+            tags.append(f"ffn_mult_{got_fm}")
 
     return "+".join(sorted(tags)) if tags else CANONICAL_VARIANT
 
@@ -416,6 +504,23 @@ def apply_architecture(cfg: dict, architecture: str) -> dict:
         mc["num_experts"] = CANONICAL_NUM_EXPERTS
         mc["max_depth"] = canonical_depth
         mc["adaptive_halting"] = True
+
+    # T8.3 PARAMETER BUDGET. ffn_mult is stamped here, alongside num_experts and
+    # max_depth, because it is now definitionally architecture-scoped: MoR has one
+    # FFN where MoRE has six, so equal ffn_mult means an unequal parameter budget.
+    # Left at the shared 4, MoR is 571,150 parameters against MoRE's 3,201,555 --
+    # an 82.2% shortfall, so any MoRE-beats-MoR result would be confounded with
+    # capacity and T9.2's 5% budget-matching bound fails outright. At 24 (= 4 x 6,
+    # MoR's single FFN given the total hidden width of MoRE's six) MoR is 3,197,710
+    # and the gap is 0.12%.
+    #
+    # Stamped rather than left to config.json so `--architecture mor` alone
+    # produces a budget-matched model; an explicit `--ffn_mult 4` still wins,
+    # because resolve_overrides runs after this and produces the labelled
+    # `ffn_mult_4` small-baseline ablation (resolve_variant).
+    _canonical_fm = CANONICAL_FFN_MULT.get(arch)
+    if _canonical_fm is not None:
+        mc["ffn_mult"] = _canonical_fm
 
     cfg["architecture"] = arch
     cfg.setdefault("logging", {}).setdefault(

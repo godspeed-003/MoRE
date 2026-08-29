@@ -1,0 +1,723 @@
+[cfg] dense_routing        model.routing_mode: 'top1_sparse' -> 'dense_blend'
+[cfg] fixed_depth          model.fixed_depth: False -> True
+[cfg] routing_supervision  loss_weights.step_routing: 0.0 -> 0.5
+[cfg] router_noise         model.router_noise: 'none' -> 'fixed_annealed'
+[cfg] two_blocks           model.num_blocks: 1 -> 2
+[state] baseline arm = 5 canonical MoRE runs, code state verified
+[plan] 5 run(s) to launch, 10 already on disk
+
+===== 1/5  arm=router_noise  seed=43  elapsed=0 min =====
+
+[run] router_noise seed=43  (train.py --architecture more --config C:\Users\Hp\Desktop\Waste\MoRE\automated\phase10_configs\router_noise.json --seed 43 --run_name t10_more_router_noise)
+wandb: [wandb.login()] Loaded credentials for https://api.wandb.ai from C:\Users\Hp\_netrc.
+wandb: Currently logged in as: rshisode607 (rshisode607-government-college-of-engineering-aurangabad) to https://api.wandb.ai. Use `wandb login --relogin` to force relogin
+wandb: WARNING Using a boolean value for 'reinit' is deprecated. Use 'return_previous' or 'finish_previous' instead.
+wandb: setting up run 1rz8g4ud
+wandb: Tracking run with wandb version 0.28.0
+wandb: Run data is saved locally in C:\Users\Hp\Desktop\Waste\MoRE\code\wandb\run-20260829_071244-1rz8g4ud
+wandb: Run `wandb offline` to turn off syncing.
+wandb: Syncing run t10_more_router_noise_seed43
+wandb:  View project at https://wandb.ai/rshisode607-government-college-of-engineering-aurangabad/micro-MoRE-poc
+wandb:  View run at https://wandb.ai/rshisode607-government-college-of-engineering-aurangabad/micro-MoRE-poc/runs/1rz8g4ud
+C:\Users\Hp\anaconda3\envs\more_env\lib\site-packages\wandb\integration\torch\wandb_torch.py:187: UserWarning: _histc_cuda does not have a deterministic implementation, but you set 'torch.use_deterministic_algorithms(True, warn_only=True)'. You can file an issue at https://github.com/pytorch/pytorch/issues to help us prioritize adding deterministic support for this operation. (Triggered internally at C:\cb\pytorch_1000000000000\work\aten\src\ATen\Context.cpp:95.)
+  flat.histc(bins=self._num_bins)
+wandb: uploading artifact run-1rz8g4ud-paperop_avg_recursion_depth_table-SP4SRw; updating run metadata
+wandb: uploading artifact run-1rz8g4ud-paperop_avg_recursion_depth_table-SP4SRw
+wandb: uploading media\images\paper\routing_confusion_matrix_49_97671a78c286f2eee02b.png; uploading media\images\paper\routing_confusion_matrix_counts_49_cd2f41a7e61215bd24ea.png; uploading media\images\paper\op_avg_recursion_depth_49_3a6003fe03d5b893e70d.png; uploading media\table\paper\op_avg_recursion_depth_table_49_36367d4e6e9cf5978443.table.json; uploading output.log (+ 3 more)
+wandb: uploading media\images\paper\op_avg_recursion_depth_49_3a6003fe03d5b893e70d.png; uploading media\table\paper\op_avg_recursion_depth_table_49_36367d4e6e9cf5978443.table.json; uploading output.log; uploading wandb-summary.json; uploading config.yaml (+ 1 more)
+wandb: uploading data
+wandb: 
+wandb: Run summary:
+wandb:   depth/allocation_error_abs 0.88001
+wandb:   depth/allocation_error_rel 0.59619
+wandb:        depth_dist/step_1_pct 0.09401
+wandb:        depth_dist/step_2_pct 98.3337
+wandb:        depth_dist/step_3_pct 1.15304
+wandb:        depth_dist/step_4_pct 0.13411
+wandb:        depth_dist/step_5_pct 0.07663
+wandb:        depth_dist/step_6_pct 0.08109
+wandb:        depth_dist/step_7_pct 0.12742
+wandb: diag/max_pairwise_cosine_sim 0.06424
+wandb:                         +110 ...
+wandb: 
+wandb:  View run t10_more_router_noise_seed43 at: https://wandb.ai/rshisode607-government-college-of-engineering-aurangabad/micro-MoRE-poc/runs/1rz8g4ud
+wandb:  View project at: https://wandb.ai/rshisode607-government-college-of-engineering-aurangabad/micro-MoRE-poc
+wandb: Synced 5 W&B file(s), 100 media file(s), 50 artifact file(s) and 0 other file(s)
+wandb: Find logs at: .\wandb\run-20260829_071244-1rz8g4ud\logs
+[Run] architecture   = more
+[Run] experiment_id   = t10_more_router_noise_seed43__4b4249de
+[Run] experiment_group= exploratory
+[Run] output directory= C:\Users\Hp\Desktop\Waste\MoRE\runs\t10_more_router_noise_seed43__4b4249de
+[Seed] seed=43  determinism=warn_only  streams=random+numpy+torch_cpu+torch_cuda+dataloader_generator+dataloader_worker
+[Seed] cudnn.deterministic=True  cudnn.benchmark=False  deterministic_algorithms=True  CUBLAS_WORKSPACE_CONFIG=:4096:8
+[Train] Device: cuda
+[Train] Effective settings: epochs=50, lr=0.001, routing_balance=0.001, step_routing=0.0, subset_fraction=1.0, subset_seed=43
+[Dataset] Loaded 59500 records from 'C:\Users\Hp\Desktop\Waste\MoRE\data\train.jsonl'.
+[Dataset] Using validation set: C:\Users\Hp\Desktop\Waste\MoRE\data\val.jsonl
+[Dataset] Loaded 5250 records from 'C:\Users\Hp\Desktop\Waste\MoRE\data\val.jsonl'.
+[Model] Total parameters: 3,201,555
+[Train] halting: ponder_weight=0.001, supervision=OFF (pure ACT)
+[Epoch 001 Batch 0] Router grad norm: 0.070467 | router_noise=fixed_annealed scales: ['0.0995']
+[Epoch 002 Batch 0] Router grad norm: 0.012177 | router_noise=fixed_annealed scales: ['0.0547']
+[Epoch 002/50] task=0.0748  step_route=0.5847  bal=-0.6236  halt=0.3569  val=0.0710  route_acc=0.0883  route_hung=0.5242  route_ami=0.5076  entropy_norm=0.9523  cos_max=0.0033  tok/s=2248
+[Epoch 003 Batch 0] Router grad norm: 0.009282 | router_noise=fixed_annealed scales: ['0.0135']
+[Epoch 004 Batch 0] Router grad norm: 0.019608 | router_noise=fixed_annealed scales: ['0.0000']
+[Epoch 004/50] task=0.0718  step_route=0.5871  bal=-0.7102  halt=0.3339  val=0.0724  route_acc=0.0885  route_hung=0.5169  route_ami=0.4801  entropy_norm=0.9683  cos_max=0.0041  tok/s=2161
+[Epoch 005 Batch 0] Router grad norm: 0.009230 | router_noise=fixed_annealed scales: ['0.0000']
+[Epoch 006 Batch 0] Router grad norm: 0.011328 | router_noise=fixed_annealed scales: ['0.0000']
+[Epoch 006/50] task=0.0710  step_route=0.5944  bal=-0.6964  halt=0.3434  val=0.0708  route_acc=0.0849  route_hung=0.5205  route_ami=0.4796  entropy_norm=0.9682  cos_max=0.0182  tok/s=2393
+[Epoch 007 Batch 0] Router grad norm: 0.023161 | router_noise=fixed_annealed scales: ['0.0000']
+[Epoch 008 Batch 0] Router grad norm: 0.029856 | router_noise=fixed_annealed scales: ['0.0000']
+[Epoch 008/50] task=0.0691  step_route=0.5863  bal=-0.6821  halt=0.3358  val=0.0692  route_acc=0.0848  route_hung=0.5177  route_ami=0.4763  entropy_norm=0.9699  cos_max=0.0287  tok/s=2589
+[Epoch 009 Batch 0] Router grad norm: 0.012849 | router_noise=fixed_annealed scales: ['0.0000']
+[Epoch 010 Batch 0] Router grad norm: 0.024081 | router_noise=fixed_annealed scales: ['0.0000']
+[Epoch 010/50] task=0.0686  step_route=0.5928  bal=-0.6799  halt=0.3228  val=0.0677  route_acc=0.0846  route_hung=0.5191  route_ami=0.4775  entropy_norm=0.9733  cos_max=0.0374  tok/s=2650
+[Epoch 011 Batch 0] Router grad norm: 0.009845 | router_noise=fixed_annealed scales: ['0.0000']
+[Epoch 012 Batch 0] Router grad norm: 0.010334 | router_noise=fixed_annealed scales: ['0.0000']
+[Epoch 012/50] task=0.0667  step_route=0.5866  bal=-0.6843  halt=0.3047  val=0.0645  route_acc=0.0868  route_hung=0.5146  route_ami=0.4747  entropy_norm=0.9665  cos_max=0.0406  tok/s=2257
+[Epoch 013 Batch 0] Router grad norm: 0.010904 | router_noise=fixed_annealed scales: ['0.0000']
+[Epoch 014 Batch 0] Router grad norm: 0.012527 | router_noise=fixed_annealed scales: ['0.0000']
+[Epoch 014/50] task=0.0668  step_route=0.5914  bal=-0.6926  halt=0.3028  val=0.0658  route_acc=0.0948  route_hung=0.4786  route_ami=0.4431  entropy_norm=0.9700  cos_max=0.0432  tok/s=2558
+[Epoch 015 Batch 0] Router grad norm: 0.008860 | router_noise=fixed_annealed scales: ['0.0000']
+[Epoch 016 Batch 0] Router grad norm: 0.010399 | router_noise=fixed_annealed scales: ['0.0000']
+[Epoch 016/50] task=0.0654  step_route=0.6031  bal=-0.7121  halt=0.2919  val=0.0651  route_acc=0.1639  route_hung=0.4833  route_ami=0.4593  entropy_norm=0.9652  cos_max=0.0444  tok/s=2571
+[Epoch 017 Batch 0] Router grad norm: 0.005427 | router_noise=fixed_annealed scales: ['0.0000']
+[Epoch 018 Batch 0] Router grad norm: 0.017970 | router_noise=fixed_annealed scales: ['0.0000']
+[Epoch 018/50] task=0.0657  step_route=0.6060  bal=-0.6999  halt=0.2903  val=0.0651  route_acc=0.0762  route_hung=0.5724  route_ami=0.5411  entropy_norm=0.9609  cos_max=0.0496  tok/s=2430
+[Epoch 019 Batch 0] Router grad norm: 0.008029 | router_noise=fixed_annealed scales: ['0.0000']
+[Epoch 020 Batch 0] Router grad norm: 0.004962 | router_noise=fixed_annealed scales: ['0.0000']
+[Epoch 020/50] task=0.0645  step_route=0.6007  bal=-0.7123  halt=0.2916  val=0.0647  route_acc=0.0854  route_hung=0.5637  route_ami=0.5298  entropy_norm=0.9572  cos_max=0.0519  tok/s=2497
+[Epoch 021 Batch 0] Router grad norm: 0.006350 | router_noise=fixed_annealed scales: ['0.0000']
+[Epoch 022 Batch 0] Router grad norm: 0.008845 | router_noise=fixed_annealed scales: ['0.0000']
+[Epoch 022/50] task=0.0642  step_route=0.6126  bal=-0.7509  halt=0.2862  val=0.0642  route_acc=0.0860  route_hung=0.5635  route_ami=0.5284  entropy_norm=0.9847  cos_max=0.0544  tok/s=2251
+[Epoch 023 Batch 0] Router grad norm: 0.005030 | router_noise=fixed_annealed scales: ['0.0000']
+[Epoch 024 Batch 0] Router grad norm: 0.009001 | router_noise=fixed_annealed scales: ['0.0000']
+[Epoch 024/50] task=0.0639  step_route=0.6120  bal=-0.7451  halt=0.2861  val=0.0640  route_acc=0.1626  route_hung=0.4869  route_ami=0.5077  entropy_norm=0.9802  cos_max=0.0571  tok/s=2354
+[Epoch 025 Batch 0] Router grad norm: 0.009609 | router_noise=fixed_annealed scales: ['0.0000']
+[Epoch 026 Batch 0] Router grad norm: 0.008992 | router_noise=fixed_annealed scales: ['0.0000']
+[Epoch 026/50] task=0.0635  step_route=0.6151  bal=-0.7474  halt=0.2833  val=0.0646  route_acc=0.1631  route_hung=0.4613  route_ami=0.4806  entropy_norm=0.9854  cos_max=0.0582  tok/s=2370
+[Epoch 027 Batch 0] Router grad norm: 0.009308 | router_noise=fixed_annealed scales: ['0.0000']
+[Epoch 028 Batch 0] Router grad norm: 0.005938 | router_noise=fixed_annealed scales: ['0.0000']
+[Epoch 028/50] task=0.0632  step_route=0.6204  bal=-0.7475  halt=0.2853  val=0.0644  route_acc=0.1626  route_hung=0.4862  route_ami=0.5061  entropy_norm=0.9725  cos_max=0.0603  tok/s=2422
+[Epoch 029 Batch 0] Router grad norm: 0.011984 | router_noise=fixed_annealed scales: ['0.0000']
+[Epoch 030 Batch 0] Router grad norm: 0.008220 | router_noise=fixed_annealed scales: ['0.0000']
+[Epoch 030/50] task=0.0630  step_route=0.6252  bal=-0.7509  halt=0.2810  val=0.0639  route_acc=0.1627  route_hung=0.4623  route_ami=0.4764  entropy_norm=0.9952  cos_max=0.0612  tok/s=2536
+[Epoch 031 Batch 0] Router grad norm: 0.006853 | router_noise=fixed_annealed scales: ['0.0000']
+[Epoch 032 Batch 0] Router grad norm: 0.012606 | router_noise=fixed_annealed scales: ['0.0000']
+[Epoch 032/50] task=0.0624  step_route=0.6212  bal=-0.7489  halt=0.2812  val=0.0647  route_acc=0.0852  route_hung=0.4621  route_ami=0.4783  entropy_norm=0.9981  cos_max=0.0615  tok/s=2415
+[Epoch 033 Batch 0] Router grad norm: 0.006910 | router_noise=fixed_annealed scales: ['0.0000']
+[Epoch 034 Batch 0] Router grad norm: 0.011223 | router_noise=fixed_annealed scales: ['0.0000']
+[Epoch 034/50] task=0.0621  step_route=0.6201  bal=-0.7562  halt=0.2855  val=0.0642  route_acc=0.0861  route_hung=0.5390  route_ami=0.5175  entropy_norm=0.9952  cos_max=0.0626  tok/s=2446
+[Epoch 035 Batch 0] Router grad norm: 0.008989 | router_noise=fixed_annealed scales: ['0.0000']
+[Epoch 036 Batch 0] Router grad norm: 0.009358 | router_noise=fixed_annealed scales: ['0.0000']
+[Epoch 036/50] task=0.0618  step_route=0.6217  bal=-0.7584  halt=0.2866  val=0.0634  route_acc=0.0862  route_hung=0.5382  route_ami=0.5173  entropy_norm=0.9957  cos_max=0.0628  tok/s=2393
+[Epoch 037 Batch 0] Router grad norm: 0.013574 | router_noise=fixed_annealed scales: ['0.0000']
+[Epoch 038 Batch 0] Router grad norm: 0.012398 | router_noise=fixed_annealed scales: ['0.0000']
+[Epoch 038/50] task=0.0615  step_route=0.6228  bal=-0.7679  halt=0.2851  val=0.0639  route_acc=0.1626  route_hung=0.4623  route_ami=0.4747  entropy_norm=0.9951  cos_max=0.0635  tok/s=2361
+[Epoch 039 Batch 0] Router grad norm: 0.009360 | router_noise=fixed_annealed scales: ['0.0000']
+[Epoch 040 Batch 0] Router grad norm: 0.007293 | router_noise=fixed_annealed scales: ['0.0000']
+[Epoch 040/50] task=0.0612  step_route=0.6216  bal=-0.7672  halt=0.2872  val=0.0638  route_acc=0.0864  route_hung=0.5386  route_ami=0.5164  entropy_norm=0.9949  cos_max=0.0639  tok/s=2389
+[Epoch 041 Batch 0] Router grad norm: 0.009723 | router_noise=fixed_annealed scales: ['0.0000']
+[Epoch 042 Batch 0] Router grad norm: 0.005828 | router_noise=fixed_annealed scales: ['0.0000']
+[Epoch 042/50] task=0.0609  step_route=0.6217  bal=-0.7725  halt=0.2873  val=0.0639  route_acc=0.1622  route_hung=0.4629  route_ami=0.4749  entropy_norm=0.9952  cos_max=0.0641  tok/s=2322
+[Epoch 043 Batch 0] Router grad norm: 0.009987 | router_noise=fixed_annealed scales: ['0.0000']
+[Epoch 044 Batch 0] Router grad norm: 0.010014 | router_noise=fixed_annealed scales: ['0.0000']
+[Epoch 044/50] task=0.0607  step_route=0.6210  bal=-0.7744  halt=0.2878  val=0.0639  route_acc=0.1626  route_hung=0.4623  route_ami=0.4746  entropy_norm=0.9947  cos_max=0.0642  tok/s=2299
+[Epoch 045 Batch 0] Router grad norm: 0.010215 | router_noise=fixed_annealed scales: ['0.0000']
+[Epoch 046 Batch 0] Router grad norm: 0.009538 | router_noise=fixed_annealed scales: ['0.0000']
+[Epoch 046/50] task=0.0608  step_route=0.6211  bal=-0.7720  halt=0.2878  val=0.0639  route_acc=0.1625  route_hung=0.4624  route_ami=0.4748  entropy_norm=0.9946  cos_max=0.0642  tok/s=2299
+[Epoch 047 Batch 0] Router grad norm: 0.011346 | router_noise=fixed_annealed scales: ['0.0000']
+[Epoch 048 Batch 0] Router grad norm: 0.014998 | router_noise=fixed_annealed scales: ['0.0000']
+[Epoch 048/50] task=0.0606  step_route=0.6209  bal=-0.7735  halt=0.2876  val=0.0637  route_acc=0.1626  route_hung=0.4623  route_ami=0.4749  entropy_norm=0.9946  cos_max=0.0642  tok/s=2323
+[Epoch 049 Batch 0] Router grad norm: 0.008683 | router_noise=fixed_annealed scales: ['0.0000']
+[Epoch 050 Batch 0] Router grad norm: 0.007152 | router_noise=fixed_annealed scales: ['0.0000']
+[Epoch 050/50] task=0.0605  step_route=0.6206  bal=-0.7744  halt=0.2876  val=0.0637  route_acc=0.1626  route_hung=0.4623  route_ami=0.4749  entropy_norm=0.9946  cos_max=0.0642  tok/s=2341
+
+[Train] Complete. Best val_loss = 0.063430
+[Seed] ops without a deterministic implementation were used in this run: _histc_cuda. Losses may not reproduce bitwise; this is recorded in provenance rather than hidden.
+[Run] metrics written to C:\Users\Hp\Desktop\Waste\MoRE\runs\t10_more_router_noise_seed43__4b4249de\metrics.json
+[run] router_noise seed=43 exit=0 in 23.3 min
+
+===== 2/5  arm=router_noise  seed=44  elapsed=23 min =====
+
+[run] router_noise seed=44  (train.py --architecture more --config C:\Users\Hp\Desktop\Waste\MoRE\automated\phase10_configs\router_noise.json --seed 44 --run_name t10_more_router_noise)
+wandb: [wandb.login()] Loaded credentials for https://api.wandb.ai from C:\Users\Hp\_netrc.
+wandb: Currently logged in as: rshisode607 (rshisode607-government-college-of-engineering-aurangabad) to https://api.wandb.ai. Use `wandb login --relogin` to force relogin
+wandb: WARNING Using a boolean value for 'reinit' is deprecated. Use 'return_previous' or 'finish_previous' instead.
+wandb: Tracking run with wandb version 0.28.0
+wandb: Run data is saved locally in C:\Users\Hp\Desktop\Waste\MoRE\code\wandb\run-20260829_073600-7jompjoz
+wandb: Run `wandb offline` to turn off syncing.
+wandb: Syncing run t10_more_router_noise_seed44
+wandb:  View project at https://wandb.ai/rshisode607-government-college-of-engineering-aurangabad/micro-MoRE-poc
+wandb:  View run at https://wandb.ai/rshisode607-government-college-of-engineering-aurangabad/micro-MoRE-poc/runs/7jompjoz
+C:\Users\Hp\anaconda3\envs\more_env\lib\site-packages\wandb\integration\torch\wandb_torch.py:187: UserWarning: _histc_cuda does not have a deterministic implementation, but you set 'torch.use_deterministic_algorithms(True, warn_only=True)'. You can file an issue at https://github.com/pytorch/pytorch/issues to help us prioritize adding deterministic support for this operation. (Triggered internally at C:\cb\pytorch_1000000000000\work\aten\src\ATen\Context.cpp:95.)
+  flat.histc(bins=self._num_bins)
+wandb: uploading artifact run-7jompjoz-paperop_avg_recursion_depth_table-TkXgHg; updating run metadata
+wandb: uploading artifact run-7jompjoz-paperop_avg_recursion_depth_table-TkXgHg
+wandb: uploading media\table\paper\op_avg_recursion_depth_table_49_37f10c0c786220ceb30d.table.json; uploading output.log; uploading wandb-summary.json; uploading config.yaml; uploading media\images\paper\routing_confusion_matrix_49_13959bcf69e6eae3deeb.png (+ 2 more)
+wandb: uploading media\images\paper\routing_confusion_matrix_counts_49_bdcafcbe8ba23196ff4c.png; uploading media\images\paper\op_avg_recursion_depth_49_2ea9871e4638cd2ee7ba.png
+wandb: uploading media\images\paper\op_avg_recursion_depth_49_2ea9871e4638cd2ee7ba.png
+wandb: uploading history steps 49-50, summary, console lines 76-80
+wandb: 
+wandb: Run summary:
+wandb:   depth/allocation_error_abs 0.97682
+wandb:   depth/allocation_error_rel 0.64992
+wandb:        depth_dist/step_1_pct 0.34573
+wandb:        depth_dist/step_2_pct 88.66563
+wandb:        depth_dist/step_3_pct 8.9922
+wandb:        depth_dist/step_4_pct 1.76877
+wandb:        depth_dist/step_5_pct 0.18534
+wandb:        depth_dist/step_6_pct 0.0352
+wandb:        depth_dist/step_7_pct 0.00713
+wandb: diag/max_pairwise_cosine_sim 0.07858
+wandb:                         +110 ...
+wandb: 
+wandb:  View run t10_more_router_noise_seed44 at: https://wandb.ai/rshisode607-government-college-of-engineering-aurangabad/micro-MoRE-poc/runs/7jompjoz
+wandb:  View project at: https://wandb.ai/rshisode607-government-college-of-engineering-aurangabad/micro-MoRE-poc
+wandb: Synced 5 W&B file(s), 100 media file(s), 50 artifact file(s) and 0 other file(s)
+wandb: Find logs at: .\wandb\run-20260829_073600-7jompjoz\logs
+[Run] architecture   = more
+[Run] experiment_id   = t10_more_router_noise_seed44__7944f3d9
+[Run] experiment_group= exploratory
+[Run] output directory= C:\Users\Hp\Desktop\Waste\MoRE\runs\t10_more_router_noise_seed44__7944f3d9
+[Seed] seed=44  determinism=warn_only  streams=random+numpy+torch_cpu+torch_cuda+dataloader_generator+dataloader_worker
+[Seed] cudnn.deterministic=True  cudnn.benchmark=False  deterministic_algorithms=True  CUBLAS_WORKSPACE_CONFIG=:4096:8
+[Train] Device: cuda
+[Train] Effective settings: epochs=50, lr=0.001, routing_balance=0.001, step_routing=0.0, subset_fraction=1.0, subset_seed=44
+[Dataset] Loaded 59500 records from 'C:\Users\Hp\Desktop\Waste\MoRE\data\train.jsonl'.
+[Dataset] Using validation set: C:\Users\Hp\Desktop\Waste\MoRE\data\val.jsonl
+[Dataset] Loaded 5250 records from 'C:\Users\Hp\Desktop\Waste\MoRE\data\val.jsonl'.
+[Model] Total parameters: 3,201,555
+[Train] halting: ponder_weight=0.001, supervision=OFF (pure ACT)
+[Epoch 001 Batch 0] Router grad norm: 0.163262 | router_noise=fixed_annealed scales: ['0.0993']
+[Epoch 002 Batch 0] Router grad norm: 0.042454 | router_noise=fixed_annealed scales: ['0.0448']
+[Epoch 002/50] task=0.0754  step_route=0.5752  bal=-0.6513  halt=0.4640  val=0.0723  route_acc=0.1815  route_hung=0.4514  route_ami=0.4365  entropy_norm=0.9412  cos_max=0.0042  tok/s=2035
+[Epoch 003 Batch 0] Router grad norm: 0.018072 | router_noise=fixed_annealed scales: ['0.0000']
+[Epoch 004 Batch 0] Router grad norm: 0.007521 | router_noise=fixed_annealed scales: ['0.0000']
+[Epoch 004/50] task=0.0722  step_route=0.5948  bal=-0.6261  halt=0.3860  val=0.0705  route_acc=0.1804  route_hung=0.4476  route_ami=0.4210  entropy_norm=0.9453  cos_max=0.0043  tok/s=2502
+[Epoch 005 Batch 0] Router grad norm: 0.020965 | router_noise=fixed_annealed scales: ['0.0000']
+[Epoch 006 Batch 0] Router grad norm: 0.010421 | router_noise=fixed_annealed scales: ['0.0000']
+[Epoch 006/50] task=0.0703  step_route=0.6029  bal=-0.6493  halt=0.3553  val=0.0685  route_acc=0.1813  route_hung=0.4471  route_ami=0.4120  entropy_norm=0.9453  cos_max=0.0123  tok/s=2650
+[Epoch 007 Batch 0] Router grad norm: 0.014692 | router_noise=fixed_annealed scales: ['0.0000']
+[Epoch 008 Batch 0] Router grad norm: 0.023725 | router_noise=fixed_annealed scales: ['0.0000']
+[Epoch 008/50] task=0.0682  step_route=0.6230  bal=-0.6788  halt=0.3260  val=0.0680  route_acc=0.1754  route_hung=0.4489  route_ami=0.4019  entropy_norm=0.9293  cos_max=0.0206  tok/s=2330
+[Epoch 009 Batch 0] Router grad norm: 0.015500 | router_noise=fixed_annealed scales: ['0.0000']
+[Epoch 010 Batch 0] Router grad norm: 0.007076 | router_noise=fixed_annealed scales: ['0.0000']
+[Epoch 010/50] task=0.0671  step_route=0.6038  bal=-0.6952  halt=0.3222  val=0.0664  route_acc=0.1797  route_hung=0.4896  route_ami=0.4826  entropy_norm=0.9429  cos_max=0.0272  tok/s=2661
+[Epoch 011 Batch 0] Router grad norm: 0.011168 | router_noise=fixed_annealed scales: ['0.0000']
+[Epoch 012 Batch 0] Router grad norm: 0.019192 | router_noise=fixed_annealed scales: ['0.0000']
+[Epoch 012/50] task=0.0664  step_route=0.6063  bal=-0.6954  halt=0.3093  val=0.0649  route_acc=0.0985  route_hung=0.5192  route_ami=0.5266  entropy_norm=0.9473  cos_max=0.0380  tok/s=2801
+[Epoch 013 Batch 0] Router grad norm: 0.007541 | router_noise=fixed_annealed scales: ['0.0000']
+[Epoch 014 Batch 0] Router grad norm: 0.009678 | router_noise=fixed_annealed scales: ['0.0000']
+[Epoch 014/50] task=0.0657  step_route=0.6080  bal=-0.7267  halt=0.3067  val=0.0646  route_acc=0.1815  route_hung=0.4187  route_ami=0.4335  entropy_norm=0.9547  cos_max=0.0462  tok/s=2683
+[Epoch 015 Batch 0] Router grad norm: 0.011626 | router_noise=fixed_annealed scales: ['0.0000']
+[Epoch 016 Batch 0] Router grad norm: 0.016905 | router_noise=fixed_annealed scales: ['0.0000']
+[Epoch 016/50] task=0.0650  step_route=0.6018  bal=-0.7365  halt=0.3053  val=0.0651  route_acc=0.1754  route_hung=0.4697  route_ami=0.5050  entropy_norm=0.9502  cos_max=0.0541  tok/s=2597
+[Epoch 017 Batch 0] Router grad norm: 0.007508 | router_noise=fixed_annealed scales: ['0.0000']
+[Epoch 018 Batch 0] Router grad norm: 0.009134 | router_noise=fixed_annealed scales: ['0.0000']
+[Epoch 018/50] task=0.0648  step_route=0.6135  bal=-0.6775  halt=0.3065  val=0.0647  route_acc=0.1792  route_hung=0.4349  route_ami=0.3967  entropy_norm=0.9699  cos_max=0.0622  tok/s=2357
+[Epoch 019 Batch 0] Router grad norm: 0.008360 | router_noise=fixed_annealed scales: ['0.0000']
+[Epoch 020 Batch 0] Router grad norm: 0.015899 | router_noise=fixed_annealed scales: ['0.0000']
+[Epoch 020/50] task=0.0645  step_route=0.6030  bal=-0.6910  halt=0.3142  val=0.0637  route_acc=0.1007  route_hung=0.4330  route_ami=0.4251  entropy_norm=0.9720  cos_max=0.0662  tok/s=2554
+[Epoch 021 Batch 0] Router grad norm: 0.008971 | router_noise=fixed_annealed scales: ['0.0000']
+[Epoch 022 Batch 0] Router grad norm: 0.008112 | router_noise=fixed_annealed scales: ['0.0000']
+[Epoch 022/50] task=0.0639  step_route=0.5951  bal=-0.7364  halt=0.3154  val=0.0638  route_acc=0.1788  route_hung=0.4184  route_ami=0.4295  entropy_norm=0.9888  cos_max=0.0685  tok/s=2514
+[Epoch 023 Batch 0] Router grad norm: 0.007479 | router_noise=fixed_annealed scales: ['0.0000']
+[Epoch 024 Batch 0] Router grad norm: 0.011208 | router_noise=fixed_annealed scales: ['0.0000']
+[Epoch 024/50] task=0.0634  step_route=0.5898  bal=-0.7316  halt=0.2971  val=0.0638  route_acc=0.1786  route_hung=0.4037  route_ami=0.3797  entropy_norm=0.9903  cos_max=0.0695  tok/s=2707
+[Epoch 025 Batch 0] Router grad norm: 0.010950 | router_noise=fixed_annealed scales: ['0.0000']
+[Epoch 026 Batch 0] Router grad norm: 0.007179 | router_noise=fixed_annealed scales: ['0.0000']
+[Epoch 026/50] task=0.0633  step_route=0.5863  bal=-0.7204  halt=0.2984  val=0.0636  route_acc=0.1013  route_hung=0.5182  route_ami=0.5178  entropy_norm=0.9923  cos_max=0.0713  tok/s=2700
+[Epoch 027 Batch 0] Router grad norm: 0.008671 | router_noise=fixed_annealed scales: ['0.0000']
+[Epoch 028 Batch 0] Router grad norm: 0.006317 | router_noise=fixed_annealed scales: ['0.0000']
+[Epoch 028/50] task=0.0629  step_route=0.5856  bal=-0.7380  halt=0.2985  val=0.0642  route_acc=0.1794  route_hung=0.5079  route_ami=0.4805  entropy_norm=0.9895  cos_max=0.0736  tok/s=2589
+[Epoch 029 Batch 0] Router grad norm: 0.007392 | router_noise=fixed_annealed scales: ['0.0000']
+[Epoch 030 Batch 0] Router grad norm: 0.009565 | router_noise=fixed_annealed scales: ['0.0000']
+[Epoch 030/50] task=0.0623  step_route=0.5812  bal=-0.7464  halt=0.2922  val=0.0645  route_acc=0.1037  route_hung=0.5364  route_ami=0.4859  entropy_norm=0.9819  cos_max=0.0748  tok/s=2719
+[Epoch 031 Batch 0] Router grad norm: 0.014626 | router_noise=fixed_annealed scales: ['0.0000']
+[Epoch 032 Batch 0] Router grad norm: 0.007493 | router_noise=fixed_annealed scales: ['0.0000']
+[Epoch 032/50] task=0.0622  step_route=0.5793  bal=-0.7482  halt=0.2938  val=0.0639  route_acc=0.1017  route_hung=0.5138  route_ami=0.4664  entropy_norm=0.9941  cos_max=0.0753  tok/s=2966
+[Epoch 033 Batch 0] Router grad norm: 0.010626 | router_noise=fixed_annealed scales: ['0.0000']
+[Epoch 034 Batch 0] Router grad norm: 0.005769 | router_noise=fixed_annealed scales: ['0.0000']
+[Epoch 034/50] task=0.0620  step_route=0.5801  bal=-0.7540  halt=0.2953  val=0.0629  route_acc=0.1032  route_hung=0.4783  route_ami=0.4462  entropy_norm=0.9949  cos_max=0.0771  tok/s=2760
+[Epoch 035 Batch 0] Router grad norm: 0.006742 | router_noise=fixed_annealed scales: ['0.0000']
+[Epoch 036 Batch 0] Router grad norm: 0.013956 | router_noise=fixed_annealed scales: ['0.0000']
+[Epoch 036/50] task=0.0614  step_route=0.5734  bal=-0.7530  halt=0.3017  val=0.0638  route_acc=0.1028  route_hung=0.4978  route_ami=0.4264  entropy_norm=0.9950  cos_max=0.0778  tok/s=2793
+[Epoch 037 Batch 0] Router grad norm: 0.008897 | router_noise=fixed_annealed scales: ['0.0000']
+[Epoch 038 Batch 0] Router grad norm: 0.013269 | router_noise=fixed_annealed scales: ['0.0000']
+[Epoch 038/50] task=0.0612  step_route=0.5749  bal=-0.7622  halt=0.2987  val=0.0634  route_acc=0.1025  route_hung=0.4975  route_ami=0.4280  entropy_norm=0.9956  cos_max=0.0782  tok/s=2665
+[Epoch 039 Batch 0] Router grad norm: 0.006845 | router_noise=fixed_annealed scales: ['0.0000']
+[Epoch 040 Batch 0] Router grad norm: 0.006084 | router_noise=fixed_annealed scales: ['0.0000']
+[Epoch 040/50] task=0.0607  step_route=0.5802  bal=-0.7648  halt=0.2962  val=0.0630  route_acc=0.1027  route_hung=0.5160  route_ami=0.5082  entropy_norm=0.9940  cos_max=0.0786  tok/s=2578
+[Epoch 041 Batch 0] Router grad norm: 0.008570 | router_noise=fixed_annealed scales: ['0.0000']
+[Epoch 042 Batch 0] Router grad norm: 0.009527 | router_noise=fixed_annealed scales: ['0.0000']
+[Epoch 042/50] task=0.0604  step_route=0.5749  bal=-0.7685  halt=0.3030  val=0.0629  route_acc=0.1029  route_hung=0.4868  route_ami=0.4416  entropy_norm=0.9951  cos_max=0.0786  tok/s=2742
+[Epoch 043 Batch 0] Router grad norm: 0.009862 | router_noise=fixed_annealed scales: ['0.0000']
+[Epoch 044 Batch 0] Router grad norm: 0.008456 | router_noise=fixed_annealed scales: ['0.0000']
+[Epoch 044/50] task=0.0603  step_route=0.5773  bal=-0.7698  halt=0.3002  val=0.0631  route_acc=0.1029  route_hung=0.4639  route_ami=0.4388  entropy_norm=0.9968  cos_max=0.0785  tok/s=2688
+[Epoch 045 Batch 0] Router grad norm: 0.009162 | router_noise=fixed_annealed scales: ['0.0000']
+[Epoch 046 Batch 0] Router grad norm: 0.008397 | router_noise=fixed_annealed scales: ['0.0000']
+[Epoch 046/50] task=0.0602  step_route=0.5746  bal=-0.7651  halt=0.3024  val=0.0629  route_acc=0.1029  route_hung=0.4922  route_ami=0.4712  entropy_norm=0.9961  cos_max=0.0786  tok/s=2702
+[Epoch 047 Batch 0] Router grad norm: 0.008314 | router_noise=fixed_annealed scales: ['0.0000']
+[Epoch 048 Batch 0] Router grad norm: 0.014614 | router_noise=fixed_annealed scales: ['0.0000']
+[Epoch 048/50] task=0.0600  step_route=0.5757  bal=-0.7678  halt=0.3009  val=0.0628  route_acc=0.1029  route_hung=0.5099  route_ami=0.4623  entropy_norm=0.9954  cos_max=0.0786  tok/s=2657
+[Epoch 049 Batch 0] Router grad norm: 0.011565 | router_noise=fixed_annealed scales: ['0.0000']
+[Epoch 050 Batch 0] Router grad norm: 0.010230 | router_noise=fixed_annealed scales: ['0.0000']
+[Epoch 050/50] task=0.0598  step_route=0.5752  bal=-0.7645  halt=0.2995  val=0.0629  route_acc=0.1029  route_hung=0.5097  route_ami=0.4545  entropy_norm=0.9953  cos_max=0.0786  tok/s=2684
+
+[Train] Complete. Best val_loss = 0.062811
+[Seed] ops without a deterministic implementation were used in this run: _histc_cuda. Losses may not reproduce bitwise; this is recorded in provenance rather than hidden.
+[Run] metrics written to C:\Users\Hp\Desktop\Waste\MoRE\runs\t10_more_router_noise_seed44__7944f3d9\metrics.json
+[run] router_noise seed=44 exit=0 in 21.5 min
+
+===== 3/5  arm=two_blocks  seed=42  elapsed=45 min =====
+
+[run] two_blocks seed=42  (train.py --architecture more --config C:\Users\Hp\Desktop\Waste\MoRE\automated\phase10_configs\two_blocks.json --seed 42 --run_name t10_more_two_blocks)
+wandb: [wandb.login()] Loaded credentials for https://api.wandb.ai from C:\Users\Hp\_netrc.
+wandb: Currently logged in as: rshisode607 (rshisode607-government-college-of-engineering-aurangabad) to https://api.wandb.ai. Use `wandb login --relogin` to force relogin
+wandb: WARNING Using a boolean value for 'reinit' is deprecated. Use 'return_previous' or 'finish_previous' instead.
+wandb: setting up run mgiojdx8
+wandb: Tracking run with wandb version 0.28.0
+wandb: Run data is saved locally in C:\Users\Hp\Desktop\Waste\MoRE\code\wandb\run-20260829_075727-mgiojdx8
+wandb: Run `wandb offline` to turn off syncing.
+wandb: Syncing run t10_more_two_blocks_seed42
+wandb:  View project at https://wandb.ai/rshisode607-government-college-of-engineering-aurangabad/micro-MoRE-poc
+wandb:  View run at https://wandb.ai/rshisode607-government-college-of-engineering-aurangabad/micro-MoRE-poc/runs/mgiojdx8
+C:\Users\Hp\anaconda3\envs\more_env\lib\site-packages\wandb\integration\torch\wandb_torch.py:187: UserWarning: _histc_cuda does not have a deterministic implementation, but you set 'torch.use_deterministic_algorithms(True, warn_only=True)'. You can file an issue at https://github.com/pytorch/pytorch/issues to help us prioritize adding deterministic support for this operation. (Triggered internally at C:\cb\pytorch_1000000000000\work\aten\src\ATen\Context.cpp:95.)
+  flat.histc(bins=self._num_bins)
+wandb: uploading artifact run-mgiojdx8-paperop_avg_recursion_depth_table-LPvAWg
+wandb: uploading config.yaml; uploading media\images\paper\routing_confusion_matrix_49_f955b8277102be4a97c9.png; uploading media\images\paper\routing_confusion_matrix_counts_49_e35b226eba97803a154c.png; uploading media\images\paper\op_avg_recursion_depth_49_43df22c7da107fa22155.png; uploading media\table\paper\op_avg_recursion_depth_table_49_33db16f7f6d18171b3d2.table.json (+ 2 more)
+wandb: uploading wandb-summary.json
+wandb: uploading history steps 49-50, summary, console lines 76-80
+wandb: 
+wandb: Run summary:
+wandb:   depth/allocation_error_abs 0.91239
+wandb:   depth/allocation_error_rel 0.58089
+wandb:        depth_dist/step_1_pct 4.42058
+wandb:        depth_dist/step_2_pct 94.6928
+wandb:        depth_dist/step_3_pct 0.71909
+wandb:        depth_dist/step_4_pct 0.13767
+wandb:        depth_dist/step_5_pct 0.02718
+wandb:        depth_dist/step_6_pct 0.00223
+wandb:        depth_dist/step_7_pct 0.00045
+wandb: diag/max_pairwise_cosine_sim 0.10395
+wandb:                         +110 ...
+wandb: 
+wandb:  View run t10_more_two_blocks_seed42 at: https://wandb.ai/rshisode607-government-college-of-engineering-aurangabad/micro-MoRE-poc/runs/mgiojdx8
+wandb:  View project at: https://wandb.ai/rshisode607-government-college-of-engineering-aurangabad/micro-MoRE-poc
+wandb: Synced 5 W&B file(s), 100 media file(s), 50 artifact file(s) and 0 other file(s)
+wandb: Find logs at: .\wandb\run-20260829_075727-mgiojdx8\logs
+[Run] architecture   = more
+[Run] experiment_id   = t10_more_two_blocks_seed42__d1e7ab72
+[Run] experiment_group= exploratory
+[Run] output directory= C:\Users\Hp\Desktop\Waste\MoRE\runs\t10_more_two_blocks_seed42__d1e7ab72
+[Seed] seed=42  determinism=warn_only  streams=random+numpy+torch_cpu+torch_cuda+dataloader_generator+dataloader_worker
+[Seed] cudnn.deterministic=True  cudnn.benchmark=False  deterministic_algorithms=True  CUBLAS_WORKSPACE_CONFIG=:4096:8
+[Train] Device: cuda
+[Train] Effective settings: epochs=50, lr=0.001, routing_balance=0.001, step_routing=0.0, subset_fraction=1.0, subset_seed=42
+[Dataset] Loaded 59500 records from 'C:\Users\Hp\Desktop\Waste\MoRE\data\train.jsonl'.
+[Dataset] Using validation set: C:\Users\Hp\Desktop\Waste\MoRE\data\val.jsonl
+[Dataset] Loaded 5250 records from 'C:\Users\Hp\Desktop\Waste\MoRE\data\val.jsonl'.
+[Model] Total parameters: 6,358,553
+[Train] halting: ponder_weight=0.001, supervision=OFF (pure ACT)
+[Epoch 001 Batch 0] Router grad norm: 0.163771 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 002 Batch 0] Router grad norm: 0.017267 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 002/50] task=0.0754  step_route=0.5835  bal=-0.6666  halt=0.3154  val=0.0741  route_acc=0.1214  route_hung=0.4988  route_ami=0.5310  entropy_norm=0.9338  cos_max=0.0036  tok/s=1655
+[Epoch 003 Batch 0] Router grad norm: 0.013056 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 004 Batch 0] Router grad norm: 0.017801 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 004/50] task=0.0726  step_route=0.5917  bal=-0.6541  halt=0.3004  val=0.0705  route_acc=0.1232  route_hung=0.5513  route_ami=0.5566  entropy_norm=0.9269  cos_max=0.0066  tok/s=1463
+[Epoch 005 Batch 0] Router grad norm: 0.012467 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 006 Batch 0] Router grad norm: 0.011693 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 006/50] task=0.0723  step_route=0.5948  bal=-0.6305  halt=0.2844  val=0.0703  route_acc=0.1859  route_hung=0.4014  route_ami=0.3754  entropy_norm=0.9692  cos_max=0.0176  tok/s=1626
+[Epoch 007 Batch 0] Router grad norm: 0.009482 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 008 Batch 0] Router grad norm: 0.021646 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 008/50] task=0.0711  step_route=0.5918  bal=-0.6712  halt=0.2847  val=0.0669  route_acc=0.1232  route_hung=0.5544  route_ami=0.5337  entropy_norm=0.9769  cos_max=0.0282  tok/s=1477
+[Epoch 009 Batch 0] Router grad norm: 0.005562 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 010 Batch 0] Router grad norm: 0.007727 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 010/50] task=0.0692  step_route=0.5977  bal=-0.6817  halt=0.2775  val=0.0663  route_acc=0.1798  route_hung=0.4881  route_ami=0.3988  entropy_norm=0.9737  cos_max=0.0371  tok/s=1680
+[Epoch 011 Batch 0] Router grad norm: 0.011746 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 012 Batch 0] Router grad norm: 0.012323 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 012/50] task=0.0669  step_route=0.5846  bal=-0.7264  halt=0.2717  val=0.0679  route_acc=0.1242  route_hung=0.4756  route_ami=0.4789  entropy_norm=0.9843  cos_max=0.0465  tok/s=1570
+[Epoch 013 Batch 0] Router grad norm: 0.008945 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 014 Batch 0] Router grad norm: 0.005953 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 014/50] task=0.0664  step_route=0.5858  bal=-0.7049  halt=0.2699  val=0.0658  route_acc=0.1953  route_hung=0.4758  route_ami=0.5072  entropy_norm=0.9761  cos_max=0.0553  tok/s=1825
+[Epoch 015 Batch 0] Router grad norm: 0.006133 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 016 Batch 0] Router grad norm: 0.015418 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 016/50] task=0.0658  step_route=0.5800  bal=-0.7284  halt=0.2694  val=0.0651  route_acc=0.1811  route_hung=0.4727  route_ami=0.4692  entropy_norm=0.9909  cos_max=0.0648  tok/s=1861
+[Epoch 017 Batch 0] Router grad norm: 0.007731 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 018 Batch 0] Router grad norm: 0.006433 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 018/50] task=0.0652  step_route=0.5874  bal=-0.7307  halt=0.2689  val=0.0641  route_acc=0.1242  route_hung=0.5296  route_ami=0.5121  entropy_norm=0.9929  cos_max=0.0744  tok/s=1914
+[Epoch 019 Batch 0] Router grad norm: 0.007560 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 020 Batch 0] Router grad norm: 0.005001 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 020/50] task=0.0649  step_route=0.5786  bal=-0.7257  halt=0.2684  val=0.0635  route_acc=0.1236  route_hung=0.4517  route_ami=0.4318  entropy_norm=0.9928  cos_max=0.0792  tok/s=1848
+[Epoch 021 Batch 0] Router grad norm: 0.007976 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 022 Batch 0] Router grad norm: 0.009219 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 022/50] task=0.0645  step_route=0.5745  bal=-0.7445  halt=0.2692  val=0.0641  route_acc=0.2038  route_hung=0.4851  route_ami=0.5192  entropy_norm=0.9961  cos_max=0.0843  tok/s=1809
+[Epoch 023 Batch 0] Router grad norm: 0.005085 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 024 Batch 0] Router grad norm: 0.006822 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 024/50] task=0.0640  step_route=0.5850  bal=-0.7351  halt=0.2696  val=0.0640  route_acc=0.1235  route_hung=0.5294  route_ami=0.5389  entropy_norm=0.9960  cos_max=0.0886  tok/s=1754
+[Epoch 025 Batch 0] Router grad norm: 0.010192 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 026 Batch 0] Router grad norm: 0.006636 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 026/50] task=0.0637  step_route=0.5804  bal=-0.7451  halt=0.2682  val=0.0637  route_acc=0.2795  route_hung=0.4638  route_ami=0.5139  entropy_norm=0.9960  cos_max=0.0931  tok/s=1964
+[Epoch 027 Batch 0] Router grad norm: 0.013499 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 028 Batch 0] Router grad norm: 0.008554 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 028/50] task=0.0633  step_route=0.5835  bal=-0.7522  halt=0.2697  val=0.0638  route_acc=0.1238  route_hung=0.5292  route_ami=0.5057  entropy_norm=0.9962  cos_max=0.0946  tok/s=1957
+[Epoch 029 Batch 0] Router grad norm: 0.009547 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 030 Batch 0] Router grad norm: 0.007718 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 030/50] task=0.0628  step_route=0.5845  bal=-0.7507  halt=0.2698  val=0.0631  route_acc=0.1257  route_hung=0.4734  route_ami=0.4710  entropy_norm=0.9991  cos_max=0.0981  tok/s=1930
+[Epoch 031 Batch 0] Router grad norm: 0.008013 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 032 Batch 0] Router grad norm: 0.006292 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 032/50] task=0.0626  step_route=0.5798  bal=-0.7551  halt=0.2699  val=0.0637  route_acc=0.2589  route_hung=0.4250  route_ami=0.4438  entropy_norm=0.9968  cos_max=0.0994  tok/s=1918
+[Epoch 033 Batch 0] Router grad norm: 0.008786 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 034 Batch 0] Router grad norm: 0.009307 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 034/50] task=0.0620  step_route=0.5751  bal=-0.7560  halt=0.2691  val=0.0631  route_acc=0.1228  route_hung=0.5024  route_ami=0.4960  entropy_norm=0.9925  cos_max=0.1016  tok/s=1827
+[Epoch 035 Batch 0] Router grad norm: 0.007678 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 036 Batch 0] Router grad norm: 0.005681 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 036/50] task=0.0617  step_route=0.5829  bal=-0.7578  halt=0.2684  val=0.0632  route_acc=0.1252  route_hung=0.5592  route_ami=0.5427  entropy_norm=0.9949  cos_max=0.1027  tok/s=1809
+[Epoch 037 Batch 0] Router grad norm: 0.006311 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 038 Batch 0] Router grad norm: 0.007013 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 038/50] task=0.0612  step_route=0.5788  bal=-0.7563  halt=0.2722  val=0.0636  route_acc=0.1236  route_hung=0.5522  route_ami=0.5200  entropy_norm=0.9919  cos_max=0.1034  tok/s=1898
+[Epoch 039 Batch 0] Router grad norm: 0.008090 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 040 Batch 0] Router grad norm: 0.007584 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 040/50] task=0.0608  step_route=0.5763  bal=-0.7661  halt=0.2737  val=0.0639  route_acc=0.1236  route_hung=0.5518  route_ami=0.5334  entropy_norm=0.9965  cos_max=0.1036  tok/s=1937
+[Epoch 041 Batch 0] Router grad norm: 0.009387 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 042 Batch 0] Router grad norm: 0.012659 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 042/50] task=0.0605  step_route=0.5759  bal=-0.7681  halt=0.2749  val=0.0635  route_acc=0.1233  route_hung=0.5520  route_ami=0.5332  entropy_norm=0.9966  cos_max=0.1038  tok/s=1861
+[Epoch 043 Batch 0] Router grad norm: 0.007244 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 044 Batch 0] Router grad norm: 0.008965 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 044/50] task=0.0601  step_route=0.5746  bal=-0.7677  halt=0.2756  val=0.0633  route_acc=0.1234  route_hung=0.5521  route_ami=0.5310  entropy_norm=0.9949  cos_max=0.1040  tok/s=1894
+[Epoch 045 Batch 0] Router grad norm: 0.007942 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 046 Batch 0] Router grad norm: 0.011839 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 046/50] task=0.0601  step_route=0.5749  bal=-0.7680  halt=0.2756  val=0.0635  route_acc=0.1234  route_hung=0.5446  route_ami=0.5317  entropy_norm=0.9962  cos_max=0.1040  tok/s=1877
+[Epoch 047 Batch 0] Router grad norm: 0.008734 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 048 Batch 0] Router grad norm: 0.011152 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 048/50] task=0.0599  step_route=0.5750  bal=-0.7727  halt=0.2762  val=0.0635  route_acc=0.1234  route_hung=0.5518  route_ami=0.5299  entropy_norm=0.9968  cos_max=0.1040  tok/s=1825
+[Epoch 049 Batch 0] Router grad norm: 0.010468 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 050 Batch 0] Router grad norm: 0.008096 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 050/50] task=0.0599  step_route=0.5745  bal=-0.7709  halt=0.2762  val=0.0635  route_acc=0.1234  route_hung=0.5519  route_ami=0.5302  entropy_norm=0.9966  cos_max=0.1040  tok/s=1784
+
+[Train] Complete. Best val_loss = 0.063053
+[Seed] ops without a deterministic implementation were used in this run: _histc_cuda. Losses may not reproduce bitwise; this is recorded in provenance rather than hidden.
+[Run] metrics written to C:\Users\Hp\Desktop\Waste\MoRE\runs\t10_more_two_blocks_seed42__d1e7ab72\metrics.json
+[run] two_blocks seed=42 exit=0 in 30.2 min
+
+===== 4/5  arm=two_blocks  seed=43  elapsed=75 min =====
+
+[run] two_blocks seed=43  (train.py --architecture more --config C:\Users\Hp\Desktop\Waste\MoRE\automated\phase10_configs\two_blocks.json --seed 43 --run_name t10_more_two_blocks)
+wandb: [wandb.login()] Loaded credentials for https://api.wandb.ai from C:\Users\Hp\_netrc.
+wandb: Currently logged in as: rshisode607 (rshisode607-government-college-of-engineering-aurangabad) to https://api.wandb.ai. Use `wandb login --relogin` to force relogin
+wandb: WARNING Using a boolean value for 'reinit' is deprecated. Use 'return_previous' or 'finish_previous' instead.
+wandb: setting up run oixhxec7
+wandb: Tracking run with wandb version 0.28.0
+wandb: Run data is saved locally in C:\Users\Hp\Desktop\Waste\MoRE\code\wandb\run-20260829_082741-oixhxec7
+wandb: Run `wandb offline` to turn off syncing.
+wandb: Syncing run t10_more_two_blocks_seed43
+wandb:  View project at https://wandb.ai/rshisode607-government-college-of-engineering-aurangabad/micro-MoRE-poc
+wandb:  View run at https://wandb.ai/rshisode607-government-college-of-engineering-aurangabad/micro-MoRE-poc/runs/oixhxec7
+C:\Users\Hp\anaconda3\envs\more_env\lib\site-packages\wandb\integration\torch\wandb_torch.py:187: UserWarning: _histc_cuda does not have a deterministic implementation, but you set 'torch.use_deterministic_algorithms(True, warn_only=True)'. You can file an issue at https://github.com/pytorch/pytorch/issues to help us prioritize adding deterministic support for this operation. (Triggered internally at C:\cb\pytorch_1000000000000\work\aten\src\ATen\Context.cpp:95.)
+  flat.histc(bins=self._num_bins)
+wandb: uploading artifact run-oixhxec7-paperop_avg_recursion_depth_table-eCxNUQ; updating run metadata
+wandb: uploading artifact run-oixhxec7-paperop_avg_recursion_depth_table-eCxNUQ
+wandb: uploading artifact run-oixhxec7-paperop_avg_recursion_depth_table-eCxNUQ; uploading history steps 49-50, summary, console lines 76-80
+wandb: uploading artifact run-oixhxec7-paperop_avg_recursion_depth_table-eCxNUQ
+wandb: uploading media\images\paper\routing_confusion_matrix_49_ffbc2f60b6c5166883b4.png; uploading media\images\paper\routing_confusion_matrix_counts_49_7ce256ca50e3de7d76f8.png; uploading media\images\paper\op_avg_recursion_depth_49_441ad63dad0d8e7bede5.png; uploading media\table\paper\op_avg_recursion_depth_table_49_a5faa24f7236be1a28c6.table.json; uploading output.log (+ 2 more)
+wandb: uploading media\images\paper\routing_confusion_matrix_counts_49_7ce256ca50e3de7d76f8.png; uploading media\images\paper\op_avg_recursion_depth_49_441ad63dad0d8e7bede5.png; uploading media\table\paper\op_avg_recursion_depth_table_49_a5faa24f7236be1a28c6.table.json; uploading output.log; uploading wandb-summary.json (+ 1 more)
+wandb: uploading wandb-summary.json
+wandb: uploading data
+wandb: 
+wandb: Run summary:
+wandb:   depth/allocation_error_abs 0.89643
+wandb:   depth/allocation_error_rel 0.58158
+wandb:        depth_dist/step_1_pct 4.44509
+wandb:        depth_dist/step_2_pct 87.65739
+wandb:        depth_dist/step_3_pct 7.18646
+wandb:        depth_dist/step_4_pct 0.55246
+wandb:        depth_dist/step_5_pct 0.11985
+wandb:        depth_dist/step_6_pct 0.02673
+wandb:        depth_dist/step_7_pct 0.01203
+wandb: diag/max_pairwise_cosine_sim 0.11901
+wandb:                         +110 ...
+wandb: 
+wandb:  View run t10_more_two_blocks_seed43 at: https://wandb.ai/rshisode607-government-college-of-engineering-aurangabad/micro-MoRE-poc/runs/oixhxec7
+wandb:  View project at: https://wandb.ai/rshisode607-government-college-of-engineering-aurangabad/micro-MoRE-poc
+wandb: Synced 5 W&B file(s), 100 media file(s), 50 artifact file(s) and 0 other file(s)
+wandb: Find logs at: .\wandb\run-20260829_082741-oixhxec7\logs
+[Run] architecture   = more
+[Run] experiment_id   = t10_more_two_blocks_seed43__c5b67537
+[Run] experiment_group= exploratory
+[Run] output directory= C:\Users\Hp\Desktop\Waste\MoRE\runs\t10_more_two_blocks_seed43__c5b67537
+[Seed] seed=43  determinism=warn_only  streams=random+numpy+torch_cpu+torch_cuda+dataloader_generator+dataloader_worker
+[Seed] cudnn.deterministic=True  cudnn.benchmark=False  deterministic_algorithms=True  CUBLAS_WORKSPACE_CONFIG=:4096:8
+[Train] Device: cuda
+[Train] Effective settings: epochs=50, lr=0.001, routing_balance=0.001, step_routing=0.0, subset_fraction=1.0, subset_seed=43
+[Dataset] Loaded 59500 records from 'C:\Users\Hp\Desktop\Waste\MoRE\data\train.jsonl'.
+[Dataset] Using validation set: C:\Users\Hp\Desktop\Waste\MoRE\data\val.jsonl
+[Dataset] Loaded 5250 records from 'C:\Users\Hp\Desktop\Waste\MoRE\data\val.jsonl'.
+[Model] Total parameters: 6,358,553
+[Train] halting: ponder_weight=0.001, supervision=OFF (pure ACT)
+[Epoch 001 Batch 0] Router grad norm: 0.115425 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 002 Batch 0] Router grad norm: 0.028102 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 002/50] task=0.0750  step_route=0.6244  bal=-0.6056  halt=0.2970  val=0.0709  route_acc=0.0823  route_hung=0.3449  route_ami=0.3250  entropy_norm=0.9019  cos_max=0.0032  tok/s=1939
+[Epoch 003 Batch 0] Router grad norm: 0.012033 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 004 Batch 0] Router grad norm: 0.028573 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 004/50] task=0.0718  step_route=0.6223  bal=-0.6832  halt=0.2807  val=0.0703  route_acc=0.1536  route_hung=0.3937  route_ami=0.3434  entropy_norm=0.9600  cos_max=0.0094  tok/s=1821
+[Epoch 005 Batch 0] Router grad norm: 0.012849 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 006 Batch 0] Router grad norm: 0.018127 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 006/50] task=0.0701  step_route=0.6174  bal=-0.6883  halt=0.2766  val=0.0675  route_acc=0.0145  route_hung=0.4763  route_ami=0.4586  entropy_norm=0.9806  cos_max=0.0196  tok/s=1855
+[Epoch 007 Batch 0] Router grad norm: 0.021209 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 008 Batch 0] Router grad norm: 0.015336 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 008/50] task=0.0691  step_route=0.6244  bal=-0.6988  halt=0.2747  val=0.0674  route_acc=0.0079  route_hung=0.5908  route_ami=0.5221  entropy_norm=0.9780  cos_max=0.0295  tok/s=1555
+[Epoch 009 Batch 0] Router grad norm: 0.011283 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 010 Batch 0] Router grad norm: 0.017418 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 010/50] task=0.0678  step_route=0.6227  bal=-0.7021  halt=0.2696  val=0.0661  route_acc=0.0600  route_hung=0.4311  route_ami=0.3626  entropy_norm=0.9882  cos_max=0.0394  tok/s=1834
+[Epoch 011 Batch 0] Router grad norm: 0.007242 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 012 Batch 0] Router grad norm: 0.006165 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 012/50] task=0.0668  step_route=0.6251  bal=-0.7141  halt=0.2705  val=0.0640  route_acc=0.0039  route_hung=0.4570  route_ami=0.4079  entropy_norm=0.9846  cos_max=0.0526  tok/s=1575
+[Epoch 013 Batch 0] Router grad norm: 0.018569 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 014 Batch 0] Router grad norm: 0.019892 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 014/50] task=0.0660  step_route=0.6261  bal=-0.7339  halt=0.2665  val=0.0650  route_acc=0.0755  route_hung=0.4389  route_ami=0.4103  entropy_norm=0.9931  cos_max=0.0618  tok/s=1839
+[Epoch 015 Batch 0] Router grad norm: 0.008269 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 016 Batch 0] Router grad norm: 0.006551 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 016/50] task=0.0657  step_route=0.6179  bal=-0.7107  halt=0.2670  val=0.0656  route_acc=0.0790  route_hung=0.4913  route_ami=0.4691  entropy_norm=0.9924  cos_max=0.0715  tok/s=1785
+[Epoch 017 Batch 0] Router grad norm: 0.006163 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 018 Batch 0] Router grad norm: 0.007859 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 018/50] task=0.0651  step_route=0.6199  bal=-0.7337  halt=0.2688  val=0.0638  route_acc=0.0780  route_hung=0.4906  route_ami=0.4288  entropy_norm=0.9960  cos_max=0.0820  tok/s=1831
+[Epoch 019 Batch 0] Router grad norm: 0.005820 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 020 Batch 0] Router grad norm: 0.007075 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 020/50] task=0.0648  step_route=0.6170  bal=-0.7363  halt=0.2676  val=0.0636  route_acc=0.0793  route_hung=0.4483  route_ami=0.4418  entropy_norm=0.9827  cos_max=0.0890  tok/s=1702
+[Epoch 021 Batch 0] Router grad norm: 0.008193 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 022 Batch 0] Router grad norm: 0.003423 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 022/50] task=0.0642  step_route=0.6135  bal=-0.7486  halt=0.2662  val=0.0636  route_acc=0.1566  route_hung=0.4910  route_ami=0.4336  entropy_norm=0.9966  cos_max=0.0954  tok/s=1803
+[Epoch 023 Batch 0] Router grad norm: 0.005651 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 024 Batch 0] Router grad norm: 0.005738 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 024/50] task=0.0638  step_route=0.6067  bal=-0.7508  halt=0.2666  val=0.0628  route_acc=0.0764  route_hung=0.4866  route_ami=0.4284  entropy_norm=0.9973  cos_max=0.1031  tok/s=1746
+[Epoch 025 Batch 0] Router grad norm: 0.005055 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 026 Batch 0] Router grad norm: 0.008978 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 026/50] task=0.0633  step_route=0.6043  bal=-0.7623  halt=0.2653  val=0.0636  route_acc=0.0797  route_hung=0.4763  route_ami=0.4314  entropy_norm=0.9957  cos_max=0.1074  tok/s=1756
+[Epoch 027 Batch 0] Router grad norm: 0.012180 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 028 Batch 0] Router grad norm: 0.009219 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 028/50] task=0.0632  step_route=0.6003  bal=-0.7517  halt=0.2661  val=0.0634  route_acc=0.0885  route_hung=0.4662  route_ami=0.4152  entropy_norm=0.9944  cos_max=0.1100  tok/s=1640
+[Epoch 029 Batch 0] Router grad norm: 0.007906 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 030 Batch 0] Router grad norm: 0.011624 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 030/50] task=0.0627  step_route=0.5991  bal=-0.7586  halt=0.2685  val=0.0628  route_acc=0.0793  route_hung=0.4868  route_ami=0.4501  entropy_norm=0.9925  cos_max=0.1122  tok/s=1757
+[Epoch 031 Batch 0] Router grad norm: 0.007683 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 032 Batch 0] Router grad norm: 0.009264 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 032/50] task=0.0623  step_route=0.5947  bal=-0.7636  halt=0.2672  val=0.0632  route_acc=0.0810  route_hung=0.5173  route_ami=0.4631  entropy_norm=0.9906  cos_max=0.1153  tok/s=1682
+[Epoch 033 Batch 0] Router grad norm: 0.005206 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 034 Batch 0] Router grad norm: 0.005238 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 034/50] task=0.0619  step_route=0.5939  bal=-0.7623  halt=0.2661  val=0.0633  route_acc=0.0810  route_hung=0.4406  route_ami=0.3675  entropy_norm=0.9908  cos_max=0.1171  tok/s=1811
+[Epoch 035 Batch 0] Router grad norm: 0.008442 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 036 Batch 0] Router grad norm: 0.010559 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 036/50] task=0.0615  step_route=0.5923  bal=-0.7686  halt=0.2704  val=0.0626  route_acc=0.0800  route_hung=0.5450  route_ami=0.4957  entropy_norm=0.9972  cos_max=0.1175  tok/s=1626
+[Epoch 037 Batch 0] Router grad norm: 0.004285 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 038 Batch 0] Router grad norm: 0.007949 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 038/50] task=0.0611  step_route=0.5923  bal=-0.7719  halt=0.2677  val=0.0631  route_acc=0.0800  route_hung=0.4717  route_ami=0.4016  entropy_norm=0.9967  cos_max=0.1179  tok/s=1686
+[Epoch 039 Batch 0] Router grad norm: 0.010108 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 040 Batch 0] Router grad norm: 0.010200 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 040/50] task=0.0608  step_route=0.5921  bal=-0.7710  halt=0.2682  val=0.0628  route_acc=0.0805  route_hung=0.4421  route_ami=0.4047  entropy_norm=0.9939  cos_max=0.1190  tok/s=1722
+[Epoch 041 Batch 0] Router grad norm: 0.007388 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 042 Batch 0] Router grad norm: 0.004268 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 042/50] task=0.0604  step_route=0.5917  bal=-0.7757  halt=0.2699  val=0.0627  route_acc=0.0806  route_hung=0.5418  route_ami=0.4953  entropy_norm=0.9905  cos_max=0.1192  tok/s=1631
+[Epoch 043 Batch 0] Router grad norm: 0.008187 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 044 Batch 0] Router grad norm: 0.010454 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 044/50] task=0.0602  step_route=0.5927  bal=-0.7688  halt=0.2719  val=0.0628  route_acc=0.0802  route_hung=0.5486  route_ami=0.4869  entropy_norm=0.9933  cos_max=0.1193  tok/s=1596
+[Epoch 045 Batch 0] Router grad norm: 0.005620 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 046 Batch 0] Router grad norm: 0.008821 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 046/50] task=0.0601  step_route=0.5927  bal=-0.7726  halt=0.2711  val=0.0629  route_acc=0.0805  route_hung=0.5559  route_ami=0.5088  entropy_norm=0.9901  cos_max=0.1191  tok/s=1627
+[Epoch 047 Batch 0] Router grad norm: 0.008568 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 048 Batch 0] Router grad norm: 0.009521 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 048/50] task=0.0600  step_route=0.5936  bal=-0.7720  halt=0.2726  val=0.0628  route_acc=0.0805  route_hung=0.4842  route_ami=0.4266  entropy_norm=0.9855  cos_max=0.1190  tok/s=1572
+[Epoch 049 Batch 0] Router grad norm: 0.007548 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 050 Batch 0] Router grad norm: 0.006096 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 050/50] task=0.0597  step_route=0.5936  bal=-0.7741  halt=0.2725  val=0.0628  route_acc=0.0805  route_hung=0.5051  route_ami=0.4426  entropy_norm=0.9858  cos_max=0.1190  tok/s=1565
+
+[Train] Complete. Best val_loss = 0.062601
+[Seed] ops without a deterministic implementation were used in this run: _histc_cuda. Losses may not reproduce bitwise; this is recorded in provenance rather than hidden.
+[Run] metrics written to C:\Users\Hp\Desktop\Waste\MoRE\runs\t10_more_two_blocks_seed43__c5b67537\metrics.json
+[run] two_blocks seed=43 exit=0 in 31.6 min
+
+===== 5/5  arm=two_blocks  seed=44  elapsed=107 min =====
+
+[run] two_blocks seed=44  (train.py --architecture more --config C:\Users\Hp\Desktop\Waste\MoRE\automated\phase10_configs\two_blocks.json --seed 44 --run_name t10_more_two_blocks)
+wandb: [wandb.login()] Loaded credentials for https://api.wandb.ai from C:\Users\Hp\_netrc.
+wandb: Currently logged in as: rshisode607 (rshisode607-government-college-of-engineering-aurangabad) to https://api.wandb.ai. Use `wandb login --relogin` to force relogin
+wandb: WARNING Using a boolean value for 'reinit' is deprecated. Use 'return_previous' or 'finish_previous' instead.
+wandb: Tracking run with wandb version 0.28.0
+wandb: Run data is saved locally in C:\Users\Hp\Desktop\Waste\MoRE\code\wandb\run-20260829_085915-75staywv
+wandb: Run `wandb offline` to turn off syncing.
+wandb: Syncing run t10_more_two_blocks_seed44
+wandb:  View project at https://wandb.ai/rshisode607-government-college-of-engineering-aurangabad/micro-MoRE-poc
+wandb:  View run at https://wandb.ai/rshisode607-government-college-of-engineering-aurangabad/micro-MoRE-poc/runs/75staywv
+C:\Users\Hp\anaconda3\envs\more_env\lib\site-packages\wandb\integration\torch\wandb_torch.py:187: UserWarning: _histc_cuda does not have a deterministic implementation, but you set 'torch.use_deterministic_algorithms(True, warn_only=True)'. You can file an issue at https://github.com/pytorch/pytorch/issues to help us prioritize adding deterministic support for this operation. (Triggered internally at C:\cb\pytorch_1000000000000\work\aten\src\ATen\Context.cpp:95.)
+  flat.histc(bins=self._num_bins)
+wandb: uploading artifact run-75staywv-paperop_avg_recursion_depth_table--pU_7A; updating run metadata
+wandb: uploading artifact run-75staywv-paperop_avg_recursion_depth_table--pU_7A
+wandb: uploading media\images\paper\op_avg_recursion_depth_49_00713ff1fd763a23e505.png; uploading media\table\paper\op_avg_recursion_depth_table_49_6fff11ac3f5f7ced7d76.table.json; uploading output.log; uploading wandb-summary.json; uploading config.yaml (+ 2 more)
+wandb: uploading media\table\paper\op_avg_recursion_depth_table_49_6fff11ac3f5f7ced7d76.table.json; uploading output.log; uploading wandb-summary.json; uploading config.yaml; uploading media\images\paper\routing_confusion_matrix_49_ac04a7d00e5e920a7604.png (+ 1 more)
+wandb: uploading wandb-summary.json
+wandb: uploading history steps 49-50, summary, console lines 76-80
+wandb: 
+wandb: Run summary:
+wandb:   depth/allocation_error_abs 0.98871
+wandb:   depth/allocation_error_rel 0.65071
+wandb:        depth_dist/step_1_pct 4.69637
+wandb:        depth_dist/step_2_pct 86.58365
+wandb:        depth_dist/step_3_pct 7.23725
+wandb:        depth_dist/step_4_pct 1.06883
+wandb:        depth_dist/step_5_pct 0.34217
+wandb:        depth_dist/step_6_pct 0.05926
+wandb:        depth_dist/step_7_pct 0.01247
+wandb: diag/max_pairwise_cosine_sim 0.07941
+wandb:                         +110 ...
+wandb: 
+wandb:  View run t10_more_two_blocks_seed44 at: https://wandb.ai/rshisode607-government-college-of-engineering-aurangabad/micro-MoRE-poc/runs/75staywv
+wandb:  View project at: https://wandb.ai/rshisode607-government-college-of-engineering-aurangabad/micro-MoRE-poc
+wandb: Synced 5 W&B file(s), 100 media file(s), 50 artifact file(s) and 0 other file(s)
+wandb: Find logs at: .\wandb\run-20260829_085915-75staywv\logs
+[Run] architecture   = more
+[Run] experiment_id   = t10_more_two_blocks_seed44__b978a882
+[Run] experiment_group= exploratory
+[Run] output directory= C:\Users\Hp\Desktop\Waste\MoRE\runs\t10_more_two_blocks_seed44__b978a882
+[Seed] seed=44  determinism=warn_only  streams=random+numpy+torch_cpu+torch_cuda+dataloader_generator+dataloader_worker
+[Seed] cudnn.deterministic=True  cudnn.benchmark=False  deterministic_algorithms=True  CUBLAS_WORKSPACE_CONFIG=:4096:8
+[Train] Device: cuda
+[Train] Effective settings: epochs=50, lr=0.001, routing_balance=0.001, step_routing=0.0, subset_fraction=1.0, subset_seed=44
+[Dataset] Loaded 59500 records from 'C:\Users\Hp\Desktop\Waste\MoRE\data\train.jsonl'.
+[Dataset] Using validation set: C:\Users\Hp\Desktop\Waste\MoRE\data\val.jsonl
+[Dataset] Loaded 5250 records from 'C:\Users\Hp\Desktop\Waste\MoRE\data\val.jsonl'.
+[Model] Total parameters: 6,358,553
+[Train] halting: ponder_weight=0.001, supervision=OFF (pure ACT)
+[Epoch 001 Batch 0] Router grad norm: 0.089829 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 002 Batch 0] Router grad norm: 0.009506 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 002/50] task=0.0744  step_route=0.5440  bal=-0.5934  halt=0.3173  val=0.0724  route_acc=0.1786  route_hung=0.4567  route_ami=0.4060  entropy_norm=0.9118  cos_max=0.0038  tok/s=1720
+[Epoch 003 Batch 0] Router grad norm: 0.009699 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 004 Batch 0] Router grad norm: 0.011014 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 004/50] task=0.0713  step_route=0.5471  bal=-0.6718  halt=0.2939  val=0.0691  route_acc=0.1753  route_hung=0.4993  route_ami=0.4615  entropy_norm=0.9485  cos_max=0.0090  tok/s=1603
+[Epoch 005 Batch 0] Router grad norm: 0.010544 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 006 Batch 0] Router grad norm: 0.006881 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 006/50] task=0.0688  step_route=0.5471  bal=-0.6577  halt=0.2851  val=0.0674  route_acc=0.0963  route_hung=0.4583  route_ami=0.4403  entropy_norm=0.9650  cos_max=0.0157  tok/s=1733
+[Epoch 007 Batch 0] Router grad norm: 0.023845 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 008 Batch 0] Router grad norm: 0.007515 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 008/50] task=0.0681  step_route=0.5369  bal=-0.6656  halt=0.2809  val=0.0659  route_acc=0.1752  route_hung=0.4247  route_ami=0.3800  entropy_norm=0.9652  cos_max=0.0232  tok/s=1769
+[Epoch 009 Batch 0] Router grad norm: 0.007759 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 010 Batch 0] Router grad norm: 0.006917 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 010/50] task=0.0671  step_route=0.5364  bal=-0.6727  halt=0.2732  val=0.0669  route_acc=0.0923  route_hung=0.4149  route_ami=0.3582  entropy_norm=0.9697  cos_max=0.0359  tok/s=1770
+[Epoch 011 Batch 0] Router grad norm: 0.010723 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 012 Batch 0] Router grad norm: 0.010597 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 012/50] task=0.0678  step_route=0.5369  bal=-0.6747  halt=0.2830  val=0.0671  route_acc=0.1514  route_hung=0.5060  route_ami=0.5021  entropy_norm=0.9321  cos_max=0.0420  tok/s=1317
+[Epoch 013 Batch 0] Router grad norm: 0.005212 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 014 Batch 0] Router grad norm: 0.006788 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 014/50] task=0.0668  step_route=0.5414  bal=-0.6691  halt=0.2710  val=0.0649  route_acc=0.0980  route_hung=0.4443  route_ami=0.3965  entropy_norm=0.9741  cos_max=0.0536  tok/s=1645
+[Epoch 015 Batch 0] Router grad norm: 0.003584 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 016 Batch 0] Router grad norm: 0.006929 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 016/50] task=0.0656  step_route=0.5382  bal=-0.7211  halt=0.2772  val=0.0642  route_acc=0.0993  route_hung=0.5655  route_ami=0.5317  entropy_norm=0.9717  cos_max=0.0538  tok/s=1630
+[Epoch 017 Batch 0] Router grad norm: 0.008309 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 018 Batch 0] Router grad norm: 0.008696 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 018/50] task=0.0675  step_route=0.5955  bal=-0.6038  halt=0.2965  val=0.0651  route_acc=0.0830  route_hung=0.4486  route_ami=0.3751  entropy_norm=0.9553  cos_max=0.0652  tok/s=1317
+[Epoch 019 Batch 0] Router grad norm: 0.008768 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 020 Batch 0] Router grad norm: 0.010042 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 020/50] task=0.0655  step_route=0.5757  bal=-0.7191  halt=0.2830  val=0.0641  route_acc=0.0818  route_hung=0.4153  route_ami=0.3553  entropy_norm=0.9626  cos_max=0.0709  tok/s=1727
+[Epoch 021 Batch 0] Router grad norm: 0.018442 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 022 Batch 0] Router grad norm: 0.007204 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 022/50] task=0.0646  step_route=0.5738  bal=-0.7315  halt=0.2795  val=0.0639  route_acc=0.0814  route_hung=0.4486  route_ami=0.3685  entropy_norm=0.9719  cos_max=0.0730  tok/s=1633
+[Epoch 023 Batch 0] Router grad norm: 0.007832 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 024 Batch 0] Router grad norm: 0.006631 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 024/50] task=0.0639  step_route=0.5689  bal=-0.7492  halt=0.2834  val=0.0634  route_acc=0.0875  route_hung=0.4494  route_ami=0.3958  entropy_norm=0.9790  cos_max=0.0746  tok/s=1502
+[Epoch 025 Batch 0] Router grad norm: 0.007272 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 026 Batch 0] Router grad norm: 0.004208 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 026/50] task=0.0637  step_route=0.5658  bal=-0.7542  halt=0.2820  val=0.0637  route_acc=0.1598  route_hung=0.4117  route_ami=0.3639  entropy_norm=0.9864  cos_max=0.0765  tok/s=1582
+[Epoch 027 Batch 0] Router grad norm: 0.007021 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 028 Batch 0] Router grad norm: 0.011158 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 028/50] task=0.0634  step_route=0.5638  bal=-0.7567  halt=0.2797  val=0.0643  route_acc=0.0104  route_hung=0.4111  route_ami=0.3344  entropy_norm=0.9803  cos_max=0.0771  tok/s=1517
+[Epoch 029 Batch 0] Router grad norm: 0.006030 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 030 Batch 0] Router grad norm: 0.005721 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 030/50] task=0.0627  step_route=0.5630  bal=-0.7606  halt=0.2825  val=0.0637  route_acc=0.1553  route_hung=0.4439  route_ami=0.3724  entropy_norm=0.9862  cos_max=0.0787  tok/s=1523
+[Epoch 031 Batch 0] Router grad norm: 0.007742 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 032 Batch 0] Router grad norm: 0.004045 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 032/50] task=0.0624  step_route=0.5662  bal=-0.7650  halt=0.2817  val=0.0638  route_acc=0.0820  route_hung=0.4427  route_ami=0.3846  entropy_norm=0.9854  cos_max=0.0794  tok/s=1560
+[Epoch 033 Batch 0] Router grad norm: 0.004541 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 034 Batch 0] Router grad norm: 0.004740 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 034/50] task=0.0621  step_route=0.5670  bal=-0.7659  halt=0.2821  val=0.0630  route_acc=0.0098  route_hung=0.4582  route_ami=0.3940  entropy_norm=0.9910  cos_max=0.0797  tok/s=1576
+[Epoch 035 Batch 0] Router grad norm: 0.005946 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 036 Batch 0] Router grad norm: 0.008514 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 036/50] task=0.0616  step_route=0.5684  bal=-0.7651  halt=0.2807  val=0.0639  route_acc=0.0677  route_hung=0.4480  route_ami=0.3396  entropy_norm=0.9920  cos_max=0.0797  tok/s=1575
+[Epoch 037 Batch 0] Router grad norm: 0.011903 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 038 Batch 0] Router grad norm: 0.005848 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 038/50] task=0.0612  step_route=0.5672  bal=-0.7671  halt=0.2815  val=0.0635  route_acc=0.1427  route_hung=0.4420  route_ami=0.3547  entropy_norm=0.9868  cos_max=0.0797  tok/s=1511
+[Epoch 039 Batch 0] Router grad norm: 0.008278 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 040 Batch 0] Router grad norm: 0.007826 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 040/50] task=0.0608  step_route=0.5673  bal=-0.7657  halt=0.2826  val=0.0635  route_acc=0.0124  route_hung=0.4575  route_ami=0.3872  entropy_norm=0.9810  cos_max=0.0800  tok/s=1507
+[Epoch 041 Batch 0] Router grad norm: 0.009305 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 042 Batch 0] Router grad norm: 0.011852 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 042/50] task=0.0605  step_route=0.5696  bal=-0.7662  halt=0.2791  val=0.0635  route_acc=0.0826  route_hung=0.4565  route_ami=0.3767  entropy_norm=0.9885  cos_max=0.0795  tok/s=1487
+[Epoch 043 Batch 0] Router grad norm: 0.005109 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 044 Batch 0] Router grad norm: 0.007438 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 044/50] task=0.0603  step_route=0.5689  bal=-0.7692  halt=0.2809  val=0.0637  route_acc=0.0352  route_hung=0.4572  route_ami=0.3655  entropy_norm=0.9926  cos_max=0.0796  tok/s=1472
+[Epoch 045 Batch 0] Router grad norm: 0.003958 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 046 Batch 0] Router grad norm: 0.006260 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 046/50] task=0.0603  step_route=0.5685  bal=-0.7715  halt=0.2825  val=0.0634  route_acc=0.0447  route_hung=0.4574  route_ami=0.3617  entropy_norm=0.9956  cos_max=0.0794  tok/s=1387
+[Epoch 047 Batch 0] Router grad norm: 0.006112 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 048 Batch 0] Router grad norm: 0.009682 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 048/50] task=0.0601  step_route=0.5690  bal=-0.7717  halt=0.2820  val=0.0634  route_acc=0.0348  route_hung=0.4573  route_ami=0.3650  entropy_norm=0.9925  cos_max=0.0794  tok/s=1411
+[Epoch 049 Batch 0] Router grad norm: 0.008469 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 050 Batch 0] Router grad norm: 0.011100 | router_noise=none scales: ['0.0000', '0.0000']
+[Epoch 050/50] task=0.0599  step_route=0.5692  bal=-0.7721  halt=0.2819  val=0.0635  route_acc=0.0454  route_hung=0.4574  route_ami=0.3614  entropy_norm=0.9932  cos_max=0.0794  tok/s=1412
+
+[Train] Complete. Best val_loss = 0.063003
+[Seed] ops without a deterministic implementation were used in this run: _histc_cuda. Losses may not reproduce bitwise; this is recorded in provenance rather than hidden.
+[Run] metrics written to C:\Users\Hp\Desktop\Waste\MoRE\runs\t10_more_two_blocks_seed44__b978a882\metrics.json
+[run] two_blocks seed=44 exit=0 in 34.5 min
+
+[plan] launch phase done in 141.1 min
+
+==============================================================================
+T10 -- PHASE 10 ABLATIONS (MoRE, one field at a time)
+==============================================================================
+baseline arm : canonical MoRE from T9.1, seeds [42, 43, 44] (reused, not re-run)
+arms         : seeds [42, 43, 44], experiment_group=exploratory
+reading rule : |arm - baseline| >= 2x max(seed stds) to count
+
+PRIMARY METRIC: val/task_loss
+arm                   field changed                         val/task_loss   verdict
+canonical MoRE        --                             0.063290 +- 0.000050   baseline (5-seed: 0.063186 +- 0.000223)
+dense_routing         model.routing_mode = dense_blend 0.063687 +- 0.000348   inside seed noise (1.14x seed std) -- supports no claim
+fixed_depth           model.fixed_depth = True       0.062822 +- 0.000088   RESOLVED (2.10x seed std) -- BETTER than canonical MoRE
+routing_supervision   loss_weights.step_routing = 0.5 0.063772 +- 0.000135   RESOLVED (2.16x seed std) -- WORSE than canonical MoRE
+router_noise          model.router_noise = fixed_annealed 0.063363 +- 0.000326   inside seed noise (0.22x seed std) -- supports no claim
+two_blocks            model.num_blocks = 2           0.063258 +- 0.000346   inside seed noise (0.09x seed std) -- supports no claim
+
+routing (permutation-invariant; expert indices carry no identity)
+metric                                           canonical MoRE        dense_routing          fixed_depth  routing_supervision         router_noise           two_blocks
+val/routing_hungarian_accuracy                 0.5538 +- 0.0382     0.4963 +- 0.0372     0.4831 +- 0.0592     1.0000 +- 0.0000     0.4853 +- 0.0193     0.5048 +- 0.0386
+val/routing_ami                                0.5092 +- 0.0506     0.3971 +- 0.0268     0.4406 +- 0.0329     1.0000 +- 0.0000     0.4633 +- 0.0086     0.4447 +- 0.0689
+val/routing_purity                             0.6224 +- 0.0419     0.5404 +- 0.0385     0.5480 +- 0.0525     1.0000 +- 0.0000     0.5359 +- 0.0215     0.5635 +- 0.0632
+val/routing_matched_macro_recall               0.5712 +- 0.0847     0.5207 +- 0.0221     0.5036 +- 0.0570     1.0000 +- 0.0000     0.5326 +- 0.0399     0.4982 +- 0.0121
+val/routing_accuracy                           0.0790 +- 0.0440     0.1790 +- 0.0474     0.1379 +- 0.0527     1.0000 +- 0.0000     0.1435 +- 0.0288     0.0831 +- 0.0319
+
+depth allocation (NOT compute efficiency -- no FLOPs in these numbers)
+metric                                           canonical MoRE        dense_routing          fixed_depth  routing_supervision         router_noise           two_blocks
+train/avg_recursion_steps                      2.0524 +- 0.0611     2.0256 +- 0.0112     7.0000 +- 0.0000     2.0450 +- 0.0247     2.0760 +- 0.0412     2.0299 +- 0.0333
+depth/allocation_error_abs                     1.0048 +- 0.1231     0.9440 +- 0.0279     5.8850 +- 0.0001     1.0019 +- 0.0157     0.9378 +- 0.0417     0.9325 +- 0.0403
+halt/early_exit_rate                           0.9997 +- 0.0002     1.0000 +- 0.0000     0.0000 +- 0.0000     1.0000 +- 0.0000     0.9995 +- 0.0005     0.9999 +- 0.0000
+halt/forced_exit_rate                          0.0003 +- 0.0002     0.0000 +- 0.0000     1.0000 +- 0.0000     0.0000 +- 0.0000     0.0005 +- 0.0005     0.0001 +- 0.0000
+
+balance / differentiation / cost
+metric                                           canonical MoRE        dense_routing          fixed_depth  routing_supervision         router_noise           two_blocks
+train/expert_load_entropy_normalized           0.9860 +- 0.0022     0.9948 +- 0.0020     0.9994 +- 0.0001     0.9518 +- 0.0071     0.9937 +- 0.0018     0.9919 +- 0.0045
+train/entropy_term_normalized                  0.9985 +- 0.0006     0.9964 +- 0.0015     0.9996 +- 0.0001     0.8208 +- 0.0265     0.9983 +- 0.0007     0.9989 +- 0.0002
+diag/max_pairwise_cosine_sim                   0.0712 +- 0.0166     0.0206 +- 0.0034     0.0723 +- 0.0054     0.0163 +- 0.0025     0.0612 +- 0.0156     0.1008 +- 0.0163
+dispatch/evals_per_token                       1.0000 +- 0.0000     6.0000 +- 0.0000     1.0000 +- 0.0000     1.0000 +- 0.0000     1.0000 +- 0.0000     1.0000 +- 0.0000
+perf/throughput_tokens_sec                2073.0306 +- 170.04872912.3171 +- 145.4678 2094.3374 +- 43.84633187.0509 +- 250.39312328.0228 +- 296.28371586.8954 +- 152.9176
+total_params                              3201555.0000 +- 0.00003201555.0000 +- 0.00003201555.0000 +- 0.00003201555.0000 +- 0.00003201555.0000 +- 0.00006358553.0000 +- 0.0000
+
+WHAT EACH ARM ASKED
+  [T10.F] dense_routing: Does Top-1 sparse dispatch cost anything against evaluate-all-and-blend? If dense is no better, sparsity is free; if dense is much better, the canonical architecture is paying for sparsity it does not need.
+  [T10.B] fixed_depth: Does learned adaptive halting beat a fixed depth? T9.1 measured a depth allocation error of ~1.0 step, so the depths ACT chooses may be doing nothing that a constant could not.
+  [T10.E] routing_supervision: Does supervising the router with the oracle expert index improve the task metric, or only the routing metric? Canonical is 0.0 (T8.0b).
+  [T10.D] router_noise: Does exploration noise in the router change the partition or the loss? Canonical is none (CLAUDE.md 2). `fixed_annealed` and not `trainable`: the L2-on-trainable-noise-scale mechanism is explicitly not a proven fix, so an ablation of it would confound noise with that unproven machinery.
+  [T10.C] two_blocks: Does a second recursive block help? Varies ONLY num_blocks -- the old 1-vs-2-block headline moved three factors at once and is uninterpretable.
+
+------------------------------------------------------------------------------
+No problems. Every completed arm differs from the canonical MoRE baseline in exactly one config leaf, verified on the config that actually trained, and all arms share one code state.
+
+Wrote automated\phase10_ablations_result.json

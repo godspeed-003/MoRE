@@ -103,8 +103,9 @@ def routing_accuracy_from_confusion(confusion, num_experts: int) -> float:
     the confusion matrix was built from, computed as the diagonal fraction so
     the reported scalar and the reported matrix cannot disagree by construction
     (updated_rules.md 8.2 / T6.2). Before this existed, the value was computed
-    independently in metrics.evaluate_paper_metrics and again inline in
-    engine.py's validation loop -- two copies, of which only the engine's ran.
+    independently in `evaluate_paper_metrics` (deleted at T11.1 -- see the note
+    lower in this file) and again inline in engine.py's validation loop -- two
+    copies, of which only the engine's ran.
 
     Returns NaN (rendered "N/A", never 0.0) when the quantity does not exist:
       * num_experts < 2 -- the MoR baseline makes no routing decision at all.
@@ -459,114 +460,18 @@ def compute_token_exit_depths(
     return (depth_exits * steps.unsqueeze(0)).sum(dim=-1)
 
 
-# NOTE: currently UNUSED. engine.py accumulates the same quantities inside its
-# existing validation pass instead of paying for a second full pass over the
-# loader. Both share routing_accuracy_from_confusion above, so they cannot
-# disagree on the headline number. If you are fixing a routing metric, fix the
-# engine's loop -- that is the one that runs.
-def evaluate_paper_metrics(
-    model: MoREModel,
-    loader: DataLoader,
-    device: torch.device,
-    num_experts: int,
-    max_depth: int,
-) -> tuple[np.ndarray, float, dict[str, float], dict[str, float]]:
-    """
-    Accumulate validation-set metrics for paper figures:
-      • F×E routing confusion matrix (oracle FAMILY vs block-0 depth-1 router),
-        F = num_families (dataset label space, 6), E = num_experts
-        (T5.1: never a hard-coded 7; T8.3: the two axes are not the same width)
-      • Per-operation average recursion depth (from last MoRE block)
-
-    T8.3 STATUS WARNING -- this function is currently UNREFERENCED. engine.py
-    imports it but never calls it; the live path is the inline validation loop in
-    engine.train(), which is what produced every number in every run directory.
-    Its `model(...)` unpack expects 11 return values while MoREModel now returns
-    13, so calling it as written would raise. It is left in place (not deleted)
-    because it is the only self-contained metric harness, but do not treat it as
-    a second opinion on any reported number, and fix the unpack before reusing
-    it. The width bug below was fixed in step with the live loop so the two
-    definitions do not diverge further.
-    """
-    # T8.3: rows are ORACLE FAMILY indices (0..5 for every architecture, straight
-    # off disk), columns are PREDICTED EXPERT indices (1 wide for MoR). A square
-    # num_experts x num_experts matrix indexed out of range on MoR.
-    num_families = int(getattr(model, "num_families", NUM_EXPERTS_CANONICAL))
-    confusion = torch.zeros(num_families, num_experts, dtype=torch.float64)
-    op_depth_sum   = torch.zeros(NUM_OP_TYPES, dtype=torch.float64)
-    op_depth_count = torch.zeros(NUM_OP_TYPES, dtype=torch.float64)
-    family_depth_sum   = torch.zeros(num_families, dtype=torch.float64)
-    family_depth_count = torch.zeros(num_families, dtype=torch.float64)
-
-    model.eval()
-    with torch.no_grad():
-        for x, step_mask, step_experts, step_ops, _, _, _ in loader:
-            x            = x.to(device)
-            step_mask    = step_mask.to(device)
-            step_experts = step_experts.to(device)
-            step_ops     = step_ops.to(device)
-
-            (_, _, _, _, _, depth_exits, _, _, _,
-             first_route, _route_stats) = model(x, step_mask, step_experts)
-            if first_route is None or depth_exits is None:
-                continue
-
-            flat_mask   = step_mask.reshape(-1)
-            flat_oracle = step_experts.reshape(-1)
-            flat_route  = first_route.reshape(-1)
-            flat_ops    = step_ops.reshape(-1)
-            exit_depths = compute_token_exit_depths(depth_exits, max_depth).reshape(-1)
-
-            route_valid = flat_mask & (flat_oracle >= 0) & (flat_route >= 0)
-            if route_valid.any():
-                oracle_idx = flat_oracle[route_valid].long()
-                pred_idx   = flat_route[route_valid].long()
-                confusion.index_put_(
-                    (oracle_idx, pred_idx),
-                    torch.ones(oracle_idx.shape[0], dtype=torch.float64),
-                    accumulate=True,
-                )
-
-            depth_valid = flat_mask & (flat_ops >= 0)
-            if depth_valid.any():
-                ops    = flat_ops[depth_valid].long().cpu()
-                depths = exit_depths[depth_valid].double().cpu()
-                for op_id, depth_val in zip(ops, depths):
-                    op_depth_sum[op_id]   += depth_val
-                    op_depth_count[op_id] += 1.0
-
-            family_valid = flat_mask & (flat_oracle >= 0)
-            if family_valid.any():
-                fams   = flat_oracle[family_valid].long().cpu()
-                depths = exit_depths[family_valid].double().cpu()
-                for fam_id, depth_val in zip(fams, depths):
-                    family_depth_sum[fam_id]   += depth_val
-                    family_depth_count[fam_id] += 1.0
-
-    routing_acc = routing_accuracy_from_confusion(confusion, num_experts)
-
-    op_avg_depth: dict[str, float] = {}
-    for i, name in enumerate(ALL_OP_NAMES):
-        if op_depth_count[i] > 0:
-            op_avg_depth[name] = (op_depth_sum[i] / op_depth_count[i]).item()
-
-    family_avg_depth: dict[str, float] = {}
-    # T5.1: labels come from the one manifest helper, never a literal.
-    # T8.3: sized to the FAMILY label space, not num_experts. With E=1 the old
-    # loop indexed a 1-element tensor with family ids up to 5; with E=7 it
-    # invented a seventh family.
-    for i, label in enumerate(expert_labels(num_families)):
-        if family_depth_count[i] > 0:
-            family_avg_depth[label] = (
-                family_depth_sum[i] / family_depth_count[i]
-            ).item()
-
-    return (
-        confusion.numpy(),
-        routing_acc,
-        op_avg_depth,
-        family_avg_depth,
-    )
+# T11.1 (audit item, ex-"item 11"): `evaluate_paper_metrics` USED TO LIVE HERE and
+# has been deleted. It was a 109-line second implementation of the validation-pass
+# metric accumulation, unreferenced by anything (engine.py imported it and never
+# called it), and by the time it was removed its `model(...)` unpack expected 11
+# return values while MoREModel returns 13 -- so calling it would have raised
+# rather than produced a second opinion. Every number in every run directory came
+# from the inline loop in `engine.train()`; that loop is the only implementation.
+# If you want an offline metric harness, do NOT resurrect a parallel copy: reuse
+# `routing_accuracy_from_confusion`, `permutation_invariant_routing_metrics`,
+# `compute_token_exit_depths` and `depth_allocation_error` from this module, which
+# is exactly what engine.py calls. The two-copies-that-diverge failure is already
+# in changelog.md (the tolerance guard landed in the copy that never ran).
 
 
 def make_routing_confusion_figure(

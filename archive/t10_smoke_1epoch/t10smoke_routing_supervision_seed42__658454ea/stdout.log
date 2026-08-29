@@ -1,0 +1,55 @@
+[Run] architecture   = more
+[Run] experiment_id   = t10smoke_routing_supervision_seed42__658454ea
+[Run] experiment_group= exploratory
+[Run] output directory= C:\Users\Hp\Desktop\Waste\MoRE\runs\t10smoke_routing_supervision_seed42__658454ea
+[Seed] seed=42  determinism=warn_only  streams=random+numpy+torch_cpu+torch_cuda+dataloader_generator+dataloader_worker
+[Seed] cudnn.deterministic=True  cudnn.benchmark=False  deterministic_algorithms=True  CUBLAS_WORKSPACE_CONFIG=:4096:8
+[Train] Device: cuda
+[Train] Effective settings: epochs=1, lr=0.001, routing_balance=0.001, step_routing=0.5, subset_fraction=1.0, subset_seed=42
+[Dataset] Loaded 59500 records from 'C:\Users\Hp\Desktop\Waste\MoRE\data\train.jsonl'.
+[Dataset] Using validation set: C:\Users\Hp\Desktop\Waste\MoRE\data\val.jsonl
+[Dataset] Loaded 5250 records from 'C:\Users\Hp\Desktop\Waste\MoRE\data\val.jsonl'.
+[Model] Total parameters: 3,201,555
+[Train] halting: ponder_weight=0.001, supervision=OFF (pure ACT)
+wandb: [wandb.login()] Loaded credentials for https://api.wandb.ai from C:\Users\Hp\_netrc.
+wandb: Currently logged in as: rshisode607 (rshisode607-government-college-of-engineering-aurangabad) to https://api.wandb.ai. Use `wandb login --relogin` to force relogin
+wandb: WARNING Using a boolean value for 'reinit' is deprecated. Use 'return_previous' or 'finish_previous' instead.
+wandb: setting up run 8lhlm0cz
+wandb: Tracking run with wandb version 0.28.0
+wandb: Run data is saved locally in C:\Users\Hp\Desktop\Waste\MoRE\code\wandb\run-20260829_020815-8lhlm0cz
+wandb: Run `wandb offline` to turn off syncing.
+wandb: Syncing run t10smoke_routing_supervision_seed42
+wandb:  View project at https://wandb.ai/rshisode607-government-college-of-engineering-aurangabad/micro-MoRE-poc
+wandb:  View run at https://wandb.ai/rshisode607-government-college-of-engineering-aurangabad/micro-MoRE-poc/runs/8lhlm0cz
+[Epoch 001 Batch 0] Router grad norm: 0.132787 | router_noise=none scales: ['0.0000']
+C:\Users\Hp\anaconda3\envs\more_env\lib\site-packages\wandb\integration\torch\wandb_torch.py:187: UserWarning: _histc_cuda does not have a deterministic implementation, but you set 'torch.use_deterministic_algorithms(True, warn_only=True)'. You can file an issue at https://github.com/pytorch/pytorch/issues to help us prioritize adding deterministic support for this operation. (Triggered internally at C:\cb\pytorch_1000000000000\work\aten\src\ATen\Context.cpp:95.)
+  flat.histc(bins=self._num_bins)
+[Epoch 001/1] task=0.0877  step_route=0.0406  bal=0.1715  halt=0.4049  val=0.0771  route_acc=0.1894  route_hung=0.4950  route_ami=0.4573  entropy_norm=0.9145  cos_max=0.0048  tok/s=2744
+
+[Train] Complete. Best val_loss = 0.077135
+[Seed] ops without a deterministic implementation were used in this run: _histc_cuda. Losses may not reproduce bitwise; this is recorded in provenance rather than hidden.
+[Run] metrics written to C:\Users\Hp\Desktop\Waste\MoRE\runs\t10smoke_routing_supervision_seed42__658454ea\metrics.json
+wandb: updating run metadata; uploading artifact run-8lhlm0cz-paperop_avg_recursion_depth_table-cSr1uQ
+wandb: uploading artifact run-8lhlm0cz-paperop_avg_recursion_depth_table-cSr1uQ
+wandb: uploading artifact run-8lhlm0cz-paperop_avg_recursion_depth_table-cSr1uQ; uploading media\table\paper\op_avg_recursion_depth_table_0_db8ac5f3c17a2b310d38.table.json; uploading output.log; uploading wandb-summary.json; uploading config.yaml (+ 3 more)
+wandb: uploading media\table\paper\op_avg_recursion_depth_table_0_db8ac5f3c17a2b310d38.table.json; uploading wandb-summary.json; uploading config.yaml; uploading media\images\paper\routing_confusion_matrix_0_74d5883f9982c658634c.png; uploading media\images\paper\routing_confusion_matrix_counts_0_b1de2c39a2ad444303b5.png (+ 2 more)
+wandb: uploading history steps 0-1, summary, console lines 3-7
+wandb: uploading data
+wandb: 
+wandb: Run summary:
+wandb:   depth/allocation_error_abs 1.484
+wandb:   depth/allocation_error_rel 1.11535
+wandb:        depth_dist/step_1_pct 0
+wandb:        depth_dist/step_2_pct 40.05747
+wandb:        depth_dist/step_3_pct 43.1468
+wandb:        depth_dist/step_4_pct 7.771
+wandb:        depth_dist/step_5_pct 3.78704
+wandb:        depth_dist/step_6_pct 2.44598
+wandb:        depth_dist/step_7_pct 2.79171
+wandb: diag/max_pairwise_cosine_sim 0.00476
+wandb:                         +110 ...
+wandb: 
+wandb:  View run t10smoke_routing_supervision_seed42 at: https://wandb.ai/rshisode607-government-college-of-engineering-aurangabad/micro-MoRE-poc/runs/8lhlm0cz
+wandb:  View project at: https://wandb.ai/rshisode607-government-college-of-engineering-aurangabad/micro-MoRE-poc
+wandb: Synced 5 W&B file(s), 4 media file(s), 2 artifact file(s) and 0 other file(s)
+wandb: Find logs at: .\wandb\run-20260829_020815-8lhlm0cz\logs

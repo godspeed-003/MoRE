@@ -209,6 +209,15 @@ def _effective(resolved: dict) -> dict:
         # engine.py calls, so guard and provenance cannot disagree.
         "halting_mode":  resolve_halting_mode(resolved),
         "task_weight":   lw.get("task"),
+        # T8.3: the family-supervision weight. It belongs in enforced_fields
+        # rather than in architecture_variants because apply_architecture does
+        # NOT vary it -- all three architectures receive the same six oracle
+        # family labels off disk and the same 6-wide cls_head, so 0.5 is a shared
+        # canonical constant. Until T8.3 it was a bare literal in engine.py, which
+        # meant the second-largest term in the objective was invisible to this
+        # guard: a run could zero it by editing source and still be stamped
+        # canonical_phase_b.
+        "family_cls_weight": lw.get("family_cls"),
         # Architecture-scoped (checked against architecture_variants[arch], not
         # against enforced_fields).
         "architecture":       resolved.get("architecture"),

@@ -1,0 +1,18 @@
+{
+  "_README": "Offline validation-pass depth metrics, computed by code/eval_val_depth.py from checkpoint.pt AFTER the run finished. NOT part of the run's own metrics.json. measured_at is the best-validation-loss checkpoint, which is NOT necessarily the last-epoch model the canonical primary metric comes from.",
+  "measured_at": "best_val_checkpoint",
+  "source": "code/eval_val_depth.py",
+  "run_dir": "phaseB_mor_seed45__e5955ef2",
+  "experiment_id": "phaseB_mor_seed45__e5955ef2",
+  "architecture": "mor",
+  "resolved_seed": 45,
+  "config_hash": "e5955ef2bff8f02a3af826764a1eb7bf7aa6d34968ff3512238eba907ee988bc",
+  "val_records": 5250,
+  "offline/val_task_loss": 0.06249874422379902,
+  "val_offline/avg_recursion_steps": 2.124209172866376,
+  "val_offline/depth_allocation_error_abs": 0.9325476544243949,
+  "val_offline/depth_allocation_error_rel": 0.5871787071228027,
+  "val_offline/forced_exit_rate": 0.0,
+  "val_offline/early_exit_rate": 1.0,
+  "val_offline/mean_remainder": 0.15857282068048204
+}

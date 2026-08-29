@@ -1,0 +1,18 @@
+{
+  "sha": {
+    "more/model.py": "2e5c30da1df1163a",
+    "more/engine.py": "cf51a6fe1043fbbc",
+    "more/data.py": "967c8eef6c2534f6",
+    "more/config.py": "e217abcc5cc9b521",
+    "more/run_context.py": "71678ed183d93b87",
+    "more/cli.py": "6a29dcdb4c438efe"
+  },
+  "pinned_at": "2026-08-29T02:03:18",
+  "baseline_runs": {
+    "42": "phaseB_more_seed42__989e89cc",
+    "43": "phaseB_more_seed43__909a3dc4",
+    "44": "phaseB_more_seed44__ba0c483d",
+    "45": "phaseB_more_seed45__891228d4",
+    "46": "phaseB_more_seed46__0a9dce12"
+  }
+}

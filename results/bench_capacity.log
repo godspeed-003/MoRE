@@ -1,0 +1,29 @@
+device=cuda  steps=7  iters=20  repeats=3 (min taken)
+gpu=NVIDIA GeForce RTX 4060 Laptop GPU
+canonical point: d_model=256, batch=768
+
+== A. BATCH sweep at canonical d_model=256 ==
+   flat ms/step => launch-bound, free GPU headroom.  rising linearly => GPU-bound.
+   batch       params   ms/step      tok/s  peak MiB  x canon ms   ms/token
+      96    3,201,555    109.11      6,159       136        0.76   162.3656
+     192    3,201,555    115.15     11,672       208        0.80    85.6783
+     384    3,201,555    117.02     22,970       362        0.81    43.5356
+     768    3,201,555    143.76     37,395       695        1.00    26.7416
+    1536    3,201,555    153.03     70,259      1293        1.06    14.2330
+    3072    3,201,555    179.57    119,750      2447        1.25     8.3507
+    6144    3,201,555    275.36    156,187      4732        1.92     6.4026
+
+== B. WIDTH sweep at canonical batch=768 ==
+ d_model       params   ms/step      tok/s  peak MiB  x canon ms   ms/token
+     256    3,201,555    143.88     37,364       695        1.00    26.7639
+     384    7,186,195    268.54     20,019      1098        1.87    49.9525
+     512   12,760,083     72.47     74,184      1162        0.50    13.4801
+     768   28,675,603    197.53     27,217      1760        1.37    36.7423
+    1024   50,948,115    160.07     33,586      3132        1.11    29.7742
+
+Reading:
+  * 'ms/token' falling as batch grows is unused GPU capacity being
+    absorbed at no extra wall-clock cost. Once it flattens, the GPU is
+    saturated and more work costs proportional time.
+  * In sweep B, 'x canon ms' is what a wider model COSTS. A wider model
+    can never make a run finish sooner -- it adds work to the same loop.

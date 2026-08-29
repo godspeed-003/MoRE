@@ -33,7 +33,7 @@
     "~0.0635 with no divergence or dead experts. Do not write them up as a tuned",
     "optimum."
   ],
-  "spec_version": "1.0-T8.2-frozen",
+  "spec_version": "1.1-T8.2-frozen",
   "canonical_group": "canonical_phase_b",
 
   "enforced_fields": {
@@ -53,7 +53,8 @@
     "routing_mode": "top1_sparse",
     "router_noise": "none",
     "halting_mode": "pure_act",
-    "task_weight": 1.0
+    "task_weight": 1.0,
+    "family_cls_weight": 0.5
   },
 
   "frozen_by": {
@@ -73,7 +74,8 @@
     "routing_mode": "updated_rules.md 1.1 / plan.md 4.1. Dense evaluate-all-and-blend is ablation F and may never be canonical.",
     "router_noise": "updated_rules.md 2.5 / plan.md 7.4. Canonical default is none; noise is ablation D.",
     "halting_mode": "T8.0a controlled ACT decision experiment, 3 seeds x 2 arms x 20 epochs. pure_act 0.063676 +/- 0.000283 vs supervised_curriculum 0.063953 +/- 0.000190; gap -0.000277 is inside the seed std, so the pre-registered tie rule selected the less-supervised arm. supervised_curriculum remains available as a labelled ablation.",
-    "task_weight": "loss_weights.task = 1.0 is the reference scale every other weight is expressed against; it is not tuned."
+    "task_weight": "loss_weights.task = 1.0 is the reference scale every other weight is expressed against; it is not tuned.",
+    "family_cls_weight": "T8.3. Frozen at the value every run in the project's history actually used -- it was a bare 0.5 literal inside engine.py's total_loss until T8.3, so it is INHERITED, not selected: no sweep or ablation informed it. It is external annotation (data/script.py stamps a 'family' string per record; more/data.py reads it off disk), it is the second-largest term in the objective, and it is shared by all three architectures, which is why it sits here and not in architecture_variants. 0.0 is the labelled T10.H no_family_supervision ablation. Do not write it up as a tuned coefficient."
   },
 
   "seed_set": [42, 43, 44, 45, 46],
@@ -86,15 +88,24 @@
       "are `routing_mode` (shared, enforced above) and `num_experts` (enforced",
       "here); MoR's false is a consequence of num_experts=1, not a separate switch.",
       "",
-      "mor.ffn_mult is null: the parameter-budget policy is UNRESOLVED. At ffn_mult",
-      "4 MoR is 571,150 params against MoRE's 3,201,555 -- an 82.2% shortfall that",
-      "fails T9.2's 5% budget-matching bound. The guard therefore refuses canonical",
-      "MoR while permitting canonical MoE/MoRE. Measured candidates (T8.3, after the",
-      "label heads were widened to 6 classes): 23 -> 3,066,382 (gap 4.22%),",
-      "24 -> 3,197,710 (gap 0.12%), 25 -> 3,329,038 (gap 3.98%). 24 is principled",
-      "rather than fitted: MoR's single FFN gets 4 x 6, the total hidden width of",
-      "MoRE's six experts, and the 0.12% residual is the router and per-expert halt",
-      "heads MoR does not have. See PRE_PHASE7_AUDIT.md."
+      "T8.3 -- mor.ffn_mult is RESOLVED at 24 (was null). The parameter-budget",
+      "policy is: equalise the TOTAL FFN hidden width, not the per-FFN multiplier.",
+      "MoR has one FFN where MoRE has six, so the shared multiplier 4 gives MoR",
+      "571,150 params against MoRE's 3,201,555 -- an 82.2% shortfall that fails",
+      "T9.2's 5% budget-matching bound outright, and would have made every",
+      "MoE/MoR/MoRE loss comparison a comparison of model sizes. 24 = 4 x 6 gives",
+      "MoR's single FFN the total hidden width of MoRE's six experts; it is",
+      "principled rather than fitted. Measured (T8.3, after the label heads were",
+      "widened to 6 classes): 23 -> 3,066,382 (gap 4.22%), 24 -> 3,197,710 (gap",
+      "0.12%), 25 -> 3,329,038 (gap 3.98%). The 0.12% residual is the router and",
+      "the six per-expert halt heads that MoR does not have; it is irreducible by",
+      "any integer multiplier and is reported, not hidden.",
+      "",
+      "ffn_mult 4 REMAINS AVAILABLE as the labelled under-budgeted small baseline",
+      "(variant tag ffn_mult_4, T10.I). It answers a different question -- what MoR",
+      "does at MoRE's per-expert width -- and may appear in an ablation table with",
+      "the parameter count printed beside it, never in the headline comparison.",
+      "See PHASE11_AUDIT.md."
     ],
     "moe": {
       "num_experts": 6,
@@ -111,7 +122,7 @@
       "num_experts": 1,
       "max_depth": 7,
       "adaptive_halting": true,
-      "ffn_mult": null,
+      "ffn_mult": 24,
       "routing_balance_weight": 0.0,
       "step_routing_weight": 0.0,
       "halting_weight": 0.001,
@@ -135,7 +146,7 @@
     "num_experts": "updated_rules.md 2 / plan.md 7.2 - six families E1..E6, E7 catch-all removed. MoR is 1 by definition (no routing decision).",
     "max_depth": "plan.md Section 10 - recursion budget 7, matching max_steps. MoE is 1 by definition (no recursion).",
     "adaptive_halting": "Definitional: MoR and MoRE have ACT halting, MoE does not.",
-    "ffn_mult": "moe/more: 4, unchanged since the field was introduced (T6.7). mor: UNRESOLVED - see architecture_variants._note and T9.2.",
+    "ffn_mult": "moe/more: 4, unchanged since the field was introduced (T6.7). mor: 24, RESOLVED at T8.3 by equalising total FFN hidden width (4 x 6 experts). Measured gap to MoRE 0.12%, inside T9.2's 5% bound; 23 and 25 give 4.22% and 3.98%. See architecture_variants._note. ffn_mult 4 for MoR is the labelled ffn_mult_4 small-baseline ablation, not canonical.",
     "routing_balance_weight": "T4.2 measurement, frozen at 0.001 (weighted balance term at 0.017x task loss post-warmup, hard expert load spread 9.5-29.3%). MoR 0.0: nothing to balance with one expert.",
     "step_routing_weight": "T8.0b / plan.md E. 0.0 = canonical. Non-zero trains the router against the oracle expert index and is the T10.E oracle-routing ablation. Measured cost of removing the oracle: -0.000155 val task loss against a 0.000428 seed std, i.e. inside noise.",
     "halting_weight": "Ponder cost 0.001. MoE 0.0: max_depth 1 means every token forced-exits at step 1, so a ponder cost would be a constant.",
@@ -143,5 +154,29 @@
   },
 
   "run_name_template": "phaseB_{architecture}_seed{seed}",
-  "dataset_version": "more6-v1-seed42-n70000-3c1087b6aad9"
+  "dataset_version": "more6-v1-seed42-n70000-3c1087b6aad9",
+
+  "protocol": {
+    "_README": [
+      "Comparison protocol for the Phase 9 headline matrix. These fields are NOT",
+      "in enforced_fields and the Gate 0 guard does not check them -- they are the",
+      "written-down rules the protocol audit (plan.md step 3) requires, recorded",
+      "here so there is one source of truth instead of a convention held only in a",
+      "changelog entry.",
+      "Changing val_interval changes config_hash, so it must be set BEFORE the",
+      "matrix launches; a mid-matrix change produces two hash groups that may not",
+      "share a table."
+    ],
+    "val_interval": 2,
+    "val_interval_note": "logging.log_interval in config.json. Gates validation in engine.py. Raised from 10 to 2 at T9.0: at 10 a 20-epoch run measured val twice, so checkpoint_selection had two candidates and always returned the last epoch on a still-falling curve.",
+    "checkpoint_selection": "final epoch (last-epoch val/task_loss)",
+    "checkpoint_selection_note": "AMENDED AT T11.0b. Was 'lowest val/task_loss among evaluated epochs'. The old rule's own note required re-checking, on the matrix, whether the argmin coincided with the final epoch as it had on the six 20-epoch T10.H runs. Re-checked: it does NOT -- all 15 canonical Phase B runs diverge. That forced a choice, and last-epoch is the defensible one: best_val_loss is a minimum over the ~13 evaluated epochs, i.e. an order statistic whose downward bias grows with an arm's per-epoch validation noise, and that noise is NOT matched across arms (MoR 0.000052 vs MoE 0.000194 per-seed std). Selecting on it would hand the noisiest arm the largest free improvement -- a selection bias that varies by architecture, which is exactly what a three-way comparison cannot tolerate. Last-epoch is noisier per run but unbiased and identically defined for every arm. Fixed epoch count with no early stopping makes it well defined. Verified harmless to the conclusion: every pairwise verdict in the matrix is identical under both rules (see PHASE11_AUDIT.md 7.1), so this amendment changes the declared protocol, not any finding. best_val_loss is still recorded in metrics.json and may be reported as a secondary column, never as the primary.",
+    "parameter_budget_policy": "equalise total FFN hidden width, not per-FFN multiplier",
+    "parameter_budget_note": "MoR has one FFN where MoE/MoRE have six, so MoR ffn_mult = 24 = 4 x 6. Residual gap 0.120% (MoR 3,197,710 vs 3,201,555) decomposes EXACTLY into three parts, corrected at T11.0b: 1,285 for the six per-expert halt heads MoR does not have, 1,280 for the router, and 1,280 in FFN BIASES -- the component the pre-T11.0b version of this note omitted. Six experts carry 6 x (1024 + 256) = 7,680 bias parameters against MoR's single 6144 + 256 = 6,400. The weight MATRICES match to the parameter (6 x 2 x 256 x 1024 = 2 x 256 x 6144); only the biases cannot be equalised, and they cannot be at any integer multiplier. The gap runs AGAINST the headline result -- MoR wins on val/task_loss with fewer parameters -- so it cannot be the explanation. State it, never hide it. Separately: MoE and MoRE are parameter-identical to the unit (3,201,555 both), because adaptive_halting is not a MoREModel constructor argument, so the six halt heads are allocated under architecture=moe as well and simply never receive gradient. That makes MoRE-vs-MoE the exactly-matched isolation of recursion.",
+    "seed_reporting": "mean +- std over the full seed_set; verdicts come from the exact two-sided randomization test in code/seed_stats.py, never from a k x std threshold",
+    "seed_reporting_note": "AMENDED AT T11.0b. Was 'a difference smaller than the seed std is not a difference'. That rule, and the 2x variant used in practice, compares a difference of MEANS against the spread of a SINGLE arm's seeds. The correct denominator is the standard error of the difference, sqrt(s_a^2/n_a + s_b^2/n_b), which at n=5 per arm is about sqrt(5) smaller -- so the old rule was roughly sqrt(n) too CONSERVATIVE and was suppressing real results. It suppressed two: MoR-vs-MoRE in the matrix ('1.93x, noise'; actually 3.94 standard errors, p = 0.0159) and both the dense_routing and routing_supervision Phase 10 arms. Replaced with exact enumeration rather than a re-tuned k: at 5-vs-5 there are only C(10,5) = 252 regroupings of the pooled values, so the null distribution is computed exactly -- deterministic, no normality assumption, no threshold to justify. ALWAYS report the resolution floor 1/C(n_a+n_b, n_a) alongside p: 0.0040 at 5v5, 0.0179 at 3v5, 0.0500 at 3v3. A p equal to the floor means the observed split is the single most extreme arrangement the design admits, which is a weaker statement than 'significant' and does not survive Bonferroni at six arms. Do NOT use the paired sign-flip variant here: 2^5 = 32 sign assignments give a minimum two-sided p of 0.0625, which can never reach alpha = 0.05, and pairing is weakly motivated anyway because train_split_version = fixed-file-splits-v1 fixes the split, so a seed varies only initialisation and shuffle order. The old necessary condition is still computed and reported as gap_over_std so it can be checked; it is not the verdict.",
+    "primary_metric": "val/task_loss",
+    "primary_metric_floor": 0.080914,
+    "primary_metric_floor_note": "predict-the-train-mean on the real val split (n=5250). Read val/task_loss against this, never against 0."
+  }
 }

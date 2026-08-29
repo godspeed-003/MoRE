@@ -224,3 +224,71 @@ interpretation everywhere.
 - Exploratory sweep drivers live in `automated/` and must never launch canonical
   runs. `archive/` holds invalidated history; re-stamp it with
   `python archive/mark_invalidated.py`.
+
+---
+
+## 10. Two audiences, two registers
+
+**The rule: files are for the next agent, chat is for the researcher.** Both must
+be technical. They must be technical about *different things*.
+
+### Files in the repo — keep the deep engineering detail
+
+`changelog.md`, `TASKS.md`, code comments, docstrings, `ARCHITECTURE.md`,
+`results_exp.md`, `canonical_spec.json` notes, and the paper draft. Write these as
+densely as they already are. Their purpose is that six months from now a person or
+an agent debugging a bad number can find the exact line, the exact field, and the
+reason a past decision went the way it did. Keep:
+
+- file:line references, exact metric keys, exact config field paths
+- the failure mode in full, including the wrong output verbatim
+- why an alternative fix was rejected
+- provenance details, hashes, counts, seeds, run-directory names
+
+Nothing in this section reduces what goes into files. Under-documenting a trap is
+the more expensive error.
+
+### Chat messages to the user — write for an AI researcher, not a build engineer
+
+The reader is a competent AI researcher who is making architectural and scientific
+decisions and does not want their working memory filled with build details. They
+want to reason about things like *"should `cls_loss` exist at all"* and *"is MoR
+actually the better architecture"* — not about deterministic-kernel warnings or
+`stdout.log` line counts.
+
+**Lead with the decision or the result.** State what was learned, what it means
+for the architecture or the paper, and what the open choice is. Then, only if it
+matters to that decision, one line of mechanism.
+
+**Include, in chat:**
+- the scientific finding and the number that supports it, with its uncertainty
+- what it implies for the architecture, the claims, or the next experiment
+- the decision you made and the one you need from the user
+- cost in wall-clock or money when it affects a choice
+- a defect's *consequence* ("those runs can't go in the paper, ~1.6 h lost")
+
+**Leave out of chat** (put it in the files instead):
+- verbatim log lines, stack traces, warning text, line counts
+- file:line citations unless the user is about to open that line
+- exact metric-key strings, config paths, hashes, directory names
+- how a fix was implemented, unless the user must choose between fixes
+- restating what a test asserts; report that it passed and what it covers
+
+**A worked contrast.**
+
+> ✗ *"`log_interval` gates validation at `engine.py:629` via `epoch %
+> log["log_interval"] == 0 or epoch == epochs`, so `results.tsv` carried `nan` in
+> 18 of 20 `val_loss` rows; changed `logging.log_interval` 10 → 2, which mutates
+> `config_hash`."*
+>
+> ✓ *"We were only measuring validation loss twice per run, so 'best checkpoint'
+> was really just 'last checkpoint'. Fixed — we now validate every 2 epochs. This
+> had to land before the matrix, because it changes the run's config identity."*
+
+Tables of results are welcome in chat — they are the finding. Tables of
+implementation detail are not.
+
+**When the user asks a mechanism question, answer it at full depth.** This section
+sets the default, not a ceiling. "Why is the GPU idle", "how does the halting
+gradient reach the halt head" — those get the real answer.
+

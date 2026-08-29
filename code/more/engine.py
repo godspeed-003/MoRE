@@ -28,7 +28,6 @@ from .model import MoEBlock, MoREWrapper, MoREModel
 from .metrics import (compute_expert_load_entropy,
                       compute_pairwise_cosine_sim,
                       compute_token_exit_depths,
-                      evaluate_paper_metrics,
                       routing_accuracy_from_confusion,
                       permutation_invariant_routing_metrics,
                       paper_metrics_to_wandb,
@@ -43,7 +42,7 @@ from .model import (CAPACITY_POLICY, CANONICAL_ROUTING_MODE,
                     ROUTER_NOISE_ANNEAL_STEPS_DEFAULT)
 from .metrics import halting_supervision_loss, depth_allocation_error
 from .families import op_target_depth_table
-from .config import resolve_halting_mode
+from .config import resolve_halting_mode, CANONICAL_FAMILY_CLS_WEIGHT
 
 # ---------------------------------------------------------------------------
 # 4. Training loop
@@ -77,6 +76,14 @@ def train(cfg: dict, run_epochs: int | None = None, ctx: "RunContext | None" = N
     mc  = cfg["model"]
     tc  = cfg["training"]
     lw  = cfg["loss_weights"]
+    # T8.3: family_cls was a bare 0.5 literal in the loss assembly until now, so
+    # a config dict hand-built by a caller that does not go through
+    # config.load_config (smoke_test.py, verify_pipeline.py, the regression
+    # suites) has no such key and the assembly would KeyError. Default it to the
+    # canonical weight HERE, into cfg itself, so the value reaches
+    # resolved_config.json and provenance rather than being silently supplied at
+    # the point of use -- the exact failure mode the literal had.
+    lw.setdefault("family_cls", CANONICAL_FAMILY_CLS_WEIGHT)
     dc  = cfg["data"]
     log = cfg["logging"]
 
@@ -329,6 +336,13 @@ def train(cfg: dict, run_epochs: int | None = None, ctx: "RunContext | None" = N
         "ffn_mult":            mc.get("ffn_mult", 4),
         "routing_supervision_enabled": float(lw.get("step_routing", 0.0)) != 0.0,
         "routing_supervision_weight":  float(lw.get("step_routing", 0.0)),
+        # T8.3: the family-supervision pair, reported the same way as the routing
+        # pair and for the same reason -- 0.0 vs "off" should not have to be
+        # inferred. Until T8.3 this coefficient was a literal in the loss
+        # assembly, so the W&B table could not distinguish a run that had
+        # whole-program family supervision from one that did not.
+        "family_supervision_enabled": float(lw.get("family_cls", 0.0)) != 0.0,
+        "family_cls_weight":          float(lw.get("family_cls", 0.0)),
         "router_noise_scale": (
             float(mc.get("router_noise_init", ROUTER_NOISE_INIT_SCALE_DEFAULT))
             if mc.get("router_noise", CANONICAL_ROUTER_NOISE) != "none" else 0.0
@@ -366,6 +380,8 @@ def train(cfg: dict, run_epochs: int | None = None, ctx: "RunContext | None" = N
         "ffn_mult":                    mc.get("ffn_mult", 4),
         "routing_supervision_enabled": float(lw.get("step_routing", 0.0)) != 0.0,
         "routing_supervision_weight":  float(lw.get("step_routing", 0.0)),
+        "family_supervision_enabled":  float(lw.get("family_cls", 0.0)) != 0.0,
+        "family_cls_weight":           float(lw.get("family_cls", 0.0)),
         "router_noise_scale": (
             float(mc.get("router_noise_init", ROUTER_NOISE_INIT_SCALE_DEFAULT))
             if mc.get("router_noise", CANONICAL_ROUTER_NOISE) != "none" else 0.0
@@ -394,6 +410,7 @@ def train(cfg: dict, run_epochs: int | None = None, ctx: "RunContext | None" = N
         model.train()
         epoch_total      = 0.0
         epoch_task       = 0.0
+        epoch_cls        = 0.0
         epoch_bal        = 0.0
         epoch_halt       = 0.0
         epoch_halt_sup      = 0.0
@@ -533,8 +550,21 @@ def train(cfg: dict, run_epochs: int | None = None, ctx: "RunContext | None" = N
                 )
             else:
                 noise_reg_loss = torch.zeros((), device=device)
+            # T8.3: `0.5` was a bare literal here. It is the coefficient on the
+            # 6-way whole-program FAMILY cross-entropy -- the second-largest term
+            # in the objective -- and because it lived in source rather than in
+            # config it appeared in no resolved_config, no provenance block and no
+            # results table, so no run could be labelled by it and the only way to
+            # ablate it was to edit this line (which produces an UNLABELLED
+            # variant, forbidden by CLAUDE.md 6). It is now
+            # loss_weights.family_cls, canonical 0.5, with 0.0 the T10.H
+            # no_family_supervision ablation that resolve_variant tags.
+            # NOTE it stays INSIDE the lw["task"] factor, exactly as the literal
+            # did, so this change is numerically identical at the canonical value
+            # and no existing run's loss is retroactively reinterpreted.
             total_loss = (
-                lw["task"]              * (task_loss + 0.5 * cls_loss)
+                lw["task"]              * (task_loss
+                                           + lw["family_cls"] * cls_loss)
                 + lw["step_routing"]   * step_routing_loss    # per-step oracle CE (direct)
                 + lw["routing_balance"] * bal_loss            # maximise entropy, minimise collapse
                 + current_halt_weight   * ponder_cost         # differentiable ACT ponder cost
@@ -562,6 +592,13 @@ def train(cfg: dict, run_epochs: int | None = None, ctx: "RunContext | None" = N
             bs = x.shape[0]
             epoch_total      += total_loss.item()
             epoch_task       += task_loss.item()
+            # T8.3: the family CE was never accumulated, so `classification_loss`
+            # -- which CLAUDE.md 4 names explicitly in the list of components that
+            # must be tracked separately -- appeared in no metrics.json and no W&B
+            # panel, even though at weight 0.5 it is the second-largest term in
+            # total_loss. Its absence also made the T10.H ablation unreadable:
+            # there was no series to compare against.
+            epoch_cls        += cls_loss.item()
             epoch_bal        += bal_loss.item()
             epoch_halt       += ponder_cost.item()
             epoch_halt_sup   += halt_sup_loss.item()
@@ -587,6 +624,10 @@ def train(cfg: dict, run_epochs: int | None = None, ctx: "RunContext | None" = N
         # ---- Validation + paper metrics --------------------------------
         val_loss = float("nan")
         paper_log_dict: dict = {}
+        # T11.1 (audit item 7): validation-pass depth metrics. Declared out here,
+        # not inside the `if`, so a non-logging epoch leaves it empty rather than
+        # NameError-ing at the merge below.
+        val_depth_log: dict = {}
         pim: dict = {}
         if val_loader is not None and (epoch % log["log_interval"] == 0 or epoch == epochs):
             model.eval()
@@ -622,6 +663,25 @@ def train(cfg: dict, run_epochs: int | None = None, ctx: "RunContext | None" = N
             family_depth_sum   = torch.zeros(_F, dtype=torch.float64)
             family_depth_count = torch.zeros(_F, dtype=torch.float64)
 
+            # T11.1 (audit item 7): depth metrics measured ON THE VALIDATION PASS.
+            # Every depth number before this was `depth/*` and `train/avg_recursion
+            # _steps`, accumulated inside the TRAINING loop -- i.e. under dropout,
+            # on training data, with the halt head mid-update. A paper sentence of
+            # the form "MoRE allocates depth in accordance with the curriculum" is
+            # a claim about the trained model's behaviour on held-out data, which
+            # the training-time number does not measure. The model already returns
+            # `val_expected_depth` and `val_halt_stats` from this same forward pass
+            # (they were unpacked and discarded), so this costs no extra compute --
+            # only accumulation. The training-time keys are KEPT and unchanged: the
+            # two are different measurements, not a correction of one by the other.
+            val_depth_abs_err = 0.0
+            val_depth_rel_err = 0.0
+            val_depth_err_n   = 0
+            val_exp_depth_sum = 0.0
+            val_exp_depth_n   = 0
+            val_halt_acc: dict[str, float] = {}
+            val_halt_batches  = 0
+
             with torch.no_grad():
                 for x_v, sm_v, se_v, so_v, fam_v, _, tgt_v in val_loader:
                     x_v, sm_v, se_v, so_v, fam_v, tgt_v = (
@@ -636,6 +696,27 @@ def train(cfg: dict, run_epochs: int | None = None, ctx: "RunContext | None" = N
                     l_v = F.mse_loss(reg_v.squeeze(-1), tgt_v)
                     val_total += l_v.item() * x_v.shape[0]
                     val_n     += x_v.shape[0]
+
+                    # Same helper the training loop calls (metrics.depth_allocation
+                    # _error), so the two passes cannot disagree on the definition.
+                    if val_expected_depth is not None:
+                        _vda, _vdr = depth_allocation_error(
+                            val_expected_depth, so_v, sm_v, _target_depth_table
+                        )
+                        if _vda is not None:
+                            val_depth_abs_err += _vda
+                            val_depth_rel_err += _vdr
+                            val_depth_err_n   += 1
+                        _vm = sm_v.reshape(-1)
+                        if bool(_vm.any()):
+                            val_exp_depth_sum += float(
+                                val_expected_depth.reshape(-1)[_vm].sum().item()
+                            )
+                            val_exp_depth_n += int(_vm.sum().item())
+                    if val_halt_stats:
+                        for _k, _v in val_halt_stats.items():
+                            val_halt_acc[_k] = val_halt_acc.get(_k, 0.0) + _v
+                        val_halt_batches += 1
 
                     if first_route is None or depth_exits is None:
                         continue
@@ -676,8 +757,34 @@ def train(cfg: dict, run_epochs: int | None = None, ctx: "RunContext | None" = N
 
             val_loss = val_total / max(val_n, 1)
 
-            # Shared with metrics.evaluate_paper_metrics: one definition, so
-            # the scalar and the confusion matrix cannot drift (T6.2). Returns
+            # T11.1 (audit item 7): the validation-pass depth block. Absent, never
+            # 0.0, when the quantity does not exist -- `val_expected_depth` is None
+            # for a non-adaptive model (the fixed_depth ablation), and a zero here
+            # would read as perfect allocation. Keys are namespaced `val/` so no
+            # reader can mistake them for the `depth/*` training-time numbers.
+            if val_depth_err_n > 0:
+                val_depth_log["val/depth_allocation_error_abs"] = (
+                    val_depth_abs_err / val_depth_err_n
+                )
+                val_depth_log["val/depth_allocation_error_rel"] = (
+                    val_depth_rel_err / val_depth_err_n
+                )
+            if val_exp_depth_n > 0:
+                val_depth_log["val/avg_recursion_steps"] = (
+                    val_exp_depth_sum / val_exp_depth_n
+                )
+            _vfe = val_halt_acc.get("forced_exits", 0.0)
+            _vee = val_halt_acc.get("early_exits",  0.0)
+            if (_vfe + _vee) > 0:
+                val_depth_log["val/forced_exit_rate"] = _vfe / (_vfe + _vee)
+                val_depth_log["val/early_exit_rate"]  = _vee / (_vfe + _vee)
+                val_depth_log["val/mean_remainder"]   = (
+                    val_halt_acc.get("mean_remainder", 0.0)
+                    / max(val_halt_batches, 1)
+                )
+
+            # The single definition of routing accuracy (T6.2), so the scalar
+            # and the confusion matrix cannot drift. Returns
             # NaN -> "N/A" when num_experts < 2, because MoR makes no routing
             # decision and its 0.1005 was not a routing measurement.
             routing_acc = routing_accuracy_from_confusion(
@@ -754,6 +861,14 @@ def train(cfg: dict, run_epochs: int | None = None, ctx: "RunContext | None" = N
         log_dict = {
             "train/total_loss":          epoch_total      / n_batches,
             "train/task_loss":           epoch_task       / n_batches,
+            # T8.3: the whole-program family CE, reported under BOTH the name
+            # CLAUDE.md 4 uses ("classification_loss") and the name of the config
+            # key that weights it ("family_cls_loss"), so a reader can go from the
+            # chart to loss_weights.family_cls without guessing. This is the raw,
+            # UNWEIGHTED component; the weight is in provenance as
+            # family_cls_weight.
+            "train/classification_loss": epoch_cls        / n_batches,
+            "train/family_cls_loss":     epoch_cls        / n_batches,
             "train/aux_routing_loss":    epoch_bal        / n_batches,
             # T4.1: this is now a MEAN over (block, depth) calls, not a sum, so
             # it is comparable across max_depth and num_blocks settings.
@@ -765,7 +880,18 @@ def train(cfg: dict, run_epochs: int | None = None, ctx: "RunContext | None" = N
             # unambiguous names are the two below it.
             "train/halting_loss":            epoch_halt       / n_batches,
             "train/ponder_cost":             epoch_halt       / n_batches,
-            "train/halting_supervision_loss": epoch_halt_sup  / n_batches,
+            # T11.0b: N/A, not 0.0, when the term was never computed. This key
+            # read 0.0 in all 15 canonical Phase B runs -- halting supervision is
+            # off in canonical (loss_weights.halting_supervision = 0.0), so
+            # epoch_halt_sup was never accumulated and the division produced a
+            # clean zero that is indistinguishable from "supervised, and the
+            # predicted depths matched the curriculum exactly". Opposite
+            # meanings, same rendering (CLAUDE.md 4). The gate is the enabling
+            # flag, not the value, so a genuinely-converged 0.0 still prints 0.0.
+            "train/halting_supervision_loss": (
+                epoch_halt_sup / n_batches
+                if halting_supervision_enabled else "N/A"
+            ),
             "train/step_routing_loss":   epoch_step_route / n_batches,
             "train/avg_recursion_steps": (
                 avg_depth.item() if avg_depth is not None else float("nan")
@@ -907,6 +1033,7 @@ def train(cfg: dict, run_epochs: int | None = None, ctx: "RunContext | None" = N
                 torch.save(model.state_dict(), ctx.path("checkpoint.pt"))
 
         log_dict.update(paper_log_dict)
+        log_dict.update(val_depth_log)
 
         wandb.log(log_dict, step=epoch)
 
@@ -935,8 +1062,15 @@ def train(cfg: dict, run_epochs: int | None = None, ctx: "RunContext | None" = N
         ami_str  = _na(pim.get("ami"))
 
         # Append to results.tsv (per-run; plan.md 2.2)
+        # T9.0: an unevaluated epoch writes the string "N/A", not `nan`. Nothing
+        # was ever *reported* as a measurement here (the `isnan` guard below
+        # keeps it out of best_val_loss), but results.tsv used `nan` for "not
+        # evaluated" while metrics.json uses "N/A" for the same idea. Two
+        # conventions for "no number here" in one run directory is what a
+        # plotting script misreads as a measured zero or a diverged loss.
+        val_str = "N/A" if math.isnan(val_loss) else f"{val_loss:.6f}"
         results_rows.append(
-            f"{epoch}\t{epoch_task/n_batches:.6f}\t{val_loss:.6f}\t"
+            f"{epoch}\t{epoch_task/n_batches:.6f}\t{val_str}\t"
             f"{entropy_str}\t{depth_str}\t"
             f"{mean_cos_str}\t{max_cos_str}\t{routing_acc_str}\t"
             f"{hung_str}\t{ami_str}"
@@ -953,12 +1087,21 @@ def train(cfg: dict, run_epochs: int | None = None, ctx: "RunContext | None" = N
             f.write("\n".join(results_rows) + "\n")
 
         if epoch % log["log_interval"] == 0 or epoch == epochs:
+            # T8.1: `bal` and `halt` go through the same _na renderer as the
+            # routing columns. The console previously printed MoR's balance term
+            # as bal=1.0000 and MoE's ponder cost as halt=1.0000 while
+            # metrics.json wrote "N/A" for both -- the artifact and the log
+            # disagreed about the same quantity, and 1.0000 in a console column
+            # next to MoRE's -0.6128 reads as "MoR is maximally imbalanced".
+            # Both are constants of E == 1 / max_depth == 1, not measurements.
+            _bal_defined  = mc["num_experts"] > 1
+            _halt_defined = mc["max_depth"] > 1 and mc.get("adaptive_halting", True)
             print(
                 f"[Epoch {epoch:03d}/{epochs}] "
                 f"task={epoch_task/n_batches:.4f}  "
                 f"step_route={epoch_step_route/n_batches:.4f}  "
-                f"bal={epoch_bal/n_batches:.4f}  "
-                f"halt={epoch_halt/n_batches:.4f}  "
+                f"bal={_na(epoch_bal/n_batches if _bal_defined else None)}  "
+                f"halt={_na(epoch_halt/n_batches if _halt_defined else None)}  "
                 f"val={val_loss:.4f}  "
                 f"route_acc={routing_acc_str}  "
                 f"route_hung={hung_str}  route_ami={ami_str}  "
@@ -989,7 +1132,16 @@ def train(cfg: dict, run_epochs: int | None = None, ctx: "RunContext | None" = N
         # "early exit rate" is 0 by construction and is not a measurement of
         # halting behaviour. Report N/A rather than a comparable-looking zero.
         if mc["max_depth"] <= 1 or not mc.get("adaptive_halting", True):
-            for _k in ("halt/forced_exit_rate", "halt/early_exit_rate",
+            # T11.0b: the two raw COUNTS were missing from this list while the
+            # four derived rates were in it, so a MoE metrics.json carried
+            # halt/forced_exits as a real integer (every token, forced at step 1)
+            # beside halt/forced_exit_rate = "N/A". A count is as much a halting
+            # measurement as a rate; at max_depth == 1 neither is one, because
+            # the exit is a property of the configuration and nothing was
+            # decided. Emitting the count invites an exporter to divide it by
+            # itself and re-derive the very rate this block refuses to state.
+            for _k in ("halt/forced_exits", "halt/early_exits",
+                       "halt/forced_exit_rate", "halt/early_exit_rate",
                        "halt/mean_remainder", "halt/mean_halt_mass"):
                 metrics[_k] = "N/A"
             # At max_depth == 1 the ponder cost is (N + R) / (max_depth + 1) =
@@ -1002,6 +1154,18 @@ def train(cfg: dict, run_epochs: int | None = None, ctx: "RunContext | None" = N
             # operation mix, not of anything the model allocated.
             for _k in ("train/ponder_cost", "train/halting_loss",
                        "depth/allocation_error_abs", "depth/allocation_error_rel"):
+                metrics[_k] = "N/A"
+            # T11.1 (audit item 7): the validation-pass twins of the same four.
+            # `val_expected_depth` is None at max_depth == 1 / non-adaptive, so
+            # these keys are simply absent from log_dict there; stating "N/A"
+            # explicitly keeps "does not apply to this architecture" distinct from
+            # "this run predates the metric", which is the distinction the
+            # exporter's absent-vs-N/A boundary rests on.
+            for _k in ("val/depth_allocation_error_abs",
+                       "val/depth_allocation_error_rel",
+                       "val/avg_recursion_steps",
+                       "val/forced_exit_rate", "val/early_exit_rate",
+                       "val/mean_remainder"):
                 metrics[_k] = "N/A"
         metrics["halting_mode"] = halting_mode
         # T4.1/T4.2: with a single expert there is nothing to balance. The
@@ -1016,6 +1180,21 @@ def train(cfg: dict, run_epochs: int | None = None, ctx: "RunContext | None" = N
                        "train/entropy_term", "train/switch_aux_term",
                        "train/entropy_term_normalized",
                        "train/balance_to_task_ratio"):
+                metrics[_k] = "N/A"
+            # T8.1: the FLAT routing keys were simply ABSENT from a MoR
+            # metrics.json, while the nested routing_permutation_invariant block
+            # wrote "N/A" for the same quantities. Two conventions for one fact
+            # in one file: the nested block's own comment states the rule ("the
+            # field list is the same for every architecture and a missing key can
+            # never be mistaken for an unrecorded run") and the flat keys did not
+            # follow it. Absence is not fabrication, so this was not a wrong
+            # number -- but an exporter joining three architectures on a common
+            # column set has to decide what a missing column means, and the whole
+            # point of writing "N/A" is that it never has to.
+            for _k in ("val/routing_accuracy", "val/routing_hungarian_accuracy",
+                       "val/routing_ami", "val/routing_purity",
+                       "val/routing_macro_recall",
+                       "val/routing_matched_macro_recall"):
                 metrics[_k] = "N/A"
         # The normalizer that makes the term depth-invariant, recorded so a
         # reader can confirm which aggregation produced the number.

@@ -1,0 +1,1176 @@
+{
+  "generated": "2026-08-29T19:09:20",
+  "candidate_seeds": [
+    42,
+    43,
+    44,
+    45,
+    46
+  ],
+  "seeds": [
+    42,
+    43,
+    44
+  ],
+  "primary_metric": "val/task_loss",
+  "reading_rule": "exact two-sided randomization test on the difference of means, code/seed_stats.py; alpha = 0.05; report min_p alongside p",
+  "reading_rule_superseded": "|arm - baseline| >= 2 * max(seed stds) -- withdrawn at T11.0b, wrong denominator",
+  "problems": [
+    "router_noise: n=3 of 5 frozen seeds ([42, 43, 44]). The exact test's resolution floor is 0.0179, so this arm cannot report a p below that value no matter how large the effect. This is a design limit, not a defect -- but a p AT the floor must not be presented as clearing a Bonferroni correction.",
+    "two_blocks: n=3 of 5 frozen seeds ([42, 43, 44]). The exact test's resolution floor is 0.0179, so this arm cannot report a p below that value no matter how large the effect. This is a design limit, not a defect -- but a p AT the floor must not be presented as clearing a Bonferroni correction.",
+    "ponder_cost_low: n=3 of 5 frozen seeds ([42, 43, 44]). The exact test's resolution floor is 0.0179, so this arm cannot report a p below that value no matter how large the effect. This is a design limit, not a defect -- but a p AT the floor must not be presented as clearing a Bonferroni correction."
+  ],
+  "baseline_dirs": {
+    "42": "phaseB_more_seed42__989e89cc",
+    "43": "phaseB_more_seed43__909a3dc4",
+    "44": "phaseB_more_seed44__ba0c483d",
+    "45": "phaseB_more_seed45__891228d4",
+    "46": "phaseB_more_seed46__0a9dce12"
+  },
+  "baseline_agg_3seed": {
+    "val/task_loss": {
+      "mean": 0.06329010550039155,
+      "std": 6.133843153117173e-05,
+      "n": 3
+    },
+    "best_val_loss": {
+      "mean": 0.0628977950272106,
+      "std": 0.00017553006060011878,
+      "n": 3
+    },
+    "train/task_loss": {
+      "mean": 0.060035571646996036,
+      "std": 0.00027984944097002496,
+      "n": 3
+    },
+    "val/routing_accuracy": {
+      "mean": 0.07896991382351459,
+      "std": 0.05384319415578039,
+      "n": 3
+    },
+    "val/routing_hungarian_accuracy": {
+      "mean": 0.5537637118043307,
+      "std": 0.04679715231822852,
+      "n": 3
+    },
+    "val/routing_ami": {
+      "mean": 0.5092172113082785,
+      "std": 0.06200407677710086,
+      "n": 3
+    },
+    "val/routing_purity": {
+      "mean": 0.6224361235700248,
+      "std": 0.05130747861646765,
+      "n": 3
+    },
+    "val/routing_matched_macro_recall": {
+      "mean": 0.5712126827528144,
+      "std": 0.10374914480613581,
+      "n": 3
+    },
+    "train/expert_load_entropy_normalized": {
+      "mean": 0.986018180847168,
+      "std": 0.002672221282801465,
+      "n": 3
+    },
+    "train/entropy_term_normalized": {
+      "mean": 0.9984586223737333,
+      "std": 0.0007161647026931696,
+      "n": 3
+    },
+    "train/avg_recursion_steps": {
+      "mean": 2.0523558855056763,
+      "std": 0.0748779951171373,
+      "n": 3
+    },
+    "depth/allocation_error_abs": {
+      "mean": 1.004757013076391,
+      "std": 0.1507410685558633,
+      "n": 3
+    },
+    "halt/early_exit_rate": {
+      "mean": 0.9997326798841613,
+      "std": 0.0002703107384649667,
+      "n": 3
+    },
+    "halt/forced_exit_rate": {
+      "mean": 0.00026732011583871686,
+      "std": 0.00027031073846500356,
+      "n": 3
+    },
+    "dispatch/evals_per_token": {
+      "mean": 1.0,
+      "std": 0.0,
+      "n": 3
+    },
+    "diag/max_pairwise_cosine_sim": {
+      "mean": 0.07119101782639821,
+      "std": 0.020305446215933082,
+      "n": 3
+    },
+    "perf/throughput_tokens_sec": {
+      "mean": 2073.0306183663943,
+      "std": 208.26625074602637,
+      "n": 3
+    },
+    "total_params": {
+      "mean": 3201555,
+      "std": 0.0,
+      "n": 3
+    },
+    "val_offline/avg_recursion_steps": {
+      "mean": 2.381042649643451,
+      "std": 0.13788241190990133,
+      "n": 3
+    },
+    "val_offline/depth_allocation_error_abs": {
+      "mean": 1.0282090050833566,
+      "std": 0.13202546034331702,
+      "n": 3
+    },
+    "val_offline/depth_allocation_error_rel": {
+      "mean": 0.720691598597027,
+      "std": 0.12045752189072398,
+      "n": 3
+    },
+    "val_offline/early_exit_rate": {
+      "mean": 0.999496043944968,
+      "std": 0.0008728774920973805,
+      "n": 3
+    }
+  },
+  "baseline_agg_5seed": {
+    "val/task_loss": {
+      "mean": 0.06318631941505841,
+      "std": 0.0002488397759922556,
+      "n": 5
+    },
+    "best_val_loss": {
+      "mean": 0.06289154891712324,
+      "std": 0.0002159911470204388,
+      "n": 5
+    },
+    "train/task_loss": {
+      "mean": 0.06023693761955469,
+      "std": 0.00035990858814264834,
+      "n": 5
+    },
+    "val/routing_accuracy": {
+      "mean": 0.16286851786524215,
+      "std": 0.1864475565409543,
+      "n": 5
+    },
+    "val/routing_hungarian_accuracy": {
+      "mean": 0.5258277478203901,
+      "std": 0.06115202000192092,
+      "n": 5
+    },
+    "val/routing_ami": {
+      "mean": 0.4906606880761507,
+      "std": 0.07364282742507852,
+      "n": 5
+    },
+    "val/routing_purity": {
+      "mean": 0.6047170286750996,
+      "std": 0.06175442829180905,
+      "n": 5
+    },
+    "val/routing_matched_macro_recall": {
+      "mean": 0.5491492055132566,
+      "std": 0.09844341871997857,
+      "n": 5
+    },
+    "train/expert_load_entropy_normalized": {
+      "mean": 0.9874574780464173,
+      "std": 0.002915198045067185,
+      "n": 5
+    },
+    "train/entropy_term_normalized": {
+      "mean": 0.9980318611002171,
+      "std": 0.0014028876379795054,
+      "n": 5
+    },
+    "train/avg_recursion_steps": {
+      "mean": 2.0642338037490844,
+      "std": 0.05817258110284064,
+      "n": 5
+    },
+    "depth/allocation_error_abs": {
+      "mean": 1.005457496184569,
+      "std": 0.11549754209682064,
+      "n": 5
+    },
+    "halt/early_exit_rate": {
+      "mean": 0.9998217865894409,
+      "std": 0.00022730944119086236,
+      "n": 5
+    },
+    "halt/forced_exit_rate": {
+      "mean": 0.00017821341055914458,
+      "std": 0.00022730944119089502,
+      "n": 5
+    },
+    "dispatch/evals_per_token": {
+      "mean": 1.0,
+      "std": 0.0,
+      "n": 5
+    },
+    "diag/max_pairwise_cosine_sim": {
+      "mean": 0.07325551509857178,
+      "std": 0.026087622186080347,
+      "n": 5
+    },
+    "perf/throughput_tokens_sec": {
+      "mean": 2225.04839903403,
+      "std": 274.437535879003,
+      "n": 5
+    },
+    "total_params": {
+      "mean": 3201555,
+      "std": 0.0,
+      "n": 5
+    },
+    "val_offline/avg_recursion_steps": {
+      "mean": 2.3531250442930127,
+      "std": 0.10867249439841084,
+      "n": 5
+    },
+    "val_offline/depth_allocation_error_abs": {
+      "mean": 0.9939806733812604,
+      "std": 0.10537288465788894,
+      "n": 5
+    },
+    "val_offline/depth_allocation_error_rel": {
+      "mean": 0.6933883598872593,
+      "std": 0.09314940893936093,
+      "n": 5
+    },
+    "val_offline/early_exit_rate": {
+      "mean": 0.9996875472458802,
+      "std": 0.0006708486133061817,
+      "n": 5
+    }
+  },
+  "arms": {
+    "dense_routing": {
+      "task": "T10.F",
+      "field": "model.routing_mode",
+      "value": "dense_blend",
+      "question": "Does Top-1 sparse dispatch cost anything against evaluate-all-and-blend? If dense is no better, sparsity is free; if dense is much better, the canonical architecture is paying for sparsity it does not need.",
+      "seeds": [
+        42,
+        43,
+        44,
+        45,
+        46
+      ],
+      "dirs": {
+        "42": "t10_more_dense_routing_ablation_seed42__4120dc24",
+        "43": "t10_more_dense_routing_ablation_seed43__d19f311c",
+        "44": "t10_more_dense_routing_ablation_seed44__de735808",
+        "45": "t10_more_dense_routing_ablation_seed45__afee8084",
+        "46": "t10_more_dense_routing_ablation_seed46__1d012434"
+      },
+      "agg": {
+        "val/task_loss": {
+          "mean": 0.06371572884491512,
+          "std": 0.00030456308126349397,
+          "n": 5
+        },
+        "best_val_loss": {
+          "mean": 0.06296349208780698,
+          "std": 0.0002959807655938836,
+          "n": 5
+        },
+        "train/task_loss": {
+          "mean": 0.05924197282546606,
+          "std": 0.0003452592270211508,
+          "n": 5
+        },
+        "val/routing_accuracy": {
+          "mean": 0.20981706395202337,
+          "std": 0.1151293789962026,
+          "n": 5
+        },
+        "val/routing_hungarian_accuracy": {
+          "mean": 0.4717028675099531,
+          "std": 0.049742900657179984,
+          "n": 5
+        },
+        "val/routing_ami": {
+          "mean": 0.39272568496454563,
+          "std": 0.025971442958141137,
+          "n": 5
+        },
+        "val/routing_purity": {
+          "mean": 0.5247694401048228,
+          "std": 0.04619643137798763,
+          "n": 5
+        },
+        "val/routing_matched_macro_recall": {
+          "mean": 0.4988762574251768,
+          "std": 0.03993279768134862,
+          "n": 5
+        },
+        "train/expert_load_entropy_normalized": {
+          "mean": 0.9943362236022949,
+          "std": 0.0029799709380158353,
+          "n": 5
+        },
+        "train/entropy_term_normalized": {
+          "mean": 0.9963708036746808,
+          "std": 0.0013133684985494752,
+          "n": 5
+        },
+        "train/avg_recursion_steps": {
+          "mean": 2.054041337966919,
+          "std": 0.04617107262470373,
+          "n": 5
+        },
+        "depth/allocation_error_abs": {
+          "mean": 0.974417918920517,
+          "std": 0.053000391779568785,
+          "n": 5
+        },
+        "halt/early_exit_rate": {
+          "mean": 0.9999937625306304,
+          "std": 1.1618092947567972e-05,
+          "n": 5
+        },
+        "halt/forced_exit_rate": {
+          "mean": 6.23746936957006e-06,
+          "std": 1.1618092947565426e-05,
+          "n": 5
+        },
+        "dispatch/evals_per_token": {
+          "mean": 6.0,
+          "std": 0.0,
+          "n": 5
+        },
+        "diag/max_pairwise_cosine_sim": {
+          "mean": 0.021004507690668105,
+          "std": 0.0029911510649595022,
+          "n": 5
+        },
+        "perf/throughput_tokens_sec": {
+          "mean": 3051.3610282922536,
+          "std": 310.820690689188,
+          "n": 5
+        },
+        "total_params": {
+          "mean": 3201555,
+          "std": 0.0,
+          "n": 5
+        },
+        "val_offline/avg_recursion_steps": {
+          "mean": 2.190112318221476,
+          "std": 0.04718744794686804,
+          "n": 5
+        },
+        "val_offline/depth_allocation_error_abs": {
+          "mean": 0.9632179124014718,
+          "std": 0.04038522354660638,
+          "n": 5
+        },
+        "val_offline/depth_allocation_error_rel": {
+          "mean": 0.6108554533549717,
+          "std": 0.02197418272241169,
+          "n": 5
+        },
+        "val_offline/early_exit_rate": {
+          "mean": 1.0,
+          "std": 0.0,
+          "n": 5
+        }
+      },
+      "primary": {
+        "gap": 0.0005294094298567142,
+        "p_value": 0.007936507936507936,
+        "min_p": 0.003968253968253968,
+        "n_perms": 252,
+        "cohens_d": 1.9036614826372158,
+        "se_diff": 0.00017588627267901813,
+        "gap_over_std": 1.738258713631458,
+        "n_arm": 5,
+        "n_base": 5,
+        "test": "exact two-sided randomization on the difference of means",
+        "verdict": "SIGNIFICANT (p=0.0079, d=+1.90) -- WORSE than canonical MoRE; survives Bonferroni at 6 arms (alpha=0.0083)",
+        "arm_seeds": [
+          42,
+          43,
+          44,
+          45,
+          46
+        ],
+        "baseline_seeds": [
+          42,
+          43,
+          44,
+          45,
+          46
+        ]
+      }
+    },
+    "fixed_depth": {
+      "task": "T10.B",
+      "field": "model.fixed_depth",
+      "value": true,
+      "question": "Does learned adaptive halting beat a fixed depth? T9.1 measured a depth allocation error of ~1.0 step, so the depths ACT chooses may be doing nothing that a constant could not.",
+      "seeds": [
+        42,
+        43,
+        44,
+        45,
+        46
+      ],
+      "dirs": {
+        "42": "t10_more_fixed_depth_seed42__5bcde9fd",
+        "43": "t10_more_fixed_depth_seed43__66a417f3",
+        "44": "t10_more_fixed_depth_seed44__ba544f66",
+        "45": "t10_more_fixed_depth_seed45__be64ebdc",
+        "46": "t10_more_fixed_depth_seed46__557b8dcf"
+      },
+      "agg": {
+        "val/task_loss": {
+          "mean": 0.06288561094658715,
+          "std": 0.00014261599210028231,
+          "n": 5
+        },
+        "best_val_loss": {
+          "mean": 0.06271453878879547,
+          "std": 0.00016568557094607533,
+          "n": 5
+        },
+        "train/task_loss": {
+          "mean": 0.060776695198355574,
+          "std": 0.0002025596019534885,
+          "n": 5
+        },
+        "val/routing_accuracy": {
+          "mean": 0.230267600665222,
+          "std": 0.14221153856050703,
+          "n": 5
+        },
+        "val/routing_hungarian_accuracy": {
+          "mean": 0.5024038703825027,
+          "std": 0.06416869104318346,
+          "n": 5
+        },
+        "val/routing_ami": {
+          "mean": 0.4600256643697494,
+          "std": 0.039616984002644184,
+          "n": 5
+        },
+        "val/routing_purity": {
+          "mean": 0.5694300257017588,
+          "std": 0.054861680163635025,
+          "n": 5
+        },
+        "val/routing_matched_macro_recall": {
+          "mean": 0.5355853500790665,
+          "std": 0.07770291334734393,
+          "n": 5
+        },
+        "train/expert_load_entropy_normalized": {
+          "mean": 0.9985492706298829,
+          "std": 0.0012252513030110905,
+          "n": 5
+        },
+        "train/entropy_term_normalized": {
+          "mean": 0.9995627308001139,
+          "std": 7.91957265038077e-05,
+          "n": 5
+        },
+        "train/avg_recursion_steps": {
+          "mean": 6.999999904632569,
+          "std": 2.132480599880018e-07,
+          "n": 5
+        },
+        "depth/allocation_error_abs": {
+          "mean": 5.885032258889614,
+          "std": 0.0002079469914291373,
+          "n": 5
+        },
+        "halt/early_exit_rate": {
+          "mean": 0.0,
+          "std": 0.0,
+          "n": 5
+        },
+        "halt/forced_exit_rate": {
+          "mean": 1.0,
+          "std": 0.0,
+          "n": 5
+        },
+        "dispatch/evals_per_token": {
+          "mean": 1.0,
+          "std": 0.0,
+          "n": 5
+        },
+        "diag/max_pairwise_cosine_sim": {
+          "mean": 0.08377086371183395,
+          "std": 0.024748805422622044,
+          "n": 5
+        },
+        "perf/throughput_tokens_sec": {
+          "mean": 2198.190326445345,
+          "std": 273.84286158454677,
+          "n": 5
+        },
+        "total_params": {
+          "mean": 3201555,
+          "std": 0.0,
+          "n": 5
+        },
+        "val_offline/avg_recursion_steps": null,
+        "val_offline/depth_allocation_error_abs": null,
+        "val_offline/depth_allocation_error_rel": null,
+        "val_offline/early_exit_rate": null
+      },
+      "primary": {
+        "gap": -0.00030070846847125854,
+        "p_value": 0.047619047619047616,
+        "min_p": 0.003968253968253968,
+        "n_perms": 252,
+        "cohens_d": -1.482739434552216,
+        "se_diff": 0.00012826578290302035,
+        "gap_over_std": 1.208442128161284,
+        "n_arm": 5,
+        "n_base": 5,
+        "test": "exact two-sided randomization on the difference of means",
+        "verdict": "SIGNIFICANT (p=0.0476, d=-1.48) -- BETTER than canonical MoRE; fails Bonferroni at 6 arms (alpha=0.0083)",
+        "arm_seeds": [
+          42,
+          43,
+          44,
+          45,
+          46
+        ],
+        "baseline_seeds": [
+          42,
+          43,
+          44,
+          45,
+          46
+        ]
+      }
+    },
+    "routing_supervision": {
+      "task": "T10.E",
+      "field": "loss_weights.step_routing",
+      "value": 0.5,
+      "question": "Does supervising the router with the oracle expert index improve the task metric, or only the routing metric? Canonical is 0.0 (T8.0b).",
+      "seeds": [
+        42,
+        43,
+        44,
+        45,
+        46
+      ],
+      "dirs": {
+        "42": "t10_more_routing_supervision_seed42__baf59bec",
+        "43": "t10_more_routing_supervision_seed43__77c0601e",
+        "44": "t10_more_routing_supervision_seed44__2124ebad",
+        "45": "t10_more_routing_supervision_seed45__af4b9046",
+        "46": "t10_more_routing_supervision_seed46__277e1d30"
+      },
+      "agg": {
+        "val/task_loss": {
+          "mean": 0.06375136814117431,
+          "std": 0.00012144761197389122,
+          "n": 5
+        },
+        "best_val_loss": {
+          "mean": 0.06337554256916046,
+          "std": 0.0001470959540798363,
+          "n": 5
+        },
+        "train/task_loss": {
+          "mean": 0.060295427523744415,
+          "std": 0.0002025121744512714,
+          "n": 5
+        },
+        "val/routing_accuracy": {
+          "mean": 1.0,
+          "std": 0.0,
+          "n": 5
+        },
+        "val/routing_hungarian_accuracy": {
+          "mean": 1.0,
+          "std": 0.0,
+          "n": 5
+        },
+        "val/routing_ami": {
+          "mean": 1.0,
+          "std": 0.0,
+          "n": 5
+        },
+        "val/routing_purity": {
+          "mean": 1.0,
+          "std": 0.0,
+          "n": 5
+        },
+        "val/routing_matched_macro_recall": {
+          "mean": 1.0,
+          "std": 0.0,
+          "n": 5
+        },
+        "train/expert_load_entropy_normalized": {
+          "mean": 0.9480858564376831,
+          "std": 0.008224131621125431,
+          "n": 5
+        },
+        "train/entropy_term_normalized": {
+          "mean": 0.8320672601733384,
+          "std": 0.028463301148703157,
+          "n": 5
+        },
+        "train/avg_recursion_steps": {
+          "mean": 1.9801179885864257,
+          "std": 0.10351184150403002,
+          "n": 5
+        },
+        "depth/allocation_error_abs": {
+          "mean": 0.9917452309376154,
+          "std": 0.01949125277953785,
+          "n": 5
+        },
+        "halt/early_exit_rate": {
+          "mean": 1.0,
+          "std": 0.0,
+          "n": 5
+        },
+        "halt/forced_exit_rate": {
+          "mean": 0.0,
+          "std": 0.0,
+          "n": 5
+        },
+        "dispatch/evals_per_token": {
+          "mean": 1.0,
+          "std": 0.0,
+          "n": 5
+        },
+        "diag/max_pairwise_cosine_sim": {
+          "mean": 0.018854551948606968,
+          "std": 0.005431219495735743,
+          "n": 5
+        },
+        "perf/throughput_tokens_sec": {
+          "mean": 3547.1729267044725,
+          "std": 541.4661774997464,
+          "n": 5
+        },
+        "total_params": {
+          "mean": 3201555,
+          "std": 0.0,
+          "n": 5
+        },
+        "val_offline/avg_recursion_steps": {
+          "mean": 2.3059134666113366,
+          "std": 0.050852393537850475,
+          "n": 5
+        },
+        "val_offline/depth_allocation_error_abs": {
+          "mean": 0.991197179044996,
+          "std": 0.0168574034078344,
+          "n": 5
+        },
+        "val_offline/depth_allocation_error_rel": {
+          "mean": 0.654849808556693,
+          "std": 0.019333497800173762,
+          "n": 5
+        },
+        "val_offline/early_exit_rate": {
+          "mean": 1.0,
+          "std": 0.0,
+          "n": 5
+        }
+      },
+      "primary": {
+        "gap": 0.0005650487261159021,
+        "p_value": 0.007936507936507936,
+        "min_p": 0.003968253968253968,
+        "n_perms": 252,
+        "cohens_d": 2.885931533576952,
+        "se_diff": 0.00012383114032426317,
+        "gap_over_std": 2.270733140884549,
+        "n_arm": 5,
+        "n_base": 5,
+        "test": "exact two-sided randomization on the difference of means",
+        "verdict": "SIGNIFICANT (p=0.0079, d=+2.89) -- WORSE than canonical MoRE; survives Bonferroni at 6 arms (alpha=0.0083)",
+        "arm_seeds": [
+          42,
+          43,
+          44,
+          45,
+          46
+        ],
+        "baseline_seeds": [
+          42,
+          43,
+          44,
+          45,
+          46
+        ]
+      }
+    },
+    "router_noise": {
+      "task": "T10.D",
+      "field": "model.router_noise",
+      "value": "fixed_annealed",
+      "question": "Does exploration noise in the router change the partition or the loss? Canonical is none (CLAUDE.md 2). `fixed_annealed` and not `trainable`: the L2-on-trainable-noise-scale mechanism is explicitly not a proven fix, so an ablation of it would confound noise with that unproven machinery.",
+      "seeds": [
+        42,
+        43,
+        44
+      ],
+      "dirs": {
+        "42": "t10_more_router_noise_seed42__b5b894b7",
+        "43": "t10_more_router_noise_seed43__4b4249de",
+        "44": "t10_more_router_noise_seed44__7944f3d9"
+      },
+      "agg": {
+        "val/task_loss": {
+          "mean": 0.06336253858038357,
+          "std": 0.0003993255018053229,
+          "n": 3
+        },
+        "best_val_loss": {
+          "mean": 0.06316187160071872,
+          "std": 0.00031768213003650154,
+          "n": 3
+        },
+        "train/task_loss": {
+          "mean": 0.060115375707292154,
+          "std": 0.00034646926061892436,
+          "n": 3
+        },
+        "val/routing_accuracy": {
+          "mean": 0.14354348300828168,
+          "std": 0.03521316378662185,
+          "n": 3
+        },
+        "val/routing_hungarian_accuracy": {
+          "mean": 0.4852760839254817,
+          "std": 0.023693028224767616,
+          "n": 3
+        },
+        "val/routing_ami": {
+          "mean": 0.4633367321885192,
+          "std": 0.010487457134399261,
+          "n": 3
+        },
+        "val/routing_purity": {
+          "mean": 0.5359404659913656,
+          "std": 0.02632273643172293,
+          "n": 3
+        },
+        "val/routing_matched_macro_recall": {
+          "mean": 0.5325943902005768,
+          "std": 0.0489176145266801,
+          "n": 3
+        },
+        "train/expert_load_entropy_normalized": {
+          "mean": 0.9937009215354919,
+          "std": 0.0022041369642455053,
+          "n": 3
+        },
+        "train/entropy_term_normalized": {
+          "mean": 0.9982603259332686,
+          "std": 0.0008144845933476523,
+          "n": 3
+        },
+        "train/avg_recursion_steps": {
+          "mean": 2.076024611790975,
+          "std": 0.050447487934736655,
+          "n": 3
+        },
+        "depth/allocation_error_abs": {
+          "mean": 0.9378376689731566,
+          "std": 0.051084456777509744,
+          "n": 3
+        },
+        "halt/early_exit_rate": {
+          "mean": 0.9994713002153413,
+          "std": 0.000651170277054901,
+          "n": 3
+        },
+        "halt/forced_exit_rate": {
+          "mean": 0.0005286997846587956,
+          "std": 0.0006511702770549096,
+          "n": 3
+        },
+        "dispatch/evals_per_token": {
+          "mean": 1.0,
+          "std": 0.0,
+          "n": 3
+        },
+        "diag/max_pairwise_cosine_sim": {
+          "mean": 0.06115855276584625,
+          "std": 0.019153203051349085,
+          "n": 3
+        },
+        "perf/throughput_tokens_sec": {
+          "mean": 2328.0228318158465,
+          "std": 362.8719173564195,
+          "n": 3
+        },
+        "total_params": {
+          "mean": 3201555,
+          "std": 0.0,
+          "n": 3
+        },
+        "val_offline/avg_recursion_steps": {
+          "mean": 2.3278244062898965,
+          "std": 0.07282308705514577,
+          "n": 3
+        },
+        "val_offline/depth_allocation_error_abs": {
+          "mean": 0.9272011092730931,
+          "std": 0.04109192135395662,
+          "n": 3
+        },
+        "val_offline/depth_allocation_error_rel": {
+          "mean": 0.6315008345104399,
+          "std": 0.04649990759235748,
+          "n": 3
+        },
+        "val_offline/early_exit_rate": {
+          "mean": 1.0,
+          "std": 0.0,
+          "n": 3
+        }
+      },
+      "primary": {
+        "gap": 0.00017621916532516158,
+        "p_value": 0.4107142857142857,
+        "min_p": 0.017857142857142856,
+        "n_perms": 56,
+        "cohens_d": 0.5296596577854492,
+        "se_diff": 0.0002560036437641715,
+        "gap_over_std": 0.44129204002370737,
+        "n_arm": 3,
+        "n_base": 5,
+        "test": "exact two-sided randomization on the difference of means",
+        "verdict": "not significant (p=0.4107, floor 0.0179) -- supports no claim",
+        "arm_seeds": [
+          42,
+          43,
+          44
+        ],
+        "baseline_seeds": [
+          42,
+          43,
+          44,
+          45,
+          46
+        ]
+      }
+    },
+    "two_blocks": {
+      "task": "T10.C",
+      "field": "model.num_blocks",
+      "value": 2,
+      "question": "Does a second recursive block help? Varies ONLY num_blocks -- the old 1-vs-2-block headline moved three factors at once and is uninterpretable.",
+      "seeds": [
+        42,
+        43,
+        44
+      ],
+      "dirs": {
+        "42": "t10_more_two_blocks_seed42__d1e7ab72",
+        "43": "t10_more_two_blocks_seed43__c5b67537",
+        "44": "t10_more_two_blocks_seed44__b978a882"
+      },
+      "agg": {
+        "val/task_loss": {
+          "mean": 0.06325799120891662,
+          "std": 0.0004233754787256486,
+          "n": 3
+        },
+        "best_val_loss": {
+          "mean": 0.06288576546879042,
+          "std": 0.00024807273315854907,
+          "n": 3
+        },
+        "train/task_loss": {
+          "mean": 0.05982712189802247,
+          "std": 9.010757606785509e-05,
+          "n": 3
+        },
+        "val/routing_accuracy": {
+          "mean": 0.083102353474777,
+          "std": 0.03909481120091028,
+          "n": 3
+        },
+        "val/routing_hungarian_accuracy": {
+          "mean": 0.5048127803255555,
+          "std": 0.04727180326632467,
+          "n": 3
+        },
+        "val/routing_ami": {
+          "mean": 0.44474693708538793,
+          "std": 0.08443760823028751,
+          "n": 3
+        },
+        "val/routing_purity": {
+          "mean": 0.5634900636664483,
+          "std": 0.07740608064260698,
+          "n": 3
+        },
+        "val/routing_matched_macro_recall": {
+          "mean": 0.498210519335732,
+          "std": 0.01481891780165356,
+          "n": 3
+        },
+        "train/expert_load_entropy_normalized": {
+          "mean": 0.9918502569198608,
+          "std": 0.005527870678647095,
+          "n": 3
+        },
+        "train/entropy_term_normalized": {
+          "mean": 0.9988712611580101,
+          "std": 0.0002966155962034737,
+          "n": 3
+        },
+        "train/avg_recursion_steps": {
+          "mean": 2.0298670530319214,
+          "std": 0.04080047630520514,
+          "n": 3
+        },
+        "depth/allocation_error_abs": {
+          "mean": 0.9325090351267757,
+          "std": 0.049319421922113735,
+          "n": 3
+        },
+        "halt/early_exit_rate": {
+          "mean": 0.9999487636444642,
+          "std": 4.449762609810675e-05,
+          "n": 3
+        },
+        "halt/forced_exit_rate": {
+          "mean": 5.1236355535754065e-05,
+          "std": 4.4497626098102424e-05,
+          "n": 3
+        },
+        "dispatch/evals_per_token": {
+          "mean": 1.0,
+          "std": 0.0,
+          "n": 3
+        },
+        "diag/max_pairwise_cosine_sim": {
+          "mean": 0.10079135000705719,
+          "std": 0.01999191038402566,
+          "n": 3
+        },
+        "perf/throughput_tokens_sec": {
+          "mean": 1586.89543791323,
+          "std": 187.28509533731065,
+          "n": 3
+        },
+        "total_params": {
+          "mean": 6358553,
+          "std": 0.0,
+          "n": 3
+        },
+        "val_offline/avg_recursion_steps": {
+          "mean": 2.12606280263611,
+          "std": 0.023970812255280492,
+          "n": 3
+        },
+        "val_offline/depth_allocation_error_abs": {
+          "mean": 0.9184404129073733,
+          "std": 0.02296994470048048,
+          "n": 3
+        },
+        "val_offline/depth_allocation_error_rel": {
+          "mean": 0.5839089779626755,
+          "std": 0.019932879489010732,
+          "n": 3
+        },
+        "val_offline/early_exit_rate": {
+          "mean": 0.9999916007324161,
+          "std": 1.454795820160271e-05,
+          "n": 3
+        }
+      },
+      "primary": {
+        "gap": 7.167179385821065e-05,
+        "p_value": 0.75,
+        "min_p": 0.017857142857142856,
+        "n_perms": 56,
+        "cohens_d": 0.20639701131430183,
+        "se_diff": 0.0002685762067245829,
+        "gap_over_std": 0.16928659655476802,
+        "n_arm": 3,
+        "n_base": 5,
+        "test": "exact two-sided randomization on the difference of means",
+        "verdict": "not significant (p=0.7500, floor 0.0179) -- supports no claim",
+        "arm_seeds": [
+          42,
+          43,
+          44
+        ],
+        "baseline_seeds": [
+          42,
+          43,
+          44,
+          45,
+          46
+        ]
+      }
+    },
+    "ponder_cost_low": {
+      "task": "T10.J",
+      "field": "loss_weights.halting",
+      "value": 0.0001,
+      "question": "T10.B found fixed depth BETTER than learned halting at 2.10x seed std, but [PRE-REGISTRATION -- LEFT VERBATIM. The 2.10x was a population-std artifact (T11.0a: mean_std divided by n, not n-1); corrected it is 1.88x, and under the exact randomization test that replaced the k x std rule entirely (T11.0b, code/seed_stats.py) T10.B is p = 0.125 -- NOT significant. The verdict this text rests on is withdrawn; the arm's own rationale below still holds, because 'is the coefficient mis-tuned' is worth answering whether or not fixed depth won.] that arm also raised the compute budget 2.05 -> 7.0 steps, so it cannot separate 'adaptive computation does not work' from 'our ponder cost is mis-weighted'. This arm reduces the ponder coefficient 10x (0.001 -> 0.0001) and changes NOTHING else, so halting stays adaptive and differentiable while the task term is allowed to dominate. Reading: if avg_recursion_steps rises from ~2.05 toward max_depth and val/task_loss moves to the fixed_depth number (0.062822), the ACT objective was mis-weighted and adaptive computation is viable at lower compute than fixed depth. If depth rises but loss does not follow, the halt head is not learning anything useful and Outcome C stands for the depth half of the architecture. 0.0001 and not 0.0: at zero there is no pressure to exit at all, which degenerates into T10.B and re-measures a number we already have.",
+      "seeds": [
+        42,
+        43,
+        44
+      ],
+      "dirs": {
+        "42": "t10_more_ponder_cost_low_seed42__c9460f1f",
+        "43": "t10_more_ponder_cost_low_seed43__b7b13086",
+        "44": "t10_more_ponder_cost_low_seed44__0c6d8f0e"
+      },
+      "agg": {
+        "val/task_loss": {
+          "mean": 0.06363023282090823,
+          "std": 0.00047310539469373595,
+          "n": 3
+        },
+        "best_val_loss": {
+          "mean": 0.06299369398894764,
+          "std": 0.00033222215137533373,
+          "n": 3
+        },
+        "train/task_loss": {
+          "mean": 0.06016163200012639,
+          "std": 0.0004150157210432318,
+          "n": 3
+        },
+        "val/routing_accuracy": {
+          "mean": 0.12454433973357523,
+          "std": 0.04779736482512889,
+          "n": 3
+        },
+        "val/routing_hungarian_accuracy": {
+          "mean": 0.5653714996052344,
+          "std": 0.061209510235492266,
+          "n": 3
+        },
+        "val/routing_ami": {
+          "mean": 0.5408720841321016,
+          "std": 0.038613786115430426,
+          "n": 3
+        },
+        "val/routing_purity": {
+          "mean": 0.6495153622604108,
+          "std": 0.014272043782864488,
+          "n": 3
+        },
+        "val/routing_matched_macro_recall": {
+          "mean": 0.5321329693478118,
+          "std": 0.08973398315629544,
+          "n": 3
+        },
+        "train/expert_load_entropy_normalized": {
+          "mean": 0.9873209198315939,
+          "std": 0.0017563506291102694,
+          "n": 3
+        },
+        "train/entropy_term_normalized": {
+          "mean": 0.9984062407278206,
+          "std": 0.001288829762239968,
+          "n": 3
+        },
+        "train/avg_recursion_steps": {
+          "mean": 2.5120109717051187,
+          "std": 0.08762079346856652,
+          "n": 3
+        },
+        "depth/allocation_error_abs": {
+          "mean": 1.249641984446436,
+          "std": 0.08867812424650781,
+          "n": 3
+        },
+        "halt/early_exit_rate": {
+          "mean": 0.989587881488082,
+          "std": 0.008875846408852844,
+          "n": 3
+        },
+        "halt/forced_exit_rate": {
+          "mean": 0.010412118511918022,
+          "std": 0.008875846408852814,
+          "n": 3
+        },
+        "dispatch/evals_per_token": {
+          "mean": 1.0,
+          "std": 0.0,
+          "n": 3
+        },
+        "diag/max_pairwise_cosine_sim": {
+          "mean": 0.07363484551509221,
+          "std": 0.028048475805695763,
+          "n": 3
+        },
+        "perf/throughput_tokens_sec": {
+          "mean": 1850.9976305473403,
+          "std": 201.57370915591443,
+          "n": 3
+        },
+        "total_params": {
+          "mean": 3201555,
+          "std": 0.0,
+          "n": 3
+        },
+        "val_offline/avg_recursion_steps": {
+          "mean": 2.7720884906804875,
+          "std": 0.07457121546461436,
+          "n": 3
+        },
+        "val_offline/depth_allocation_error_abs": {
+          "mean": 1.1495408955074493,
+          "std": 0.0567527565999364,
+          "n": 3
+        },
+        "val_offline/depth_allocation_error_rel": {
+          "mean": 0.8304071369625273,
+          "std": 0.09331862602194341,
+          "n": 3
+        },
+        "val_offline/early_exit_rate": {
+          "mean": 0.9994456483394648,
+          "std": 0.0005114595356091432,
+          "n": 3
+        }
+      },
+      "primary": {
+        "gap": 0.0004439134058498162,
+        "p_value": 0.16071428571428573,
+        "min_p": 0.017857142857142856,
+        "n_perms": 56,
+        "cohens_d": 1.1744111827440806,
+        "se_diff": 0.0002949471449586865,
+        "gap_over_std": 0.9382970704385708,
+        "n_arm": 3,
+        "n_base": 5,
+        "test": "exact two-sided randomization on the difference of means",
+        "verdict": "not significant (p=0.1607, floor 0.0179) -- supports no claim",
+        "arm_seeds": [
+          42,
+          43,
+          44
+        ],
+        "baseline_seeds": [
+          42,
+          43,
+          44,
+          45,
+          46
+        ]
+      }
+    }
+  }
+}

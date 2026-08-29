@@ -149,9 +149,56 @@ a = json.loads(json.dumps(base))
 b = json.loads(json.dumps(base))
 a["logging"]["run_name"] = "phaseB_MoRE_seed42"
 b["logging"]["run_name"] = "phaseB_MoRE_seed43"
-check("T6.7b two seeds of one experiment share a config_hash, so the exporter "
-      "can average them instead of refusing to mix hashes",
+check("T6.7b the run LABEL is outside the hash -- two names, one hash",
       config_hash(a) == config_hash(b), f"{config_hash(a)[:8]} vs {config_hash(b)[:8]}")
+
+# T9.1b: the assertion above used to be worded "two seeds of one experiment share
+# a config_hash, so the exporter can average them instead of refusing to mix
+# hashes" -- while varying only `logging.run_name`. It therefore never exercised
+# the claim it made, and passed. It is false: --seed lands in
+# `data.subset_seed` / `training.subset_seed`, which are INSIDE the hashed config.
+# Discovered when the T9.1 matrix reported 5 distinct hashes per architecture on
+# 15 otherwise-clean canonical runs.
+#
+# `config_hash()` is deliberately left alone: subset_seed really does select a
+# different data subset when subset_fraction < 1.0, so excluding it would let two
+# different datasets share one identity. The correct predicate for "these five
+# runs may be averaged into one row" is seed-BLIND config equality, which is what
+# run_phase9_matrix.py:seed_blind_diff() checks by naming the differing field.
+sa = json.loads(json.dumps(base))
+sb = json.loads(json.dumps(base))
+for c, s in ((sa, 42), (sb, 43)):
+    c.setdefault("data", {})["subset_seed"] = s
+    c.setdefault("training", {})["subset_seed"] = s
+check("T6.7b/T9.1b changing the SEED does change config_hash -- the seed is "
+      "inside the hashed config, so the matrix may not verify seeds by hash",
+      config_hash(sa) != config_hash(sb),
+      f"{config_hash(sa)[:8]} vs {config_hash(sb)[:8]}")
+
+
+def _seed_blind(cfg: dict) -> dict:
+    """Same reduction as run_phase9_matrix.scientific_config(), inlined so this
+    gate does not import the driver."""
+    def flat(d, pre=""):
+        o = {}
+        for k, v in d.items():
+            kk = pre + k
+            o.update(flat(v, kk + ".")) if isinstance(v, dict) else o.setdefault(kk, v)
+        return o
+    f = flat({k: v for k, v in cfg.items() if k not in ("provenance", "logging")})
+    return {k: v for k, v in f.items()
+            if k not in ("data.subset_seed", "training.subset_seed")}
+
+
+check("T6.7b/T9.1b two seeds of one experiment are identical once the seed is "
+      "factored out -- this is what lets five seeds share one row",
+      _seed_blind(sa) == _seed_blind(sb),
+      f"{[k for k in set(_seed_blind(sa)) | set(_seed_blind(sb)) if _seed_blind(sa).get(k) != _seed_blind(sb).get(k)]}")
+
+sc = json.loads(json.dumps(sa))
+sc["training"]["lr"] = 0.002
+check("T6.7b/T9.1b the seed-blind comparison still catches a real config change",
+      _seed_blind(sa) != _seed_blind(sc), "lr 0.001 vs 0.002")
 
 c = json.loads(json.dumps(base))
 c["training"]["lr"] = 0.002

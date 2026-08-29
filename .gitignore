@@ -23,10 +23,21 @@ runs/**/*.pt
 runs/**/stdout.log
 
 # --- Model checkpoints outside the archive ----------------------------------
-# The two archived checkpoints are already tracked as evidence and are
-# unaffected by this rule.
+# The two checkpoints under archive/pre_finalization/ are tracked as evidence of
+# the pre-audit state and are unaffected by this rule.
+#
+# T11.5: the exception is scoped to `pre_finalization` deliberately. It used to
+# read `!archive/**/*.pt`, which was correct when those two files were the only
+# archived checkpoints -- but `archive/t9_1_undeclared_group_runs/` and
+# `archive/t10_smoke_1epoch/` later added 11 more, ~155 MB, and the blanket
+# exception would have committed all of them. Those runs are INVALIDATED; the
+# evidence a future reader needs is their `config.json`,
+# `resolved_config.json`, `metrics.json`, `results.tsv` and
+# `INVALIDATED.md` -- all still tracked. A checkpoint of an invalidated run is
+# not citable and is regenerable from its own recorded config, so it is weight,
+# not evidence. The files remain on disk; only tracking is declined.
 *.pt
-!archive/**/*.pt
+!archive/pre_finalization/**/*.pt
 
 # --- Global output filenames that Phase 0 abolished -------------------------
 # Listed so a stray legacy write is never committed by accident.

@@ -83,9 +83,28 @@ def _experts(d):
         return 0
 
 
+def _depth(d):
+    try:
+        return int(_load(d)[1].get("model", {}).get("max_depth", 0))
+    except Exception:                                        # noqa: BLE001
+        return 0
+
+
+# T8.1: `num_experts >= 2` alone still left the verdict dependent on which
+# architecture ran last. Gate 5 checks the ROUTING block (needs E >= 2) and the
+# DEPTH block (needs max_depth > 1) on the same run, and MoE satisfies only the
+# first: it runs at max_depth 1, where engine.py correctly writes
+# train/ponder_cost as the string "N/A" because (N+R)/(max_depth+1) is the
+# constant 1.0 for every token. G5.5's `ponder_cost > 0.0` then raised
+# TypeError: '>' not supported between 'str' and 'float' -- the same defect as
+# the entropy comparison below, one metric later. The run selected for the full
+# block is therefore the newest one that has BOTH properties (i.e. MoRE), with
+# routing-only and single-expert runs used for their own targeted checks.
 _routing = [d for d in cands if _experts(d) >= 2]
+_full    = [d for d in cands if _experts(d) >= 2 and _depth(d) > 1]
 _single  = [d for d in cands if _experts(d) == 1]
-RUN    = _routing[-1] if _routing else (cands[-1] if cands else None)
+RUN    = (_full[-1] if _full else
+          (_routing[-1] if _routing else (cands[-1] if cands else None)))
 RUN_E1 = _single[-1] if _single else None
 print(f"\nreading run: {os.path.basename(RUN) if RUN else 'NONE FOUND'}")
 if RUN_E1:
@@ -195,6 +214,26 @@ if RUN_E1 is not None:
     check("G5.2b a single-expert run reports NO routing or expert-diversity "
           "quantity as a number -- every one is N/A (CLAUDE.md 4)",
           not leaked, f"reported numerically: {leaked}")
+    # T8.1: the stronger form. "Not a number" was satisfied by the key being
+    # ABSENT, which is how MoR metrics.json actually behaved: the flat
+    # val/routing_* keys vanished while the nested block wrote "N/A", two
+    # conventions for one fact in one file. An exporter joining three
+    # architectures on a common column set then has to decide what a missing
+    # column means. Require the key to be PRESENT and to be the string.
+    _FLAT_NA = ["val/routing_accuracy", "val/routing_hungarian_accuracy",
+                "val/routing_ami", "val/routing_purity",
+                "val/routing_macro_recall",
+                "train/expert_load_entropy_normalized",
+                "train/entropy_term", "train/switch_aux_term",
+                "train/routing_balance_loss",
+                "diag/mean_pairwise_cosine_sim",
+                "diag/max_pairwise_cosine_sim"]
+    _absent_na = [k for k in _FLAT_NA if m1.get(k) != "N/A"]
+    check("G5.2b every undefined routing key is PRESENT in a single-expert run "
+          "and equals the string 'N/A' -- absence is not the same contract as "
+          "N/A, and the two must not be mixed in one file",
+          not _absent_na,
+          f"absent or not 'N/A': {[(k, m1.get(k)) for k in _absent_na]}")
     _pim1 = m1.get("routing_permutation_invariant", {})
     check("G5.2b the permutation-invariant block of a single-expert run is N/A "
           "throughout, not an empty dict that a reader could mistake for 0",
@@ -318,7 +357,7 @@ p_dead = [i for i in used
 check("G5.5 the differentiable ponder cost by itself reaches every active "
       "halt head", not p_dead, f"unreached: {p_dead}")
 check("G5.5 the run reports a differentiable ponder cost, not just a depth "
-      "count", metrics.get("train/ponder_cost", 0.0) > 0.0,
+      "count", (_num(metrics.get("train/ponder_cost")) or 0.0) > 0.0,
       str(metrics.get("train/ponder_cost")))
 
 # ---------------------------------------------------------------- 6

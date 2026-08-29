@@ -81,6 +81,29 @@ def build_parser(default_architecture: str | None = None) -> argparse.ArgumentPa
              "no routing target.",
     )
     p.add_argument(
+        "--family_cls", type=float, default=None,
+        help="Override loss_weights.family_cls -- the weight on the 6-way "
+             "whole-program FAMILY cross-entropy (cls_head). This was a bare "
+             "0.5 literal inside engine.py's total_loss until T8.3, i.e. the "
+             "second-largest term in the objective appeared in no config, no "
+             "provenance block and no results table. It is EXTERNAL "
+             "annotation, not self-supervision: data/script.py stamps a "
+             "\"family\" string into every record and more/data.py reads it off "
+             "disk. Canonical is 0.5; 0.0 is the T10.H "
+             "no-family-supervision ablation, labelled as such by "
+             "resolve_variant.",
+    )
+    p.add_argument(
+        "--ffn_mult", type=int, default=None,
+        help="Override model.ffn_mult (FFN hidden width = ffn_mult * d_model). "
+             "apply_architecture stamps the canonical, budget-matched value per "
+             "architecture (MoE/MoRE 4, MoR 24 = 4x6, giving MoR's single FFN "
+             "the total hidden width of MoRE's six experts, T9.2 gap 0.12%%). An "
+             "explicit value overrides that and is labelled ffn_mult_<n>, so the "
+             "under-budgeted MoR-small baseline (ffn_mult 4, 82.2%% short) can "
+             "never be tabled as canonical.",
+    )
+    p.add_argument(
         "--experiment_group", type=str, default=None,
         help="Run group. Use 'canonical_phase_b' ONLY for the frozen canonical "
              "matrix; the Gate 0 guard in run_context.py refuses the run if it "
@@ -178,6 +201,32 @@ def main(argv=None, default_architecture: str | None = None) -> int:
                     "not actually use."
                 )
             raw_cfg["loss_weights"]["step_routing"] = args.step_routing
+
+        # T8.3 / T10.H family-supervision override. Same placement and the same
+        # refuse-don't-ignore discipline. This is the term that was a bare 0.5
+        # literal in engine.py, so before this flag existed the only way to ablate
+        # it was to edit source -- which produces an unlabelled variant.
+        if args.family_cls is not None:
+            if args.family_cls < 0.0:
+                raise ValueError(
+                    "--family_cls must be >= 0. A negative coefficient would "
+                    "MAXIMISE the family cross-entropy, i.e. train the pooled "
+                    "representation to be family-INdistinguishable."
+                )
+            raw_cfg["loss_weights"]["family_cls"] = args.family_cls
+
+        # T8.3 / T9.2 parameter-budget override. apply_architecture has just
+        # stamped the canonical value for this architecture (MoE/MoRE 4, MoR 24);
+        # an explicit value overrides it and is labelled `ffn_mult_<n>` by
+        # resolve_variant, so the under-budgeted MoR small baseline can never be
+        # tabled as canonical.
+        if args.ffn_mult is not None:
+            if args.ffn_mult < 1:
+                raise ValueError(
+                    f"--ffn_mult must be >= 1, got {args.ffn_mult}. The FFN "
+                    "hidden width is ffn_mult * d_model."
+                )
+            raw_cfg["model"]["ffn_mult"] = args.ffn_mult
 
         resolved = resolve_overrides(
             raw_cfg,

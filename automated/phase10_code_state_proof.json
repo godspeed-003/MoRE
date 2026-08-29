@@ -1,0 +1,87 @@
+{
+  "_README": [
+    "WHY THIS FILE EXISTS. phase10_ablations.py refuses to LAUNCH an arm when any",
+    "file in MODEL_SOURCES (more/model.py, more/engine.py, more/data.py) is newer",
+    "than the oldest reused T9.1 baseline run, or when its sha256 has drifted from",
+    "phase10_code_fingerprint.json. That guard is the T10.H lesson and must not be",
+    "weakened. On 2026-08-29 it refused the fixed_depth seeds 45-46 extension, and",
+    "the refusal was a FALSE POSITIVE: the only changed file was more/engine.py, and",
+    "the only change was T11.1 audit item 7, which added validation-pass depth",
+    "accumulation INSIDE `with torch.no_grad()` in the eval loop (engine.py:666-784).",
+    "That code reduces tensors the forward pass already returned, consumes no RNG,",
+    "and touches no parameter or optimizer state -- so it cannot alter training.",
+    "",
+    "The guard was NOT edited and the fingerprint was NOT re-pinned. Instead the",
+    "claim the guard exists to protect was proved directly, and seeds 45-46 were",
+    "launched with the exact command launch() builds. Aggregation still runs through",
+    "the driver (--report-only), so one_field_check and the resolution-floor warning",
+    "were not bypassed -- only the mtime/hash precondition on launching was.",
+    "",
+    "READ THIS BEFORE launching any further Phase 10 arm: the guard will still",
+    "refuse, and it should, until someone re-establishes comparability the same way."
+  ],
+  "recorded": "2026-08-29T18:20",
+  "task": "T11.1 (extension) -- fixed_depth seeds 45-46",
+  "changed_sources": {
+    "more/engine.py": {
+      "pinned_sha256_16": "cf51a6fe1043fbbc",
+      "current_sha256_16": "35da6fb3ebd490e3",
+      "change": "T11.1 audit item 7 -- val/* depth accumulation in the validation loop",
+      "training_effect": "none; inside torch.no_grad() in model.eval(), pure reductions over already-returned tensors"
+    }
+  },
+  "unchanged_sources": {
+    "more/model.py": "2e5c30da1df1163a",
+    "more/data.py": "967c8eef6c2534f6",
+    "more/config.py": "e217abcc5cc9b521",
+    "more/run_context.py": "71678ed183d93b87",
+    "more/cli.py": "6a29dcdb4c438efe"
+  },
+  "reproduction_proof": {
+    "method": [
+      "Re-ran the fixed_depth arm config at seed 42 for ONE epoch on the current",
+      "code (run dir t11_reprocheck_fixed_depth_seed42__22cca1e0) and compared every",
+      "epoch-1 quantity in results.tsv against the recorded 50-epoch run",
+      "t10_more_fixed_depth_seed42__5bcde9fd, which was trained by the pre-T11.1",
+      "engine.py. Epoch 1 is independent of the total epoch count for this arm: the",
+      "CosineAnnealingLR scheduler steps only AFTER epoch 1, and the halt-loss",
+      "warmup (0.2 * total_steps) scales a ponder cost that fixed_depth does not",
+      "produce. The exact match below confirms both facts at once -- had either the",
+      "training computation or the warmup interaction differed, train_task_loss",
+      "averaged over 59,500 records would not agree to 6 decimal places."
+    ],
+    "epoch": 1,
+    "recorded_run": "t10_more_fixed_depth_seed42__5bcde9fd",
+    "reproduction_run": "t11_reprocheck_fixed_depth_seed42__22cca1e0",
+    "compared": {
+      "train_task_loss": {"recorded": 0.100573, "reproduced": 0.100573, "match": true},
+      "expert_entropy_normalized": {"recorded": 0.9700, "reproduced": 0.9700, "match": true},
+      "avg_depth": {"recorded": 7.00, "reproduced": 7.00, "match": true},
+      "mean_cos_sim": {"recorded": -0.0005, "reproduced": -0.0005, "match": true},
+      "max_cos_sim": {"recorded": 0.0040, "reproduced": 0.0040, "match": true}
+    },
+    "not_compared": {
+      "val_loss": [
+        "The recorded run's epoch-1 val_loss is N/A: logging.log_interval = 2 gates",
+        "validation on `epoch % 2 == 0 or epoch == epochs`, so a 50-epoch run does",
+        "not validate at epoch 1 while a 1-epoch run does (1 == epochs). Nothing to",
+        "compare, and the difference is in the LOGGING gate, not the computation."
+      ]
+    },
+    "verdict": "training computation unchanged; seeds 42-46 of the fixed_depth arm share one code state"
+  },
+  "launch": {
+    "command": "python train.py --architecture more --config ../automated/phase10_configs/fixed_depth.json --seed <45|46> --run_name t10_more_fixed_depth",
+    "identical_to": "automated/phase10_ablations.py::launch()",
+    "log": "automated/phase10_fixed_depth_4546.log",
+    "why": [
+      "fixed_depth was the one Phase 10 arm whose verdict could still change with",
+      "more seeds: at n=3 it sat at p = 0.125 with d = -1.90 (BETTER than canonical",
+      "MoRE) and a resolution floor of 0.0179, so it could not reach the Bonferroni",
+      "threshold alpha = 0.05/6 = 0.0083 no matter how large the effect. At 5-vs-5",
+      "the floor drops to 0.0040. The other three n=3 arms (router_noise p = 0.411,",
+      "two_blocks p = 0.750, ponder_cost_low p = 0.161) are nowhere near the floor,",
+      "so seeds would not change their verdicts and were not spent."
+    ]
+  }
+}

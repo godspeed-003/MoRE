@@ -18,7 +18,9 @@
     "step_feat_dim": 12,
     "num_blocks": 1,
     "dropout": 0.1,
-    "ffn_mult": 4
+    "ffn_mult": 4,
+    "routing_mode": "top1_sparse",
+    "router_noise": "none"
   },
   "training": {
     "lr": 0.001,
@@ -30,9 +32,11 @@
   },
   "loss_weights": {
     "task": 1.0,
+    "family_cls": 0.5,
     "routing_balance": 0.001,
     "step_routing": 0.0,
-    "halting": 0.001
+    "halting": 0.001,
+    "halting_supervision": 0.0
   },
   "data": {
     "train_path": "../data/train.jsonl",
@@ -41,10 +45,11 @@
     "max_val": 1000000.0,
     "pad_value": 0.0,
     "dataset_version": "more6-v1-seed42-n70000-3c1087b6aad9",
-    "train_split_version": "fixed-file-splits-v1"
+    "train_split_version": "fixed-file-splits-v1",
+    "subset_fraction": 1.0
   },
   "logging": {
     "wandb_project": "micro-MoRE-poc",
-    "log_interval": 10
+    "log_interval": 2
   }
 }
