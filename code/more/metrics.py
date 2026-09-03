@@ -196,6 +196,11 @@ def routing_agreement_keys_all() -> tuple[str, ...]:
 # three because they are what §4.4 makes primary.
 CONTROL_COMPARED_METRICS = ("raw_accuracy", "hungarian_accuracy", "ami", "purity")
 
+# Below this, the control draws are identical and the "spread" is floating-point residue
+# rather than a null distribution, so `delta / std` is undefined rather than large. See the
+# comment at its use for the run that made this necessary.
+_CONTROL_STD_FLOOR = 1e-12
+
 
 def confusion_from_pairs(oracle, predicted, num_experts: int):
     """`[num_experts, num_experts]` counts of (oracle family, predicted expert).
@@ -287,7 +292,14 @@ def partition_agreement_vs_control(oracle, predicted, control_oracles,
         out["metrics"][key] = {
             "real": float(rv), "control_mean": cm, "control_std": cs,
             "delta": delta,
-            "delta_z": (delta / cs) if cs > 0 else None,
+            # `cs > 0` is NOT a sufficient guard, and a real run proved it: a router whose
+            # block-majority expert is CONSTANT gives every control draw the identical
+            # score, so the spread is floating-point residue -- measured at 2.1e-31 in
+            # `runs/langB_MoRE_seed44__2ce26c0d`, which turned a delta of -2e-31 into a
+            # z of -0.95. A z near one from a 1e-31 denominator is not a small effect,
+            # it is no effect at all, and it would read as the former. Below the floor
+            # the ratio is undefined and is reported as such.
+            "delta_z": ((delta / cs) if cs > _CONTROL_STD_FLOOR else None),
         }
     return out
 

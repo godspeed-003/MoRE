@@ -1754,7 +1754,7 @@ does not exist here (T-L0.0).
   documents, which is a small sample for a 6-way partition, and that must be said in the
   paper rather than discovered by a reviewer.
 
-- [ ] **T-L6.6 Article-level routing agreement, beside POS and against its own null.**
+- [x] **T-L6.6 Article-level routing agreement, beside POS and against its own null.**
   Score the learned partition against the topic axis with the same machinery T-L3.3
   built: `specialization_vs_control` takes any partition, so this needs a per-block
   variant (`agreement = did this article's tokens concentrate on one expert`) plus a
@@ -1764,8 +1764,42 @@ does not exist here (T-L0.0).
   agreement numbers and both null bands appear for every language run; a synthetic
   router that routes by topic scores above the topic null and near the POS null, and
   vice versa — i.e. the two axes are shown to be separable before either is quoted.
-  **Status: the SEPARABILITY clause is verified; the every-run clause is pending an
-  in-flight CPU run.** Box stays `[ ]` until both have executed.
+  **Evidence (every-run clause, EXECUTED).** `runs/langB_MoRE_seed44__2ce26c0d` (MoRE,
+  wikitext-2, 1 epoch, batch 96, seed 44, CPU) wrote **21 POS-axis keys and 20 topic-axis
+  keys**, no `routing_control_error`. So both agreement numbers and both null bands appear
+  in a real run's `metrics.json`.
+
+  **What the run measured, and it is informative in both directions.**
+
+  *POS axis — the partition carries POS information, the labelling does not.*
+  AMI 0.1041 against a control mean of **0.0069** → delta **+0.097**, z 28.5. Hungarian
+  0.3617 vs 0.2937 (+0.068), purity 0.3687 vs 0.2998 (+0.069). But raw agreement 0.1424
+  against a control of 0.2403 → delta **−0.098**. That is the raw-versus-Hungarian gap
+  `updated_rules.md` §8.3 exists for: the router's *partition* aligns with POS above
+  chance while its *index assignment* is worse than chance, so quoting raw agreement alone
+  would have reported the opposite conclusion.
+
+  *Topic axis — no article-level preference at all, and the machinery says so cleanly.*
+  AMI **−9.7e-16**, delta **0.0**, `control_std` **0.0**; purity and Hungarian both
+  **0.6351351351**, which is exactly the largest val topic's block share
+  (0.6351351351351351) to the last digit. The block-majority expert is **constant across
+  all 1,110 val blocks**. Note this is *not* token-level collapse — the token load entropy
+  is 0.832 and `routing_collapsed_experts = none` — so the router does vary within a
+  block while having no article-level preference whatsoever. That is a direct, measured
+  answer to "did the right article go to the right expert" after one epoch: **no.**
+
+  **A DEFECT THE RUN EXPOSED, fixed in the same commit.** `delta_z` was guarded on
+  `control_std > 0`, which is not sufficient: with a constant prediction every control
+  draw scores identically, so the "spread" is floating-point residue — measured at
+  **2.1e-31** — and a delta of −2e-31 became **z = −0.95**. A z near one from a 1e-31
+  denominator is not a small effect, it is no effect, and it reads as the former. Now
+  guarded on a `1e-12` floor and reported as `None` below it.
+
+  **A CORRECTION to an earlier framing.** The 0.0527 figure from T-L3.3 is the AMI a
+  *POS-perfect* router scores against the control — it is not a universal floor. The
+  control mean depends on **both** partitions, so the right baseline is the run's own
+  control mean, which here was 0.0069. Comparing any run's AMI against a fixed 0.0527 by
+  hand is wrong, and now unnecessary: the per-run band is in `metrics.json`.
 
   **Evidence (separability, executed).** `code/test_language_families.py` → **114 passed,
   0 failed, 1 skipped**, checks TL6.6a–i. Three synthetic routers, scored on both axes:

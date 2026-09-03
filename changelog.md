@@ -5311,6 +5311,52 @@ CPU. The box stays `[ ]` until that has actually run.
 the number that makes it interpretable; `engine.py` `_lang_route` / `_lang_ids_full` for
 the accumulators and why there are two.
 
+## T-L6.6 closed by a real run — and the topic axis answers the question: no
+
+`runs/langB_MoRE_seed44__2ce26c0d` (MoRE, wikitext-2, 1 epoch, batch 96, seed 44, CPU)
+wrote **21 POS-axis keys and 20 topic-axis keys**, no `routing_control_error`, so the
+every-run clause of T-L6.6 is executed and the box is ticked. Suite 114 passed, 0 failed,
+1 skipped; Gate L0 `TOTAL 356 356 0 0`.
+
+**POS axis: the PARTITION carries POS information, the LABELLING does not.** AMI 0.1041
+against a control mean of 0.0069 -- delta **+0.097**, z 28.5. Hungarian 0.3617 vs 0.2937,
+purity 0.3687 vs 0.2998, both about +0.068. But **raw agreement 0.1424 against a control
+of 0.2403, delta -0.098** -- below its own null. That is exactly the raw-versus-Hungarian
+gap `updated_rules.md` §8.3 exists for: quoting raw agreement alone would have reported the
+OPPOSITE conclusion from the permutation-invariant metrics on the same run. This is the
+first language run where the specialization metrics disagree with each other, and the
+ordering §4.4 imposed (permutation-invariant first, agreement last) is what makes it
+readable rather than confusing.
+
+**Topic axis: no article-level preference at all, reported cleanly.** AMI -9.7e-16, delta
+exactly 0.0, `control_std` exactly 0.0; purity and Hungarian both **0.6351351351**, which
+is the largest val topic's block share (0.6351351351351351) **to the last digit**. The
+block-majority expert is CONSTANT across all 1,110 val blocks.
+
+And this is *not* token-level collapse: token load entropy is 0.832 and
+`routing_collapsed_experts = none`. So the router varies expert within a block while having
+no preference between articles. After one epoch, "did the right article go to the right
+expert" has a measured answer, and it is **no** -- which is the honest negative the second
+axis was added to be able to give.
+
+**A DEFECT THE RUN EXPOSED, fixed here.** `delta_z` was guarded on `control_std > 0`, which
+is not sufficient. With a constant prediction every control draw scores identically, so the
+spread is floating-point residue -- **measured at 2.1e-31** -- and a delta of -2e-31 became
+**z = -0.95**. A z near one from a 1e-31 denominator is not a small effect, it is no effect,
+and it reads as the former. Now guarded on a `1e-12` floor with `None` below it, and the
+comment names the run that made it necessary.
+
+**A CORRECTION worth its own paragraph, because it was written into `HANDOFF.md` as
+guidance.** The 0.0527 figure from T-L3.3 is the AMI a *POS-perfect* router scores against
+the control -- it is NOT a universal AMI floor. The control mean depends on BOTH partitions,
+and for this router it was 0.0069. So "compare a run's AMI against 0.0527 by hand" was wrong
+advice; the per-run band in `metrics.json` is the right baseline and is now always present.
+`HANDOFF.md` has been corrected, since it is the document another agent will follow.
+
+**Where to look.** `metrics._CONTROL_STD_FLOOR` for the z guard;
+`runs/langB_MoRE_seed44__2ce26c0d/metrics.json` for both axes side by side;
+`TASKS_LANGUAGE.md` T-L6.6 Evidence for the numbers.
+
 <!-- APPEND-MARKER-CL -->
 
 

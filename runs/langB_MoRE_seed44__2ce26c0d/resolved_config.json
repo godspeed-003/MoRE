@@ -119,6 +119,9 @@
     "family_cls_weight": 0.0,
     "router_noise_scale": 0.0,
     "halt_target_mode": "pure_act",
-    "total_params": 5584908
+    "total_params": 5584908,
+    "nondeterministic_ops_observed": [
+      "none"
+    ]
   }
 }

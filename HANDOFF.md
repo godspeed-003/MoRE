@@ -57,10 +57,14 @@ Three things already measured that will change how you read your results:
   5.29× largest/smallest family token ratio. A router that perfectly reproduced POS
   would score 0.8884. So the balance term and the POS-agreement number pull against each
   other, and every language load-entropy figure must be quoted against 0.8884.
-- **The AMI floor for a 6-way partition with these marginals is 0.0527, not 0.** An
-  observed AMI of ~0.06 against POS is *at the floor*. Always report the shuffled-control
-  band next to the number. (The control is built and unit-tested but **not yet wired into
-  the engine** — T-L6.9. Until it is, compare against 0.0527 by hand.)
+- **AMI has a nonzero floor, and it is PER RUN — do not use a fixed constant.** The
+  shuffled control is now wired (T-L6.9), so every language `metrics.json` carries
+  `val/routing_control_pos/ami_control_mean` and its std beside `ami_real`. Use those. An
+  earlier note here said to compare against 0.0527 by hand; that figure is the AMI a
+  *POS-perfect* router scores against the control and is **not** a universal floor — the
+  control mean depends on both partitions and was 0.0069 in the seed-44 run. Read the
+  delta and its z, and treat a `delta_z` of `None` as "the control had no spread", which
+  happens when the prediction is constant.
 - **A mis-shifted LM loss reads ~5.6 nats at epoch 0** — below the uniform floor, close
   enough to 4.98 to look like fast learning. If an early loss looks too good, suspect the
   shift before believing it.
