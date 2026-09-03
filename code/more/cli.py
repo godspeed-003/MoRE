@@ -17,6 +17,7 @@ import sys
 from .config import (load_config, apply_architecture, apply_task,
                      enforce_routing_mode, stamp_seed_into_run_name,
                      resolve_task, ARCHITECTURES, TASKS, TASK_ARITHMETIC,
+                     LANGUAGE_CORPORA,
                      TASK_LANGUAGE)
 from .engine import train
 from .run_context import RunContext, resolve_overrides, ProxyGuardError
@@ -127,6 +128,15 @@ def build_parser(default_architecture: str | None = None) -> argparse.ArgumentPa
              "was (T-L1.0); a language run is named langB_<Arch>_seed<S> and "
              "carries `language` in its variant, so it can never be read as one "
              "of the fifteen canonical arithmetic runs.",
+    )
+    p.add_argument(
+        "--corpus", choices=LANGUAGE_CORPORA, default=None,
+        help="Which language corpus to read, language only. wikitext-103 is "
+             "CANONICAL and the default; wikitext-2 is a CORRECTNESS corpus only -- "
+             "it shares its val/test splits byte-for-byte with wikitext-103, so a "
+             "number measured on it is not an independent replication and its "
+             "primary_metric_floor (5.398) is not comparable with the canonical "
+             "4.985.",
     )
     p.add_argument(
         "--seq_len", type=int, default=None,
@@ -315,6 +325,7 @@ def main(argv=None, default_architecture: str | None = None) -> int:
         for _flag, _val, _section, _key in (
             ("--seq_len",    args.seq_len,    "data", "seq_len"),
             ("--vocab_size", args.vocab_size, "data", "vocab_size"),
+            ("--corpus",     args.corpus,     "data", "corpus"),
         ):
             if _val is None:
                 continue
@@ -327,7 +338,10 @@ def main(argv=None, default_architecture: str | None = None) -> int:
                     "would enter the resolved config, the config_hash and the "
                     "provenance record while describing nothing the run did."
                 )
-            if _val < 1:
+            # `--corpus` is a name, not a size, so the positivity check is guarded on
+            # the type. `argparse` already restricted it to LANGUAGE_CORPORA, so there
+            # is nothing further to validate here.
+            if isinstance(_val, int) and _val < 1:
                 raise ValueError(f"{_flag} must be >= 1, got {_val}.")
             raw_cfg[_section][_key] = _val
 

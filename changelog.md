@@ -4974,6 +4974,73 @@ threshold may drive dispatch, but the objective keeps a differentiable route.
 a parameter-budget gate fails; `test_lang_recursion.py` L4a before believing any claim
 that halting is learned from the task.
 
+## T-L7.4 (part) — the engine now actually loads the language corpus, and a run starts
+
+`code/more/engine.py`, `code/more/config.py`, `code/more/cli.py`, `SETUP.md` (new),
+`HANDOFF.md` (new). Gate L0 `TOTAL 356 356 0 0`; all six language suites unchanged
+(25 / 11 / 22 / 133 / 89 / 72 passed, 0 failed).
+
+**THE GAP THIS CLOSED, stated plainly because it was not obvious from the ledger.**
+Every piece of the language path existed and was gate-verified -- dataset class, tied LM
+head, causal-LM loss, detached probe, depth correlations, Gates L1-L4 -- but
+`engine.train()` still built `MoREDataset(jsonl_path=...)` unconditionally. **A
+`--task language` run would have loaded the arithmetic JSONL.** Nothing raised; the
+config said `task: language`, the model would have been built for language, and the data
+would have been arithmetic. No ledger box covered the wiring, which is how it stayed
+invisible through five phases of green suites.
+
+**What was wired.** `resolve_task` is now resolved before the dataset (`_task_early`,
+named separately only because the dataset branch sits above where `_task` was already
+being set), and the dataset, the val split and the model constructor all branch on it.
+Both dataset classes return the same 7-tuple, so everything below the branch -- the
+DataLoader, the epoch loop, the metric accumulation -- stays shared, which is plan.md
+§9's one-training-system requirement.
+
+**No random-split fallback on language, deliberately.** The arithmetic path falls back to
+carving a validation set out of train when `val_path` is missing. Language must not: the
+corpus ships author-provided splits and T-L2.7 verified zero exact-content overlap across
+all 526,320 canonical train blocks, so a fallback would quietly destroy the one property
+that makes the leakage audit meaningful.
+
+**Two mismatch guards rather than coercion.** A `data.seq_len` that disagrees with the
+packed length RAISES, naming both values and the `dataset_version`, because the blocks on
+disk *are* that length and a config asking for another is asking for a corpus that was
+not built. Same for `vocab_size` against the tokenizer's V -- the tied LM head is
+`[V, d_model]`, so that disagreement is not cosmetic.
+
+**`data.corpus` defaults to the CANONICAL corpus, not the dev one.** A silent fallback to
+wikitext-2 would quote the loss against the wrong floor -- 5.398 instead of 4.985 -- and
+the two are not comparable, because the corpora tokenize the identical val text to
+different token counts (T-L2.2). `--corpus` is plumbed through the same
+refuse-on-arithmetic path as `--seq_len`, and the positivity check in that loop is now
+guarded on `isinstance(_val, int)`: `--corpus` is a name, and `"wikitext-2" < 1` raised
+`TypeError: '<' not supported between instances of 'str' and 'int'`.
+
+**FIRST REAL LANGUAGE RUN STARTS CORRECTLY.**
+`runs/langB_MoRE_seed42__91c9bba1` -- note the `langB_` prefix, so it can never be read
+as one of the fifteen `phaseB_*` arithmetic runs. It resolved
+`task=language, corpus=wikitext-2, variant=language, family_cls=0.0,
+step_routing=0.0`, loaded `10,527 blocks x 256 tokens` with `floor = 5.3983`, built
+**5,584,908 parameters** -- exactly the MoRE reference from the T-L6.3 derivation -- and
+printed a non-zero router gradient norm (0.009294) on the first batch. It was launched on
+the CPU interpreter and has NOT completed, so there is no `metrics.json` and no number
+from it is quoted anywhere. The directory is kept rather than deleted (CLAUDE.md §6): a
+run directory with no `metrics.json` cannot be mistaken for a result.
+
+**`SETUP.md` and `HANDOFF.md`** are written for the 4060 8 GB machine that will run the
+canonical matrix. `SETUP.md` is the environment build, the dataset rebuild (`*.npy` is not
+tracked; `token_family.npy` is, because it needs a specific nltk model), and a
+symptom-to-cause table. The `--ignore-installed torch` step is called out because without
+it pip sees the inherited CPU torch, decides the requirement is satisfied, and yields a
+venv that silently trains on CPU. `HANDOFF.md` carries the three numbers that change how
+results are read -- the 4.9849 floor, the partition's own 0.8884 load entropy, and the
+0.0527 AMI floor -- plus the warning that a mis-shifted loss reads ~5.6 nats at epoch 0,
+which is close enough to the floor to look like fast learning.
+
+**Where to look.** `engine.py` `_task_early` for the dataset branch and the two mismatch
+guards; `config.LANGUAGE_CORPUS_DEFAULT` when a run reads the wrong corpus; `cli.py`'s
+override loop when a string-valued language flag is added next.
+
 <!-- APPEND-MARKER-CL -->
 
 

@@ -24,6 +24,7 @@ import matplotlib.pyplot as plt
 
 from .families import expert_labels, ALL_OP_NAMES, NUM_OP_TYPES, NUM_EXPERTS_CANONICAL
 from .data import MoREDataset
+from .lang_data import MoRELanguageDataset
 from .model import MoEBlock, MoREWrapper, MoREModel
 from .metrics import (compute_expert_load_entropy,
                       compute_pairwise_cosine_sim,
@@ -93,6 +94,11 @@ def train(cfg: dict, run_epochs: int | None = None, ctx: "RunContext | None" = N
     lw.setdefault("family_cls", CANONICAL_FAMILY_CLS_WEIGHT)
     dc  = cfg["data"]
     log = cfg["logging"]
+    # Resolved before the dataset because the dataset depends on it. `_task` below is
+    # the same value from the same helper; this early binding exists only because the
+    # dataset branch sits above the block where `_task` is set, and two names for one
+    # value is cheaper than moving the halting-mode resolution.
+    _task_early = resolve_task(cfg)
 
     # ---- T6.1 global seeding (plan.md §8.1) -----------------------------
     # FIRST, before the dataset, the model or the optimiser exist. Every one of
@@ -129,14 +135,44 @@ def train(cfg: dict, run_epochs: int | None = None, ctx: "RunContext | None" = N
     )
 
     # ---- Dataset -------------------------------------------------------
-    train_ds = MoREDataset(
-        jsonl_path=dc.get("train_path", dc.get("jsonl_path")),
-        max_steps=max_steps,
-        step_feat_dim=step_feat_dim,
-        max_val=dc["max_val"],
-        pad_value=dc["pad_value"],
-        num_experts=mc["num_experts"],
-    )
+    # T-L7.4: the task chooses the dataset, exactly as `plan_language.md` §1 says the
+    # axis works. Both classes return the same 7-tuple (T-L2.3), so everything below
+    # this branch -- the DataLoader, the epoch loop, the metric accumulation -- is
+    # shared, which is the ONE-training-system requirement of plan.md §9.
+    if _task_early == TASK_LANGUAGE:
+        _corpus = dc.get("corpus", "wikitext-103")
+        train_ds = MoRELanguageDataset(_corpus, "train")
+        if int(train_ds.seq_len) != int(dc.get("seq_len", train_ds.seq_len)):
+            # A mismatch is a real defect rather than something to coerce: the blocks
+            # on disk ARE `train_ds.seq_len` long, and a config asking for a different
+            # length is asking for a corpus that was not built. Repacking is a
+            # deliberate act (`build_language_dataset.py --stage pack --seq_len N`).
+            raise ValueError(
+                f"data.seq_len = {dc.get('seq_len')} but "
+                f"data/lang/{_corpus}/ was packed at seq_len = {train_ds.seq_len} "
+                f"({train_ds.dataset_version}). Repack the corpus or drop the "
+                f"override -- silently using the stored length would make the "
+                f"resolved config disagree with the data it describes."
+            )
+        if int(train_ds.vocab_size) != int(dc.get("vocab_size", train_ds.vocab_size)):
+            raise ValueError(
+                f"data.vocab_size = {dc.get('vocab_size')} but the corpus tokenizer "
+                f"has V = {train_ds.vocab_size}. The tied LM head is "
+                f"[V, d_model], so this is not a cosmetic disagreement."
+            )
+        print(f"[Dataset] {train_ds}")
+        print(f"[Dataset] floor = {train_ds.primary_metric_floor} nats/token "
+              f"(bigram, T-L2.5) | train_split_version = "
+              f"{train_ds.train_split_version}")
+    else:
+        train_ds = MoREDataset(
+            jsonl_path=dc.get("train_path", dc.get("jsonl_path")),
+            max_steps=max_steps,
+            step_feat_dim=step_feat_dim,
+            max_val=dc["max_val"],
+            pad_value=dc["pad_value"],
+            num_experts=mc["num_experts"],
+        )
 
     if 0.0 < subset_fraction < 1.0 and len(train_ds) > 1:
         subset_n    = max(1, int(len(train_ds) * subset_fraction))
@@ -153,7 +189,17 @@ def train(cfg: dict, run_epochs: int | None = None, ctx: "RunContext | None" = N
 
     val_ds   = None
     val_path = dc.get("val_path")
-    if val_path and os.path.exists(val_path):
+    if _task_early == TASK_LANGUAGE:
+        # The corpus ships its own author-provided val split, and T-L2.7 verified zero
+        # exact-content overlap with train across all 526,320 canonical train blocks.
+        # So there is no random-split fallback here: falling back would carve a
+        # validation set out of TRAIN and quietly destroy the one property that makes
+        # the leakage audit meaningful.
+        val_ds  = MoRELanguageDataset(dc.get("corpus", "wikitext-103"), "val")
+        n_train = len(train_ds)
+        n_val   = len(val_ds)
+        print(f"[Dataset] {val_ds}")
+    elif val_path and os.path.exists(val_path):
         print(f"[Dataset] Using validation set: {val_path}")
         val_ds = MoREDataset(
             jsonl_path=val_path,
@@ -233,6 +279,15 @@ def train(cfg: dict, run_epochs: int | None = None, ctx: "RunContext | None" = N
         # ('t >= 0 && t < n_classes') in the first batch. Passed explicitly rather
         # than left to the default so the coupling cannot silently return.
         num_families=NUM_EXPERTS_CANONICAL,
+        # T-L4.0 / T-L5.0. Attention and the token embedding are constructed only when
+        # the task asks for them, so an arithmetic state_dict stays bit-identical.
+        # `max_seq_len` sizes the positional table and MUST be the packed length the
+        # corpus was built at -- the mismatch guard above is what makes that true.
+        attention=bool(mc.get("attention", False)),
+        n_heads=int(mc.get("n_heads", 4)),
+        max_seq_len=(int(dc["seq_len"]) if _task_early == TASK_LANGUAGE else None),
+        task=_task_early,
+        vocab_size=(int(dc["vocab_size"]) if _task_early == TASK_LANGUAGE else None),
     ).to(device)
 
     total_params = sum(p.numel() for p in model.parameters())

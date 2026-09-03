@@ -83,6 +83,15 @@ CANONICAL_TASK = TASK_ARITHMETIC
 # value below exists only so that `--task language` alone builds a RUNNABLE model
 # instead of raising KeyError; it is provisional and is not the protocol.
 LANGUAGE_SEQ_LEN_DEFAULT    = 256     # provisional -- GATE L5 owns the real value
+
+# WHICH corpus a `--task language` run reads. The CANONICAL one by default: a run that
+# silently fell back to the dev corpus would quote its loss against the wrong
+# `primary_metric_floor` (5.398 rather than 4.985), and the two are not comparable
+# because the corpora tokenize the identical val text to different token counts
+# (T-L2.2). `wikitext-2` is for correctness only -- it shares val/test byte-for-byte
+# with wikitext-103, so it can never be an independent replication (T-L2.0).
+LANGUAGE_CORPUS_DEFAULT     = "wikitext-103"
+LANGUAGE_CORPORA            = ("wikitext-2", "wikitext-103")
 LANGUAGE_VOCAB_SIZE_DEFAULT = 8192    # T-L2.1: byte-level BPE fitted on train only
 LANGUAGE_N_HEADS_DEFAULT    = 4       # plan_language.md §6.6, frozen at d_model 256
 
@@ -833,6 +842,14 @@ def _apply_language_block(cfg: dict, declared_family_cls=None) -> dict:
     # from T-L7.0's measurement on 6 GB of VRAM, not this file's to assert.
     dc.setdefault("seq_len", LANGUAGE_SEQ_LEN_DEFAULT)
     dc.setdefault("vocab_size", LANGUAGE_VOCAB_SIZE_DEFAULT)
+    # WHICH corpus. `setdefault` so config_language.json, the frozen spec and
+    # `--corpus` all win, but a default is required for `--task language` alone to be
+    # runnable at all (T-L1.2's Verify). The canonical corpus is the default rather
+    # than the dev one, because a run that silently used wikitext-2 would report a
+    # loss against the wrong `primary_metric_floor` -- 5.398 instead of 4.985 -- and
+    # the two are not comparable (the corpora tokenize the same val text to different
+    # token counts, T-L2.2).
+    dc.setdefault("corpus", LANGUAGE_CORPUS_DEFAULT)
     mc.setdefault("n_heads", LANGUAGE_N_HEADS_DEFAULT)
     # plan_language.md §5: the LM head is tied to the token embedding. Named here
     # so `--task language` alone builds the model the plan specifies; a config may
