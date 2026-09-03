@@ -300,6 +300,82 @@ L6 NUM_SUBWORD   numerals, and subword continuation pieces with no standalone PO
 W&B-safe labels (no `/` inside a label, `updated_rules.md` §9):
 `L1_FUNCTION, L2_NOUN, L3_VERB, L4_MODIFIER, L5_PUNCT_SYM, L6_NUM_SUBWORD`.
 
+### 4.1a DECISION (2026-09-03): POS stays PRIMARY, topic is added as a SECOND axis
+
+Raised: a production MoE has experts that look like *law / science / math / code*, so
+should the language oracle be a **topic** partition (Military History, Pop Culture,
+Geography, Science …) with routing scored per ARTICLE rather than per token?
+
+The question is a good one and the answer is "both, and it is nearly free" — because
+of a property T-L5.3 established that did not hold when §4.1 was written.
+
+**Why not topic as the primary oracle, at this scale.** Each expert FFN is
+`256 → 1024 → 256` ≈ 524 K parameters. Production topic experts are billions. There is
+no capacity at 524 K for "Military History" as *knowledge*; what an expert that size can
+plausibly organize by is low-level distributional structure, which is far closer to
+lexical class than to subject matter. And WikiText-103 ships **no** topic labels, so a
+topic oracle would have to be induced by clustering — making the reference partition
+*our* construction, which is the same objection that kept FineWeb-Edu out of the
+canonical arm (§3.1).
+
+**Why it costs almost nothing to add anyway.** After T-L3.2 and T-L5.3 the oracle
+partition is a **read-only measurement reference**: `family_probe` reads `h.detach()`
+(trunk gradients verified bitwise identical at probe weight 0.0 / 0.5 / 1.0), the
+agreement metric is named `routing_agreement_with_pos` rather than accuracy, and
+`metrics.specialization_vs_control` scores *any* partition against a marginal-matched
+null. So the choice of reference does not shape the model **at all** — it only changes
+what the learned partition is compared against. Two references answer a strictly better
+question than one:
+
+> Not "does the router reproduce POS?" but "**what, if anything, does a small recursive
+> MoE organize by?**"
+
+If the learned partition beats the null against neither POS nor topic, that is Outcome C
+stated honestly and is a cleaner negative result than a single-reference near-miss.
+
+**What gets built (T-L6.5, T-L6.6).** A per-block topic label
+`block_topic[n_blocks]`, induced by k-means over TF-IDF document vectors at **k = 6** and
+a recorded seed, from the ` = Title = `-delimited documents `iter_documents` already
+segments. Six, not four or eight, so the topic axis is directly comparable with the POS
+axis and with the arithmetic study's router width. It is labelled **induced, not ground
+truth**, gets its own shuffled control, and is reported beside POS — never instead of it.
+Article-level routing agreement is then exactly "did the tokens of this article route to
+one expert", which is the intuition behind the question.
+
+**Expert count stays 6.** `canonical_spec_language.json` freezes `num_experts = 6` so
+MoE/MoRE keep the arithmetic study's router width; changing it would confound every
+difference between the two studies with a difference in width.
+
+### 4.1b DECISION (2026-09-03): recursion stays PER-TOKEN
+
+Raised: rather than recursing token by token, group a question (or its hard part) and
+recurse the whole span — `"to be"` and `"not to be"` as units.
+
+**Kept per-token, for three reasons.**
+
+1. **Attention already does the grouping.** Since T-L4.0 a shared causal
+   self-attention sublayer runs over the FULL sequence at *every* recursion step, so a
+   position that recurses more pulls in more context each time. `"to be"` and
+   `"not to be"` are jointly represented without segment-level halting; per-token depth
+   controls how many *rounds* of that mixing each position gets, not whether mixing
+   happens.
+2. **Per-token ACT is the formulation this paper is positioned against.** Universal
+   Transformer / ACT and Mixture-of-Recursions are per-token, and
+   `updated_rules.md` §2.2 mandates per-token early exit with frozen halted states. A
+   segment-level halt head is a different architecture, and comparing it to prior work
+   gets *harder*, not easier.
+3. **"The hard part of the question" is not knowable a priori.** Choosing spans would
+   require an invented segmentation — the same class of error §5 forbids for depth
+   targets. A designed span boundary would make a designed correlation look like a
+   discovery.
+
+**What the concern does get (T-L6.7).** Depth is additionally reported at the SPAN
+level — mean exit depth per document, and the within-document vs between-document
+variance of depth — so "does the model spend more computation on harder *passages*" is
+answered as a measurement rather than assumed away. That is a metric addition, not an
+architecture change.
+
+
 ### 4.2 Assigned at the token-TYPE level
 
 The label is a property of the **BPE id**, not of the occurrence: one

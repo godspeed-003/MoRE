@@ -170,6 +170,16 @@ def main(argv=None):
     np.save(out, deciles)
     sha = bld._sha256_file(out)
 
+    # T-L6.1: the raw per-type train counts, frozen as their own artifact.
+    # `depth/spearman_vs_logfreq` and `depth/spearman_vs_unigram_surprisal` are
+    # non-circular only because both are properties of the corpus fixed BEFORE any
+    # model runs (`plan_language.md` §5.2). Storing the counts rather than the two
+    # derived vectors keeps one source of truth: `lang_data` derives log-frequency
+    # and surprisal from this array, so they cannot disagree about the smoothing.
+    counts_path = os.path.join(bld.corpus_dir(corpus), "token_train_count.npy")
+    np.save(counts_path, counts)
+    counts_sha = bld._sha256_file(counts_path)
+
     per = []
     for d in range(N_DECILES):
         sel = deciles == d
@@ -211,6 +221,9 @@ def main(argv=None):
         "decile_generator_commit": bld._git_commit(),
         "token_decile_file": f"data/lang/{corpus}/token_decile.npy",
         "token_decile_sha256": sha,
+        "token_train_count_file": f"data/lang/{corpus}/token_train_count.npy",
+        "token_train_count_sha256": counts_sha,
+        "token_train_count_total": int(counts.sum()),
         "token_decile_dtype": str(deciles.dtype),
         "token_decile_len": int(deciles.shape[0]),
         "n_frequency_deciles": N_DECILES,

@@ -1605,10 +1605,42 @@ does not exist here (T-L0.0).
   ponder weight set to zero, which is the only version of this test that proves the
   task path (not the ponder regularizer) supplies the gradient.
 
+- [ ] **T-L6.5 Induced per-block TOPIC partition, as a SECOND reference axis.**
+  `plan_language.md` §4.1a. Build `block_topic[n_blocks]` from the
+  ` = Title = `-delimited documents `iter_documents` already segments: TF-IDF over
+  documents, k-means at **k = 6** with a recorded seed, then each packed block takes
+  the topic of the document that supplies most of its tokens. Six so the topic axis is
+  directly comparable with the POS axis and with the arithmetic router width.
+  **Labelled induced, not ground truth** — WikiText ships no topic labels, so this is
+  our construction and is reported as such, exactly like the shuffled control.
+  **Verify:** the label array has one entry per stored block; the six clusters are
+  non-degenerate (no cluster below 2% of blocks); the top TF-IDF terms per cluster are
+  printed and are humanly recognisable as topics; a second run at the same seed
+  reproduces the assignment byte-identically.
+
+- [ ] **T-L6.6 Article-level routing agreement, beside POS and against its own null.**
+  Score the learned partition against the topic axis with the same machinery T-L3.3
+  built: `specialization_vs_control` takes any partition, so this needs a per-block
+  variant (`agreement = did this article's tokens concentrate on one expert`) plus a
+  marginal-matched shuffled control for the topic labels. Reported BESIDE
+  `routing_agreement_with_pos`, never instead of it, so the paper answers "what does a
+  small recursive MoE organize by" rather than presupposing POS. **Verify:** both
+  agreement numbers and both null bands appear for every language run; a synthetic
+  router that routes by topic scores above the topic null and near the POS null, and
+  vice versa — i.e. the two axes are shown to be separable before either is quoted.
+
+- [ ] **T-L6.7 Span-level depth reporting.** `plan_language.md` §4.1b. Per-token
+  recursion is kept, but "does the model spend more computation on harder *passages*"
+  is answered as a measurement: `depth/mean_by_document`, and the within-document
+  versus between-document variance of exit depth. If between-document variance is a
+  negligible share of the total, the model is not allocating at the passage level and
+  that is the honest finding. **Verify:** the variance decomposition sums to the total
+  depth variance; document boundaries come from the stored EOT positions, not from a
+  re-segmentation.
+
 ---
 
 ## Phase L-7 — Calibration and protocol freeze  (`plan_language.md` §10, Gate L5)
-
 - [ ] **T-L7.0 Measure throughput and memory on the RTX 3050 (6 GB).** The
   arithmetic protocol's `batch_size = 768` is meaningless for `[B, S, V]` logits;
   6 GB is the binding constraint and must be measured, not estimated. Sweep batch
@@ -1642,6 +1674,29 @@ does not exist here (T-L0.0).
   same `input_ids`: assert the tensors are equal for the same record index under
   all three configs. **Verify:** `torch.equal` on the input batch across MoE/MoR/
   MoRE at the same seed and index.
+
+- [ ] **T-L7.4 One-command runner for the 4060 8 GB co-author machine.** The best
+  GPU available to the project is Ayan's RTX 4060 Laptop (8 GB), not this machine's
+  3050 (6 GB), so the canonical matrix should run there. What must exist before that
+  hand-off: a `SETUP.md` naming the exact environment build (the `--system-site-packages`
+  + `--ignore-installed torch==2.6.0 --index-url .../cu126` recipe from T-L0.1, which is
+  the step most likely to be got wrong), a **dataset rebuild command** because
+  `data/lang/**/*.npy` is not tracked, and a single entry point that runs the whole arm
+  and writes only into `runs/<experiment_id>/`. W&B needs settling first — a canonical
+  run will die in `wandb.init` with `UsageError: No API key configured` exactly as
+  T-L1.4's re-run did, and it will leave a directory-shaped artifact behind when it does.
+  **Verify:** on a machine that has never seen this repo, `git clone` + the documented
+  setup + **one** command reproduces the wikitext-2 dataset (hashes matching the tracked
+  manifest) and completes a short language run; the 8 GB VRAM figure replaces the 6 GB
+  one in the T-L7.0 table for the arms actually run there.
+
+- [ ] **T-L7.5 Push after every gate that a REAL RUN validated.** Standing
+  instruction, recorded here because it is a protocol rule rather than a one-off: the
+  branch is pushed to `origin` after each gate whose pass depends on an executed run,
+  not on a pre-written assertion alone. Gate L0 qualifies (Gate 5 launches two real
+  1-epoch training runs); Gates L1/L2/L3 are static and do not by themselves trigger a
+  push. **Verify:** `git log origin/<branch>..HEAD` is empty immediately after each
+  run-validated gate passes.
 
 ---
 
@@ -1760,3 +1815,29 @@ where compute forces it, and say so in the caption rather than presenting a
 - [ ] **T-LX.3 Keep this ledger current in the same commit as the code.** A ticked
   box with no evidence line, or evidence in chat only, is the failure mode this
   file exists to prevent.
+
+- [ ] **T-LX.4 Oracle routing is ABLATION-ONLY and must never enter a canonical
+  language run.** It existed in the micro-POC to prove MoRE could route at all, by
+  hard-coding each token's expert; in a real run the router learns from the loss alone.
+  Already enforced rather than merely intended: `canonical_spec_language.json` pins
+  `step_routing_weight = 0.0` in **all three** architecture blocks, and
+  `config.resolve_variant` tags any non-zero value `oracle_routing`, which is not equal
+  to `language` and is therefore refused the canonical group by the proxy guard. §7.4
+  notes the ablation is *more* interesting on language than on arithmetic — it measures
+  how much achievable loss is given up by forcing a POS partition — and it still may
+  never share a table with canonical runs. **Verify:** all three arms show
+  `step_routing_weight = 0.0`; a run with a non-zero value is refused
+  `canonical_lang_b`.
+
+- [ ] **T-LX.5 `N/A` stays in the machine record; the PAPER renderer drops
+  all-`N/A` columns.** These are different requests and conflating them would undo a
+  fix. `metrics.json` and `results.tsv` must keep `"N/A"`, because an exporter joining
+  MoE/MoR/MoRE rows on a common column set has to decide what a *missing* column means —
+  that is the defect the `"N/A"` contract closed (see the changelog entry on the eleven
+  flat routing keys), and CLAUDE.md §4 forbids the 0.0 that would otherwise fill the
+  gap. What should not carry dead columns is the human-facing table: the language
+  `results.md` writer drops any column that is `N/A` for **every** row in the table it is
+  rendering, and says in a footnote which ones it dropped and why. **Verify:** a
+  language `results.tsv` still contains `depth_allocation_error_*` as `N/A`; the
+  rendered language results table does not show them, and names them in a footnote.
+

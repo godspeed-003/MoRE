@@ -32,7 +32,9 @@ from .metrics import (compute_expert_load_entropy,
                       permutation_invariant_routing_metrics,
                       paper_metrics_to_wandb,
                       make_routing_confusion_figure,
-                      make_op_depth_bar_figure)
+                      make_op_depth_bar_figure,
+                      language_depth_metrics,
+                      language_depth_to_wandb)
 from .run_context import RunContext, resolve_overrides, ProxyGuardError
 from .seeding import (apply_seeding, make_generator, seed_worker,
                       nondeterministic_ops_observed)
@@ -283,6 +285,8 @@ def train(cfg: dict, run_epochs: int | None = None, ctx: "RunContext | None" = N
     # measured on a different corpus. None when the dataset does not supply one --
     # reported as an absent key rather than as 0.0.
     _floor = None
+    _tok_family = _log_freq = _surprisal = None
+    _NUM_LANG_FAMILIES, _LANG_FAMILY_LABELS = 0, []
     if _task == TASK_LANGUAGE:
         # Unwrapped, because `random_split` returns a `Subset` and the attribute
         # lives on the underlying `MoRELanguageDataset`. Bounded loop rather than
@@ -293,6 +297,16 @@ def train(cfg: dict, run_epochs: int | None = None, ctx: "RunContext | None" = N
                 break
             _ds = getattr(_ds, "dataset", None)
         _floor = getattr(_ds, "primary_metric_floor", None)
+        # T-L6.1: the frozen corpus-difficulty vectors, resolved ONCE here rather
+        # than per validation pass. They come from the dataset, so a run cannot
+        # correlate depth against a frequency table built for another corpus.
+        from .lang_families import (LANG_FAMILY_LABELS as _LFL,
+                                    NUM_FAMILIES as _NLF)
+        _LANG_FAMILY_LABELS, _NUM_LANG_FAMILIES = list(_LFL), _NLF
+        if _ds is not None and hasattr(_ds, "log_freq"):
+            _tok_family = _ds.token_family.numpy() if _ds.token_family is not None else None
+            _log_freq = _ds.log_freq()
+            _surprisal = _ds.unigram_surprisal()
     if _task != "arithmetic":
         print(f"[Train] task={_task}: the confusion diagonal is published as "
               f"{_agree_key}")
@@ -756,6 +770,12 @@ def train(cfg: dict, run_epochs: int | None = None, ctx: "RunContext | None" = N
             val_exp_depth_n   = 0
             val_halt_acc: dict[str, float] = {}
             val_halt_batches  = 0
+            # T-L6.1: per-token exit depth, id and loss, accumulated over the whole
+            # validation split so the correlations are over the split rather than over
+            # whichever batch happened to be last.
+            _lang_depth_ed: list = []
+            _lang_depth_ids: list = []
+            _lang_depth_loss: list = []
 
             with torch.no_grad():
                 for x_v, sm_v, se_v, so_v, fam_v, _, tgt_v in val_loader:
@@ -778,6 +798,27 @@ def train(cfg: dict, run_epochs: int | None = None, ctx: "RunContext | None" = N
                     )
                     val_total += l_v.item() * x_v.shape[0]
                     val_n     += x_v.shape[0]
+
+                    # T-L6.1: exit depth, token id and that token's OWN loss, all
+                    # over the identical token set. The set is the positions the loss
+                    # is actually taken over -- `[:, :-1]`, since the last position
+                    # has no next-token target -- so the three vectors describe the
+                    # same population, which is what T-L6.1 requires.
+                    #
+                    # `reduction="none"` rather than a second forward pass, so the
+                    # per-token losses are the same numbers the mean above came from.
+                    if _task == TASK_LANGUAGE and depth_exits is not None:
+                        _ed = compute_token_exit_depths(
+                            depth_exits, mc["max_depth"]
+                        ).reshape(x_v.shape[0], x_v.shape[1])
+                        _pt = F.cross_entropy(
+                            reg_v[:, :-1, :].reshape(-1, reg_v.shape[-1]),
+                            x_v[:, 1:].reshape(-1),
+                            reduction="none",
+                        )
+                        _lang_depth_ed.append(_ed[:, :-1].reshape(-1).cpu())
+                        _lang_depth_ids.append(x_v[:, :-1].reshape(-1).cpu())
+                        _lang_depth_loss.append(_pt.detach().cpu())
 
                     # Same helper the training loop calls (metrics.depth_allocation
                     # _error), so the two passes cannot disagree on the definition.
@@ -851,6 +892,19 @@ def train(cfg: dict, run_epochs: int | None = None, ctx: "RunContext | None" = N
                 val_depth_log["val/depth_allocation_error_rel"] = (
                     val_depth_rel_err / val_depth_err_n
                 )
+            # T-L6.0: on LANGUAGE these two keys are structurally undefined, not
+            # merely unmeasured. There is no per-token ground-truth depth for English
+            # (`plan_language.md` §5.1), `lang_families.op_target_depth_table()` is
+            # empty by construction, so `val_depth_err_n` is 0 and the branch above
+            # never fires. Writing "N/A" makes the absence a STATEMENT rather than a
+            # gap: an exporter joining arithmetic and language rows on a common column
+            # set has to decide what a missing column means, and the whole point of
+            # "N/A" is that it never has to. A 0.0 or -1 here would read as perfect
+            # allocation against a curriculum that does not exist -- the single most
+            # misleading number this migration could produce.
+            if _task == TASK_LANGUAGE:
+                val_depth_log["val/depth_allocation_error_abs"] = "N/A"
+                val_depth_log["val/depth_allocation_error_rel"] = "N/A"
             if val_exp_depth_n > 0:
                 val_depth_log["val/avg_recursion_steps"] = (
                     val_exp_depth_sum / val_exp_depth_n
@@ -864,6 +918,32 @@ def train(cfg: dict, run_epochs: int | None = None, ctx: "RunContext | None" = N
                     val_halt_acc.get("mean_remainder", 0.0)
                     / max(val_halt_batches, 1)
                 )
+
+            # T-L6.1 / T-L6.2: the correlational depth report that REPLACES
+            # allocation error on language. Computed once per validation pass over the
+            # whole split, each rho with its permutation null band -- a near-constant
+            # depth vector can produce a nonzero rho from tie-breaking alone, so a
+            # depth correlation without its null is uninterpretable.
+            _lang_depth: dict = {}
+            if _task == TASK_LANGUAGE and _lang_depth_ed:
+                try:
+                    _lang_depth = language_depth_metrics(
+                        torch.cat(_lang_depth_ed).numpy(),
+                        torch.cat(_lang_depth_ids).numpy(),
+                        torch.cat(_lang_depth_loss).numpy(),
+                        _tok_family, _log_freq, _surprisal,
+                        mc["max_depth"], _NUM_LANG_FAMILIES, _LANG_FAMILY_LABELS,
+                        seed=seed,
+                    )
+                    val_depth_log.update(language_depth_to_wandb(_lang_depth))
+                except Exception as _exc:      # pragma: no cover
+                    # Reported, not swallowed: a failed depth report must not take
+                    # the run down, but it must not look like a run without one.
+                    print(f"[Train] language depth metrics unavailable: "
+                          f"{type(_exc).__name__}: {_exc}", file=sys.stderr)
+                    val_depth_log["val/depth_report_error"] = (
+                        f"{type(_exc).__name__}: {_exc}"
+                    )
 
             # The single definition of routing accuracy (T6.2), so the scalar
             # and the confusion matrix cannot drift. Returns

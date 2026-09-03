@@ -662,6 +662,223 @@ def compute_token_exit_depths(
     return (depth_exits * steps.unsqueeze(0)).sum(dim=-1)
 
 
+# ---------------------------------------------------------------------------
+# T-L6.1 / T-L6.2  Depth correlations, with ties and a null band
+# ---------------------------------------------------------------------------
+#
+# WHY CORRELATIONS AT ALL. `plan_language.md` §5.1: there is no per-token
+# ground-truth depth for English, so `depth/allocation_error_*` is `N/A` on language
+# (T-L6.0) and the Second Objective -- does MoRE learn adaptive computation? -- has to
+# be tested against properties of the corpus we did NOT choose. Writing a per-token
+# depth target and then reporting agreement with it would make a designed correlation
+# look like a discovery.
+#
+# `spearman_vs_logfreq` and `spearman_vs_unigram_surprisal` are non-circular because
+# both are fixed at dataset-build time, before any model exists.
+# `spearman_vs_model_loss` is the interesting one: it asks whether the model spends
+# more computation where IT finds the task hard, which is a behavioural claim rather
+# than a designed one.
+
+# Percentiles of the permutation null. Two-sided 95%: a rho inside this band is
+# indistinguishable from the same depth marginal paired at random.
+NULL_BAND_PERCENTILES = (2.5, 97.5)
+NULL_PERMUTATIONS = 200
+
+
+def _average_ranks(a: np.ndarray) -> np.ndarray:
+    """Ranks of `a` with TIES AVERAGED, which is what makes this Spearman.
+
+    Ties are the whole difficulty here and they are not rare -- exit depth is an
+    integer in `1..max_depth`, so on a collapsed-depth model almost every value is
+    tied. `argsort().argsort()` would give ordinal ranks and break ties by array
+    position, which manufactures a correlation out of whatever order the batch
+    happened to arrive in: the arithmetic POC put 93-97% of tokens at exactly 2 steps,
+    and ordinal ranks over that would have produced a confident non-zero rho from
+    nothing.
+    """
+    order = np.argsort(a, kind="stable")
+    ranks = np.empty(a.size, dtype=np.float64)
+    sorted_a = a[order]
+    i = 0
+    while i < a.size:
+        j = i
+        while j + 1 < a.size and sorted_a[j + 1] == sorted_a[i]:
+            j += 1
+        ranks[order[i:j + 1]] = 0.5 * (i + j) + 1.0
+        i = j + 1
+    return ranks
+
+
+def spearman_rho(x, y):
+    """Spearman rank correlation with averaged ties, or None when undefined.
+
+    `None` rather than 0.0 or nan when either side is constant: a constant vector has
+    no rank variance, so the correlation does not exist, and a 0.0 there would read as
+    "measured no relationship" (CLAUDE.md §4). A collapsed-depth model is exactly the
+    case that produces it, so this branch is reached in practice.
+
+    Implemented rather than taken from scipy so the metric layer keeps its
+    torch/numpy-only import set, matching the hand-rolled Hungarian and AMI above.
+    `code/test_lang_depth.py` checks it against `scipy.stats.spearmanr` on random and
+    heavily-tied data, so "exact" is verified rather than claimed.
+    """
+    x = np.asarray(x, dtype=np.float64).ravel()
+    y = np.asarray(y, dtype=np.float64).ravel()
+    if x.size != y.size:
+        raise ValueError(
+            f"spearman_rho needs paired inputs, got {x.size} and {y.size}. A "
+            "length mismatch here would silently correlate different token sets."
+        )
+    if x.size < 2:
+        return None
+    rx, ry = _average_ranks(x), _average_ranks(y)
+    sx, sy = rx.std(), ry.std()
+    if sx == 0.0 or sy == 0.0:
+        return None
+    return float(((rx - rx.mean()) * (ry - ry.mean())).mean() / (sx * sy))
+
+
+def spearman_with_null(x, y, n_perm=NULL_PERMUTATIONS, seed=0):
+    """`{rho, n, null_low, null_high, null_mean, exceeds_null}` for one pair.
+
+    T-L6.2, and it is mandatory rather than decorative. A near-constant depth vector
+    can still produce a nonzero rho through tie-breaking alone, so a depth correlation
+    published without its null band is uninterpretable. The null destroys ONLY the
+    pairing -- `y` is permuted, so both marginals, including the tie structure that
+    causes the problem, are preserved exactly.
+
+    `exceeds_null` is the verdict: True when the observed rho falls outside the
+    two-sided 95% band. It is None when rho itself is None, never False -- "undefined"
+    and "inside the band" are different findings.
+    """
+    rho = spearman_rho(x, y)
+    n = int(np.asarray(x).size)
+    out = {"rho": rho, "n": n, "n_permutations": int(n_perm),
+           "null_low": None, "null_high": None, "null_mean": None,
+           "exceeds_null": None}
+    if rho is None or n < 2:
+        return out
+    rng = np.random.default_rng(seed)
+    ys = np.asarray(y, dtype=np.float64).ravel()
+    draws = []
+    for _ in range(n_perm):
+        r = spearman_rho(x, rng.permutation(ys))
+        if r is not None:
+            draws.append(r)
+    if not draws:
+        return out
+    lo, hi = np.percentile(draws, NULL_BAND_PERCENTILES)
+    out.update(null_low=float(lo), null_high=float(hi),
+               null_mean=float(np.mean(draws)),
+               exceeds_null=bool(rho < lo or rho > hi))
+    return out
+
+def language_depth_metrics(exit_depth, token_ids, per_token_loss,
+                           token_family, log_freq, unigram_surprisal,
+                           max_depth, num_families, family_labels,
+                           seed=0, n_perm=NULL_PERMUTATIONS) -> dict:
+    """The five §5.2 depth metrics, each with its permutation null band.
+
+    Args are all over the SAME flat token set, and that is a requirement rather than a
+    convenience: T-L6.1 asks for the correlations "computed over the identical token
+    set", so a caller that masked one of them differently would be comparing
+    populations. The lengths are checked.
+
+        exit_depth        [N] the depth each token actually exited at
+        token_ids         [N] vocabulary id per token
+        per_token_loss    [N] that token's own cross-entropy, or None
+        token_family      [V] int8 lookup, -1 = ignore
+        log_freq          [V] log(1 + train count) per type, fixed at build time
+        unigram_surprisal [V] -log p_unigram per type, frozen at build time
+
+    `logfreq` and `surprisal` are TYPE-level properties, so their correlations are
+    computed over token OCCURRENCES via a gather -- which weights each type by how
+    often the model actually met it. The alternative, one point per type, would give a
+    hapax the same weight as `the` and would answer a different question.
+    """
+    ed = np.asarray(exit_depth, dtype=np.float64).ravel()
+    ids = np.asarray(token_ids).ravel().astype(np.int64)
+    if ed.size != ids.size:
+        raise ValueError(
+            f"exit_depth ({ed.size}) and token_ids ({ids.size}) must describe the "
+            "same tokens; T-L6.1 requires every correlation over one token set."
+        )
+    out: dict = {"n_tokens": int(ed.size), "max_depth": int(max_depth)}
+
+    # Descriptive, no target. The histogram is over 1..max_depth so a collapsed
+    # allocation is visible as a spike rather than inferred from a low variance.
+    hist = np.bincount(ed.astype(np.int64), minlength=max_depth + 1)[1:]
+    out["hist"] = {str(d + 1): int(hist[d]) for d in range(max_depth)}
+    out["mean"] = float(ed.mean()) if ed.size else None
+    out["std"] = float(ed.std()) if ed.size else None
+    # The number that says whether any correlation CAN be meaningful. A model with
+    # one distinct exit depth has no depth variance to correlate with anything, and
+    # `spearman_rho` returns None there rather than a number.
+    out["distinct_exit_depths"] = int(np.unique(ed).size)
+
+    lf = np.asarray(log_freq, dtype=np.float64)
+    us = np.asarray(unigram_surprisal, dtype=np.float64)
+    out["spearman_vs_logfreq"] = spearman_with_null(
+        ed, lf[ids], n_perm=n_perm, seed=seed)
+    out["spearman_vs_unigram_surprisal"] = spearman_with_null(
+        ed, us[ids], n_perm=n_perm, seed=seed + 1)
+
+    if per_token_loss is not None:
+        pl = np.asarray(per_token_loss, dtype=np.float64).ravel()
+        if pl.size != ed.size:
+            raise ValueError(
+                f"per_token_loss ({pl.size}) does not match exit_depth ({ed.size})."
+            )
+        out["spearman_vs_model_loss"] = spearman_with_null(
+            ed, pl, n_perm=n_perm, seed=seed + 2)
+    else:
+        out["spearman_vs_model_loss"] = None
+
+    fam = np.asarray(token_family).ravel()[ids]
+    by_family = {}
+    for f in range(num_families):
+        sel = fam == f
+        by_family[family_labels[f]] = (float(ed[sel].mean()) if sel.any() else None)
+    out["mean_by_family"] = by_family
+    # Unmapped tokens get their own entry rather than being folded into a family:
+    # -1 is the ignore label, and averaging it into L1 would move a published number.
+    _unm = fam < 0
+    out["mean_unmapped"] = float(ed[_unm].mean()) if _unm.any() else None
+    return out
+
+
+def language_depth_to_wandb(dm: dict, prefix: str = "depth") -> dict:
+    """Flatten `language_depth_metrics` into log keys, `None` OMITTED not zeroed.
+
+    An undefined correlation is absent. A 0.0 in `depth/spearman_vs_model_loss` would
+    read as "measured: the model allocates compute unrelated to difficulty", which is
+    a finding, not a missing value -- and it is the specific finding the arithmetic POC
+    actually made, so the two must stay distinguishable.
+    """
+    log: dict = {}
+    for k in ("n_tokens", "mean", "std", "distinct_exit_depths"):
+        if dm.get(k) is not None:
+            log[f"{prefix}/{k}"] = dm[k]
+    for d, n in dm.get("hist", {}).items():
+        log[f"{prefix}/hist/step_{d}"] = n
+    for lbl, v in (dm.get("mean_by_family") or {}).items():
+        if v is not None:
+            log[f"{prefix}/mean_by_family/{lbl}"] = v
+    for key in ("spearman_vs_logfreq", "spearman_vs_unigram_surprisal",
+                "spearman_vs_model_loss"):
+        rec = dm.get(key)
+        if not rec or rec.get("rho") is None:
+            continue
+        log[f"{prefix}/{key}"] = rec["rho"]
+        for f in ("null_low", "null_high", "null_mean"):
+            if rec.get(f) is not None:
+                log[f"{prefix}/{key}_{f}"] = rec[f]
+        if rec.get("exceeds_null") is not None:
+            log[f"{prefix}/{key}_exceeds_null"] = int(rec["exceeds_null"])
+    return log
+
+
+
 # T11.1 (audit item, ex-"item 11"): `evaluate_paper_metrics` USED TO LIVE HERE and
 # has been deleted. It was a 109-line second implementation of the validation-pass
 # metric accumulation, unreferenced by anything (engine.py imported it and never

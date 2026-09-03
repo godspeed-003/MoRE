@@ -226,3 +226,53 @@ class MoRELanguageDataset(Dataset):
         """
         rec = self.manifest.get("family_counts_tokens", {}).get(self.split)
         return dict(rec["by_family"]) if rec else None
+
+    # -- T-L6.1 frozen corpus difficulty vectors -----------------------------
+
+    def train_counts(self):
+        """`[V]` int64 per-type TRAIN occurrence counts, from the frozen artifact.
+
+        Train, always, whatever `self.split` is: the difficulty vectors these feed are
+        properties of the corpus the model was fitted on, and rebuilding them from the
+        evaluation split would make the null depend on the data being scored.
+        """
+        path = os.path.join(self.dir, "token_train_count.npy")
+        if not os.path.exists(path):
+            raise FileNotFoundError(
+                f"{path} is missing. Build it with "
+                f"python data/lang/build_depth_deciles.py --corpus {self.corpus} -- "
+                f"the depth correlations are non-circular only because these counts "
+                f"are fixed before any model runs (plan_language.md §5.2)."
+            )
+        counts = np.load(path)
+        if counts.shape != (self.vocab_size,):
+            raise ValueError(
+                f"{path} has shape {counts.shape}, expected ({self.vocab_size},)."
+            )
+        return counts
+
+    def log_freq(self):
+        """`[V]` float64 `log(1 + train count)`.
+
+        `1 +` rather than a masked log: unseen types exist (80 of 8192 on the canonical
+        corpus) and `log(0)` would put `-inf` into a rank vector, where it is not an
+        extreme value but a NaN generator. With the shift they rank below every seen
+        type, which is the correct ordering and the whole of what Spearman uses.
+        """
+        return np.log1p(self.train_counts().astype(np.float64))
+
+    def unigram_surprisal(self):
+        """`[V]` float64 `-log p_unigram`, with the manifest's own smoothing.
+
+        The smoothing is read from `unigram_smoothing` rather than chosen here, so this
+        vector and `unigram_ce` in the manifest describe the same distribution. Getting
+        that wrong would give a surprisal ordering inconsistent with the floor the run
+        is quoted against.
+        """
+        c = self.train_counts().astype(np.float64)
+        smoothing = self.manifest.get("unigram_smoothing", "")
+        if not smoothing.startswith("none"):
+            c = c + 1.0
+        p = c / c.sum()
+        return -np.log(p)
+
