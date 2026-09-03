@@ -51,6 +51,12 @@ from .model import CANONICAL_ROUTING_MODE, CANONICAL_ROUTER_NOISE
 # active" using the SAME code that stamps provenance, not a second copy of the
 # rule. config.py imports model.py and families.py only, so there is no cycle.
 from .config import resolve_halting_mode, resolve_variant, CANONICAL_VARIANT
+# T-L1.3: which canonical spec applies is decided by the TASK, so the guard reads
+# the task with the same helper the config layer does. resolve_task returns
+# CANONICAL_TASK for a config with no `task` key, which is what keeps every
+# arithmetic run -- and every archived resolved config -- resolving exactly as
+# before (T-L1.0).
+from .config import resolve_task, CANONICAL_TASK, TASK_ARITHMETIC, TASK_LANGUAGE
 
 
 # --------------------------------------------------------------------------- #
@@ -64,6 +70,35 @@ RUNS_ROOT = os.path.join(_REPO_DIR, "runs")
 CANONICAL_SPEC_PATH = os.path.join(_CODE_DIR, "canonical_spec.json")
 
 CANONICAL_GROUP = "canonical_phase_b"
+
+# --- T-L1.3: one frozen spec and one canonical group PER TASK --------------- #
+#
+# Why the group name has to differ, and not merely the file: 'canonical_phase_b'
+# is the exact string export_results.py admits into the headline arithmetic
+# table. A language run inside it would contribute a row whose primary metric is
+# a per-token cross-entropy in nats sitting in a column of arithmetic MSEs --
+# numerically plausible, scientifically meaningless. So a language run claiming
+# 'canonical_phase_b' is REFUSED outright (see assert_not_silent_proxy) rather
+# than quietly stamped exploratory, which is what would happen to any other
+# unrecognised label.
+#
+# CANONICAL_GROUP and CANONICAL_SPEC_PATH keep their names and values: they are
+# imported elsewhere (test_phase6_seeding.py) and are the arithmetic entries of
+# the two maps below.
+CANONICAL_SPEC_PATH_LANGUAGE = os.path.join(_CODE_DIR, "canonical_spec_language.json")
+CANONICAL_GROUP_LANGUAGE = "canonical_lang_b"
+
+CANONICAL_SPEC_PATH_BY_TASK = {
+    TASK_ARITHMETIC: CANONICAL_SPEC_PATH,
+    TASK_LANGUAGE:   CANONICAL_SPEC_PATH_LANGUAGE,
+}
+CANONICAL_GROUP_BY_TASK = {
+    TASK_ARITHMETIC: CANONICAL_GROUP,
+    TASK_LANGUAGE:   CANONICAL_GROUP_LANGUAGE,
+}
+# Every string that means "this is a headline run" on SOME task. Used only to
+# tell a cross-task claim (refuse) from an exploratory label (allow).
+_ALL_CANONICAL_GROUPS = frozenset(CANONICAL_GROUP_BY_TASK.values())
 
 # Any run that does not explicitly and validly claim CANONICAL_GROUP is
 # stamped with this, so the exporter's filter can never pick it up by accident.
@@ -177,14 +212,37 @@ class ProxyGuardError(RuntimeError):
     """Raised when a run claims canonical status but does not satisfy the spec."""
 
 
-def load_canonical_spec(path: str = CANONICAL_SPEC_PATH) -> dict:
+def load_canonical_spec(path: str | None = None,
+                        task: str | None = None) -> dict:
     """
-    Load canonical_spec.json.
+    Load the canonical spec for a task.
 
     Fields whose value is null are 'not yet frozen'.  A run cannot claim
     canonical status while any required field is unfrozen — that is what stops
-    a canonical matrix from being launched before Phase 8 freezes the config.
+    a canonical matrix from being launched before the config is frozen.
+
+    T-L1.3: WHICH spec is chosen by the TASK, not by the architecture. `task`
+    None means CANONICAL_TASK, so `load_canonical_spec()` with no arguments still
+    reads canonical_spec.json and every existing caller is unaffected. An
+    explicit `path` still wins over the task selection, which is what lets a test
+    point the guard at a fixture without monkeypatching the module.
+
+    The two specs are separate FILES rather than two blocks of one file because
+    canonical_spec.json has three readers besides this one -- export_results.py
+    and the two Phase-6 gates parse it directly -- so restructuring it would put
+    all of them on a language commit for no scientific gain. See that file's
+    _README, and canonical_spec_language.json's.
     """
+    if path is None:
+        t = task or CANONICAL_TASK
+        if t not in CANONICAL_SPEC_PATH_BY_TASK:
+            raise ValueError(
+                f"No canonical spec is registered for task {t!r}. Known tasks: "
+                f"{sorted(CANONICAL_SPEC_PATH_BY_TASK)}. A new task must bring "
+                "its own frozen spec -- falling back to another task's would let "
+                "it inherit numbers that were measured on different data."
+            )
+        path = CANONICAL_SPEC_PATH_BY_TASK[t]
     with open(path, "r", encoding="utf-8") as f:
         return json.load(f)
 
@@ -248,6 +306,20 @@ def _effective(resolved: dict) -> dict:
         # guard: a run could zero it by editing source and still be stamped
         # canonical_phase_b.
         "family_cls_weight": lw.get("family_cls"),
+        # ---- T-L1.3: the language shape fields ------------------------------
+        # Read unconditionally and with .get, so on an arithmetic config they are
+        # simply None. That is safe because the guard iterates over the SPEC's
+        # enforced_fields, not over this dict: canonical_spec.json does not list
+        # them, so nothing compares them, and no arithmetic behaviour changes.
+        # canonical_spec_language.json does list them, and a key it lists that
+        # this function did not produce would be reported as
+        # "requires 8192, run has None" -- a real check failing for a fake
+        # reason, which is the trap this block exists to avoid.
+        "seq_len":      dc.get("seq_len"),
+        "vocab_size":   dc.get("vocab_size"),
+        "n_heads":      mc.get("n_heads"),
+        "attention":    mc.get("attention"),
+        "tie_lm_head":  mc.get("tie_lm_head"),
         # Architecture-scoped (checked against architecture_variants[arch], not
         # against enforced_fields).
         "architecture":       resolved.get("architecture"),
@@ -274,18 +346,48 @@ def assert_not_silent_proxy(resolved: dict, spec: dict | None = None) -> str:
 
     Returns the experiment_group the run is allowed to use.
 
-    - A run that does not set logging.experiment_group == CANONICAL_GROUP is
-      simply stamped non-canonical.  No error: exploratory work stays cheap.
-    - A run that DOES claim CANONICAL_GROUP must satisfy every pinned field in
-      canonical_spec.json, must not be missing a seed, and must not run on a
-      data subset.  Otherwise ProxyGuardError aborts before any compute.
+    - A run that does not set logging.experiment_group to its task's canonical
+      group is simply stamped non-canonical.  No error: exploratory work stays
+      cheap.
+    - A run that DOES claim it must satisfy every pinned field in that task's
+      spec, must not be missing a seed, and must not run on a data subset.
+      Otherwise ProxyGuardError aborts before any compute.
+    - T-L1.3: a run that claims ANOTHER task's canonical group is refused
+      outright.  Stamping it exploratory would be the wrong mercy -- the operator
+      asked for a headline run and would get a silently downgraded one.
     """
+    task = resolve_task(resolved)
     if spec is None:
-        spec = load_canonical_spec()
+        spec = load_canonical_spec(task=task)
+
+    # Read from the spec, not from the module constants, so the two tasks cannot
+    # drift apart in code: adding a task means adding a file, not an if-branch.
+    canonical_group   = spec.get("canonical_group") or CANONICAL_GROUP
+    canonical_variant = spec.get("canonical_variant") or CANONICAL_VARIANT
+    # Which file the operator has to edit to fix a complaint below. Derived from
+    # the task rather than hard-coded, so a language failure does not send the
+    # reader to the arithmetic spec.
+    spec_file = os.path.basename(
+        CANONICAL_SPEC_PATH_BY_TASK.get(task, CANONICAL_SPEC_PATH))
 
     claimed = resolved.get("logging", {}).get("experiment_group")
 
-    if claimed != CANONICAL_GROUP:
+    if claimed != canonical_group and claimed in _ALL_CANONICAL_GROUPS:
+        raise ProxyGuardError(
+            f"Gate 0 (proxy guard) refused this run: WRONG GROUP FOR THE TASK.\n"
+            f"  task                     = {task!r}\n"
+            f"  experiment_group claimed = {claimed!r}\n"
+            f"  the group for this task   = {canonical_group!r}\n\n"
+            f"{claimed!r} is the headline group of a different task, and each "
+            "task's headline table is filtered on that exact string. Admitting "
+            "this run would put its primary metric in a column of a different "
+            "quantity -- a per-token cross-entropy in nats beside an arithmetic "
+            "MSE, or the reverse. Set logging.experiment_group to "
+            f"{canonical_group!r} if this really is a headline run for "
+            f"task={task!r}, or to an exploratory label otherwise."
+        )
+
+    if claimed != canonical_group:
         return claimed or NONCANONICAL_GROUP_DEFAULT
 
     eff = spec.get("enforced_fields", {})
@@ -296,10 +398,10 @@ def assert_not_silent_proxy(resolved: dict, spec: dict | None = None) -> str:
     unfrozen = sorted(k for k, v in eff.items() if v is None)
     if unfrozen:
         problems.append(
-            "canonical_spec.json has unfrozen fields (still null): "
+            "the canonical spec has unfrozen fields (still null): "
             + ", ".join(unfrozen)
-            + ". Phase 8 must freeze the canonical configuration before any "
-              "run may claim experiment_group='" + CANONICAL_GROUP + "'."
+            + ". The canonical configuration must be frozen before any "
+              "run may claim experiment_group='" + canonical_group + "'."
         )
 
     # 2. Every frozen field must match exactly.
@@ -336,7 +438,7 @@ def assert_not_silent_proxy(resolved: dict, spec: dict | None = None) -> str:
         if not isinstance(arch_spec, dict):
             problems.append(
                 f"architecture={arch!r} has no block in "
-                "canonical_spec.json:architecture_variants, so there is nothing "
+                f"{spec_file}:architecture_variants, so there is nothing "
                 "to enforce it against. Add the block or drop the canonical claim."
             )
         else:
@@ -347,7 +449,7 @@ def assert_not_silent_proxy(resolved: dict, spec: dict | None = None) -> str:
                     problems.append(
                         f"architecture_variants.{arch}.{key} is null (NOT YET "
                         f"FROZEN), so no {arch} run may claim canonical status. "
-                        "Freeze it in canonical_spec.json first -- see that "
+                        f"Freeze it in {spec_file} first -- see that "
                         "file's architecture_variants._note for why it is open."
                     )
                     continue
@@ -373,10 +475,11 @@ def assert_not_silent_proxy(resolved: dict, spec: dict | None = None) -> str:
     # oracle-routing tag could never fire and an oracle-supervised run reported
     # variant="canonical". Fixed in T8.2; see config.py:resolve_variant.
     got_variant = resolve_variant(resolved)
-    if got_variant != CANONICAL_VARIANT:
+    if got_variant != canonical_variant:
         problems.append(
-            f"variant={got_variant!r} -- this run has at least one ablation "
-            f"active, so it may not claim experiment_group='{CANONICAL_GROUP}'. "
+            f"variant={got_variant!r} -- canonical for task={task!r} is "
+            f"{canonical_variant!r}, so this run has at least one ablation "
+            f"active and may not claim experiment_group='{canonical_group}'. "
             "plan.md E and CLAUDE.md 6 forbid mixing an ablation into the "
             "headline table; label it as the ablation it is."
         )
@@ -393,7 +496,7 @@ def assert_not_silent_proxy(resolved: dict, spec: dict | None = None) -> str:
     if got["seed"] is None:
         problems.append(
             "seed is not set. Canonical runs must pass --seed from the frozen "
-            "seed set (see canonical_spec.json:seed_set)."
+            f"seed set (see {spec_file}:seed_set)."
         )
     elif got["seed"] not in spec.get("seed_set", []):
         problems.append(
@@ -432,14 +535,15 @@ def assert_not_silent_proxy(resolved: dict, spec: dict | None = None) -> str:
     if problems:
         raise ProxyGuardError(
             "Gate 0 (proxy guard) refused this run.\n"
-            "A run claiming experiment_group='" + CANONICAL_GROUP + "' must be "
-            "fully canonical. Problems:\n  - "
+            f"A run with task={task!r} claiming experiment_group='"
+            + canonical_group + "' must be fully canonical, as defined by "
+            + spec_file + ". Problems:\n  - "
             + "\n  - ".join(problems)
             + "\n\nEither fix the config, or drop the canonical claim by setting "
               "logging.experiment_group to an exploratory label."
         )
 
-    return CANONICAL_GROUP
+    return canonical_group
 
 
 # --------------------------------------------------------------------------- #

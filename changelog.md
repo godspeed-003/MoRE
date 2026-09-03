@@ -4005,6 +4005,221 @@ matplotlib 3.10.0, wandb 0.25.0, datasets 4.6.1, transformers 4.51.3,
 tokenizers 0.21.0, huggingface_hub 0.30.2, pyarrow 23.0.1, nltk 3.9.1;
 spacy/stanza/flair absent in both.
 
+## T-L1.0 / T-L1.1 — the `task` axis, and why its default is the *absence* of a key
+
+**What changed.** `code/more/config.py` gained a `task` axis orthogonal to
+`architecture`: `TASK_ARITHMETIC`/`TASK_LANGUAGE` constants, a `TASKS` tuple
+beside `ARCHITECTURES`, `resolve_task(cfg)`, `apply_task(cfg, task)` and the
+`_apply_language_block` helper that stamps the language shape fields
+(`seq_len`, `vocab_size`, `n_heads`, `attention`, `tie_lm_head`) and the language
+loss weights. `resolve_variant` and `canonical_run_name` became task-aware.
+
+**The ledger box's literal wording is not implementable, and this is the one
+design decision of the phase worth remembering.** T-L1.0 said "add `task` to
+`load_config_defaults` with default `arithmetic`". Doing that —
+`cfg.setdefault("task", TASK_ARITHMETIC)` — fails the box's *own* Verify
+criterion, and the mechanism is `run_context.py:82`: `config_hash` is a SHA-256
+over the resolved config with only `provenance` and `logging` removed. A new
+top-level key with a value, even a value that changes no behaviour, changes the
+hash of **every arithmetic config**. That would rename every future arithmetic run
+directory, break the `config_hash` equality the proxy guard and
+`export_results.py` both rely on, and make the 15 admitted rows of the Phase 11
+headline table unreproducible by any later run — for a key whose only content is
+"this is the thing it has always been".
+
+So **the arithmetic default is the absence of the key.** `resolve_task` reads
+`cfg.get("task", CANONICAL_TASK)`; nothing writes `task` unless
+`apply_task(cfg, "language")` is called. Arithmetic resolved configs and hashes
+are byte-identical to pre-axis, which T-L1.4 then demonstrated on a real run
+(`fa9339bc…`, 2014 bytes, all 64 hex digits). The cost is that `task` is not
+self-documenting in an arithmetic `resolved_config.json`; the compensation is that
+`resolve_task` is the single reader and there is no second code path.
+
+**Two defects found and fixed while wiring this up.**
+
+1. **`resolve_variant` compared `family_cls` against the arithmetic default on
+   language runs.** Language sets `family_cls_weight = 0.0` by design — on
+   language the family classifier is a **detached probe** (`h.detach()`), so a
+   non-zero weight would train a head on gradients that never reach the trunk,
+   i.e. it would be either a no-op or a lie depending on which you believed. But
+   `resolve_variant`'s ablation detection read `0.0 != 0.5` and returned
+   `no_family_cls`, so *every* language run would have been labelled an ablation
+   of a term it does not have. Fixed by making the expected default per-task. The
+   general shape of this trap: **a variant detector that hard-codes one task's
+   defaults reports the other task's canonical settings as deviations.**
+
+2. **The declared-vs-defaulted ambiguity.** Once the language default is `0.0`,
+   `--family_cls 0.0` on a language run and no flag at all produce the same
+   config — but only one of them is a user asserting something. `cli.py` takes a
+   `_user_family_cls` snapshot **before** defaults are applied, so an explicit
+   `--family_cls` on language is *refused* (naming `plan_language.md` §7.3 and the
+   detached probe) rather than silently agreed with. Refuse-don't-ignore, same as
+   every other override.
+
+**Ordering matters and is fragile.** `apply_task` must run *after*
+`apply_architecture` and *before* the override blocks. After, because the run name
+template is task-dependent (`phaseB_{Arch}` vs `langB_{Arch}`) and
+`apply_architecture` sets the architecture the template interpolates. Before,
+because an override that lands ahead of `apply_task` gets overwritten by the
+task's `setdefault`s instead of being honoured or refused.
+
+**Where to look.** [code/more/config.py](code/more/config.py) — `resolve_task`
+(`:84`), `TASKS` (`:57`), `resolve_variant` (`:460`), `_apply_language_block`
+(`:744`), `apply_task` (`:848`); [code/more/cli.py](code/more/cli.py) `main`
+(`:155`) for the ordering and the `_user_family_cls` snapshot;
+`code/test_language_task_axis.py` TL1.0*/TL1.1*/TL1.2* for the checks.
+
+**Verified by.** `code/test_language_task_axis.py` → **72 passed, 0 failed**.
+TL1.2a–q drive `cli.main()` end to end with only `RunContext.create` and `train`
+stubbed: no `--task` and `--task arithmetic` are byte-identical through the CLI
+(2077 bytes, no `task` key, no shape field); `--task language` resolves to
+`langB_MoRE` with `seq_len 256`; `--task language --family_cls 0.5` exits 1 with a
+`ValueError` naming §7.3 and never reaches `train()`; the shape flags are refused
+on arithmetic rather than ignored; `--vocab_size` is bounded at the uint16 ceiling
+(65536 accepted, 70000 refused — the tokenized arrays are `uint16` and id 65536
+would wrap to id 0, a *valid* id for a different token, corrupting the corpus with
+no error anywhere).
+
+---
+
+## T-L1.3 — one canonical spec per task, and a refusal that used to give the wrong reason
+
+**What changed.** `code/canonical_spec_language.json` is new;
+`run_context.load_canonical_spec(path=None, task=None)` selects by task
+(`CANONICAL_SPEC_PATH_BY_TASK`), each task has its own canonical group
+(`canonical_phase_b` / `canonical_lang_b`), and the proxy guard refuses a
+cross-task canonical claim as its own first-class check.
+`code/canonical_spec.json` is **untouched**, as are its three other direct readers
+(`export_results.py`, `test_phase6_provenance.py`, `test_phase6_seeding.py`) —
+which is why this is a second *file* rather than a `task` sub-object inside the
+existing one.
+
+**The cross-task refusal already worked, and that was the problem.** Because
+T-L1.1 makes `resolve_variant` return `"language"` and never `"canonical"`, check
+2c already refused a language run claiming `canonical_phase_b` — with the message
+*"variant='language' … this run has at least one ablation active"*. That is false,
+and it would send the next reader hunting for an ablation that does not exist.
+The check is now explicit, named ("WRONG GROUP FOR THE TASK"), symmetric in both
+directions, and placed **before** the field loop so it cannot be buried under a
+list of null-field complaints
+([code/more/run_context.py:370](code/more/run_context.py:370)). **A guard that
+refuses for the wrong reason is a guard that will be worked around.**
+
+**Why separate group strings.** `canonical_phase_b` is the exact string
+`export_results.py` filters the headline arithmetic table on. A language row
+admitted there would put a per-token cross-entropy in nats into a column of
+arithmetic MSEs — a units error that no downstream check would catch because both
+are floats near 0.1. Two group names make the filter do the separating.
+
+**`_effective()` had to grow five keys** (`seq_len`, `vocab_size` from `data`;
+`n_heads`, `attention`, `tie_lm_head` from `model`). The guard iterates the
+**spec's** `enforced_fields`, so a field the spec pins but `_effective` cannot
+produce reports as *"requires 8192, run has None"*: a real check failing for a
+fake reason, and one that would be debugged as a config bug. All five are read
+with `.get`, so on arithmetic they are `None` and nothing compares them —
+`canonical_spec.json` does not list them. TL1.3h asserts the closure directly
+(`unreadable == []`) rather than trusting the list to stay in sync.
+
+**The language spec leaves eleven fields null, not the eight T-L1.3 named.** The
+three extra, with the reasoning in the file's `_NULLS_NOTE`: `dropout` (0.1 was
+*inherited* on 70 k arithmetic records; ~103 M tokens against ~3.2 M parameters
+underfits, so the inherited value points the wrong way), and
+`routing_balance_weight` + `halting_weight`. Those last two are the substantive
+ones: T4.2 chose `0.001` because it put the weighted balance term at `0.017×` the
+task loss, and a per-token cross-entropy near `ln(8192) = 9.0` nats at init is two
+orders of magnitude larger than arithmetic's `~0.06` MSE. The same coefficient
+would put the balance term at `~1e-4 ×` the task loss — **effectively off, in the
+arm whose central failure mode is router collapse** — and an equally invisible
+ponder cost would silently turn adaptive depth into always-max depth. A loss
+coefficient calibrated against one task's loss scale does not transfer to
+another's. A null makes the guard strictly stricter, never looser, so leaving them
+null costs nothing but a later measurement.
+
+`attention: true` sits in `enforced_fields`, shared by all three arms, and
+deliberately **not** in `architecture_variants`. That placement *is* the claim
+that MoR keeps attention: one expert is not the same as no context, and a MoR arm
+without attention would be a bag-of-tokens model losing to two sequence models.
+
+**Where to look.** [code/canonical_spec_language.json](code/canonical_spec_language.json)
+`_README` (why a second file, the four-condition contract, why `canonical_variant`
+is `"language"`) and `_NULLS_NOTE` (the eleven nulls);
+[code/more/run_context.py](code/more/run_context.py) — the per-task constants
+after `CANONICAL_GROUP`, `load_canonical_spec`, `_effective`,
+`assert_not_silent_proxy`'s opening block; `code/verify_pipeline.py` for the
+sandbox dep tuple (the language spec is copied in so a future language run in the
+sandbox fails for a real reason rather than a `FileNotFoundError`).
+
+**Verified by.** TL1.3a–p inside the 72-check language suite. `load_canonical_spec()`
+with no arguments still reads the arithmetic spec, whose identity fields are
+unchanged and which gained no key (TL1.3a/b); an unregistered task **raises**
+rather than falling back to another task's numbers (TL1.3f); the cross-task claim
+is refused in both directions naming the task and the right group (TL1.3i–k); a
+language run claiming its own group is refused for **unfrozen fields**, not for
+its group, and the message names `canonical_spec_language.json` (TL1.3l–n);
+`test_phase5_dimensions.py:G4.37`'s router-noise case is re-checked from the
+language suite because that gate's message assertions are what the rewrite could
+most easily have broken (TL1.3p).
+
+---
+
+## T-L1.4 — GATE L0 after the task axis: 356, identical params, and a bit-identical run
+
+**Why the gate runs here.** The task axis is the change most likely to silently
+alter arithmetic behaviour, and it lands before any language code exists — so a
+regression caught here has exactly one possible cause.
+
+**All three criteria, executed.**
+
+1. `C:\Users\vedan\anaconda3\python.exe code/run_correctness_suite.py` →
+   gate 1 19, gate 2 31, gate 3 27, gate 4 129, gate 5 150,
+   `TOTAL 356 356 0 0`, `CORRECTNESS SUITE: ALL GATES PASS`, ~146 s.
+
+2. **Parameter counts unchanged for all three arms.** Measured by extracting the
+   T-L0.3 tree with `git archive 112809a code` into a scratch directory and
+   building all three arms from a resolved config in *both* trees, same
+   interpreter, model constructed exactly as `engine.py:202-229` does. Compared as
+   JSON including a **per-tensor `numel` map**, because a compensating pair of
+   shape changes would leave the total intact: `diff` **empty**.
+   moe `3,201,555` / 54 tensors, mor `3,197,710` / 24, more `3,201,555` / 54;
+   the MoR/MoRE gap is 3,845 params = 0.12%, the T4.x parameter-matching result.
+   **`engine.py:220`'s comment citing `6,358,553` is the pre-T8.2 two-block
+   figure and is not the baseline** — the baseline is what the T-L0.3 tree
+   produces, which is what was measured.
+
+3. **The 1-epoch arithmetic run is bit-identical, not merely close.**
+   `--architecture mor --epochs 1 --seed 44` against the pre-change reference
+   `runs/t_l03_mor_timing_seed44__fa9339bc` (built at `08e90427`):
+   `config_hash` identical to all 64 hex digits
+   (`fa9339bc279495e8b5bb8c604833526d90adf3a6a0808319d0cf927ffed90f73`, which is
+   why the re-run auto-named itself `…__r3`), resolved config byte-identical at
+   **2014 bytes** with `task` absent from both, and **all 93 comparable
+   `metrics.json` keys equal** — `train/task_loss = 0.09949329204093187`,
+   `val/task_loss = best_val_loss = 0.07614141606433052`,
+   `train/total_loss = 0.12512240410806277`,
+   `nondeterministic_ops_observed = ['none']` in both. Excluded:
+   `experiment_id` (carries the `__r3` suffix by construction),
+   `perf/throughput_tokens_sec` (1940 → 1599 tok/s — machine load, not a property
+   of the model), `_non_scalar_keys_omitted`.
+
+**One operational finding that will bite Phase L-7.** The first attempt died in
+`wandb.init` with `UsageError: No API key configured`, **after**
+`RunContext.create` had already made the run directory — leaving
+`runs/t_l03_mor_timing_seed44__fa9339bc__r2` with a `config.json`,
+`resolved_config.json` and a `stdout.log` holding the traceback, but no
+`metrics.json`. It is **kept, not deleted** (CLAUDE.md §6: archive, never delete;
+a directory with no `metrics.json` cannot be mistaken for a result), and its
+`resolved_config.json` is in fact the artifact that proves the hash claim above.
+The `stdout.log` is on-disk only — the standing `runs/**/stdout.log` rule excludes
+it — which is why the error line is quoted here rather than cited.
+Re-run with `WANDB_MODE=offline` and `WANDB_DIR` outside the repo, so no `wandb/`
+directory landed in the tree. **A canonical language run will hit the same wall**
+and leave the same directory-shaped debris; W&B credentials need settling before
+the matrix, not during it.
+
+**Where to look.** `TASKS_LANGUAGE.md` T-L1.4 Evidence for the tables;
+`runs/t_l03_mor_timing_seed44__fa9339bc__r3/metrics.json` versus
+`runs/t_l03_mor_timing_seed44__fa9339bc/metrics.json` for the comparison itself.
+
 <!-- APPEND-MARKER-CL -->
 
 

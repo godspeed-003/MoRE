@@ -378,7 +378,11 @@ def check_dummy_pass():
         return
     shutil.copytree(pkg_src, os.path.join(tmpdir, "more"),
                     ignore=shutil.ignore_patterns("__pycache__"))
-    for dep in ("canonical_spec.json",):
+    # T-L1.3: both specs, because run_context selects between them on the run's
+    # task. This sandbox only ever runs arithmetic, so the language spec is never
+    # read here -- it is copied so that if that ever changes the failure is a real
+    # one and not a FileNotFoundError that looks like a code bug.
+    for dep in ("canonical_spec.json", "canonical_spec_language.json"):
         dep_src = os.path.join(CODE_DIR, dep)
         if not os.path.exists(dep_src):
             results.record(f"{dep} found", False, f"'{dep_src}' missing")

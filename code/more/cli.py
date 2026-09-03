@@ -14,8 +14,10 @@ from __future__ import annotations
 import argparse
 import sys
 
-from .config import (load_config, apply_architecture, enforce_routing_mode,
-                     stamp_seed_into_run_name, ARCHITECTURES)
+from .config import (load_config, apply_architecture, apply_task,
+                     enforce_routing_mode, stamp_seed_into_run_name,
+                     resolve_task, ARCHITECTURES, TASKS, TASK_ARITHMETIC,
+                     TASK_LANGUAGE)
 from .engine import train
 from .run_context import RunContext, resolve_overrides, ProxyGuardError
 
@@ -111,6 +113,42 @@ def build_parser(default_architecture: str | None = None) -> argparse.ArgumentPa
              "(default: 'exploratory') marks the run non-canonical so the "
              "exporter excludes it.",
     )
+    # ---- T-L1.2: the task axis (plan_language.md §1) ----------------------
+    p.add_argument(
+        "--task", choices=TASKS, default=None,
+        help="arithmetic (default) = the micro-POC of operation families; "
+             "language = causal LM on the tokenized English corpus. ORTHOGONAL "
+             "to --architecture: the task selects the dataset, the input "
+             "adapter, the output head, the task loss and the oracle-label "
+             "source, while --architecture continues to select only "
+             "num_experts / max_depth / adaptive_halting / ffn_mult. Omitting "
+             "the flag leaves NO `task` key in the resolved config, so every "
+             "arithmetic config_hash and every archived run stays exactly as it "
+             "was (T-L1.0); a language run is named langB_<Arch>_seed<S> and "
+             "carries `language` in its variant, so it can never be read as one "
+             "of the fifteen canonical arithmetic runs.",
+    )
+    p.add_argument(
+        "--seq_len", type=int, default=None,
+        help="Override data.seq_len -- the packed sequence length, language "
+             "only. Sequences are packed to exactly this length and the "
+             "trailing partial block is dropped, so step_mask is all-True and "
+             "the ACT depth accounting needs no padding case "
+             "(plan_language.md §3). This is a PROTOCOL field frozen by Gate L5 "
+             "from measured throughput and VRAM headroom on the actual GPU (6 GB "
+             "here), not a free parameter: an explicit value is for calibration "
+             "runs and is labelled as a deviation once the spec is frozen.",
+    )
+    p.add_argument(
+        "--vocab_size", type=int, default=None,
+        help="Override data.vocab_size -- language only. Canonical is 8192, a "
+             "byte-level BPE fitted on the TRAINING SPLIT ONLY (T-L2.1). Not a "
+             "pretrained tokenizer: GPT-2's 50257 would put a 12.9 M-parameter "
+             "embedding table in front of a 3.2 M-parameter expert stack and the "
+             "study would be measuring the embedding, not the architecture. "
+             "Changing this invalidates the tokenized dataset, so it must match "
+             "the dataset manifest -- Gate L2 checks that it does.",
+    )
     return p
 
 
@@ -125,6 +163,24 @@ def main(argv=None, default_architecture: str | None = None) -> int:
         # config -- the single source of truth that trains, is hashed, and is
         # logged -- already carries num_experts / max_depth / halting.
         apply_architecture(raw_cfg, args.architecture)
+
+        # T-L1.2 (plan_language.md §1). The task is stamped IMMEDIATELY after the
+        # architecture and BEFORE every override block below, and that placement is
+        # the whole point of the box:
+        #
+        #   * before the overrides, so `--task language --family_cls 0.5` reaches
+        #     the same refuse-don't-ignore path as --routing_balance on MoR rather
+        #     than being quietly overwritten by whichever ran last;
+        #   * after apply_architecture, so the architecture's hard constraints are
+        #     already in place and the task can repair the run name that
+        #     apply_architecture stamped (phaseB_* -> langB_*).
+        #
+        # Omitting --task calls nothing: `task` stays absent from the config, so an
+        # arithmetic run's resolved config and config_hash are byte-identical to
+        # what they were before this axis existed (T-L1.0).
+        if args.task is not None:
+            apply_task(raw_cfg, args.task)
+        task = resolve_task(raw_cfg)
 
         # T3.3 halting-supervision override. Applied AFTER apply_architecture so
         # the architecture's own decision still wins where it is a hard
@@ -213,6 +269,28 @@ def main(argv=None, default_architecture: str | None = None) -> int:
                     "MAXIMISE the family cross-entropy, i.e. train the pooled "
                     "representation to be family-INdistinguishable."
                 )
+            # T-L1.2 (plan_language.md §7.3). apply_task already forced this to 0.0
+            # for language, so without this refusal the flag would silently win and
+            # a language run would record a supervision weight on a head whose
+            # gradient cannot reach the trunk -- a provenance record of a term that
+            # does not exist. Refused here rather than in apply_task because THIS is
+            # where the value is unambiguously a declaration by the operator.
+            if task == TASK_LANGUAGE and args.family_cls != 0.0:
+                raise ValueError(
+                    f"--family_cls {args.family_cls} with --task {TASK_LANGUAGE}. "
+                    "On language the family head is a DETACHED probe "
+                    "(plan_language.md §7.3): it reads h.detach(), so its gradient "
+                    "reaches only its own Linear and its weight cannot change what "
+                    "the trunk learns. The point is that `probe/family_ce` and every "
+                    "routing/AMI number then measure EMERGENT structure, with no "
+                    "family signal anywhere in the trunk's objective -- which is "
+                    "strictly stronger than the arithmetic study, where a 6-way "
+                    "family cross-entropy was the second-largest term and the "
+                    "specialization claim has to be caveated for it. A non-zero "
+                    "weight here would claim a supervision term that does not "
+                    "exist, and a packed LM sequence has no whole-sequence family "
+                    "label for one to use. Drop the flag, or pass 0.0."
+                )
             raw_cfg["loss_weights"]["family_cls"] = args.family_cls
 
         # T8.3 / T9.2 parameter-budget override. apply_architecture has just
@@ -227,6 +305,44 @@ def main(argv=None, default_architecture: str | None = None) -> int:
                     "hidden width is ffn_mult * d_model."
                 )
             raw_cfg["model"]["ffn_mult"] = args.ffn_mult
+
+        # T-L1.2 language shape overrides. Same placement, same discipline. Both
+        # REFUSE on arithmetic rather than being ignored: the arithmetic task has no
+        # packed sequence length and no token vocabulary at all -- its input is a
+        # [max_steps, step_feat_dim] numeric feature block -- so accepting the flag
+        # would write a field into the resolved config, and therefore into the
+        # config_hash and the provenance record, that describes nothing the run did.
+        for _flag, _val, _section, _key in (
+            ("--seq_len",    args.seq_len,    "data", "seq_len"),
+            ("--vocab_size", args.vocab_size, "data", "vocab_size"),
+        ):
+            if _val is None:
+                continue
+            if task != TASK_LANGUAGE:
+                raise ValueError(
+                    f"{_flag} requires --task {TASK_LANGUAGE}, but this run is "
+                    f"task={task!r}. The arithmetic task has no packed sequence "
+                    "length and no token vocabulary -- its input is a numeric "
+                    "[max_steps, step_feat_dim] feature block -- so this value "
+                    "would enter the resolved config, the config_hash and the "
+                    "provenance record while describing nothing the run did."
+                )
+            if _val < 1:
+                raise ValueError(f"{_flag} must be >= 1, got {_val}.")
+            raw_cfg[_section][_key] = _val
+
+        if args.vocab_size is not None:
+            # The tokenized .npy arrays are uint16 (plan_language.md §3), so ids
+            # must fit in 16 bits. Caught here rather than as a silent wraparound
+            # at dataset-build time, where id 65536 becomes id 0 -- a valid-looking
+            # token that is simply the wrong word.
+            if args.vocab_size > 65536:
+                raise ValueError(
+                    f"--vocab_size {args.vocab_size} exceeds 65536. Token ids are "
+                    "stored as uint16, so a larger vocabulary wraps around "
+                    "silently: id 65536 becomes id 0, which is a valid id for a "
+                    "different token and would corrupt the corpus with no error."
+                )
 
         resolved = resolve_overrides(
             raw_cfg,

@@ -25,6 +25,106 @@ from .families import NUM_EXPERTS_CANONICAL
 CANONICAL_NUM_EXPERTS = NUM_EXPERTS_CANONICAL
 
 
+# ---------------------------------------------------------------------------
+# The TASK axis  (T-L1.0 / plan_language.md §1)
+# ---------------------------------------------------------------------------
+# `task` is ORTHOGONAL to `architecture` and the two must never be merged into a
+# single enum. They answer different questions:
+#
+#   architecture -> num_experts / max_depth / adaptive_halting / ffn_mult
+#                   i.e. WHICH computation module and HOW MUCH depth
+#   task         -> input adapter, output head, task loss, oracle-label source,
+#                   metric vocabulary, dataset
+#
+# All nine (task, architecture) pairs are meaningful, which is the whole point:
+# the arithmetic study's MoE/MoR/MoRE comparison is re-run on language with the
+# same engine, so a difference between the two studies is a property of the data
+# and not of a second implementation (CLAUDE.md §9: ONE training system).
+#
+# Defined at the top of the module, above the defaults that use them, for the
+# same reason as CANONICAL_NUM_EXPERTS above.
+#
+# NAME COLLISION, and it is unavoidable: `cfg["task"]` is this axis, while
+# `cfg["loss_weights"]["task"]` is the WEIGHT on the task-loss term and predates
+# the migration. They are different quantities at different depths -- one selects
+# the objective, the other scales one term of it. Neither is renamed: renaming the
+# loss weight would move every arithmetic config_hash, which is the exact harm this
+# axis is built to avoid. `test_language_task_axis.py:TL1.0a` asserts that
+# `loss_weights.task` is the ONLY `task` key in a resolved arithmetic config, so
+# the collision cannot quietly become a leak.
+TASK_ARITHMETIC = "arithmetic"
+TASK_LANGUAGE   = "language"
+TASKS = (TASK_ARITHMETIC, TASK_LANGUAGE)
+
+# The task whose absence is assumed. See resolve_task() for why absence -- rather
+# than an injected default key -- is what "default arithmetic" means here.
+CANONICAL_TASK = TASK_ARITHMETIC
+
+# Language shape fields, stamped by apply_task.
+#
+# `attention` is DEFINITIONAL and is assigned, not defaulted: language is not
+# learnable without context (plan_language.md §1.3), and `MoREWrapper(attention=
+# False)` constructs no attention module at all, so a language run with it off is
+# not a weaker language model -- it is a model that cannot see any other token.
+#
+# The three NUMBERS are `setdefault`, not assignment, and the difference matters.
+# `seq_len` is one of the protocol fields that canonical_spec_language.json holds
+# at `null` until GATE L5 freezes it FROM MEASUREMENT (plan_language.md §10.2) --
+# 6 GB of VRAM is the binding constraint on this phase (ENVIRONMENT.md §2), so the
+# real value comes out of T-L7.0's throughput probe. If apply_task assigned it,
+# editing config_language.json or the frozen spec would have no effect and the
+# gate's own value would be silently overwritten by a literal in this file. The
+# value below exists only so that `--task language` alone builds a RUNNABLE model
+# instead of raising KeyError; it is provisional and is not the protocol.
+LANGUAGE_SEQ_LEN_DEFAULT    = 256     # provisional -- GATE L5 owns the real value
+LANGUAGE_VOCAB_SIZE_DEFAULT = 8192    # T-L2.1: byte-level BPE fitted on train only
+LANGUAGE_N_HEADS_DEFAULT    = 4       # plan_language.md §6.6, frozen at d_model 256
+
+
+def resolve_task(cfg: dict) -> str:
+    """
+    The task this config declares: "arithmetic" (the default) or "language".
+
+    ABSENCE MEANS ARITHMETIC, and that is a deliberate design choice rather than
+    laziness about writing a setdefault. `run_context.config_hash()` is SHA-256
+    over the config with only `provenance` and `logging` removed, so injecting a
+    top-level `task` key into every config would move the hash of every arithmetic
+    config -- including the fifteen canonical Phase-B runs. Their stored
+    resolved_config.json would keep the old hash while a re-resolution of the same
+    file produced a new one, so `export_results.py` (which refuses to mix config
+    hashes) would read a re-run as a different experiment, and run_context's
+    property that "a re-run of the same config is recognisably the same run" would
+    quietly stop holding.
+
+    So the key is present only when someone actually declared it. An arithmetic
+    config resolves byte-identically to what it resolved to before this axis
+    existed (T-L1.0's Verify criterion, checked by test_gateL0_task_axis.py), and a
+    language config carries `"task": "language"` and hashes differently -- which is
+    correct, because it IS a different experiment.
+
+    Every run still REPORTS its task: engine.py publishes `provenance.task`, and
+    `provenance` is outside the hash. Same shape as `variant` and `halting_mode` --
+    derived, published, never hashed.
+
+    Raises ValueError on an unrecognised value rather than falling back to
+    arithmetic: silently running the arithmetic pipeline because someone typed
+    `--task lang` would produce a complete, plausible, wrong run (CLAUDE.md §2:
+    an unmapped value must raise, never fall back).
+    """
+    task = cfg.get("task")
+    if task is None:
+        return CANONICAL_TASK
+    task = str(task).lower()
+    if task not in TASKS:
+        raise ValueError(
+            f"task must be one of {TASKS}, got {cfg.get('task')!r}. Absence means "
+            f"{CANONICAL_TASK!r}; an unrecognised value is refused rather than "
+            "defaulted, because defaulting would run the arithmetic pipeline on a "
+            "config that asked for something else and report it as arithmetic."
+        )
+    return task
+
+
 def load_config_defaults(cfg: dict | None = None) -> dict:
     """
     Fill in every default key, in place, and return cfg.
@@ -35,6 +135,29 @@ def load_config_defaults(cfg: dict | None = None) -> dict:
     the training run actually uses, and the two could drift apart silently.
     """
     cfg = {} if cfg is None else cfg
+
+    # T-L1.0 (plan_language.md §1). NOTE WHAT IS *NOT* HERE: there is no
+    # `cfg.setdefault("task", TASK_ARITHMETIC)`. That was the obvious
+    # implementation and it is wrong -- it would move the config_hash of every
+    # arithmetic run, including the fifteen canonical Phase-B ones. The default is
+    # the ABSENCE of the key; `resolve_task()` carries the full reasoning, and the
+    # language default block is applied at the end of this function.
+    #
+    # T-L1.0 / T5.3 again: "the user declared this" must stay distinguishable from
+    # "we filled it in". `loss_weights.family_cls` gets the arithmetic default 0.5
+    # below, so by the time the language block runs, a language config that
+    # explicitly asked for 0.5 is indistinguishable from one that said nothing --
+    # and those two must behave differently. The first is a copied arithmetic
+    # config and must be REFUSED (plan_language.md §7.3); the second is an ordinary
+    # language run and must be set to 0.0 and proceed. Snapshotted here, before any
+    # setdefault runs, for exactly the reason _user_subset is.
+    _user_family_cls = (
+        cfg["loss_weights"]["family_cls"]
+        if isinstance(cfg.get("loss_weights"), dict)
+        and "family_cls" in cfg["loss_weights"]
+        else None
+    )
+
 
     # T5.3 (plan.md 7.3): snapshot what the CALLER actually wrote for the
     # duplicated subset keys, BEFORE any setdefault below runs. Once the
@@ -219,6 +342,15 @@ def load_config_defaults(cfg: dict | None = None) -> dict:
         cfg["training"][_key] = _resolved
         cfg["data"][_key]     = _resolved
 
+    # T-L1.0 (plan_language.md §7 table, `load_config_defaults` row): the language
+    # block runs LAST, after every shared default, so it can react to values the
+    # shared defaults just filled in (`family_cls`) and so an arithmetic config
+    # never touches it at all. Guarded on the declared task, so this is a no-op --
+    # not a cheap no-op, literally an unentered branch -- for every arithmetic
+    # config in the repository.
+    if resolve_task(cfg) == TASK_LANGUAGE:
+        _apply_language_block(cfg, declared_family_cls=_user_family_cls)
+
     return cfg
 
 
@@ -265,6 +397,18 @@ ARCHITECTURES = ("moe", "mor", "more")
 ARCH_DISPLAY = {"moe": "MoE", "mor": "MoR", "more": "MoRE"}
 CANONICAL_RUN_PREFIX = "phaseB"
 
+# T-L1.1 (plan_language.md §10.2). The language study's run-name prefix. A
+# SEPARATE prefix, not a suffix or a tag, because the prefix is the first thing
+# sorted in a `runs/` listing, in a W&B project sidebar and in an exporter table --
+# `langB_MoRE_seed42` and `phaseB_MoRE_seed42` can never be confused at a glance or
+# by a glob, and the two studies are two studies (plan_language.md T-L10.2: not
+# merged, not averaged, not a trend across two points).
+CANONICAL_RUN_PREFIX_LANGUAGE = "langB"
+RUN_PREFIX_BY_TASK = {
+    TASK_ARITHMETIC: CANONICAL_RUN_PREFIX,
+    TASK_LANGUAGE:   CANONICAL_RUN_PREFIX_LANGUAGE,
+}
+
 # T6.7 (updated_rules.md 9). `variant` is a required provenance field and must
 # never be hand-written, because the whole point of it is to make an ablation
 # impossible to mistake for the canonical setting in a results table. It is
@@ -279,6 +423,22 @@ CANONICAL_VARIANT = "canonical"
 # so the field's introduction changes no number, and 0.0 is the labelled T10.H
 # ablation that measures how much of the routing partition it is responsible for.
 CANONICAL_FAMILY_CLS_WEIGHT = 0.5
+
+# T-L1.1. The canonical family-classification weight is TASK-DEPENDENT, and this
+# is a defect fix, not a new feature. resolve_variant compared `family_cls`
+# against the single arithmetic constant above, so an unmodified canonical
+# language config -- where 0.0 is REQUIRED (plan_language.md §7.3 / §10.1) --
+# resolved to `variant = "no_family_supervision"`: a canonical run wearing an
+# ablation label, in the one field that exists to stop an ablation being read as
+# canonical. Observed while writing test_language_task_axis.py, before any
+# language run existed to be mislabelled.
+CANONICAL_FAMILY_CLS_WEIGHT_BY_TASK = {
+    TASK_ARITHMETIC: CANONICAL_FAMILY_CLS_WEIGHT,
+    # 0.0 is not "the ablation" on language -- it is the only coherent value. The
+    # head reads h.detach(), so the weight cannot change what the trunk learns, and
+    # a packed LM sequence has no whole-sequence family label for the term to use.
+    TASK_LANGUAGE:   0.0,
+}
 
 # T10.C. Canonical recursive-block count. Frozen at 1 in canonical_spec.json's
 # enforced_fields; named here so resolve_variant can LABEL a deviation instead of
@@ -309,6 +469,18 @@ def resolve_variant(cfg: dict) -> str:
     mc = cfg.get("model", {}) or {}
     lw = cfg.get("loss_weights", {}) or {}
     tags: list[str] = []
+
+    # T-L1.1 (plan_language.md §1). The TASK goes in first, and it is the one tag
+    # that is not a "deviation" -- it is which study the run belongs to. Without it
+    # a canonical language run resolved to `variant = "canonical"`, i.e. a run on a
+    # different dataset, with a different objective and a different output head,
+    # wearing the same label as the fifteen published arithmetic runs. `variant` is
+    # read by the exporter and printed in results tables, so that is precisely the
+    # confusion this field exists to prevent.
+    #
+    # Sorting: tags are sorted below, and "arithmetic"/"language" would not
+    # reliably sort first, so the task is prepended AFTER the sort (see the return).
+    task = resolve_task(cfg)
 
     routing_mode = mc.get("routing_mode", CANONICAL_ROUTING_MODE)
     if routing_mode != CANONICAL_ROUTING_MODE:
@@ -370,9 +542,16 @@ def resolve_variant(cfg: dict) -> str:
     # ablation and must be labelled, because "MoRE discovers operation families"
     # is a different claim depending on whether a 6-way family cross-entropy was
     # in the objective.
-    if float(lw.get("family_cls", CANONICAL_FAMILY_CLS_WEIGHT)) \
-            != CANONICAL_FAMILY_CLS_WEIGHT:
-        if float(lw.get("family_cls", CANONICAL_FAMILY_CLS_WEIGHT)) == 0.0:
+    #
+    # T-L1.1: compared against the canonical weight FOR THIS TASK, not against the
+    # arithmetic 0.5 alone. On language the canonical value is 0.0 and a non-zero
+    # value is refused outright by apply_task, so the only reachable value is the
+    # canonical one and no tag is emitted -- where the shared constant used to emit
+    # `no_family_supervision` on every canonical language run.
+    _canon_fcw = CANONICAL_FAMILY_CLS_WEIGHT_BY_TASK.get(
+        task, CANONICAL_FAMILY_CLS_WEIGHT)
+    if float(lw.get("family_cls", _canon_fcw)) != _canon_fcw:
+        if float(lw.get("family_cls", _canon_fcw)) == 0.0:
             tags.append("no_family_supervision")
         else:
             tags.append(
@@ -393,6 +572,15 @@ def resolve_variant(cfg: dict) -> str:
         if want_fm is not None and got_fm != want_fm:
             tags.append(f"ffn_mult_{got_fm}")
 
+    # T-L1.1. The task leads, then the sorted deviations. So:
+    #   arithmetic, no deviations -> "canonical"      (unchanged, all 15 runs)
+    #   language,   no deviations -> "language"       (canonical FOR that task)
+    #   language,   fixed depth   -> "language+fixed_depth"
+    # The word "canonical" is deliberately never emitted for a non-default task:
+    # it is the label the arithmetic study's published table already uses, and a
+    # language row must not be able to carry it.
+    if task != CANONICAL_TASK:
+        return "+".join([task] + sorted(tags))
     return "+".join(sorted(tags)) if tags else CANONICAL_VARIANT
 
 
@@ -424,19 +612,30 @@ def resolve_halting_mode(cfg: dict) -> str:
 
 
 
-def canonical_run_name(architecture: str, seed: int | None) -> str:
+def canonical_run_name(architecture: str, seed: int | None,
+                       task: str = TASK_ARITHMETIC) -> str:
     """
-    The stable run name required by updated_rules.md 9: phaseB_<Arch>_seed<S>.
+    The stable run name required by updated_rules.md 9: phaseB_<Arch>_seed<S>,
+    or langB_<Arch>_seed<S> on the language task (T-L1.1 / plan_language.md §10.2).
 
     Seed omitted when no seed is declared -- an undeclared-seed run must not be
     given a name that claims a seed it never set (T6.1).
+
+    `task` is a keyword with the arithmetic default so that every existing caller
+    -- apply_architecture and several tests -- keeps producing byte-identical
+    names. A required third positional would have been the same change to the
+    output for arithmetic, but a much easier one to get wrong at one call site
+    and not notice, because the wrong answer is still a plausible run name.
     """
     arch = str(architecture).lower()
     if arch not in ARCHITECTURES:
         raise ValueError(
             f"architecture must be one of {ARCHITECTURES}, got {architecture!r}"
         )
-    stem = f"{CANONICAL_RUN_PREFIX}_{ARCH_DISPLAY[arch]}"
+    t = str(task).lower()
+    if t not in TASKS:
+        raise ValueError(f"task must be one of {TASKS}, got {task!r}")
+    stem = f"{RUN_PREFIX_BY_TASK[t]}_{ARCH_DISPLAY[arch]}"
     return stem if seed is None else f"{stem}_seed{int(seed)}"
 
 
@@ -523,14 +722,164 @@ def apply_architecture(cfg: dict, architecture: str) -> dict:
         mc["ffn_mult"] = _canonical_fm
 
     cfg["architecture"] = arch
+    # T-L1.1: named for the task the config declares. On the CLI path apply_task
+    # has NOT run yet at this point (cli.py calls it immediately after this
+    # function), so a `--task language` run is stamped `phaseB_*` here and repaired
+    # by _apply_language_block -- which only replaces a name that is still exactly
+    # this default, so a config-file or `--run_name` label is never clobbered.
     cfg.setdefault("logging", {}).setdefault(
-        "run_name", canonical_run_name(arch, None))
+        "run_name", canonical_run_name(arch, None, resolve_task(cfg)))
     # NOTE: enforce_routing_mode is deliberately NOT called here. At this point
     # the run_name is still the default stamped one line above -- the CLI's
     # --run_name override has not been applied yet -- so gating on the label
     # here refuses even a correctly labelled dense ablation. The gate runs in
     # cli.py AFTER resolve_overrides, against the label the run will really use.
     return cfg
+
+
+# ---------------------------------------------------------------------------
+# Task selection  (T-L1.0 / plan_language.md §1, §6.6, §7.3, §10.1)
+# ---------------------------------------------------------------------------
+
+def _apply_language_block(cfg: dict, declared_family_cls=None) -> dict:
+    """
+    Stamp the language task's shape fields, in place, and refuse the one
+    combination that cannot mean anything. ONE implementation, two callers:
+    `load_config_defaults` (a config file that declares `task: "language"`) and
+    `apply_task` (a `--task language` on the CLI). A second copy of this rule is
+    how the two entry points come to disagree -- the T5.4 trap.
+
+    `declared_family_cls` is the value the INCOMING config declared, or None if it
+    declared nothing. It cannot be read off `cfg` here, because the shared defaults
+    have already filled in the arithmetic 0.5.
+    """
+    mc = cfg.setdefault("model", {})
+    lw = cfg.setdefault("loss_weights", {})
+    dc = cfg.setdefault("data", {})
+
+    # plan_language.md §7.3, enforced rather than intended. On language the family
+    # head is a DETACHED probe: it reads h.detach(), its gradient reaches only its
+    # own Linear, and its loss weight is therefore scientifically inert. Weighting
+    # it into the trunk would re-import the exact confound the arithmetic study has
+    # to caveat -- "MoRE's representation separates families" is a much weaker
+    # statement when a family cross-entropy was being minimised on that
+    # representation the whole time.
+    #
+    # There is also no whole-sequence family label in a packed LM sequence for the
+    # term to use, so a non-zero value here can only be a copied arithmetic config.
+    # Hence: refuse a DECLARED non-zero weight, and set an undeclared one to 0.0.
+    # The distinction is the point -- silently rewriting a declared 0.5 to 0.0 would
+    # run something the config did not ask for, and raising on an undeclared 0.5
+    # would make `--task language` alone impossible (T-L1.2's Verify).
+    if declared_family_cls is not None and float(declared_family_cls) != 0.0:
+        raise ValueError(
+            f"loss_weights.family_cls = {declared_family_cls!r} with "
+            f"task = {TASK_LANGUAGE!r}. On language the family head is a DETACHED "
+            "probe (plan_language.md §7.3): it reads h.detach(), so its gradient "
+            "never reaches the trunk and its weight cannot change what is learned. "
+            "A non-zero value therefore claims a supervision term that does not "
+            "exist, and there is no whole-sequence family label in a packed LM "
+            "sequence for such a term to use -- this is almost certainly a copied "
+            "arithmetic config. Set loss_weights.family_cls to 0.0 (it is REQUIRED "
+            "at 0.0 in config_language.json) or drop the key and let the language "
+            "block set it."
+        )
+    lw["family_cls"] = 0.0
+
+    # DEFINITIONAL, so assigned rather than defaulted. MoREWrapper(attention=False)
+    # constructs NO attention module (plan_language.md §6.5, which is also what
+    # keeps the arithmetic state_dict bit-identical), so a language run with this
+    # off is not a weaker language model -- it is a model in which no token can see
+    # any other token. There is no legitimate `task = language, attention = False`
+    # run, so this is not left to a config file to get right.
+    mc["attention"] = True
+
+    # PROTOCOL NUMBERS, so setdefault: config_language.json, the frozen
+    # canonical_spec_language.json and the CLI all win over these. See the
+    # LANGUAGE_*_DEFAULT comments -- seq_len in particular is GATE L5's to freeze,
+    # from T-L7.0's measurement on 6 GB of VRAM, not this file's to assert.
+    dc.setdefault("seq_len", LANGUAGE_SEQ_LEN_DEFAULT)
+    dc.setdefault("vocab_size", LANGUAGE_VOCAB_SIZE_DEFAULT)
+    mc.setdefault("n_heads", LANGUAGE_N_HEADS_DEFAULT)
+    # plan_language.md §5: the LM head is tied to the token embedding. Named here
+    # so `--task language` alone builds the model the plan specifies; a config may
+    # still untie it as a labelled ablation.
+    mc.setdefault("tie_lm_head", True)
+
+    # Caught here rather than inside nn.MultiheadAttention, which raises the same
+    # arithmetic constraint much later and with no mention of which config field is
+    # wrong.
+    d_model = int(mc.get("d_model", 256))
+    n_heads = int(mc["n_heads"])
+    if n_heads < 1 or d_model % n_heads != 0:
+        raise ValueError(
+            f"model.n_heads = {n_heads} does not divide model.d_model = {d_model}. "
+            "Causal self-attention splits d_model into n_heads equal head "
+            f"dimensions. Canonical is n_heads = {LANGUAGE_N_HEADS_DEFAULT} at "
+            "d_model = 256 (plan_language.md §6.6), identical across MoE, MoR and "
+            "MoRE -- attention hyperparameters are part of the frozen protocol and "
+            "are not tuned per architecture."
+        )
+
+    # OWED TO L-4, recorded rather than half-done: the shared defaults still fill in
+    # `model.max_steps`, `model.step_feat_dim`, `data.max_val` and `data.pad_value`,
+    # which are arithmetic concepts that plan_language.md §10.1 lists as ABSENT from
+    # config_language.json. Deleting them belongs with the engine/model migration
+    # that stops reading them; removing them now would make a resolved language
+    # config honest about four keys while the code still expects them, which trades
+    # a cosmetic inaccuracy for a KeyError.
+
+    # T-L1.1 RUN-NAME REPAIR. cli.py runs apply_architecture BEFORE apply_task, so
+    # a `--task language` run has already had `phaseB_<Arch>` stamped in as the
+    # default name by the time this runs. Replace it -- but ONLY when it is still
+    # exactly that stamped default, character for character. Anything else is a name
+    # someone chose (a config file, a diagnostic label) and overwriting it would
+    # rename a run its author had already named, which is how a dense-routing
+    # ablation loses the label enforce_routing_mode requires.
+    log  = cfg.setdefault("logging", {})
+    arch = str(cfg.get("architecture") or "").lower()
+    if arch in ARCHITECTURES:
+        stamped_arith = canonical_run_name(arch, None, TASK_ARITHMETIC)
+        if log.get("run_name") in (None, stamped_arith):
+            log["run_name"] = canonical_run_name(arch, None, TASK_LANGUAGE)
+    return cfg
+
+
+def apply_task(cfg: dict, task: str) -> dict:
+    """
+    Stamp the task-definitional fields into cfg, in place, and return it.
+
+    arithmetic : no-op by construction -- the key is not even written, so the
+                 resolved config is byte-identical to a pre-task-axis resolution
+                 and no arithmetic config_hash moves (resolve_task, T-L1.0).
+    language   : causal self-attention on, LM shape fields present, family_cls
+                 forced to 0.0 and refused if declared non-zero (§7.3).
+
+    Deliberately parallel to apply_architecture: same in-place-and-return shape,
+    same "stamp definitional fields, let later overrides win" contract, and the
+    same placement rule -- cli.py calls it immediately after apply_architecture and
+    BEFORE the override blocks, so an explicit `--family_cls` on a language run
+    hits a refusal instead of quietly winning (T-L1.2).
+    """
+    t = str(task).lower()
+    if t not in TASKS:
+        raise ValueError(f"task must be one of {TASKS}, got {task!r}")
+
+    if t == TASK_ARITHMETIC:
+        # Not `cfg["task"] = "arithmetic"`. Writing the default in is the one thing
+        # this axis must never do: it would move every arithmetic config_hash. An
+        # explicit `--task arithmetic` and no flag at all must produce the same
+        # bytes, so they produce the same bytes.
+        cfg.pop("task", None)
+        return cfg
+
+    cfg["task"] = t
+    # declared_family_cls: at THIS entry point the caller is the CLI, and
+    # load_config_defaults has already run, so a 0.5 sitting in loss_weights is
+    # indistinguishable from the arithmetic default and must be treated as
+    # undeclared. cli.py's --family_cls block does the refusing for an explicit
+    # flag, where the declaration is unambiguous (T-L1.2).
+    return _apply_language_block(cfg, declared_family_cls=None)
 
 
 # ---------------------------------------------------------------------------
