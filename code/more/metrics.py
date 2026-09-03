@@ -1079,6 +1079,101 @@ def language_depth_metrics(exit_depth, token_ids, per_token_loss,
     return out
 
 
+def document_index_from_ids(token_ids, eot_id: int) -> np.ndarray:
+    """`doc_index[N]` -- how many documents began before each token.
+
+    T-L6.7. The encoder inserts `eot_id` BETWEEN documents and not after the last, so the
+    document index of a token is the number of EOTs strictly before it. That makes this
+    exact rather than a heuristic, and it is derived from the STORED token stream rather
+    than from a re-segmentation of the raw text -- which is what T-L6.7 asks for, because
+    a second segmentation could drift from the one the packing used.
+
+    The separator token itself is counted as belonging to the document it CLOSES, which is
+    the arbitrary half of an otherwise exact definition and is stated rather than hidden:
+    it is one token per document, ~0.4% of a 256-token block.
+    """
+    ids = np.asarray(token_ids).ravel()
+    is_eot = (ids == eot_id)
+    return (np.cumsum(is_eot) - is_eot).astype(np.int64)
+
+
+def depth_variance_decomposition(exit_depth, doc_index) -> dict:
+    """Split exit-depth variance into WITHIN-document and BETWEEN-document parts.
+
+    T-L6.7, and the point is `between_share`. Per-token recursion was kept (§4.1b) rather
+    than moving to segment-level halting, so the fair question is whether the model
+    nonetheless spends more computation on harder PASSAGES. The law of total variance
+    answers it directly:
+
+        Var(depth) = E[Var(depth | doc)]  +  Var(E[depth | doc])
+                     within-document         between-document
+
+    If `between_share` is negligible, the model is not allocating at the passage level and
+    that is the honest finding -- it is not evidence against per-token allocation, which
+    `depth/spearman_vs_model_loss` measures separately.
+
+    Both parts are POPULATION variances weighted by document token count, so they sum to
+    the total exactly (checked by the caller and by `code/test_lang_heads.py`). Using the
+    unweighted mean of per-document variances instead would not sum, and the discrepancy
+    would look like a bug in whichever term was quoted second.
+    """
+    d = np.asarray(exit_depth, dtype=np.float64).ravel()
+    g = np.asarray(doc_index).ravel().astype(np.int64)
+    if d.size != g.size:
+        raise ValueError(
+            f"exit_depth ({d.size}) and doc_index ({g.size}) must cover the same tokens."
+        )
+    if d.size == 0:
+        return {"n_documents": 0, "total": None, "within": None, "between": None,
+                "between_share": None, "per_document_mean_std": None,
+                "sum_matches_total": None}
+    n_docs = int(g.max()) + 1
+    counts = np.bincount(g, minlength=n_docs).astype(np.float64)
+    sums = np.bincount(g, weights=d, minlength=n_docs)
+    sq = np.bincount(g, weights=d * d, minlength=n_docs)
+    seen = counts > 0
+    means = np.zeros_like(sums)
+    means[seen] = sums[seen] / counts[seen]
+    # E[x^2] - (E[x])^2 per document, then token-weighted.
+    var_in = np.zeros_like(sums)
+    var_in[seen] = np.maximum(sq[seen] / counts[seen] - means[seen] ** 2, 0.0)
+    w = counts[seen] / counts[seen].sum()
+    grand = float((counts[seen] * means[seen]).sum() / counts[seen].sum())
+    within = float((w * var_in[seen]).sum())
+    between = float((w * (means[seen] - grand) ** 2).sum())
+    total = float(d.var())
+    return {
+        "n_documents": int(seen.sum()),
+        "total": total, "within": within, "between": between,
+        "between_share": (between / total) if total > 0 else None,
+        "per_document_mean_std": float(means[seen].std()),
+        "per_document_mean_min": float(means[seen].min()),
+        "per_document_mean_max": float(means[seen].max()),
+        # The identity is reported, not assumed: a mismatch means the weighting is wrong,
+        # and a silently wrong decomposition is worse than none.
+        "sum_matches_total": bool(abs(within + between - total) < 1e-9 * max(1.0, total)),
+    }
+
+
+def depth_by_document_to_wandb(dv: dict, prefix: str = "depth/by_document") -> dict:
+    """Flatten the decomposition, `None` omitted.
+
+    Per-document MEANS are not logged individually: there are 61 documents in the
+    validation split and 29,445 in train, and 61 keys that no plot reads is clutter that
+    makes the three numbers that matter harder to find. The spread, the range and the
+    between-share are what the passage-level question is answered with.
+    """
+    out = {}
+    for k in ("n_documents", "total", "within", "between", "between_share",
+              "per_document_mean_std", "per_document_mean_min",
+              "per_document_mean_max"):
+        if dv.get(k) is not None:
+            out[f"{prefix}/{k}"] = dv[k]
+    if dv.get("sum_matches_total") is not None:
+        out[f"{prefix}/sum_matches_total"] = int(dv["sum_matches_total"])
+    return out
+
+
 def language_depth_to_wandb(dm: dict, prefix: str = "depth") -> dict:
     """Flatten `language_depth_metrics` into log keys, `None` OMITTED not zeroed.
 

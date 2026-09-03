@@ -5406,6 +5406,70 @@ writing a zero: absence means "not measured", 0.0 would mean "POS is no better t
 `uncovered_depth_keys` for what counts as depth-ish; `TASKS_LANGUAGE.md` T-L6.8 for the
 prefix/pass/population table.
 
+## T-L6.7 / T-L6.11 — span-level depth, and a premise of mine that was wrong
+
+`code/more/metrics.py`, `code/more/engine.py`, `code/test_lang_heads.py`.
+**35 passed, 0 failed, 2 skipped.** Gate L0 `TOTAL 356 356 0 0`.
+
+**T-L6.7. Per-token recursion was kept (§4.1b), so the passage-level question is answered
+by the law of total variance instead of by changing the architecture.**
+
+    Var(depth) = E[Var(depth | doc)] + Var(E[depth | doc])
+                 within-document       between-document
+
+If `between_share` is negligible the model is not allocating at the passage level, and that
+is a finding rather than a gap -- it says nothing against per-token allocation, which
+`depth/spearman_vs_model_loss` measures separately.
+
+Both parts are token-weighted POPULATION variances so they sum to the total exactly.
+Verified on three synthetic cases including **unequal document sizes** (10 vs 190 tokens),
+which is precisely where an unweighted average of per-document variances breaks -- and the
+discrepancy would then look like a bug in whichever term was quoted second.
+`between_share` is 1.0 when documents differ only in mean and 0.0 when they differ only
+within, so the statistic separates the two rather than just reporting a ratio.
+`sum_matches_total` ships with the numbers rather than being assumed.
+
+Document boundaries come from `document_index_from_ids`: the count of `eot_id` tokens
+strictly before each position, in the **stored** stream. Exact rather than heuristic, and
+deliberately not a re-segmentation of the raw text, which could drift from the one the
+packing used. The one arbitrary half of the definition is stated rather than hidden -- the
+separator counts as closing its own document, one token per document, ~0.4% of a block.
+Per-document means are summarised, not logged one key each: 61 documents in val and 29,445
+in train, and 61 keys no plot reads would bury the three numbers that answer the question.
+
+**T-L6.11. THE PREMISE I RECORDED WAS WRONG, and the correction matters more than the
+task did.** I wrote that `total_params` "only reaches `stdout.log`, which is git-ignored,
+so on a pushed run it is unrecoverable". It was already being written to
+`provenance.total_params` in `resolved_config.json`, which **is** tracked. The error came
+from checking `metrics.json` alone. Confirmed on the three completed language runs: MoRE
+5,584,908 / MoR 5,581,063 / MoRE 5,584,908 -- a **0.0688%** MoR-MoRE gap on real runs,
+matching the T-L6.3 derivation's rel(total) exactly.
+
+What was genuinely missing is `non_embedding_params`, and that is the criterion T-L6.3 says
+is actually about the expert stack -- so the real gap mattered more than the one I flagged:
+
+| arm | total | embedding | non-embedding |
+|---|---|---|---|
+| MoE | 5,584,908 | 2,162,688 | 3,422,220 |
+| MoR | 5,581,063 | 2,162,688 | 3,418,375 |
+| MoRE | 5,584,908 | 2,162,688 | 3,422,220 |
+
+The embedding block is **identical across all three arms**, which is exactly why the
+total-count criterion is the easy one -- 2,162,688 sits in both the numerator and the
+denominator of a relative gap and shrinks it for free. Gap 0.069% on the total, **0.112%**
+on the non-embedding count; both inside Gate L6's 5%, and the second is the one to quote.
+All three counts now go to provenance, the W&B config and `metrics.json`. `lm_head` is tied
+to `tok_embed` so `named_parameters` yields the shared tensor once; the prefix test is a
+guard for a future untied ablation rather than a live double-count.
+
+Both tasks carry two SKIPs (TL6.7f, TL6.8f): no completed run predates either writer, so
+the in-run confirmations are pending. Two CPU runs are in flight, and both checks fail
+loudly rather than skip once a post-change run exists.
+
+**Where to look.** `metrics.depth_variance_decomposition` for the weighting that makes the
+identity hold; `document_index_from_ids` for the EOT convention;
+`engine.py` `_emb_prefixes` when a parameter count looks wrong.
+
 <!-- APPEND-MARKER-CL -->
 
 

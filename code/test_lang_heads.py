@@ -471,6 +471,88 @@ else:
 
 # ===========================================================================
 print()
+print("=== T-L6.7  Span-level depth: within- vs between-document variance ===")
+# ===========================================================================
+
+from more.metrics import (depth_variance_decomposition,          # noqa: E402
+                          document_index_from_ids,
+                          depth_by_document_to_wandb)
+import numpy as _np  # noqa: E402
+
+# The identity Var = within + between must hold EXACTLY, including with unequal document
+# sizes -- which is where an unweighted average of per-document variances breaks, and the
+# discrepancy would then look like a bug in whichever term was quoted second.
+_cases = {
+    "distinct means": (_np.array([1.] * 50 + [4.] * 50 + [7.] * 50),
+                       _np.array([0] * 50 + [1] * 50 + [2] * 50)),
+    "identical means": (_np.tile([1., 7.], 75),
+                        _np.array([0] * 50 + [1] * 50 + [2] * 50)),
+    "unequal sizes": (_np.array([1.] * 10 + [5.] * 190),
+                      _np.array([0] * 10 + [1] * 190)),
+}
+_dvs = {k: depth_variance_decomposition(d, g) for k, (d, g) in _cases.items()}
+check("TL6.7a the decomposition sums to the total variance EXACTLY, even with "
+      "unequal document sizes",
+      all(v["sum_matches_total"] for v in _dvs.values()),
+      "  ".join(f"{k}: {v['total']:.4f} = {v['within']:.4f} + {v['between']:.4f}"
+                for k, v in _dvs.items()))
+
+check("TL6.7b between-share is 1.0 when documents differ only in mean, 0.0 when they "
+      "differ only within",
+      abs(_dvs["distinct means"]["between_share"] - 1.0) < 1e-12
+      and _dvs["identical means"]["between_share"] < 1e-12,
+      f"distinct-mean {_dvs['distinct means']['between_share']:.4f}, "
+      f"identical-mean {_dvs['identical means']['between_share']:.2e} -- so the statistic "
+      f"actually separates passage-level allocation from within-passage variation")
+
+check("TL6.7c the document index comes from EOT positions in the STORED stream",
+      document_index_from_ids(_np.array([5, 6, 0, 7, 8, 0, 9]), 0).tolist()
+      == [0, 0, 0, 1, 1, 1, 2],
+      "the separator is counted as closing its own document -- the one arbitrary half of "
+      "an otherwise exact definition, ~0.4% of a 256-token block, and stated rather "
+      "than hidden. No re-segmentation of the raw text, which could drift from the "
+      "packing")
+
+_mis_raised = False
+try:
+    depth_variance_decomposition(_np.zeros(5), _np.zeros(6))
+except ValueError:
+    _mis_raised = True
+check("TL6.7d a length mismatch RAISES rather than silently truncating",
+      _mis_raised,
+      "a decomposition over two different token sets would look like a measurement")
+
+check("TL6.7e per-document MEANS are summarised, not logged one key per document",
+      set(depth_by_document_to_wandb(_dvs["distinct means"])) ==
+      {f"depth/by_document/{k}" for k in
+       ("n_documents", "total", "within", "between", "between_share",
+        "per_document_mean_std", "per_document_mean_min", "per_document_mean_max",
+        "sum_matches_total")},
+      "61 validation documents and 29,445 training ones; individual keys no plot reads "
+      "would bury the three numbers the passage-level question is answered with")
+
+_span_runs = [r for r in _lang_runs
+              if "depth/by_document/total" in _json.load(open(r, encoding="utf-8"))]
+if not _span_runs:
+    skip("TL6.7f span-level depth in a run directory",
+         f"{len(_lang_runs)} language run(s) on disk, all predating the writer; "
+         f"a fresh run is needed to confirm the keys land")
+else:
+    with open(_span_runs[0], "r", encoding="utf-8") as fh:
+        _sm = _json.load(fh)
+    check("TL6.7f the decomposition SHIPS in a run directory and sums there too",
+          _sm.get("depth/by_document/sum_matches_total") == 1
+          and _sm.get("depth/by_document/n_documents", 0) > 1,
+          f"{_sm['depth/by_document/n_documents']} documents, total "
+          f"{_sm['depth/by_document/total']:.6f} = within "
+          f"{_sm['depth/by_document/within']:.6f} + between "
+          f"{_sm['depth/by_document/between']:.6f}, between-share "
+          f"{_sm['depth/by_document/between_share']:.4f} "
+          f"({os.path.basename(os.path.dirname(_span_runs[0]))})")
+
+
+# ===========================================================================
+print()
 print("=" * 78)
 print(f"{len(PASS)} passed, {len(FAIL)} failed, {len(SKIP)} skipped")
 if FAIL:

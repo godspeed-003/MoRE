@@ -40,7 +40,10 @@ from .metrics import (compute_expert_load_entropy,
                       article_agreement_vs_topic,
                       control_comparison_to_wandb,
                       DEPTH_KEY_PROVENANCE,
-                      uncovered_depth_keys)
+                      uncovered_depth_keys,
+                      document_index_from_ids,
+                      depth_variance_decomposition,
+                      depth_by_document_to_wandb)
 from .run_context import RunContext, resolve_overrides, ProxyGuardError
 from .seeding import (apply_seeding, make_generator, seed_worker,
                       nondeterministic_ops_observed)
@@ -296,7 +299,23 @@ def train(cfg: dict, run_epochs: int | None = None, ctx: "RunContext | None" = N
     ).to(device)
 
     total_params = sum(p.numel() for p in model.parameters())
-    print(f"[Model] Total parameters: {total_params:,}")
+    # T-L6.11: the NON-EMBEDDING count, which is the criterion T-L6.3 says is actually
+    # about the expert stack. `total_params` alone is too easy to satisfy on language: the
+    # tied 8192x256 token table and the positional table are identical across all three
+    # arms, so they sit in both the numerator and the denominator of a relative gap and
+    # shrink it for free. Measured: MoR 5,581,063 vs MoRE 5,584,908 is 0.069% on the
+    # total but 0.112% on the non-embedding count.
+    #
+    # `lm_head` is tied to `tok_embed`, so `named_parameters` yields the shared tensor
+    # once -- the prefix test is a belt-and-braces guard for a future untied ablation
+    # rather than a live double-count.
+    _emb_prefixes = ("tok_embed", "pos_embed", "lm_head")
+    embedding_params = sum(
+        p.numel() for n, p in model.named_parameters()
+        if n.startswith(_emb_prefixes))
+    non_embedding_params = total_params - embedding_params
+    print(f"[Model] Total parameters: {total_params:,}  "
+          f"(embedding {embedding_params:,}, non-embedding {non_embedding_params:,})")
 
     # ---- Optimiser & Scheduler -----------------------------------------
     optimizer = torch.optim.AdamW(
@@ -377,6 +396,8 @@ def train(cfg: dict, run_epochs: int | None = None, ctx: "RunContext | None" = N
         # directory. Absent -> that axis is skipped and its keys are simply not written,
         # which an exporter reads as "not measured" rather than as a zero difference.
         _pos_control = _block_topic = None
+        _eot_id = (_ds.manifest.get("eot_id") if _ds is not None
+                   and hasattr(_ds, "manifest") else None)
         _cdir = os.path.join(LANG_ROOT, dc.get("corpus", "wikitext-103"))
         _pc = os.path.join(_cdir, "token_family_shuffled.npy")
         _bt = os.path.join(_cdir, "block_topic_val.npy")
@@ -481,6 +502,8 @@ def train(cfg: dict, run_epochs: int | None = None, ctx: "RunContext | None" = N
         # parameter-matching question (MoE/MoRE ~6.36M vs MoR ~1.10M) is asked of
         # the run record, not of a scrollback buffer.
         "total_params": total_params,
+        "embedding_params": embedding_params,
+        "non_embedding_params": non_embedding_params,
     })
     wandb.init(
         project=log["wandb_project"],
@@ -517,6 +540,8 @@ def train(cfg: dict, run_epochs: int | None = None, ctx: "RunContext | None" = N
         ),
         "halt_target_mode":            halting_mode,
         "total_params":                total_params,
+        "embedding_params":            embedding_params,
+        "non_embedding_params":        non_embedding_params,
     })
     ctx.write_resolved_config()
 
@@ -866,6 +891,11 @@ def train(cfg: dict, run_epochs: int | None = None, ctx: "RunContext | None" = N
             # of each block (no next-token target). The routing comparison
             # needs whole blocks, so it needs its own id vector.
             _lang_ids_full: list = []
+            # Full-position exit depths, aligned with `_lang_ids_full`. The
+            # trimmed `_lang_depth_ed` cannot be reused: the document index
+            # is derived from EOT positions in the WHOLE stream, and
+            # dropping each block's last token would shift it.
+            _lang_depth_full: list = []
 
             with torch.no_grad():
                 for x_v, sm_v, se_v, so_v, fam_v, _, tgt_v in val_loader:
@@ -940,6 +970,11 @@ def train(cfg: dict, run_epochs: int | None = None, ctx: "RunContext | None" = N
                     if _task == TASK_LANGUAGE and first_route is not None:
                         _lang_route.append(first_route.reshape(-1).detach().cpu())
                         _lang_ids_full.append(x_v.reshape(-1).detach().cpu())
+                        if depth_exits is not None:
+                            _lang_depth_full.append(
+                                compute_token_exit_depths(
+                                    depth_exits, mc["max_depth"]
+                                ).reshape(-1).detach().cpu())
 
                     if first_route is None or depth_exits is None:
                         continue
@@ -1048,6 +1083,25 @@ def train(cfg: dict, run_epochs: int | None = None, ctx: "RunContext | None" = N
                     print(f"[Train] reference-axis comparison unavailable: "
                           f"{type(_exc).__name__}: {_exc}", file=sys.stderr)
                     val_depth_log["val/routing_control_error"] = (
+                        f"{type(_exc).__name__}: {_exc}")
+
+            # T-L6.7: does the model spend more computation on harder PASSAGES?
+            # Per-token recursion was kept (§4.1b), so this is answered by the law of
+            # total variance rather than by changing the architecture. A negligible
+            # between-document share means no passage-level allocation, which is a
+            # finding rather than a gap.
+            if (_task == TASK_LANGUAGE and _lang_depth_full and _lang_ids_full
+                    and _eot_id is not None):
+                try:
+                    _dv = depth_variance_decomposition(
+                        torch.cat(_lang_depth_full).numpy(),
+                        document_index_from_ids(
+                            torch.cat(_lang_ids_full).numpy(), _eot_id))
+                    val_depth_log.update(depth_by_document_to_wandb(_dv))
+                except Exception as _exc:      # pragma: no cover
+                    print(f"[Train] span-level depth report unavailable: "
+                          f"{type(_exc).__name__}: {_exc}", file=sys.stderr)
+                    val_depth_log["val/depth_by_document_error"] = (
                         f"{type(_exc).__name__}: {_exc}")
 
             # T-L6.1 / T-L6.2: the correlational depth report that REPLACES
@@ -1566,6 +1620,13 @@ def train(cfg: dict, run_epochs: int | None = None, ctx: "RunContext | None" = N
         # are in the arithmetic contract Gate L0 checks -- so the provenance ships AS DATA
         # in every run directory, and `uncovered_depth_keys` refuses to let a new depth key
         # escape it. Written for both tasks: the ambiguity is not language-specific.
+        # T-L6.11: also in metrics.json, because Gate L6 builds the three-arm parameter
+        # table from the metric artifact and should not have to open a second file to do
+        # it. Already in provenance (resolved_config.json, tracked) -- this is a second
+        # copy of two integers, which is cheaper than a cross-file join in the exporter.
+        metrics["total_params"] = int(total_params)
+        metrics["embedding_params"] = int(embedding_params)
+        metrics["non_embedding_params"] = int(non_embedding_params)
         metrics["depth_key_provenance"] = DEPTH_KEY_PROVENANCE
         _uncov = uncovered_depth_keys(metrics.keys())
         if _uncov:

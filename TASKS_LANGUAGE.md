@@ -1936,15 +1936,39 @@ does not exist here (T-L0.0).
   the norms, a real behaviour should not. Until this is done, no depth-allocation claim
   may be made in either direction.
 
-- [ ] **T-L6.11 `total_params` must reach `metrics.json`.** Gate L6 publishes the three
+- [x] **T-L6.11 `total_params` must reach `metrics.json`.** Gate L6 publishes the three
   arms' parameter counts as a table and checks the MoR/MoRE gap on both the total and the
   non-embedding count, but the smoke runs' `metrics.json` carries **no parameter key at
   all** — the count is printed to `stdout.log`, which is git-ignored, so on a pushed run
   it is unrecoverable. **Verify:** every run's `metrics.json` carries `total_params` and
   `non_embedding_params`; the L6 table is built from those keys rather than from a
   console line.
+  **THE PREMISE ABOVE WAS WRONG AND IS CORRECTED HERE.** `total_params` was already being
+  written to `provenance.total_params` in `resolved_config.json`, which **is** tracked --
+  so it was neither missing nor unrecoverable, and the claim that it only reached
+  `stdout.log` was my error from checking `metrics.json` alone. Confirmed on the three
+  completed language runs: **MoRE 5,584,908 / MoR 5,581,063 / MoRE 5,584,908**, i.e. the
+  MoR-MoRE gap is **0.0688%** on real runs, matching the T-L6.3 derivation's rel(total)
+  exactly.
 
-- [ ] **T-L6.7 Span-level depth reporting.** `plan_language.md` §4.1b. Per-token
+  What was genuinely absent is `non_embedding_params` — and that is the criterion T-L6.3
+  says is the one actually about the expert stack, so its absence mattered more than the
+  thing I had flagged. Both counts now go to provenance, to the W&B config, and to
+  `metrics.json` (a second copy of two integers, cheaper than a cross-file join in the
+  exporter). Measured across the three frozen language arms:
+
+  | arm | total | embedding | non-embedding |
+  |---|---|---|---|
+  | MoE | 5,584,908 | 2,162,688 | 3,422,220 |
+  | MoR | 5,581,063 | 2,162,688 | 3,418,375 |
+  | MoRE | 5,584,908 | 2,162,688 | 3,422,220 |
+
+  The embedding block is **identical across all three arms**, which is exactly why the
+  total-count criterion is the easy one: 2,162,688 sits in both the numerator and the
+  denominator of a relative gap. Gap on the total 0.069%, on the non-embedding count
+  **0.112%** — both inside Gate L6's 5%, and the second is the one to quote.
+
+- [x] **T-L6.7 Span-level depth reporting.** `plan_language.md` §4.1b. Per-token
 
   recursion is kept, but "does the model spend more computation on harder *passages*"
   is answered as a measurement: `depth/mean_by_document`, and the within-document
@@ -1953,6 +1977,36 @@ does not exist here (T-L0.0).
   that is the honest finding. **Verify:** the variance decomposition sums to the total
   depth variance; document boundaries come from the stored EOT positions, not from a
   re-segmentation.
+  **Evidence:** `code/test_lang_heads.py` -> **35 passed, 0 failed, 2 skipped**, checks
+  TL6.7a-f. The identity `Var(depth) = within + between` holds **exactly** in all three
+  synthetic cases, including **unequal document sizes** -- which is the case where an
+  unweighted average of per-document variances breaks, and the discrepancy would then look
+  like a bug in whichever term was quoted second:
+
+  | case | total | within | between | sums |
+  |---|---|---|---|---|
+  | documents differ only in mean | 6.0000 | 0.0000 | 6.0000 | yes |
+  | documents differ only within | 9.0000 | 9.0000 | 0.0000 | yes |
+  | unequal sizes (10 vs 190 tokens) | 0.7600 | 0.0000 | 0.7600 | yes |
+
+  `between_share` is 1.0 in the first case and 0.0 in the second, so the statistic
+  genuinely separates passage-level allocation from within-passage variation rather than
+  just reporting a ratio. `sum_matches_total` is published with the numbers rather than
+  assumed, because a silently wrong decomposition is worse than none.
+
+  Document boundaries come from `document_index_from_ids`: the number of `eot_id` tokens
+  strictly before each position, in the **stored** stream. Exact, not heuristic, and
+  deliberately not a re-segmentation of the raw text, which could drift from the one the
+  packing used. The one arbitrary half of the definition is stated rather than hidden --
+  the separator is counted as closing its own document, which is one token per document,
+  ~0.4% of a 256-token block. A length mismatch raises.
+
+  Per-document means are **summarised, not logged individually**: 61 documents in the
+  validation split and 29,445 in train, and 61 keys no plot reads would bury the three
+  numbers the passage-level question is actually answered with.
+
+  TL6.7f is the one skip: no completed run predates the writer, so the in-run confirmation
+  is pending. Two CPU runs are in flight.
 
 ---
 
