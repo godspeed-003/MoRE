@@ -1119,6 +1119,13 @@ def train(cfg: dict, run_epochs: int | None = None, ctx: "RunContext | None" = N
                         _tok_family, _log_freq, _surprisal,
                         mc["max_depth"], _NUM_LANG_FAMILIES, _LANG_FAMILY_LABELS,
                         seed=seed,
+                        # T-L6.10: per-type embedding row norms, read at THIS epoch. The
+                        # tied head means this is also the output-logit scale, which is
+                        # exactly why it is a candidate mediator of the frequency-depth
+                        # correlation. Detached: a diagnostic must not touch the graph.
+                        embed_norm=(
+                            model.tok_embed.weight.detach().norm(dim=1).cpu().numpy()
+                            if hasattr(model, "tok_embed") else None),
                     )
                     val_depth_log.update(language_depth_to_wandb(_lang_depth))
                 except Exception as _exc:      # pragma: no cover

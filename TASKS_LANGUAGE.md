@@ -1935,6 +1935,50 @@ does not exist here (T-L0.0).
   correlation is tracked across epochs — an artifact should weaken as training equalises
   the norms, a real behaviour should not. Until this is done, no depth-allocation claim
   may be made in either direction.
+  **Status: the partial-correlation clause is implemented and verified; the across-epoch
+  clause needs a multi-epoch GPU run and is handed to the 4060 machine.** Box stays `[ ]`,
+  so the no-depth-claim embargo stays in force.
+
+  **Evidence (partialling, executed).** `code/test_lang_heads.py` → **42 passed, 0 failed,
+  3 skipped**, checks TL6.10a–h. `metrics.partial_spearman(depth, logfreq, norm)` uses the
+  rank partial-correlation identity, and on synthetic cases:
+
+  | case | raw ρ | partial ρ |
+  |---|---|---|
+  | fully mediated by norm | +0.9993 | **+0.0156** |
+  | genuine, norm unrelated | +0.9781 | **+0.9781** |
+  | constant depth | — | **None** (undefined, not 1.0) |
+
+  So it kills a fully mediated correlation, leaves a genuine one untouched, and returns
+  `None` in exactly the collapsed-depth case the seed-42 run produced (99.5% of tokens at
+  one depth). The engine now passes `model.tok_embed.weight.detach().norm(dim=1)` at each
+  validation epoch, and the report publishes `depth_vs_norm`, `logfreq_vs_norm`,
+  `logfreq_partial_norm`, `surprisal_partial_norm` and the binned cross-check — so a reader
+  sees **the confound's strength beside the corrected number**, not just the corrected one.
+
+  **THIS TASK'S OWN VERIFY LINE CONTAINS A FALSE EQUIVALENCE, AND IT IS MEASURED.** It
+  offers "or equivalently, rho between depth and log-frequency *within* norm deciles". That
+  is **not** equivalent. On the same fully-mediated case whose true partial is +0.0156:
+
+  | n_bins | 10 ("deciles") | 50 | 200 |
+  |---|---|---|---|
+  | within-bin ρ | **+0.941** | +0.451 | +0.106 |
+
+  Binning removes only *between*-bin variation, so with a continuous mediator and a tight
+  relationship the residual within-bin variation still carries the confound — **at ten bins
+  it would have passed a fully mediated correlation straight through.** It does not
+  over-correct a genuine one (+0.978 raw → +0.975 at 50 bins), so a *low* value from it is
+  informative while a *high* one is not conclusive. Resolution: `partial_spearman` is
+  primary, the binned version is a secondary assumption-free cross-check (it makes no
+  monotonicity assumption where the partial formula does), the default bin count is
+  **50 not 10**, and a disagreement between them is a finding rather than either being
+  trusted alone.
+
+  **What is still owed (TL6.10h).** The across-epoch trend. One epoch on this machine's CPU
+  takes tens of minutes, so it needs the 4060 — recorded in `HANDOFF.md` with the exact
+  key to plot. Until it runs, **no depth-allocation claim may be made in either
+  direction**, and that applies to the +0.392 and +0.095 frequency-depth correlations
+  already measured.
 
 - [x] **T-L6.11 `total_params` must reach `metrics.json`.** Gate L6 publishes the three
   arms' parameter counts as a table and checks the MoR/MoRE gap on both the total and the

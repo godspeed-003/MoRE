@@ -553,6 +553,94 @@ else:
 
 # ===========================================================================
 print()
+print("=== T-L6.10  The embedding-norm confound: partialled out, and measured ===")
+# ===========================================================================
+
+from more.metrics import (partial_spearman, spearman_within_bins,      # noqa: E402
+                          spearman_rho, WITHIN_BIN_DEFAULT,
+                          language_depth_metrics, language_depth_to_wandb)
+
+_rng = _np.random.default_rng(0)
+_n = 4000
+# Fully mediated: depth and logfreq are both ~2*norm, so ALL of their correlation runs
+# through the norm. This is the shape the confound would take.
+_nm = _rng.normal(size=_n)
+_dp = _nm * 2 + _rng.normal(scale=.05, size=_n)
+_lfq = _nm * 2 + _rng.normal(scale=.05, size=_n)
+_raw_a, _par_a = spearman_rho(_dp, _lfq), partial_spearman(_dp, _lfq, _nm)
+# Genuine: depth tracks logfreq, norm is unrelated noise.
+_nm2, _lfq2 = _rng.normal(size=_n), _rng.normal(size=_n)
+_dp2 = _lfq2 * 1.5 + _rng.normal(scale=.3, size=_n)
+_raw_b, _par_b = spearman_rho(_dp2, _lfq2), partial_spearman(_dp2, _lfq2, _nm2)
+
+check("TL6.10a partialling KILLS a fully mediated correlation and PRESERVES a genuine one",
+      abs(_par_a) < 0.05 and abs(_par_b - _raw_b) < 0.01,
+      f"mediated: raw {_raw_a:+.4f} -> partial {_par_a:+.4f};  "
+      f"genuine: raw {_raw_b:+.4f} -> partial {_par_b:+.4f}. So a positive partial is "
+      f"evidence the frequency-depth relation is not just the tied embedding's row norm")
+
+check("TL6.10b a constant depth vector gives an UNDEFINED partial, not 1.0",
+      partial_spearman(_np.full(_n, 2.0), _lfq2, _nm2) is None,
+      "the collapsed-depth case reaches this branch: 99.5% of tokens at one depth in the "
+      "seed-42 run, and a partial correlation with a zero denominator is undefined")
+
+# The ledger says within-norm-deciles is "equivalently" the same test. It is not, and the
+# gap is measured -- this check exists so the claim cannot quietly be treated as true.
+_bins = {nb: spearman_within_bins(_dp, _lfq, _nm, n_bins=nb)["mean"]
+         for nb in (10, 50, 200)}
+check("TL6.10c within-bin is NOT equivalent to partialling, and under-corrects",
+      _bins[10] > 0.8 and _bins[200] < _bins[50] < _bins[10]
+      and WITHIN_BIN_DEFAULT == 50,
+      f"same fully-mediated case: raw {_raw_a:+.4f}, true partial {_par_a:+.4f}, "
+      f"within-bin {_bins[10]:+.3f} at 10 bins ('norm deciles', which would have passed "
+      f"the confound straight through), {_bins[50]:+.3f} at 50, {_bins[200]:+.3f} at 200. "
+      f"Binning removes only BETWEEN-bin variation, so partial_spearman is primary and "
+      f"this is a secondary assumption-free cross-check")
+
+_wb_b = spearman_within_bins(_dp2, _lfq2, _nm2, n_bins=50)["mean"]
+check("TL6.10d within-bin does not OVER-correct a genuine correlation either",
+      abs(_wb_b - _raw_b) < 0.05,
+      f"genuine case: raw {_raw_b:+.4f}, within-bin {_wb_b:+.4f} -- so a low value from "
+      f"it is informative even though a high one is not conclusive")
+
+# The report carries the diagnostic, and it is gathered over token OCCURRENCES.
+_V, _nn = 512, 3000
+_ids_s = _rng.integers(0, _V, _nn)
+_norm_s = _rng.random(_V) + 0.5
+_lf_s = _np.log1p(_rng.integers(1, 10000, _V).astype(float))
+_us_s = -_np.log(_np.ones(_V) / _V)
+_tf_s = _rng.integers(-1, 6, _V).astype(_np.int8)
+_dep_s = _np.clip((_norm_s[_ids_s] * 6).astype(int) + 1, 1, 7).astype(float)
+_dm_s = language_depth_metrics(_dep_s, _ids_s, None, _tf_s, _lf_s, _us_s, 7, 6,
+                               [f"L{i + 1}" for i in range(6)], embed_norm=_norm_s)
+check("TL6.10e the depth report carries the norm diagnostic when a norm is supplied",
+      _dm_s["embed_norm"] is not None
+      and _dm_s["embed_norm"]["logfreq_partial_norm"] is not None
+      and abs(_dm_s["embed_norm"]["depth_vs_norm"]) > 0.8,
+      f"depth~norm {_dm_s['embed_norm']['depth_vs_norm']:+.4f} on a synthetic "
+      f"norm-driven depth, so the mediator is detected when it is present")
+
+check("TL6.10f the report OMITS the diagnostic rather than faking it when no norm exists",
+      language_depth_metrics(_dep_s, _ids_s, None, _tf_s, _lf_s, _us_s, 7, 6,
+                             [f"L{i + 1}" for i in range(6)])["embed_norm"] is None,
+      "MoE/MoR arithmetic models have no tok_embed; absent is the honest report")
+
+_lg_s = language_depth_to_wandb(_dm_s)
+check("TL6.10g the flattened keys include the partial and the binned cross-check",
+      "depth/embed_norm_logfreq_partial_norm" in _lg_s
+      and "depth/embed_norm_logfreq_within_bins_mean" in _lg_s
+      and "depth/embed_norm_depth_vs_norm" in _lg_s,
+      f"{len([k for k in _lg_s if 'embed_norm' in k])} embed_norm keys, so a reader of "
+      f"metrics.json sees the confound's strength beside the corrected number")
+
+skip("TL6.10h across-epoch trend",
+     "needs a MULTI-EPOCH language run: an artifact should weaken as training equalises "
+     "the row norms, a real behaviour should not. One epoch on CPU takes tens of minutes, "
+     "so this is a GPU task -- see HANDOFF.md")
+
+
+# ===========================================================================
+print()
 print("=" * 78)
 print(f"{len(PASS)} passed, {len(FAIL)} failed, {len(SKIP)} skipped")
 if FAIL:

@@ -1005,10 +1005,93 @@ def spearman_with_null(x, y, n_perm=NULL_PERMUTATIONS, seed=0):
                exceeds_null=bool(rho < lo or rho > hi))
     return out
 
+def partial_spearman(x, y, z):
+    """Spearman rho between `x` and `y` with `z` PARTIALLED OUT, or None.
+
+    T-L6.10. The frequency-depth correlation came out POSITIVE in both smoke runs --
+    frequent tokens received MORE recursion, MoR giving L1_FUNCTION 1.85 steps against
+    L2_NOUN 1.11 -- which is the opposite direction to the hypothesis the metric exists to
+    test. Before that can be interpreted either way, one mundane explanation has to be
+    excluded: with a WEIGHT-TIED head, `tok_embed.weight` is also the output projection, so
+    a frequent type's row norm grows faster during training, the halt head reads a hidden
+    state that still carries that embedding component, and the halt logit becomes
+    scale-correlated with frequency BY CONSTRUCTION. That is an initialization-and-training
+    artifact, not adaptive computation.
+
+        rho(x,y|z) = (r_xy - r_xz * r_yz) / sqrt((1 - r_xz^2) * (1 - r_yz^2))
+
+    on RANKS, so it is the partial Spearman rather than the partial Pearson. `None` when any
+    input has no rank variance or when the denominator vanishes -- a partial correlation
+    with a zero denominator is undefined, not 1.0, and the collapsed-depth case reaches it.
+    """
+    r_xy, r_xz, r_yz = spearman_rho(x, y), spearman_rho(x, z), spearman_rho(y, z)
+    if r_xy is None or r_xz is None or r_yz is None:
+        return None
+    denom = math.sqrt(max(0.0, (1.0 - r_xz ** 2) * (1.0 - r_yz ** 2)))
+    if denom <= 1e-12:
+        return None
+    return float((r_xy - r_xz * r_yz) / denom)
+
+
+# 50 rather than 10, measured. See `spearman_within_bins` for why the ledger's "or
+# equivalently, within norm deciles" is NOT an equivalence.
+WITHIN_BIN_DEFAULT = 50
+
+
+def spearman_within_bins(x, y, z, n_bins=WITHIN_BIN_DEFAULT):
+    """Token-weighted mean of rho(x,y) computed WITHIN bins of `z`.
+
+    THE LEDGER CALLS THIS EQUIVALENT TO PARTIALLING OUT. IT IS NOT, AND THE DIFFERENCE IS
+    MEASURED. On a synthetic case where the x-y correlation is entirely mediated by `z`
+    (raw rho +0.9993, true partial +0.0156), the within-bin mean is:
+
+        n_bins    10      20      50     100     200
+        rho     +0.941  +0.807  +0.451  +0.214  +0.106
+
+    Binning removes only BETWEEN-bin variation, so when the mediator is continuous and the
+    relationship is tight, the residual within-bin variation still carries the confound. At
+    ten bins -- "norm deciles" -- it under-corrects so badly it would pass a fully mediated
+    correlation straight through. On a genuine correlation it is stable (+0.978 at 10 bins,
+    +0.963 at 200), so it does not over-correct.
+
+    Therefore: `partial_spearman` is the PRIMARY diagnostic and this is a secondary,
+    assumption-free cross-check whose known failure mode is under-correction. Its value is
+    that it makes no monotonicity assumption where the partial formula does, so a
+    disagreement between them is worth investigating rather than either being trusted alone.
+
+    Bins are quantiles of `z`, so they are equal-count rather than equal-width -- the
+    embedding-norm distribution is skewed, and equal-width bins would put almost every
+    token in one of them.
+    """
+    xa = np.asarray(x, dtype=np.float64).ravel()
+    ya = np.asarray(y, dtype=np.float64).ravel()
+    za = np.asarray(z, dtype=np.float64).ravel()
+    if not (xa.size == ya.size == za.size) or xa.size < n_bins * 2:
+        return None
+    edges = np.quantile(za, np.linspace(0.0, 1.0, n_bins + 1))
+    idx = np.clip(np.searchsorted(edges[1:-1], za, side="right"), 0, n_bins - 1)
+    rhos, weights = [], []
+    for b in range(n_bins):
+        sel = idx == b
+        if int(sel.sum()) < 2:
+            continue
+        r = spearman_rho(xa[sel], ya[sel])
+        if r is not None:
+            rhos.append(r)
+            weights.append(int(sel.sum()))
+    if not rhos:
+        return None
+    w = np.asarray(weights, dtype=np.float64)
+    return {"mean": float((np.asarray(rhos) * w).sum() / w.sum()),
+            "n_bins_used": len(rhos),
+            "min": float(min(rhos)), "max": float(max(rhos))}
+
+
 def language_depth_metrics(exit_depth, token_ids, per_token_loss,
                            token_family, log_freq, unigram_surprisal,
                            max_depth, num_families, family_labels,
-                           seed=0, n_perm=NULL_PERMUTATIONS) -> dict:
+                           seed=0, n_perm=NULL_PERMUTATIONS,
+                           embed_norm=None) -> dict:
     """The five §5.2 depth metrics, each with its permutation null band.
 
     Args are all over the SAME flat token set, and that is a requirement rather than a
@@ -1065,6 +1148,28 @@ def language_depth_metrics(exit_depth, token_ids, per_token_loss,
             ed, pl, n_perm=n_perm, seed=seed + 2)
     else:
         out["spearman_vs_model_loss"] = None
+
+    # T-L6.10: the embedding-norm confound, excluded before any depth-allocation claim.
+    # With a WEIGHT-TIED head `tok_embed.weight` is also the output projection, so a
+    # frequent type's row norm grows faster during training, the halt head reads a state
+    # still carrying that component, and the halt logit becomes scale-correlated with
+    # frequency by construction. `embed_norm` is per TYPE and gathered by id, so the
+    # diagnostic is over the same token occurrences as the raw correlation.
+    if embed_norm is not None:
+        en = np.asarray(embed_norm, dtype=np.float64)[ids]
+        out["embed_norm"] = {
+            "depth_vs_norm": spearman_rho(ed, en),
+            "logfreq_vs_norm": spearman_rho(lf[ids], en),
+            # THE number. Primary diagnostic; see spearman_within_bins for why the
+            # binned version is a weaker cross-check rather than an equivalent.
+            "logfreq_partial_norm": partial_spearman(ed, lf[ids], en),
+            "logfreq_within_norm_bins": spearman_within_bins(ed, lf[ids], en),
+            "surprisal_partial_norm": partial_spearman(ed, us[ids], en),
+            "norm_min": float(en.min()), "norm_max": float(en.max()),
+            "norm_mean": float(en.mean()),
+        }
+    else:
+        out["embed_norm"] = None
 
     fam = np.asarray(token_family).ravel()[ids]
     by_family = {}
@@ -1191,6 +1296,16 @@ def language_depth_to_wandb(dm: dict, prefix: str = "depth") -> dict:
     for lbl, v in (dm.get("mean_by_family") or {}).items():
         if v is not None:
             log[f"{prefix}/mean_by_family/{lbl}"] = v
+    en = dm.get("embed_norm")
+    if en:
+        for k in ("depth_vs_norm", "logfreq_vs_norm", "logfreq_partial_norm",
+                  "surprisal_partial_norm", "norm_min", "norm_max", "norm_mean"):
+            if en.get(k) is not None:
+                log[f"{prefix}/embed_norm_{k}"] = en[k]
+        wb = en.get("logfreq_within_norm_bins")
+        if wb:
+            for k, v in wb.items():
+                log[f"{prefix}/embed_norm_logfreq_within_bins_{k}"] = v
     for key in ("spearman_vs_logfreq", "spearman_vs_unigram_surprisal",
                 "spearman_vs_model_loss"):
         rec = dm.get(key)

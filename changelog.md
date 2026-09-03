@@ -5470,6 +5470,67 @@ loudly rather than skip once a post-change run exists.
 identity hold; `document_index_from_ids` for the EOT convention;
 `engine.py` `_emb_prefixes` when a parameter count looks wrong.
 
+## T-L6.10 — the embedding-norm confound, partialled out, and a false equivalence found
+
+`code/more/metrics.py`, `code/more/engine.py`, `code/test_lang_heads.py`, `HANDOFF.md`.
+**42 passed, 0 failed, 3 skipped.** Gate L0 `TOTAL 356 356 0 0`. The box stays `[ ]`, so
+the no-depth-claim embargo stays in force.
+
+**WHY THIS BLOCKS A CLAIM.** Both smoke runs put the frequency-depth correlation POSITIVE
+-- frequent tokens got MORE recursion, MoR giving L1_FUNCTION 1.85 steps against L2_NOUN
+1.11 -- which is the opposite direction to the hypothesis the metric exists to test. With a
+WEIGHT-TIED head `tok_embed.weight` is also the output projection, so a frequent type's row
+norm grows faster during training, the halt head reads a state still carrying that
+component, and the halt logit becomes scale-correlated with frequency BY CONSTRUCTION. That
+is an initialization-and-training artifact wearing the shape of adaptive computation, and it
+had to be excluded before the sign could be interpreted either way.
+
+`metrics.partial_spearman(depth, logfreq, norm)` on the rank partial-correlation identity:
+
+| case | raw rho | partial rho |
+|---|---|---|
+| fully mediated by norm | +0.9993 | **+0.0156** |
+| genuine, norm unrelated | +0.9781 | **+0.9781** |
+| constant depth | -- | **None** (undefined, not 1.0) |
+
+It kills a fully mediated correlation, leaves a genuine one untouched, and returns `None` in
+exactly the collapsed-depth case the seed-42 run produced. The engine passes
+`tok_embed.weight.detach().norm(dim=1)` at each validation epoch, and the report publishes
+`depth_vs_norm` and `logfreq_vs_norm` alongside `logfreq_partial_norm` -- so a reader sees
+**the confound's strength beside the corrected number**, which is what makes the corrected
+number readable.
+
+**THE TASK'S OWN VERIFY LINE CONTAINS A FALSE EQUIVALENCE, AND IT IS NOW MEASURED.** It
+offers "or equivalently, rho between depth and log-frequency WITHIN norm deciles". On the
+same fully-mediated case whose true partial is +0.0156:
+
+| n_bins | 10 ("deciles") | 50 | 200 |
+|---|---|---|---|
+| within-bin rho | **+0.941** | +0.451 | +0.106 |
+
+Binning removes only BETWEEN-bin variation, so with a continuous mediator and a tight
+relationship the residual within-bin variation still carries the confound -- **at ten bins
+it would have passed a fully mediated correlation straight through, which is the opposite of
+what the check is for.** It does not over-correct a genuine one (+0.978 raw -> +0.975 at 50
+bins), so a LOW value from it is informative while a HIGH one is not conclusive.
+
+Resolution: `partial_spearman` is the primary diagnostic; the binned version is a secondary
+cross-check kept because it makes no monotonicity assumption where the partial formula does;
+the default is `WITHIN_BIN_DEFAULT = 50`, not 10; and a disagreement between the two is a
+finding rather than either being trusted alone. TL6.10c pins the non-equivalence so the
+ledger's wording cannot quietly be treated as true.
+
+**STILL OWED (TL6.10h).** The across-epoch trend -- an artifact should weaken as training
+equalises the row norms, a real behaviour should not. It needs a multi-epoch run.
+`HANDOFF.md` now names the exact key to plot (`depth/embed_norm_logfreq_partial_norm`) and
+carries the false-equivalence warning, since another agent follows that file. Until it runs,
+**no depth-allocation claim in either direction**, which covers the +0.392 and +0.095
+correlations already measured.
+
+**Where to look.** `metrics.partial_spearman` for the identity;
+`spearman_within_bins` for the bin-count table and why 50;
+`language_depth_metrics` `embed_norm` for what is published per epoch.
+
 <!-- APPEND-MARKER-CL -->
 
 

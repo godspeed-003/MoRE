@@ -85,7 +85,21 @@ MoR allocates depth and predicts badly; MoRE predicts (barely) above the floor w
 collapsed to 99.5% at one step. If that survives real seeds and epochs it is an Outcome B
 shape. **Do not quote it before it does.**
 
-**And do not make any depth-allocation claim until T-L6.10 is done.** The
+**And do not make any depth-allocation claim until T-L6.10 is done — it is now ONE run
+away.** The partialling machinery is built and verified: every language run already emits
+`depth/embed_norm_logfreq_partial_norm` (the corrected number) beside
+`depth/embed_norm_depth_vs_norm` and `depth/embed_norm_logfreq_vs_norm` (the confound's
+strength). What is missing is the **across-epoch trend**, which needs a multi-epoch run and
+is why it fell to your machine: an artifact should weaken as training equalises the
+embedding row norms, a real behaviour should not. Run one arm for several epochs, plot
+`depth/embed_norm_logfreq_partial_norm` per epoch, and record it as T-L6.10 Evidence.
+
+Note the ledger's own Verify line offers "or equivalently, within norm deciles" — that is
+**false**, and measured: on a fully mediated synthetic case whose true partial is +0.016,
+the within-decile value is **+0.941**, i.e. ten bins would pass the confound straight
+through. Use `logfreq_partial_norm`; treat `..._within_bins_mean` (default 50 bins) as a
+cross-check where a LOW value is informative and a high one is not conclusive.
+ The
 frequency-depth correlation is *positive* in both arms — frequent tokens get more
 recursion, MoR gives L1_FUNCTION 1.85 steps against L2_NOUN 1.11 — which is the opposite
 direction to the hypothesis. The unexcluded explanation: a tied embedding trained for one
