@@ -43,7 +43,7 @@ from .model import (CAPACITY_POLICY, CANONICAL_ROUTING_MODE,
 from .metrics import halting_supervision_loss, depth_allocation_error
 from .families import op_target_depth_table
 from .config import (resolve_halting_mode, CANONICAL_FAMILY_CLS_WEIGHT,
-                     resolve_task)
+                     resolve_task, TASK_LANGUAGE)
 # T-L3.2: the confusion diagonal is published under a task-dependent NAME. One
 # helper, so the log dict, the console line, the results.tsv header and the
 # metrics.json "N/A" contract cannot disagree about what it is called.
@@ -278,6 +278,21 @@ def train(cfg: dict, run_epochs: int | None = None, ctx: "RunContext | None" = N
     # existing arithmetic run keeps emitting `val/routing_accuracy` unchanged.
     _task = resolve_task(cfg)
     _agree_key = routing_agreement_key(_task)
+    # T-L5.1: the trivial-baseline floor for THIS corpus, read from the dataset
+    # manifest rather than from a config literal, so a run cannot quote a floor
+    # measured on a different corpus. None when the dataset does not supply one --
+    # reported as an absent key rather than as 0.0.
+    _floor = None
+    if _task == TASK_LANGUAGE:
+        # Unwrapped, because `random_split` returns a `Subset` and the attribute
+        # lives on the underlying `MoRELanguageDataset`. Bounded loop rather than
+        # recursion so a self-referential wrapper cannot hang the run.
+        _ds = getattr(train_loader, "dataset", None)
+        for _ in range(4):
+            if _ds is None or hasattr(_ds, "primary_metric_floor"):
+                break
+            _ds = getattr(_ds, "dataset", None)
+        _floor = getattr(_ds, "primary_metric_floor", None)
     if _task != "arithmetic":
         print(f"[Train] task={_task}: the confusion diagonal is published as "
               f"{_agree_key}")
@@ -434,6 +449,11 @@ def train(cfg: dict, run_epochs: int | None = None, ctx: "RunContext | None" = N
         epoch_depth_rel_err = 0.0
         epoch_depth_err_n   = 0
         epoch_step_route = 0.0
+        # T-L5.3: the probe CE accumulated separately from the blended
+        # `step_routing_loss`, because on language it is a MEASUREMENT of
+        # decodability rather than a term that trains anything -- reported
+        # under `probe/family_ce`, never folded into a total.
+        epoch_probe_ce   = 0.0
         epoch_start      = time.perf_counter()
         total_tokens     = 0
         depth_hist       = torch.zeros(mc["max_depth"])
@@ -490,8 +510,28 @@ def train(cfg: dict, run_epochs: int | None = None, ctx: "RunContext | None" = N
                 epoch_all_expert_idx.extend(batch_expert_idx)
 
             # --- Losses -------------------------------------------------
-            # 1. Primary regression loss
-            task_loss = F.mse_loss(reg_out.squeeze(-1), target)
+            # 1. Primary task loss.
+            #
+            # T-L5.1: the two tasks compute genuinely different quantities from
+            # slot 0, and the branch is here rather than inside the model so the
+            # model stays a pure function of its inputs. ARITHMETIC: MSE on the
+            # scalar answer. LANGUAGE: causal-LM cross-entropy in NATS/token, with
+            # the shift done here (`logits[:, :-1]` predicts `input_ids[:, 1:]`)
+            # rather than stored twice in the dataset (T-L2.3).
+            #
+            # NATS, not bits, and that is not a presentation choice: every other
+            # term in the weighted sum below -- balance, ponder, probe -- is in
+            # nats, and a bits/nats mix inside one weighted sum is a silent
+            # ln(2) = 0.693 scaling bug on whichever term is the odd one out.
+            # Perplexity is reported from it and never optimised.
+            if _task == TASK_LANGUAGE:
+                _V = reg_out.shape[-1]
+                task_loss = F.cross_entropy(
+                    reg_out[:, :-1, :].reshape(-1, _V),
+                    x[:, 1:].reshape(-1),
+                )
+            else:
+                task_loss = F.mse_loss(reg_out.squeeze(-1), target)
 
             # 2. Whole-program family classification (auxiliary supervision)
             # family == -1 means "multi-operation program, no single family";
@@ -499,7 +539,16 @@ def train(cfg: dict, run_epochs: int | None = None, ctx: "RunContext | None" = N
             # If a batch happens to be entirely MIXED, cross_entropy would
             # average over zero elements and return NaN, silently poisoning
             # every downstream loss. Emit an exact zero instead.
-            if bool((family >= 0).any()):
+            #
+            # T-L5.2: on language `cls_out` is None -- a packed LM block has no
+            # whole-sequence family, so the head is not constructed. The term is an
+            # exact structural zero, not a zero-weighted computation, and
+            # `apply_task` already refuses a non-zero `loss_weights.family_cls`
+            # there (§7.3), so this branch cannot silently drop a term someone
+            # meant to use.
+            if cls_out is None:
+                cls_loss = torch.zeros((), device=device)
+            elif bool((family >= 0).any()):
                 cls_loss = F.cross_entropy(cls_out, family, ignore_index=-1)
             else:
                 cls_loss = cls_out.sum() * 0.0
@@ -528,6 +577,16 @@ def train(cfg: dict, run_epochs: int | None = None, ctx: "RunContext | None" = N
                 if step_logits.shape[0] > 0
                 else torch.tensor(0.0, device=device)
             )
+            # T-L5.3: on language `step_cls_out` is `family_probe(h.detach())`, so
+            # this cross-entropy is `probe/family_ce` -- a READ-ONLY measurement of
+            # how linearly decodable the POS family is from the trunk. It is
+            # reported under its own key below and its weight is scientifically
+            # inert: the detach means no value of `loss_weights.step_routing` can
+            # change a single trunk gradient (verified bit-identically by
+            # `test_lang_heads.py` TLH.3b). On arithmetic the same tensor comes from
+            # `step_cls_head(h)`, is IN the objective, and does shape the trunk --
+            # which is the confound §7.3 refuses to inherit.
+            probe_family_ce = step_cls_loss
             # Blend: oracle CE (0.01) is secondary; step_cls CE (0.3) is primary
             step_routing_loss = 0.01 * oracle_routing_ce + 0.3 * step_cls_loss
 
@@ -627,6 +686,7 @@ def train(cfg: dict, run_epochs: int | None = None, ctx: "RunContext | None" = N
                 epoch_depth_rel_err += _dr
                 epoch_depth_err_n   += 1
             epoch_step_route += step_routing_loss.item()
+            epoch_probe_ce   += probe_family_ce.item()
             total_tokens     += bs
             if depth_exits is not None:
                 depth_hist += depth_exits.detach().cpu().sum(dim=0)
@@ -708,7 +768,14 @@ def train(cfg: dict, run_epochs: int | None = None, ctx: "RunContext | None" = N
                         first_route, _val_route_stats,
                         val_expected_depth, val_halt_stats,
                     ) = model(x_v, sm_v, se_v, so_v)
-                    l_v = F.mse_loss(reg_v.squeeze(-1), tgt_v)
+                    l_v = (
+                        F.cross_entropy(
+                            reg_v[:, :-1, :].reshape(-1, reg_v.shape[-1]),
+                            x_v[:, 1:].reshape(-1),
+                        )
+                        if _task == TASK_LANGUAGE
+                        else F.mse_loss(reg_v.squeeze(-1), tgt_v)
+                    )
                     val_total += l_v.item() * x_v.shape[0]
                     val_n     += x_v.shape[0]
 
@@ -909,6 +976,13 @@ def train(cfg: dict, run_epochs: int | None = None, ctx: "RunContext | None" = N
                 if halting_supervision_enabled else "N/A"
             ),
             "train/step_routing_loss":   epoch_step_route / n_batches,
+            # T-L5.3. On language this is a read-only probe on h.detach(),
+            # so it reports how linearly decodable the POS family is and
+            # cannot have created that decodability. On arithmetic the same
+            # CE IS in the objective at weight 0.5, so the two are published
+            # under different names to keep the distinction visible.
+            ("probe/family_ce" if _task == TASK_LANGUAGE
+             else "train/step_cls_ce"): epoch_probe_ce / n_batches,
             "train/avg_recursion_steps": (
                 avg_depth.item() if avg_depth is not None else float("nan")
             ),
@@ -1044,6 +1118,20 @@ def train(cfg: dict, run_epochs: int | None = None, ctx: "RunContext | None" = N
             # but `val/task_loss` is the name that cannot be misread as a total.
             log_dict["val/loss"]      = val_loss
             log_dict["val/task_loss"] = val_loss
+            # T-L5.1 / T-L5.4: perplexity is a MONOTONE TRANSFORM of the loss and
+            # carries no extra information, so it is reported and never optimised
+            # and never used for checkpoint selection -- the verdict is always
+            # taken on nats. Emitted only on language, because exp() of an
+            # arithmetic MSE is not a perplexity and a column that silently meant
+            # two things would be worse than a missing one.
+            if _task == TASK_LANGUAGE and math.isfinite(val_loss):
+                log_dict["val/perplexity"] = math.exp(val_loss)
+                log_dict["val/bits_per_token"] = val_loss / math.log(2)
+                # The distance from the trivial floor, which is the only form in
+                # which a language loss number means anything (T-L2.5). Absent
+                # rather than 0.0 when the floor was not supplied.
+                if _floor is not None:
+                    log_dict["val/nats_below_bigram_floor"] = _floor - val_loss
             if val_loss < best_val_loss:
                 best_val_loss = val_loss
                 torch.save(model.state_dict(), ctx.path("checkpoint.pt"))
@@ -1085,11 +1173,34 @@ def train(cfg: dict, run_epochs: int | None = None, ctx: "RunContext | None" = N
         # conventions for "no number here" in one run directory is what a
         # plotting script misreads as a measured zero or a diverged loss.
         val_str = "N/A" if math.isnan(val_loss) else f"{val_loss:.6f}"
+        # T-L5.4: the three language columns are APPENDED, never inserted. The
+        # archived arithmetic `results.tsv` files and every existing reader index by
+        # POSITION, so reordering would silently reinterpret published columns.
+        # Each is "N/A" rather than 0.0 on arithmetic: exp() of an MSE is not a
+        # perplexity, and a 0.0 in a perplexity column is a fabricated measurement
+        # (CLAUDE.md §4).
+        _ppl_str = (
+            f"{math.exp(val_loss):.4f}"
+            if (_task == TASK_LANGUAGE and not math.isnan(val_loss))
+            else "N/A"
+        )
+        _below_str = (
+            f"{_floor - val_loss:+.6f}"
+            if (_task == TASK_LANGUAGE and _floor is not None
+                and not math.isnan(val_loss))
+            else "N/A"
+        )
+        # depth_rho_model_loss is Phase L-6's measurement (correlation between the
+        # depth a token received and the loss it incurred). The column exists now so
+        # the header never has to be reordered later; it reads "N/A" until L-6
+        # computes it, which is the honest value for "not measured yet".
+        _rho_str = _na(val_depth_log.get("val/depth_rho_model_loss"), ".6f")
         results_rows.append(
             f"{epoch}\t{epoch_task/n_batches:.6f}\t{val_str}\t"
             f"{entropy_str}\t{depth_str}\t"
             f"{mean_cos_str}\t{max_cos_str}\t{routing_acc_str}\t"
-            f"{hung_str}\t{ami_str}"
+            f"{hung_str}\t{ami_str}\t"
+            f"{_ppl_str}\t{_below_str}\t{_rho_str}"
         )
 
         # Flush results to disk every epoch so a partial run is still readable.
@@ -1103,7 +1214,10 @@ def train(cfg: dict, run_epochs: int | None = None, ctx: "RunContext | None" = N
                 "expert_entropy_normalized\tavg_depth\t"
                 "mean_cos_sim\tmax_cos_sim\t"
                 f"{_agree_key.split('/', 1)[1]}\t"
-                "routing_hungarian_acc\trouting_ami\n"
+                "routing_hungarian_acc\trouting_ami\t"
+                # T-L5.4: APPENDED, never inserted -- see the row builder above for
+                # why position matters to the archived arithmetic files.
+                "val_perplexity\tnats_below_bigram_floor\tdepth_rho_model_loss\n"
             )
             f.write("\n".join(results_rows) + "\n")
 

@@ -4801,6 +4801,89 @@ positional signal that varied with step count would confound the depth analysis.
 `test_lang_causality.py` TLC.4e first, whenever a future Gate L1 failure needs
 splitting into "real leak" versus "dispatch tiling".
 
+## T-L5.0 .. T-L5.4 — the LM head, and two init defects the ln(V) check caught
+
+`code/more/model.py`, `code/more/engine.py`, `code/more/config.py`,
+`code/test_lang_heads.py` (new). **25 passed, 0 failed, 0 skipped.** Gate L0:
+`TOTAL 356 356 0 0`, ALL GATES PASS.
+
+**Heads are now constructed per task, not shared as a superset with some weighted to
+zero.** Language builds `tok_embed`, `lm_head` (tied), `family_probe`, `pos_embed`;
+arithmetic keeps `step_proj`, `op_embed`, `regression_head`, `cls_head`,
+`step_cls_head`. Each set is ABSENT on the other path, which is the T-L5.2 argument:
+an unused head still contributes parameters to the budget comparison and still invites
+a future reader to weight it. `op_embed` was the one that mattered most to drop — on
+language it would have been `nn.Embedding(0, d_model)`, since
+`lang_families.NUM_OP_TYPES` is 0. Legal to build, raises only when indexed.
+
+**THE `task_loss ~ ln(V)` CHECK PAID FOR ITSELF ON THE FIRST RUN. With
+`nn.Embedding`'s default N(0, 1) the initial loss measured 167.6 nats against a floor
+of 9.011** — an 18x overshoot, perplexity ~1e73. Weight tying makes the embedding's
+init scale an OUTPUT-LOGIT scale: `logits = h @ W.T`, so at unit-RMS `h` the logit
+spread is `std(W) * sqrt(d_model) = 1 * 16`, and a 16-nat spread over 8192 classes is a
+confidently wrong distribution rather than a uniform one. A model starting there spends
+its first epochs undoing its own initialisation, which shows up as a suspiciously steep
+early loss curve and never as an error. Fixed with std=0.02 (GPT-2 convention) on both
+`tok_embed` and `pos_embed` — the same scale on both because they are ADDED, so an
+N(0,1) positional table beside an N(0,0.02) token table would make position 50x louder
+than identity at init. After: 9.0277..9.0898 over the five frozen seeds, worst relative
+error 0.88%.
+
+**A second number worth having: a mis-shifted language run would report ~5.6 nats at
+epoch 0.** Scoring the UNSHIFTED target gives 5.5552 — 3.46 nats below the uniform
+floor, before any training — because a tied head over a residual trunk already peaks
+`logits_i` at `x_i`. That is the copy shortcut tying gives for free, and 5.6 is close
+enough to the 4.98 bigram floor to be genuinely deceiving. Gate L1 detects the general
+case; TLH.1d pins the magnitude.
+
+**T-L5.3's real test is the gradient comparison, not the `requires_grad` check.**
+`assert not h.requires_grad` at the probe input is necessary and insufficient — a
+detached tensor that still routed gradient to the trunk through a second path would
+pass it. **Trunk gradients are BITWISE identical at probe weight 0.0 / 0.5 / 1.0: 47
+tensors, `torch.equal`, zero differences.** And the check is not passing because the
+probe is inert: the probe's own gradients are exactly zero at weight 0, non-zero at 1,
+and exactly half the weight-1 values at 0.5.
+
+What that buys is the removal of a standing caveat. On arithmetic `family_cls` sits in
+the objective at weight 0.5 and shapes the trunk, so "MoRE's representation separates
+operation families" is permanently weaker there — which is why that study needs the
+`no_family_supervision` ablation. Language does not inherit the confound at all: every
+routing / Hungarian / AMI / purity number on the language arm measures emergent
+structure with no family signal anywhere in the trunk's objective.
+
+**Weight tying measured against an untied copy rather than against a formula:**
+5,523,468 tied vs 7,620,620 untied, exactly 2,097,152 saved. The expert stack plus
+attention is the other 3,426,316, which is what makes a MoR/MoRE budget comparison a
+statement about them rather than about lookup tables. The tie is real backward too: one
+backward pass puts gradient on 8,192 of 8,192 embedding rows against only 64 distinct
+ids in the batch — the excess is the output path.
+
+**`results.tsv` gained three APPENDED columns**, never inserted: `val_perplexity`,
+`nats_below_bigram_floor`, `depth_rho_model_loss`. Verified against a Gate-5-written
+arithmetic file that the ten pre-L5 columns are unchanged IN POSITION and all three new
+ones read `N/A` — `exp()` of an MSE is not a perplexity. `depth_rho_model_loss` is
+Phase L-6's measurement and the column is reserved so the header never has to be
+reordered later.
+
+`val/nats_below_bigram_floor` reads the floor from the DATASET MANIFEST via
+`MoRELanguageDataset.primary_metric_floor`, not from a config literal, so a run cannot
+quote a floor measured on a different corpus. The probe CE is published as
+`probe/family_ce` on language and `train/step_cls_ce` on arithmetic — one tensor, two
+names, because on one task it is a measurement and on the other it trains the trunk.
+
+**One structural refactor, forced and worth recording.** `MoREModel` must branch on the
+task to decide which heads exist, and `config.py` imports `model.py` and never the
+reverse (`run_context.py:52`). So `TASK_ARITHMETIC` / `TASK_LANGUAGE` moved DOWN into
+`model.py`, with `config.py` re-exporting them unchanged. The alternative was
+duplicating two string literals across two modules, against the one-manifest principle.
+No call site moved.
+
+**Where to look.** `model.py`'s task branch in `__init__` when a head is unexpectedly
+present or absent; the `nn.init.normal_(..., std=0.02)` comment when an initial loss is
+not near ln(V); `engine.py`'s `task_loss` branch for the shift; `_floor` for where the
+baseline comes from; `test_lang_heads.py` TLH.3b before touching anything about the
+probe.
+
 <!-- APPEND-MARKER-CL -->
 
 

@@ -95,6 +95,19 @@ CAPACITY_POLICY = "no_capacity_limit"
 
 
 # ---------------------------------------------------------------------------
+# 1a. Task names  (T-L5.0)
+# ---------------------------------------------------------------------------
+#
+# Defined HERE, in the lowest layer, rather than in `config.py`. `MoREModel` has to
+# branch on the task to decide which heads exist at all (§7.1), and `config.py`
+# imports `model.py` and never the reverse (see run_context.py:52), so the choice
+# was between moving the constant down or duplicating a string literal across two
+# modules. `config.py` re-exports both names unchanged, so no call site moved.
+TASK_ARITHMETIC = "arithmetic"
+TASK_LANGUAGE   = "language"
+
+
+# ---------------------------------------------------------------------------
 # 2. Model
 # ---------------------------------------------------------------------------
 
@@ -935,6 +948,8 @@ class MoREModel(nn.Module):
         attention: bool = False,
         n_heads: int = 4,
         max_seq_len: int | None = None,
+        task: str = TASK_ARITHMETIC,
+        vocab_size: int | None = None,
     ):
 
         super().__init__()
@@ -946,21 +961,32 @@ class MoREModel(nn.Module):
 
         # Per-step projection: each step row [step_feat_dim] → [d_model].
         # PyTorch applies Linear to the last dim, so [B, S, F] → [B, S, d_model].
-        self.step_proj = nn.Sequential(
-            nn.Linear(step_feat_dim, d_model),
-            nn.LayerNorm(d_model),
-            nn.GELU(),
-        )
+        #
+        # T-L5.2: ARITHMETIC ONLY. The language input adapter is a token embedding
+        # (see the head block below), so `step_proj` and `op_embed` have no meaning
+        # there. Not constructed rather than constructed-and-skipped, for the same
+        # reason as `regression_head`: an unused module still contributes parameters
+        # to the budget comparison. `op_embed` would additionally be
+        # `nn.Embedding(0, d_model)` on language -- `lang_families.NUM_OP_TYPES` is
+        # 0 because there is no operation axis -- which is legal to build and raises
+        # only when indexed, i.e. the worst kind of latent trap.
+        if str(task) != TASK_LANGUAGE:
+            self.step_proj = nn.Sequential(
+                nn.Linear(step_feat_dim, d_model),
+                nn.LayerNorm(d_model),
+                nn.GELU(),
+            )
 
-        # Operation embedding (T1.2). Since Phase 1 the feature row carries only
-        # numeric arguments, so WHICH function to compute must be told to the
-        # model somehow. It is told as an embedding over OPERATIONS (16 op codes),
-        # which is legitimate task information — never as the oracle expert index
-        # in an input slot, which is prohibited (updated_rules.md 3). Note the
-        # size is num_op_types, not num_experts: the mapping op → expert is
-        # exactly what routing is supposed to discover, so it must not be handed
-        # to the model through the embedding table's shape either.
-        self.op_embed = nn.Embedding(num_op_types, d_model)
+            # Operation embedding (T1.2). Since Phase 1 the feature row carries
+            # only numeric arguments, so WHICH function to compute must be told to
+            # the model somehow. It is told as an embedding over OPERATIONS (16 op
+            # codes), which is legitimate task information — never as the oracle
+            # expert index in an input slot, which is prohibited
+            # (updated_rules.md 3). Note the size is num_op_types, not
+            # num_experts: the mapping op → expert is exactly what routing is
+            # supposed to discover, so it must not be handed to the model through
+            # the embedding table's shape either.
+            self.op_embed = nn.Embedding(num_op_types, d_model)
 
         # Stack of MoRE blocks
         self.blocks = nn.ModuleList([
@@ -1005,37 +1031,106 @@ class MoREModel(nn.Module):
                 )
             self.max_seq_len = int(max_seq_len)
             self.pos_embed = nn.Embedding(self.max_seq_len, d_model)
-
-        # Regression head: predict normalised output scalar (from pooled repr)
-        self.regression_head = nn.Sequential(
-            nn.LayerNorm(d_model),
-            nn.Linear(d_model, d_model // 2),
-            nn.GELU(),
-            nn.Linear(d_model // 2, 1),
-        )
+            # Same scale as the token embedding, for the same reason: the two are
+            # ADDED, so a positional table at N(0, 1) beside a token table at
+            # N(0, 0.02) would make position 50x louder than identity at
+            # initialisation and the first epochs would be spent attenuating it.
+            nn.init.normal_(self.pos_embed.weight, mean=0.0, std=0.02)
 
         # T8.3: the oracle label space, kept on the module so engine.py can
         # reshape step_cls_out without re-deriving the width from num_experts --
         # which is the exact mistake that made MoR unrunnable.
         self.num_families = int(num_families)
 
-        # Whole-program auxiliary classification head (whole-program family).
-        # T5.1 (plan.md 7.1): width is NOT a literal. It was hard-coded to 7
-        # while the canonical setup runs six families, so class 6 was an
-        # unreachable logit that softmax still had to normalise over -- every
-        # family probability was scaled down by an expert that cannot exist, and
-        # the argmax could in principle land on it.
-        # T8.3: width is num_families (the DATASET's label space, always 6), not
-        # num_experts (the MODEL's expert count, 1 for MoR). See the class
-        # docstring for why MoR crashed while these were the same argument.
-        self.cls_head = nn.Linear(d_model, self.num_families)
+        # ------------------------------------------------------------------
+        # T-L5.0 / T-L5.2 / T-L5.3  Heads, per task
+        # ------------------------------------------------------------------
+        #
+        # `plan_language.md` §7.1's table, made structural. The two paths construct
+        # DIFFERENT heads rather than sharing a superset with some of them weighted
+        # to zero, for the T-L5.2 reason: an unused head still contributes
+        # parameters to the budget comparison and still invites a future reader to
+        # weight it. Absence is the enforceable form of "has no meaning here".
+        self.task = str(task)
+        if self.task == TASK_LANGUAGE:
+            if vocab_size is None:
+                raise ValueError(
+                    "task='language' requires vocab_size: the token embedding and "
+                    "the tied LM head are both [vocab_size, d_model], and a "
+                    "default would silently disagree with the corpus the manifest "
+                    "was built for."
+                )
+            self.vocab_size = int(vocab_size)
 
-        # Per-token step classification head — applied per-step token BEFORE
-        # pooling.  Supervised by per-step oracle labels (step_routing_ce loss).
-        # This teaches the router: ADD token → Expert 0, MULT → Expert 1, etc.
-        # Same T5.1 and T8.3 reasoning, and it matters more here: this head is
-        # what the routing-accuracy and confusion-matrix metrics read.
-        self.step_cls_head = nn.Linear(d_model, self.num_families)
+            # T-L5.0. WEIGHT TYING, and `lm_head.weight` IS `tok_embed.weight` --
+            # the same tensor object, not a copy kept in sync. Standard practice,
+            # and here it is also what keeps the §6 parameter budget a statement
+            # about the EXPERT STACK: two independent V x d_model tables would be
+            # 2 x 2.1 M parameters at V = 8192, d_model = 256, which is most of a
+            # 10-20 M budget spent on lookup. Tying also puts the embedding under
+            # gradient from both the input and the output path.
+            #
+            # `bias=False` is required, not stylistic: a bias would be a per-token
+            # logit offset with no counterpart in the embedding, so the head would
+            # no longer be the transpose of the input map.
+            self.tok_embed = nn.Embedding(self.vocab_size, d_model)
+            self.lm_head = nn.Linear(d_model, self.vocab_size, bias=False)
+            self.lm_head.weight = self.tok_embed.weight
+
+            # T-L5.1: TYING MAKES THE EMBEDDING INIT SCALE AN OUTPUT-LOGIT SCALE,
+            # and `nn.Embedding`'s default is N(0, 1). Measured with that default:
+            # `task_loss` at initialisation was **167.6 nats**, against the uniform
+            # floor ln(8192) = 9.011 -- an 18x overshoot and a perplexity of 1e73.
+            # The arithmetic is direct: logits = h @ W.T, so with h of unit RMS the
+            # logit spread is ~std(W) * sqrt(d_model) = 1 * 16, and a 16-nat spread
+            # over 8192 classes is a confidently wrong distribution rather than a
+            # uniform one. A model starting there spends its first epochs undoing
+            # its own initialisation, which shows up as a suspiciously steep early
+            # loss curve rather than as an error.
+            #
+            # std=0.02 is the GPT-2 convention and puts the logit spread at ~0.32,
+            # so initialisation sits at the uniform floor -- which is what T-L5.1's
+            # `task_loss ~ ln(V)` check verifies, and which is exactly why that
+            # check is in the ledger.
+            nn.init.normal_(self.tok_embed.weight, mean=0.0, std=0.02)
+
+            # T-L5.3. A READ-ONLY PROBE, and the detach happens at its INPUT in
+            # `forward`, not here. It reports how linearly decodable the POS family
+            # is from the trunk's representation WITHOUT being able to create that
+            # decodability -- see the forward-pass comment for why that distinction
+            # is the whole point of §7.3.
+            self.family_probe = nn.Linear(d_model, self.num_families)
+        else:
+            # Regression head: predict normalised output scalar (from pooled repr)
+            self.regression_head = nn.Sequential(
+                nn.LayerNorm(d_model),
+                nn.Linear(d_model, d_model // 2),
+                nn.GELU(),
+                nn.Linear(d_model // 2, 1),
+            )
+
+            # Whole-program auxiliary classification head (whole-program family).
+            # T5.1 (plan.md 7.1): width is NOT a literal. It was hard-coded to 7
+            # while the canonical setup runs six families, so class 6 was an
+            # unreachable logit that softmax still had to normalise over -- every
+            # family probability was scaled down by an expert that cannot exist,
+            # and the argmax could in principle land on it.
+            # T8.3: width is num_families (the DATASET's label space, always 6),
+            # not num_experts (the MODEL's expert count, 1 for MoR). See the class
+            # docstring for why MoR crashed while these were the same argument.
+            self.cls_head = nn.Linear(d_model, self.num_families)
+
+            # Per-token step classification head — applied per-step token BEFORE
+            # pooling.  Supervised by per-step oracle labels (step_routing_ce
+            # loss). This teaches the router: ADD token → Expert 0, MULT → 1, etc.
+            # Same T5.1 and T8.3 reasoning, and it matters more here: this head is
+            # what the routing-accuracy and confusion-matrix metrics read.
+            #
+            # NOT shared with the language path's `family_probe`, deliberately: on
+            # arithmetic this head IS in the objective at weight 0.5 and shapes the
+            # trunk, which is the confound §7.3 refuses to inherit. Two names for
+            # two different scientific roles.
+            self.step_cls_head = nn.Linear(d_model, self.num_families)
 
 
     def forward(
@@ -1083,23 +1178,36 @@ class MoREModel(nn.Module):
                                 the summed counts.
         """
         # [B, max_steps, step_feat_dim] → [B, max_steps, d_model]
-        h = self.step_proj(x)
+        if self.task == TASK_LANGUAGE:
+            # T-L5.0. `x` is `input_ids [B, S]` long, not a float feature matrix.
+            # `step_ops` is all -1 for language (there is no operation axis) and is
+            # accepted but unused, so the arithmetic caller's argument order is
+            # untouched.
+            if x.dtype not in (torch.long, torch.int32, torch.int64):
+                raise TypeError(
+                    f"task='language' expects integer input_ids, got {x.dtype}. "
+                    "A float tensor here would be silently embedded by index "
+                    "truncation."
+                )
+            h = self.tok_embed(x)
+        else:
+            h = self.step_proj(x)
 
-        # Add the operation embedding (T1.2). Since the feature row is numeric
-        # arguments only, omitting this would leave the task unlearnable in
-        # principle: "compute f(args)" with f unknown. Padded steps use index 0
-        # and are then zeroed, so the pad op contributes nothing.
-        if step_ops is None:
-            raise ValueError(
-                "MoREModel.forward requires step_ops. Operation identity is the "
-                "only remaining signal for WHICH function each step computes "
-                "(the oracle expert index was removed from the input in Phase 1, "
-                "plan.md 3.2). Passing None would silently train a model that "
-                "cannot know the operation."
-            )
-        op_valid = (step_ops >= 0)
-        op_emb   = self.op_embed(step_ops.clamp(min=0))
-        h = h + op_emb * op_valid.unsqueeze(-1).to(h.dtype)
+            # Add the operation embedding (T1.2). Since the feature row is numeric
+            # arguments only, omitting this would leave the task unlearnable in
+            # principle: "compute f(args)" with f unknown. Padded steps use index 0
+            # and are then zeroed, so the pad op contributes nothing.
+            if step_ops is None:
+                raise ValueError(
+                    "MoREModel.forward requires step_ops. Operation identity is "
+                    "the only remaining signal for WHICH function each step "
+                    "computes (the oracle expert index was removed from the input "
+                    "in Phase 1, plan.md 3.2). Passing None would silently train a "
+                    "model that cannot know the operation."
+                )
+            op_valid = (step_ops >= 0)
+            op_emb   = self.op_embed(step_ops.clamp(min=0))
+            h = h + op_emb * op_valid.unsqueeze(-1).to(h.dtype)
 
         # Zero out pad positions after projection so they carry no signal
         h = h * step_mask.unsqueeze(-1).float()
@@ -1245,7 +1353,50 @@ class MoREModel(nn.Module):
         # Per-token step classification head — diagnostic / secondary supervision.
         # step_cls_head applies to h after MoRE blocks; used to monitor whether
         # the learned representations are separable by expert class.
-        step_cls_out = self.step_cls_head(h)   # [B, max_steps, num_families]
+        #
+        # T-L5.3 -- THE DETACH IS THE WHOLE POINT, AND IT IS HERE. On arithmetic
+        # this head sits in the objective at weight 0.5, so its gradient shapes the
+        # trunk, and "MoRE's representation separates operation families" is
+        # permanently weaker for it: some of the observed structure could be this
+        # head's gradient rather than the router's own behaviour. The arithmetic
+        # write-up handles that with the `no_family_supervision` ablation, which is
+        # the right remedy after the fact.
+        #
+        # Language does not inherit the confound. `h.detach()` cuts the trunk out of
+        # the probe's backward graph entirely, so the probe can REPORT how linearly
+        # decodable the POS family is without being able to CREATE that
+        # decodability. Every routing/AMI/purity number then measures emergent
+        # structure with no family signal anywhere in the trunk's objective, and the
+        # probe's loss weight is scientifically inert rather than tuned.
+        if self.task == TASK_LANGUAGE:
+            step_cls_out = self.family_probe(h.detach())
+        else:
+            step_cls_out = self.step_cls_head(h)   # [B, max_steps, num_families]
+
+        if self.task == TASK_LANGUAGE:
+            # T-L5.0 / T-L5.2. No pooling: every position is a prediction, so
+            # collapsing the sequence would throw the task away. `reg_out` carries
+            # the per-position vocabulary logits and `cls_out` is None -- a packed
+            # LM block has no whole-sequence family, so there is no such head to
+            # call. The tuple ARITY is unchanged so `engine.py` needs no second
+            # training loop (plan.md §9); the slots' meanings are documented in the
+            # `MoRELanguageDataset` docstring's table and in §7.1.
+            logits = self.lm_head(h)               # [B, S, vocab_size]
+            return (
+                logits,
+                None,
+                step_cls_out,
+                total_bal_loss,
+                total_ponder_cost,
+                depth_exits_last,
+                avg_depth_last,
+                expert_idx_last,
+                total_oracle_routing,
+                first_route_block0,
+                route_stats_total,
+                expected_depth_last,
+                halt_stats_total,
+            )
 
         # Masked mean-pool over real steps (exclude pad positions)
         mask_f   = step_mask.unsqueeze(-1).float()                    # [B, S, 1]

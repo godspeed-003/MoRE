@@ -14,7 +14,8 @@ import json
 from .model import (CANONICAL_ROUTING_MODE, DENSE_ABLATION_ROUTING_MODE,
                     ROUTING_MODES, CANONICAL_ROUTER_NOISE, ROUTER_NOISE_MODES,
                     ROUTER_NOISE_INIT_SCALE_DEFAULT,
-                    ROUTER_NOISE_ANNEAL_STEPS_DEFAULT)
+                    ROUTER_NOISE_ANNEAL_STEPS_DEFAULT,
+                    TASK_ARITHMETIC, TASK_LANGUAGE)
 from .families import NUM_EXPERTS_CANONICAL
 
 # The canonical expert count, E1..E6; the E7 catch-all is removed
@@ -52,8 +53,13 @@ CANONICAL_NUM_EXPERTS = NUM_EXPERTS_CANONICAL
 # axis is built to avoid. `test_language_task_axis.py:TL1.0a` asserts that
 # `loss_weights.task` is the ONLY `task` key in a resolved arithmetic config, so
 # the collision cannot quietly become a leak.
-TASK_ARITHMETIC = "arithmetic"
-TASK_LANGUAGE   = "language"
+#
+# T-L5.0: the two names now come FROM `model.py` rather than being defined here.
+# `MoREModel` has to branch on the task to decide which heads exist, and `config.py`
+# imports `model.py` (never the reverse -- see run_context.py:52), so the constant
+# had to move to the lower layer or be duplicated. They are re-exported from this
+# module unchanged, so every existing `from .config import TASK_LANGUAGE` still
+# resolves and no call site moved.
 TASKS = (TASK_ARITHMETIC, TASK_LANGUAGE)
 
 # The task whose absence is assumed. See resolve_task() for why absence -- rather

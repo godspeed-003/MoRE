@@ -1390,14 +1390,44 @@ does not exist here (T-L0.0).
 
 ## Phase L-5 — Heads and the language loss  (`plan_language.md` §7)
 
-- [ ] **T-L5.0 Token embedding + weight-tied LM head.** `nn.Embedding(V, d_model)`
+- [x] **T-L5.0 Token embedding + weight-tied LM head.** `nn.Embedding(V, d_model)`
   on input, and an output projection whose weight **is** the embedding weight.
   Tying halves the embedding parameter cost and keeps the §6 parameter budget a
   statement about the expert stack rather than about two independent V×d_model
   tables. **Verify:** the two weights are the same tensor object (`is`); the tied
   head's gradient accumulates from both the input and output paths.
+  **Evidence:** `code/test_lang_heads.py` → **25 passed, 0 failed, 0 skipped**
+  (TLH.0a–f, TLH.1a–d, TLH.2a–f, TLH.3a–d, TL5.4a–e). Gate L0 after the change:
+  `TOTAL 356 356 0 0`, ALL GATES PASS.
 
-- [ ] **T-L5.1 Causal-LM cross-entropy as `task_loss`, perplexity alongside.**
+  `lm_head.weight is tok_embed.weight` → **True** (identity, not equality — a copy
+  kept in sync would drift the moment either was updated in place), and the head has
+  **no bias**: a bias would be a per-token logit offset with no counterpart in the
+  embedding, so the head would stop being the transpose of the input map.
+
+  **The saving is measured against an untied copy of the same model**, not against a
+  formula: **5,523,468 tied vs 7,620,620 untied = exactly 2,097,152 saved**. The
+  expert stack plus attention is the other 3,426,316, which is what makes a MoR/MoRE
+  budget comparison a statement about *them* rather than about lookup tables.
+
+  **The tie is real in the backward direction too**, which is what "keeps the
+  embedding under gradient from both directions" actually names: after one backward
+  pass **8,192 of 8,192** embedding rows carry gradient, against only **64** distinct
+  ids in the batch. The excess is the output path, which touches every row of the
+  vocabulary.
+
+  `task='language'` without `vocab_size` **raises** (TLH.0e), and a float input to the
+  language path **raises** rather than being indexed by truncation (TLH.0f).
+
+  **A structural note recorded because it forced a small refactor.** `MoREModel` has
+  to branch on the task to decide which heads exist, and `config.py` imports
+  `model.py` and never the reverse (`run_context.py:52`). So `TASK_ARITHMETIC` and
+  `TASK_LANGUAGE` moved *down* into `model.py` and `config.py` re-exports them
+  unchanged — the alternative was duplicating two string literals across two modules,
+  which is against the one-manifest principle. No call site moved, and Gate L0 covers
+  `config.py`.
+
+- [x] **T-L5.1 Causal-LM cross-entropy as `task_loss`, perplexity alongside.**
   `task_loss = F.cross_entropy(logits[:, :-1].reshape(-1, V),
   input_ids[:, 1:].reshape(-1))` in **nats/token**; `perplexity = exp(task_loss)`
   reported and never optimized. Nats because every other loss term in the assembly
@@ -1405,16 +1435,58 @@ does not exist here (T-L0.0).
   **Verify:** at initialization `task_loss ≈ ln(8192) ≈ 9.011` (the uniform floor —
   a strong check that the shift, the reshape and the vocabulary agree); perplexity
   equals `exp(task_loss)` to floating-point tolerance.
+  **Evidence:** at initialization, over the five frozen seeds,
+  `task_loss = 9.0277 … 9.0898` against `ln(8192) = 9.0109` — **worst relative error
+  0.88%**. Perplexity 8,331 … 8,864 against `V = 8,192`, and equals `exp(task_loss)`
+  to 1e-9. The unit is checked against the closed form rather than against a comment:
+  9.0567 is near `ln(V) = 9.0109`, not near `log2(V) = 13.0000`.
 
-- [ ] **T-L5.2 Retire the regression head on the language path.** `regression_head`
+  **THAT CHECK EARNED ITS PLACE IMMEDIATELY. With `nn.Embedding`'s default `N(0, 1)`
+  the measured initial loss was 167.6 nats** — an 18× overshoot of the uniform floor,
+  perplexity ≈ 1e73. Weight tying makes the *embedding's* init scale an *output-logit*
+  scale: `logits = h @ W.T`, so with `h` at unit RMS the logit spread is
+  `std(W) · sqrt(d_model) = 1 × 16`, and a 16-nat spread over 8,192 classes is a
+  confidently wrong distribution rather than a uniform one. A model starting there
+  spends its first epochs undoing its own initialization, which appears as a
+  suspiciously steep early loss curve and never as an error. Fixed with
+  `std = 0.02` (the GPT-2 convention) on both `tok_embed` and `pos_embed` — the same
+  scale on both because they are *added*, so an `N(0,1)` positional table beside an
+  `N(0,0.02)` token table would make position 50× louder than identity at init.
+
+  **A second measured number worth having (TLH.1d): a mis-shifted language run would
+  report ~5.6 nats at epoch 0.** Scoring the *unshifted* target gives **5.5552** —
+  3.46 nats below the uniform floor, before any training — because a tied head over a
+  residual trunk already peaks `logits_i` at `x_i`. That is the copy shortcut tying
+  gives for free, and it is what a wrongly-shifted run would show while looking like
+  it had learned instantly. Gate L1 detects the general case; this pins the magnitude,
+  and 5.6 is close enough to the 4.98 bigram floor to be genuinely deceiving.
+
+- [x] **T-L5.2 Retire the regression head on the language path.** `regression_head`
   and the masked mean-pool exist for the scalar arithmetic answer and have no
   meaning for next-token prediction. They must be absent on the language path, not
   merely unused with a zero weight — an unused head still contributes parameters to
   the budget comparison and still invites a future reader to weight it.
   **Verify:** a language model's `state_dict` contains no `regression_head.*` key;
   an arithmetic model's still does.
+  **Evidence:** both clauses hold (TLH.2a/b). A language `state_dict` has **zero**
+  `regression_head.*` keys; an arithmetic one still has all six. Going further than
+  the box asked, **five** arithmetic-only modules are absent as attributes too —
+  `regression_head`, `cls_head`, `step_cls_head`, `step_proj`, `op_embed` (TLH.2c) —
+  and the four language-only ones (`tok_embed`, `lm_head`, `family_probe`,
+  `pos_embed`) are absent on arithmetic (TLH.2d).
 
-- [ ] **T-L5.3 `family_probe` reads `h.detach()`.** STRICTER THAN ARITHMETIC
+  `op_embed` is the one that mattered most to drop: on language it would have been
+  `nn.Embedding(0, d_model)`, because `lang_families.NUM_OP_TYPES` is 0 — legal to
+  build, and raising only when indexed. That is the worst kind of latent trap.
+
+  **The tuple arity stays 13** so `engine.py` needs no second training loop
+  (`plan.md` §9). Slot 0 carries `[B, S, V]` logits, slot 1 is **None** (a packed LM
+  block has no whole-sequence family, so the head is not constructed and the engine
+  emits a structural zero), slot 2 is the probe at `[B, S, 6]`. **No pooling**: every
+  position is a prediction, so collapsing the sequence would throw the task away
+  (TLH.2f).
+
+- [x] **T-L5.3 `family_probe` reads `h.detach()`.** STRICTER THAN ARITHMETIC
   (§7.3). On arithmetic, `family_cls` at weight 0.5 shapes the trunk, which
   permanently qualifies the specialization claim there: some of the observed
   expert structure could be the family head's gradient rather than the router's own
@@ -1425,14 +1497,64 @@ does not exist here (T-L0.0).
   input; zeroing vs. setting the probe weight produces **bit-identical** trunk
   gradients (the real test — a detached tensor that still routes gradient through a
   second path would pass a naive `requires_grad` check).
+  **Evidence:** both clauses hold, and the second is the one that matters.
+  `requires_grad` at the probe input is **False** (TLH.3a — kept because it is cheap,
+  not because it is sufficient). **The real test: trunk gradients are BITWISE
+  identical at probe weight 0.0, 0.5 and 1.0 — 47 tensors compared with
+  `torch.equal`, zero differences** (TLH.3b). So no value of the probe's loss weight
+  can move a single trunk gradient, which makes "scientifically inert" a measured fact
+  rather than an intention.
 
-- [ ] **T-L5.4 Engine metric namespace and `results.tsv` extension.** Add
+  **And the check is not passing because the probe is inert** (TLH.3c): its own
+  gradients are exactly zero at weight 0, non-zero at weight 1, and **exactly half**
+  the weight-1 values at weight 0.5. The probe learns; the trunk cannot feel it.
+
+  What this buys, stated plainly: on arithmetic `family_cls` sits in the objective at
+  weight 0.5 and shapes the trunk, so "MoRE's representation separates operation
+  families" is permanently weaker there — some of the observed structure could be that
+  head's gradient rather than the router's behaviour, which is why the arithmetic study
+  needs the labelled `no_family_supervision` ablation. **Language does not inherit the
+  confound at all.** Every routing / Hungarian / AMI / purity number on the language
+  arm measures emergent structure with no family signal anywhere in the trunk's
+  objective. Two attribute names for two scientific roles, so the distinction cannot be
+  lost in a refactor (TLH.3d).
+
+- [x] **T-L5.4 Engine metric namespace and `results.tsv` extension.** Add
   `val/task_loss` in nats, `val_perplexity`, and `depth_rho_model_loss` by
   **appending** columns to `results.tsv` — never reordering, because the existing
   arithmetic readers and the archived files index by position.
   **Verify:** an arithmetic `results.tsv` parses identically before and after; the
   new language columns are populated for language runs and absent-or-`N/A`, never
   `0.0`, for arithmetic runs.
+  **Evidence:** checks TL5.4a–e, verified against a `results.tsv` that Gate 5 wrote
+  during this session's suite run
+  (`runs/t67_provenance_check_seed44__6b711a59__r19`). The **ten pre-L5 columns are
+  unchanged in position** — `epoch`, `train_task_loss`, `val_loss`,
+  `expert_entropy_normalized`, `avg_depth`, `mean_cos_sim`, `max_cos_sim`,
+  `routing_accuracy`, `routing_hungarian_acc`, `routing_ami` — and the three new ones
+  are **appended**: `val_perplexity`, `nats_below_bigram_floor`,
+  `depth_rho_model_loss`. On the arithmetic row all three read **`N/A`**, never `0.0`:
+  `exp()` of an MSE is not a perplexity, and a `0.0` in a perplexity column is a
+  fabricated measurement.
+
+  Appended rather than inserted because the archived arithmetic files and every
+  existing reader index by **position**, so an insertion would silently reinterpret
+  published columns.
+
+  `depth_rho_model_loss` is Phase L-6's measurement. The column is reserved now so the
+  header never has to be reordered later, and it reads `N/A` until L-6 computes it —
+  the honest value for "not measured yet".
+
+  New W&B keys on the language path only: `val/perplexity`, `val/bits_per_token`, and
+  `val/nats_below_bigram_floor`. That last one is the form in which a language loss
+  number means anything (T-L2.5), and the floor is read from the **dataset manifest**
+  via `MoRELanguageDataset.primary_metric_floor` rather than from a config literal, so
+  a run cannot quote a floor measured on a different corpus. Absent, not `0.0`, when
+  the dataset supplies none. The probe CE is published as **`probe/family_ce`** on
+  language and `train/step_cls_ce` on arithmetic — the same tensor under two names,
+  because on one task it is a read-only measurement and on the other it trains the
+  trunk.
+
 
 ---
 
