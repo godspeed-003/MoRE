@@ -5531,6 +5531,64 @@ correlations already measured.
 `spearman_within_bins` for the bin-count table and why 50;
 `language_depth_metrics` `embed_norm` for what is published per epoch.
 
+## T-L7.0 — what the 6 GB card allows, and a soft cliff before the hard OOM
+
+`code/measure_lang_throughput.py` (new), `code/lang_throughput_more.json`,
+`code/more/engine.py` (one appended `results.tsv` column). The measurement that lifts the
+proxy guard's refusal: `batch_size` and `seq_len` are `null` in the language spec precisely
+so no canonical claim can be made until they are measured on a real card.
+
+**The card is real and it is here.** `D:/res/git/MoRE/.venv_cuda` reports
+`torch 2.6.0+cu126`, `cuda available: True`, NVIDIA GeForce RTX 3050 6GB Laptop GPU,
+6.00 GiB. Worth recording because the CPU smoke runs took tens of minutes per epoch and the
+GPU does the same work in ~90 seconds, roughly 40x -- every language run before this one was
+CPU-bound for no reason.
+
+**THREE FINDINGS.**
+
+1. **Peak VRAM is a function of `batch x seq_len`, not of either alone.** 16,384
+   tokens/step costs 4,063 / 4,115 / 4,187 / 4,212 MiB at seq_len 128 / 256 / 512 / 1024 --
+   within 4% across an 8x range of sequence length. So the binding constraint is TOKENS PER
+   STEP, and the (batch, seq_len) split becomes a scientific choice rather than a memory one.
+
+2. **THERE IS A SOFT CLIFF BEFORE THE HARD OOM, and a "did it OOM?" test walks straight
+   into it.** At 32,768 tokens/step the reported peak is 8.2 GiB on a 6 GiB card: the driver
+   falls back to shared/host memory, NOTHING RAISES, and throughput collapses 4x --
+   33,831 -> 8,674 tok/s at seq_len 256, 29,804 -> 8,528 at 512, 23,795 -> 5,353 at 1024. A
+   sweep that recorded only OOM yes/no would have accepted batch 128 / seq_len 256 as valid
+   and then run the whole canonical matrix four times slower, with nothing in the logs
+   saying why. Hard OOM only arrives at 65,536 tokens/step.
+
+3. **At a fixed token budget, shorter sequences are faster** -- 36,855 tok/s at seq_len 128
+   against 23,795 at 1024, both at 16,384 tokens/step. Attention is O(S^2), so `seq_len`
+   costs throughput rather than memory, which is the opposite of the intuition that a longer
+   context is the expensive-in-VRAM choice.
+
+**Sweet spot on this card: ~16,384 tokens/step at about 67% VRAM.**
+`seq_len = 256, batch_size = 64` gives 33,831 tok/s at the length the corpus is already
+packed at. Recorded as a RECOMMENDATION for T-L7.1, not a decision -- and **Ayan's 4060 has
+8 GiB, so its cliff sits higher and the numbers must be re-measured there.** This table is
+the 6 GB one and says so.
+
+**Method choices that matter.** Synthetic ids, so the grid can visit `seq_len` values the
+corpus is not packed at without repacking wikitext-2 four times -- which would have measured
+the dataloader rather than the card. The cost is that host-to-device copy and page-cache
+effects are omitted, so **tokens/s is an UPPER BOUND** and the JSON records
+`tokens_per_sec_is_upper_bound: true`. `max_memory_allocated` rather than
+`memory_allocated`, because the transient peak inside the backward pass is what OOMs a run
+and the steady-state figure misses it entirely; reset between configurations so one
+config's peak cannot be attributed to the next. The ponder cost is included in the timed
+step, because it is in the real objective and adds a backward path through every halt head.
+On OOM the remaining larger batches at that `seq_len` are skipped rather than re-proved.
+
+**Also in this commit:** `results.tsv` gains `depth_logfreq_partial_norm` as an appended
+column. `metrics.json` keeps only the final epoch, and the whole point of that number is its
+TREND (T-L6.10h) -- without the column the trend is recoverable only from W&B history, which
+an offline run does not have.
+
+**Where to look.** `measure_lang_throughput.one_config` for what is timed and why;
+`lang_throughput_more.json` for the full grid; `TASKS_LANGUAGE.md` T-L7.0 for the table.
+
 <!-- APPEND-MARKER-CL -->
 
 

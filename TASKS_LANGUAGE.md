@@ -2055,13 +2055,61 @@ does not exist here (T-L0.0).
 ---
 
 ## Phase L-7 — Calibration and protocol freeze  (`plan_language.md` §10, Gate L5)
-- [ ] **T-L7.0 Measure throughput and memory on the RTX 3050 (6 GB).** The
+- [x] **T-L7.0 Measure throughput and memory on the RTX 3050 (6 GB).** The
   arithmetic protocol's `batch_size = 768` is meaningless for `[B, S, V]` logits;
   6 GB is the binding constraint and must be measured, not estimated. Sweep batch
   size and `seq_len` on wikitext-2 for a fixed small step count, recording
   tokens/s, peak VRAM, and whether the step OOMs. **Verify:** a recorded table of
   (batch, seq_len) → tokens/s, peak MiB, OOM yes/no, taken with the CUDA
   interpreter on the real GPU.
+  **Evidence:** `code/measure_lang_throughput.py`, full table in
+  `code/lang_throughput_more.json`. NVIDIA GeForce RTX 3050 6GB Laptop GPU, 6.00 GiB,
+  torch 2.6.0+cu126, MoRE at `ffn_mult 4 / max_depth 7 / d_model 256 / V 8192`, 5 timed
+  steps after 2 warmup, forward + backward + grad-clip + optimizer step:
+
+  | seq_len | batch | tokens/step | tokens/s | peak MiB | % VRAM | OOM |
+  |---|---|---|---|---|---|---|
+  | 128 | 64 | 8,192 | 31,464 | 2,028 | 33.0% | no |
+  | 128 | **128** | 16,384 | **36,855** | 4,063 | 66.1% | no |
+  | 256 | 32 | 8,192 | 29,399 | 2,091 | 34.0% | no |
+  | 256 | **64** | 16,384 | **33,831** | 4,115 | 67.0% | no |
+  | 256 | 128 | 32,768 | 8,674 | 8,194 | 133.4% | no — **thrashing** |
+  | 512 | **32** | 16,384 | **29,804** | 4,187 | 68.1% | no |
+  | 512 | 64 | 32,768 | 8,528 | 8,249 | 134.3% | no — **thrashing** |
+  | 512 | 128 | 65,536 | — | — | — | **YES** |
+  | 1024 | **16** | 16,384 | **23,795** | 4,212 | 68.6% | no |
+  | 1024 | 32 | 32,768 | 5,353 | 8,252 | 134.3% | no — **thrashing** |
+  | 1024 | 64 | 65,536 | — | — | — | **YES** |
+
+  **Three findings, and the second is the one a naive sweep would have missed.**
+
+  1. **Peak VRAM is a function of `batch × seq_len`, not of either alone.** 16,384
+     tokens/step costs 4,063 / 4,115 / 4,187 / 4,212 MiB at seq_len 128 / 256 / 512 / 1024
+     — within 4% across an 8× range of sequence length. The binding constraint is **tokens
+     per step**, which makes the (batch, seq_len) split a scientific choice rather than a
+     memory one.
+  2. **There is a SOFT CLIFF before the hard OOM, and "did it OOM?" alone walks into it.**
+     At 32,768 tokens/step the reported peak is 8.2 GiB on a 6 GiB card — the driver falls
+     back to shared/host memory, **nothing raises**, and throughput collapses **4×**
+     (33,831 → 8,674 tok/s at seq_len 256). A sweep recording only OOM yes/no would have
+     accepted batch 128 / seq_len 256 and then run the entire matrix four times slower.
+  3. **At a fixed token budget, shorter sequences are faster** — 36,855 tok/s at seq_len
+     128 against 23,795 at 1024, both at 16,384 tokens/step. Attention is O(S²), so
+     `seq_len` costs throughput rather than memory.
+
+  **Recommendation for T-L7.1, not a decision:** ~16,384 tokens/step at ≈67% VRAM is the
+  sweet spot on this card, and `seq_len = 256, batch_size = 64` gives 33,831 tok/s at the
+  length the corpus is already packed at. **Ayan's 4060 has 8 GiB, so its cliff sits higher
+  and the numbers must be re-measured there before anything is frozen** — this table is the
+  6 GB one.
+
+  **The tokens/s figures are an UPPER BOUND.** Synthetic ids are used so the grid can visit
+  `seq_len` values the corpus is not packed at without repacking four times; that omits
+  host-to-device copy and page-cache effects. `max_memory_allocated` is used rather than
+  `memory_allocated`, because the transient peak inside the backward pass is what OOMs a
+  run, and it is reset between configurations so one config's peak cannot be attributed to
+  the next. An 8-epoch real run at seq_len 256 / batch 64 is in flight for the end-to-end
+  comparison.
 
 - [ ] **T-L7.1 Freeze the language protocol in one commit.** `seq_len`,
   `vocab_size`, `batch_size`, `lr`, `weight_decay`, `epochs`, `max_depth`,

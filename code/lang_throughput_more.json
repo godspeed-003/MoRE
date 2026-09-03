@@ -1,0 +1,209 @@
+{
+  "device": "NVIDIA GeForce RTX 3050 6GB Laptop GPU",
+  "total_vram_gib": 5.99951171875,
+  "torch": "2.6.0+cu126",
+  "arch": "more",
+  "shape": {
+    "d_model": 256,
+    "n_heads": 4,
+    "num_blocks": 1,
+    "vocab_size": 8192,
+    "max_depth": 7,
+    "ffn_mult": 4
+  },
+  "timed_steps": 5,
+  "synthetic_ids": true,
+  "tokens_per_sec_is_upper_bound": true,
+  "rows": [
+    {
+      "arch": "more",
+      "seq_len": 128,
+      "batch_size": 8,
+      "tokens_per_batch": 1024,
+      "tokens_per_sec": 9721.77864488097,
+      "peak_mib": 324.900390625,
+      "oom": false,
+      "note": ""
+    },
+    {
+      "arch": "more",
+      "seq_len": 128,
+      "batch_size": 16,
+      "tokens_per_batch": 2048,
+      "tokens_per_sec": 16038.432092909077,
+      "peak_mib": 570.6865234375,
+      "oom": false,
+      "note": ""
+    },
+    {
+      "arch": "more",
+      "seq_len": 128,
+      "batch_size": 32,
+      "tokens_per_batch": 4096,
+      "tokens_per_sec": 25115.869636463893,
+      "peak_mib": 1032.4462890625,
+      "oom": false,
+      "note": ""
+    },
+    {
+      "arch": "more",
+      "seq_len": 128,
+      "batch_size": 64,
+      "tokens_per_batch": 8192,
+      "tokens_per_sec": 31464.286114789258,
+      "peak_mib": 2027.9521484375,
+      "oom": false,
+      "note": ""
+    },
+    {
+      "arch": "more",
+      "seq_len": 128,
+      "batch_size": 128,
+      "tokens_per_batch": 16384,
+      "tokens_per_sec": 36854.573705731425,
+      "peak_mib": 4062.6748046875,
+      "oom": false,
+      "note": ""
+    },
+    {
+      "arch": "more",
+      "seq_len": 256,
+      "batch_size": 8,
+      "tokens_per_batch": 2048,
+      "tokens_per_sec": 15993.907320918386,
+      "peak_mib": 577.8017578125,
+      "oom": false,
+      "note": ""
+    },
+    {
+      "arch": "more",
+      "seq_len": 256,
+      "batch_size": 16,
+      "tokens_per_batch": 4096,
+      "tokens_per_sec": 24000.096562963496,
+      "peak_mib": 1058.62744140625,
+      "oom": false,
+      "note": ""
+    },
+    {
+      "arch": "more",
+      "seq_len": 256,
+      "batch_size": 32,
+      "tokens_per_batch": 8192,
+      "tokens_per_sec": 29398.81997049078,
+      "peak_mib": 2091.4482421875,
+      "oom": false,
+      "note": ""
+    },
+    {
+      "arch": "more",
+      "seq_len": 256,
+      "batch_size": 64,
+      "tokens_per_batch": 16384,
+      "tokens_per_sec": 33830.75388973792,
+      "peak_mib": 4115.4990234375,
+      "oom": false,
+      "note": ""
+    },
+    {
+      "arch": "more",
+      "seq_len": 256,
+      "batch_size": 128,
+      "tokens_per_batch": 32768,
+      "tokens_per_sec": 8674.422085691429,
+      "peak_mib": 8194.1875,
+      "oom": false,
+      "note": ""
+    },
+    {
+      "arch": "more",
+      "seq_len": 512,
+      "batch_size": 8,
+      "tokens_per_batch": 4096,
+      "tokens_per_sec": 20774.191637500895,
+      "peak_mib": 1066.71728515625,
+      "oom": false,
+      "note": ""
+    },
+    {
+      "arch": "more",
+      "seq_len": 512,
+      "batch_size": 16,
+      "tokens_per_batch": 8192,
+      "tokens_per_sec": 26134.966428440744,
+      "peak_mib": 2104.9794921875,
+      "oom": false,
+      "note": ""
+    },
+    {
+      "arch": "more",
+      "seq_len": 512,
+      "batch_size": 32,
+      "tokens_per_batch": 16384,
+      "tokens_per_sec": 29804.00158020014,
+      "peak_mib": 4186.732421875,
+      "oom": false,
+      "note": ""
+    },
+    {
+      "arch": "more",
+      "seq_len": 512,
+      "batch_size": 64,
+      "tokens_per_batch": 32768,
+      "tokens_per_sec": 8527.888276668047,
+      "peak_mib": 8249.12353515625,
+      "oom": false,
+      "note": ""
+    },
+    {
+      "arch": "more",
+      "seq_len": 512,
+      "batch_size": 128,
+      "tokens_per_batch": 65536,
+      "tokens_per_sec": null,
+      "peak_mib": null,
+      "oom": true,
+      "note": "CUDA out of memory. Tried to allocate 2.00 GiB. GPU 0 has a total capacity of 6.00 GiB of which 0 bytes is fre"
+    },
+    {
+      "arch": "more",
+      "seq_len": 1024,
+      "batch_size": 8,
+      "tokens_per_batch": 8192,
+      "tokens_per_sec": 20621.17254726317,
+      "peak_mib": 2121.56103515625,
+      "oom": false,
+      "note": ""
+    },
+    {
+      "arch": "more",
+      "seq_len": 1024,
+      "batch_size": 16,
+      "tokens_per_batch": 16384,
+      "tokens_per_sec": 23795.268668673634,
+      "peak_mib": 4211.69677734375,
+      "oom": false,
+      "note": ""
+    },
+    {
+      "arch": "more",
+      "seq_len": 1024,
+      "batch_size": 32,
+      "tokens_per_batch": 32768,
+      "tokens_per_sec": 5352.555331771169,
+      "peak_mib": 8252.17138671875,
+      "oom": false,
+      "note": ""
+    },
+    {
+      "arch": "more",
+      "seq_len": 1024,
+      "batch_size": 64,
+      "tokens_per_batch": 65536,
+      "tokens_per_sec": null,
+      "peak_mib": null,
+      "oom": true,
+      "note": "CUDA out of memory. Tried to allocate 2.00 GiB. GPU 0 has a total capacity of 6.00 GiB of which 0 bytes is fre"
+    }
+  ]
+}

@@ -1480,7 +1480,8 @@ def train(cfg: dict, run_epochs: int | None = None, ctx: "RunContext | None" = N
             f"{entropy_str}\t{depth_str}\t"
             f"{mean_cos_str}\t{max_cos_str}\t{routing_acc_str}\t"
             f"{hung_str}\t{ami_str}\t"
-            f"{_ppl_str}\t{_below_str}\t{_rho_str}"
+            f"{_ppl_str}\t{_below_str}\t{_rho_str}\t"
+            f"{_na(val_depth_log.get('depth/embed_norm_logfreq_partial_norm'), '.6f')}"
         )
 
         # Flush results to disk every epoch so a partial run is still readable.
@@ -1497,7 +1498,14 @@ def train(cfg: dict, run_epochs: int | None = None, ctx: "RunContext | None" = N
                 "routing_hungarian_acc\trouting_ami\t"
                 # T-L5.4: APPENDED, never inserted -- see the row builder above for
                 # why position matters to the archived arithmetic files.
-                "val_perplexity\tnats_below_bigram_floor\tdepth_rho_model_loss\n"
+                "val_perplexity\tnats_below_bigram_floor\tdepth_rho_model_loss\t"
+                # T-L6.10h: the corrected frequency-depth correlation, PER EPOCH.
+                # `metrics.json` keeps only the final epoch, and the whole point of this
+                # number is its TREND -- an embedding-norm artifact should weaken as
+                # training equalises the row norms, a real behaviour should not. Without
+                # this column the trend is recoverable only from W&B history, which an
+                # offline run does not have.
+                "depth_logfreq_partial_norm\n"
             )
             f.write("\n".join(results_rows) + "\n")
 
