@@ -1,3 +1,11 @@
+"""
+PRE-FINALIZATION SWEEP DRIVER -- NOT RUNNABLE, RETAINED AS HISTORY.
+See the banner in automated/rerun_mor.py: absolute paths into
+`C:\\Users\\Hp\\Desktop\\Waste\\MoRE`, and a global `results.tsv` / sweep CSV that
+CLAUDE.md §5 prohibits and run_context.py refuses. T-L0.0 deliberately left the
+interpreter constant stale rather than making this one edit from runnable.
+"""
+
 import json
 import subprocess
 import os

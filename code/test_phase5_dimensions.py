@@ -4,7 +4,7 @@ Verifies T5.1 - T5.5 (plan.md 7.1-7.5, CLAUDE.md 2 "Expert count" / "Router
 noise", CLAUDE.md 3, CLAUDE.md 5).
 
 Run:
-    C:/Users/Hp/anaconda3/envs/more_env/python.exe code/test_phase5_dimensions.py
+    C:/Users/vedan/anaconda3/python.exe code/test_phase5_dimensions.py
 
 Design note. Phase 4 guarded against a MAGNITUDE defect; this gate guards
 against a DIMENSIONAL one, and dimensional defects in this codebase also do not

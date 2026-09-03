@@ -150,10 +150,20 @@ def routing_accuracy_from_confusion(confusion, num_experts: int) -> float:
 #
 # Everything below is computed from the SAME E×E confusion matrix the figure and
 # the raw accuracy use, so the numbers cannot disagree with the matrix or need a
-# second pass over the loader. No scipy/sklearn in this environment (checked),
-# so the assignment and the AMI correction are implemented here rather than
-# approximated -- a greedy match is not the Hungarian match and must not be
-# labelled as one.
+# second pass over the loader. The assignment and the AMI correction are
+# implemented here, exactly, rather than approximated -- a greedy match is not the
+# Hungarian match and must not be labelled as one.
+#
+# T-L0.0: this comment used to justify the local implementations with "no
+# scipy/sklearn in this environment (checked)". That was false, or had stopped
+# being true: sklearn 1.3.2 and scipy 1.14.1 are both importable from the
+# interpreters in ENVIRONMENT.md. The real reasons the local versions stay are
+# that they are exact at E<=15 and checked against brute force in
+# test_phase6_routing_metrics.py, and that the metric layer then imports nothing
+# beyond torch/numpy -- so a metrics-only environment cannot silently produce a
+# different Hungarian accuracy than the training environment did. Swapping
+# working exact code for a library call would be churn, not a fix; only the
+# stated reason was wrong.
 
 
 def _to_contingency(confusion) -> np.ndarray:

@@ -1,0 +1,120 @@
+{
+  "_README": [
+    "config.json is the DEFAULTS file. canonical_spec.json is the FROZEN CONTRACT.",
+    "T8.2: every field that canonical_spec.json:enforced_fields pins now holds the",
+    "same value here, so a run launched with no CLI overrides at all is already",
+    "canonical-compliant. Before T8.2 this file said num_blocks 2 / batch_size 128",
+    "against the spec's frozen 1 / 768, which meant the default run was silently a",
+    "proxy and only an explicitly-overridden run could be canonical.",
+    "If you change a value here, change canonical_spec.json in the same commit or",
+    "the Gate 0 guard will refuse every canonical run -- which is the intended",
+    "direction of failure."
+  ],
+  "model": {
+    "d_model": 256,
+    "num_experts": 1,
+    "max_depth": 7,
+    "max_steps": 7,
+    "step_feat_dim": 12,
+    "num_blocks": 1,
+    "dropout": 0.1,
+    "ffn_mult": 24,
+    "routing_mode": "top1_sparse",
+    "router_noise": "none",
+    "router_noise_init": 0.1,
+    "router_noise_anneal_steps": 1000,
+    "halting_supervision": false,
+    "adaptive_halting": true
+  },
+  "training": {
+    "lr": 0.001,
+    "weight_decay": 0.0001,
+    "batch_size": 768,
+    "epochs": 1,
+    "val_split": 0.1,
+    "grad_clip": 1.0,
+    "subset_fraction": 1.0,
+    "subset_seed": 44
+  },
+  "loss_weights": {
+    "task": 1.0,
+    "family_cls": 0.5,
+    "routing_balance": 0.0,
+    "step_routing": 0.0,
+    "halting": 0.001,
+    "halting_supervision": 0.0
+  },
+  "data": {
+    "train_path": "D:\\res\\git\\MoRE\\.claude\\worktrees\\english-language-dataset-migration-92946e\\data\\train.jsonl",
+    "val_path": "D:\\res\\git\\MoRE\\.claude\\worktrees\\english-language-dataset-migration-92946e\\data\\val.jsonl",
+    "test_path": "D:\\res\\git\\MoRE\\.claude\\worktrees\\english-language-dataset-migration-92946e\\data\\test.jsonl",
+    "max_val": 1000000.0,
+    "pad_value": 0.0,
+    "dataset_version": "more6-v1-seed42-n70000-3c1087b6aad9",
+    "train_split_version": "fixed-file-splits-v1",
+    "subset_fraction": 1.0,
+    "jsonl_path": "D:\\res\\git\\MoRE\\.claude\\worktrees\\english-language-dataset-migration-92946e\\data\\train.jsonl",
+    "subset_seed": 44
+  },
+  "logging": {
+    "wandb_project": "micro-MoRE-poc",
+    "log_interval": 2,
+    "run_name": "t_l03_mor_timing_seed44",
+    "experiment_group": "exploratory"
+  },
+  "architecture": "mor",
+  "provenance": {
+    "seed": 44,
+    "resolved_epochs": 1,
+    "resolved_subset_fraction": 1.0,
+    "resolved_batch_size": 768,
+    "experiment_id": "t_l03_mor_timing_seed44__fa9339bc",
+    "experiment_group": "exploratory",
+    "code_git_commit": "08e904272038bbac0fc626cb6eedd21de89071e3",
+    "code_git_dirty": true,
+    "config_hash": "fa9339bc279495e8b5bb8c604833526d90adf3a6a0808319d0cf927ffed90f73",
+    "run_dir": "runs/t_l03_mor_timing_seed44__fa9339bc",
+    "architecture": "mor",
+    "variant": "canonical",
+    "run_name": "t_l03_mor_timing_seed44",
+    "dataset_version": "more6-v1-seed42-n70000-3c1087b6aad9",
+    "train_split_version": "fixed-file-splits-v1",
+    "resolved_seed": 44,
+    "seed_source": "cli",
+    "seed_declared": true,
+    "seed_set_canonical": [
+      42,
+      43,
+      44,
+      45,
+      46
+    ],
+    "determinism_mode": "warn_only",
+    "torch_deterministic_algorithms": true,
+    "cudnn_deterministic": true,
+    "cudnn_benchmark": false,
+    "cublas_workspace_config": ":4096:8",
+    "determinism_exceptions": [
+      "CUDA not available: CUDA generators were not seeded."
+    ],
+    "wandb_run_id": "nytw7xv5",
+    "device": "cpu",
+    "halting_mode": "pure_act",
+    "halting_supervision_enabled": false,
+    "halting_supervision_weight": 0.0,
+    "ponder_weight": 0.001,
+    "resolved_routing_mode": "top1_sparse",
+    "resolved_router_noise": "none",
+    "ffn_mult": 24,
+    "routing_supervision_enabled": false,
+    "routing_supervision_weight": 0.0,
+    "family_supervision_enabled": true,
+    "family_cls_weight": 0.5,
+    "router_noise_scale": 0.0,
+    "halt_target_mode": "pure_act",
+    "total_params": 3197710,
+    "nondeterministic_ops_observed": [
+      "none"
+    ]
+  }
+}

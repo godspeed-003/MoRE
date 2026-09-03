@@ -258,7 +258,7 @@ phenomenon under study.
 | Held-out depth eval | all recursive runs | — | — | offline analysis | `runs/*/val_depth_offline.json` |
 | `family_cls` removal | on vs off | 42–44 | 20 | **exploratory proxy** | `automated/family_cls_ablation_result.json` |
 | Capacity benchmark | batch and width sweeps | — | — | microbenchmark | `results/bench_capacity.log` |
-| Correctness suite | 5 gates, 350 checks | — | — | verification | `code/run_correctness_suite.py` |
+| Correctness suite | 5 gates, 356 checks | — | — | verification | `code/run_correctness_suite.py` |
 
 The headline matrix is the only thing that enters the main table. `canonical_spec.json`
 enforces this: a run may declare `experiment_group = canonical_phase_b` only if every
@@ -332,10 +332,18 @@ as evidence of the pre-audit state.
 
 ## 6. Getting started
 
-Environment (torch 2.5.1 + CUDA; Anaconda base does not have torch):
+Environment — two interpreters, because the correctness gates and the training runs
+have different needs. Anaconda base does not have torch; see
+[ENVIRONMENT.md](ENVIRONMENT.md) for how both were built and what is pinned.
 
 ```bash
-conda activate more_env
+# correctness gates (CPU is enough, and it is what the gate counts were measured on)
+C:/Users/vedan/anaconda3/python.exe code/run_correctness_suite.py
+```
+
+```bash
+# training (CUDA)
+D:/res/git/MoRE/.venv_cuda/Scripts/python.exe code/train.py --architecture more --seed 42
 ```
 
 Train one architecture at one seed, from `code/`:
@@ -350,7 +358,8 @@ config field and the run identity changes with it. No global `best_model.pt`,
 `results.tsv` or `*_results.csv` is ever written; this is enforced by
 `code/more/run_context.py`.
 
-Verify the implementation against the five architectural gates (350 checks):
+Verify the implementation against the five architectural gates (356 checks — 350 at
+the close of the arithmetic study, +6 from two suite defects fixed in T-L0.3):
 
 ```bash
 python run_correctness_suite.py

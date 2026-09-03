@@ -1,3 +1,19 @@
+"""
+PRE-FINALIZATION SWEEP DRIVER -- NOT RUNNABLE, RETAINED AS HISTORY.
+
+Every path below points at the machine the arithmetic POC was developed on
+(`C:\\Users\\Hp\\Desktop\\Waste\\MoRE`), which does not exist here, and the outputs it
+writes -- a global `results.tsv` and a sweep CSV -- are now PROHIBITED by
+CLAUDE.md §5 and actively refused by code/more/run_context.py. It is kept because
+CLAUDE.md §6 says archive, never delete, evidence: it records how the pre-audit
+sweeps were launched.
+
+T-L0.0: the interpreter constant was deliberately NOT repointed at the current
+environment. Making a script that writes forbidden global artifacts one edit away
+from runnable is worse than leaving it obviously broken. To sweep anything now,
+write a new driver that goes through `code/train.py` and `runs/<experiment_id>/`.
+"""
+
 import json
 import subprocess
 import os

@@ -3,7 +3,7 @@
 Verifies T2.1 - T2.4 (plan.md 4.1-4.3, updated_rules.md 1.1 ablation F).
 
 Run:
-    C:/Users/Hp/anaconda3/envs/more_env/python.exe code/test_phase2_routing.py
+    C:/Users/vedan/anaconda3/python.exe code/test_phase2_routing.py
 
 Design note. Every check here is a MEASUREMENT of the running code, not an
 inspection of it. The dense-vs-sparse distinction is invisible in the loss curve

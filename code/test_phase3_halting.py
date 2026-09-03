@@ -3,7 +3,7 @@
 Verifies T3.1 - T3.4 (plan.md 5.1-5.5, updated_rules.md 2.2-2.3, CLAUDE.md 2).
 
 Run:
-    C:/Users/Hp/anaconda3/envs/more_env/python.exe code/test_phase3_halting.py
+    C:/Users/vedan/anaconda3/python.exe code/test_phase3_halting.py
 
 Design note. The defect this gate exists to prevent is SILENT. Before Phase 3
 the halting term was `active_mask.float().mean() * 0.05` -- a number computed

@@ -3689,6 +3689,329 @@ table, "What bounds all of this"), §2 (repo layout), §3 (verified commands), �
 values (0.2182 / 0.2250 / 0.2191 → the range is 21.8–22.5%, not the 22.7% carried in
 an earlier draft), parameter counts and all six Phase 10 verdicts match.
 
+---
+
+# Language migration (branch `claude/english-language-dataset-migration-92946e`)
+
+Everything below belongs to the **English-language study**, not the arithmetic
+one. The arithmetic study is closed: `TASKS.md` is closed, its runs in `runs/` are
+never re-run or deleted, and its numbers are never merged or averaged with
+language numbers (`TASKS_LANGUAGE.md` T-L10.2, T-LX.2). The two are separate
+studies that share one codebase.
+
+The plan is [plan_language.md](plan_language.md); the resumable ledger and resume
+point is [TASKS_LANGUAGE.md](TASKS_LANGUAGE.md).
+
+## T-L0.1 — CUDA interpreter, because the documented one does not exist here
+
+**What.** Built `D:\res\git\MoRE\.venv_cuda` with `torch 2.6.0+cu126` on top of
+the Anaconda base interpreter, and verified CUDA end to end on the RTX 3050.
+
+**Method.** `python -m venv --system-site-packages`, then torch alone from the
+cu126 index. `--system-site-packages` is the point: numpy, scipy, sklearn, pandas,
+wandb and the whole HuggingFace stack stay in exactly one place, so the CPU and
+CUDA interpreters cannot drift apart in anything except torch. The venv's own
+`site-packages` shadows base for torch only.
+
+CUDA was verified by running a **real device matmul**, not by trusting
+`torch.cuda.is_available()`, which returns `True` on drivers that then fail to
+launch a kernel.
+
+The install printed four dependency-conflict warnings — `google-genai`,
+`pymilvus`, `s3fs`, `streamlit`. All four are unrelated base packages with loose
+pins; none is imported anywhere in this repository. Verified harmless rather than
+assumed harmless. Base was confirmed unmodified afterwards
+(`base torch 2.6.0+cpu cuda False`), so the venv is fully reversible: delete the
+directory and nothing else changes. It is git-ignored.
+
+**Failure tracing.** `No such file or directory` on the interpreter path means you
+are reading a doc written on the old development machine — see T-L0.0.
+`torch.cuda.is_available() == False` from `.venv_cuda` means the venv's torch was
+shadowed by base's CPU build; check that `torch.__version__` ends in `+cu126`, not
+`+cpu`. A CUDA OOM at 6 GB is expected territory in the language phase, not a bug —
+that is what T-L7.0 exists to measure before the protocol is frozen.
+
+**Where to look.** [ENVIRONMENT.md](ENVIRONMENT.md) §1 and §4 (both interpreters,
+the build commands, the conflict warnings); `CLAUDE.md` §9; `ARCHITECTURE.md` §9.
+
+**Verified by.** Probe of both interpreters, 2026-09-03: CPU
+`C:\Users\vedan\anaconda3\python.exe` Python 3.12.7 `torch 2.6.0+cpu`
+`cuda False`; CUDA `D:\res\git\MoRE\.venv_cuda\Scripts\python.exe` Python 3.12.7
+`torch 2.6.0+cu126` `cuda True` CUDA 12.6,
+`NVIDIA GeForce RTX 3050 6GB Laptop GPU` 6143 MiB, compute capability 8.6, driver
+596.08.
+
+## T-L0.3a — `os.path.relpath` raises across Windows drives, and gate 4 died with no `[FAIL]`
+
+**What.** `RunContext.create` recorded the run directory as a repo-relative path.
+On this machine that **raised** and took gate 4 down at check 51. Fixed by falling
+back to the absolute path when no relative expression exists. Gate 4 went from
+`51 pass + crash` to `129 checks 129 pass 0 fail 0 skip PASS`.
+
+**Method.** The line was `os.path.relpath(directory, _REPO_DIR)`. On Windows,
+`relpath` does not degrade gracefully across mounts — it raises
+`ValueError: path is on mount 'C:', start on mount 'D:'`. The repository is on
+`D:`; `test_phase6_seeding.py:388` creates its runs root with
+`tempfile.mkdtemp(prefix="t61_runs_")`, which lands in `C:\Users\...\Temp`.
+
+Extracted `_repo_relative(path)` in
+[code/more/run_context.py](code/more/run_context.py) (just above `file_sha256`):
+keep the relative form with forward slashes when one exists, otherwise the
+absolute path, also forward-slashed. A run directory outside the repository is
+**legitimate** — both consumers of this field only echo the string — so the fix is
+to record the truth, not to force a relative path that cannot exist.
+
+Not a new defect. It was latent from the beginning and invisible on the machine
+the POC was developed on, because there the repository and the temp directory
+happened to share a drive.
+
+The secondary damage is worth remembering: the crash produced **no `[PASS]`,
+`[FAIL]` or `[SKIP]` marker at all**, so `run_correctness_suite.py` could only
+report *"output format not recognised"*. A suite whose failure mode is an
+unparseable gate tells you less than a suite that fails loudly.
+
+**Failure tracing.** *"output format not recognised"* from the suite runner means a
+gate file **crashed before its first marker** — re-run that one file directly and
+read the traceback; there is no `[FAIL]` line to find. Any `ValueError: path is on
+mount` means a path is being made relative across drives; the repo is on `D:` and
+`tempfile` is on `C:`.
+
+**Where to look.** [code/more/run_context.py](code/more/run_context.py)
+`_repo_relative` and its single call site setting `prov["run_dir"]`;
+[code/test_phase6_seeding.py](code/test_phase6_seeding.py):388 (`_TMP_RUNS`);
+`code/run_correctness_suite.py` `MARKER`.
+
+**Verified by.** `C:/Users/vedan/anaconda3/python.exe code/test_phase6_seeding.py`
+→ 60 pass, rc 0 (was 51 pass then crash). Gate 4:
+`129 checks 129 pass 0 fail 0 skip 21.1s PASS`.
+
+## T-L0.3b — gate 5 graded a run from before the fix it was testing, because `git worktree add` rewrote every mtime
+
+**What.** Gate 5's G5.2b block reported five `val/routing_*` keys as *absent* on a
+single-expert run, which would mean the T8.1 sentinel contract had regressed. It
+had not. **The writers are correct at HEAD** — a MoR run built at `08e90427` emits
+all eleven routing and expert-diversity quantities as the string `'N/A'`, present
+rather than absent. The fault was the test's *selection key*. Fixed two ways, and
+the fix closed a real blind spot as well. Gate 5:
+`150 checks 150 pass 0 fail 0 skip PASS`.
+
+**Method.** `test_gate5.py` chose its single-expert run as the newest matching
+directory by `os.path.getmtime`. But `runs/` is **tracked** (555 files), so
+`git worktree add` wrote all 132 run directories fresh, in checkout order — a
+measured mtime spread of 2026-09-03 01:54:39 → 02:30:05, 2125.8 s, carrying no
+relation whatever to when the experiments ran. That put
+`t83_mor_headfix_seed42__dd11e6dc__r2` last: commit `e5b0f6df`, from **before** the
+T8.1 fix that made those keys present-and-`"N/A"`. The test was grading
+pre-fix history and reporting a defect the current code does not have.
+
+Audited all 18 single-expert runs to be sure the archive itself was sound: 9
+satisfy the contract (all five `phaseB_mor_seed4*`, plus `t81b`/`t81c` at
+`30831ff6`), 9 predate the fix. `t81_mor` (0 `N/A` keys) and `t81b_mor_seed42`
+(5 `N/A` keys) sit at the same commit and are exactly T8.1's before/after pair — so
+the archive is behaving as intended and nothing there needs correcting.
+
+Fix 1, **selection by provenance instead of by filesystem**: `_pick(pred)` in
+[code/test_gate5.py](code/test_gate5.py) prefers directories whose
+`provenance.code_git_commit` equals `git_commit()`, returns an at-HEAD flag, and
+falls back to older runs only for the diagnostic print. G5.2b now runs only when
+`RUN_E1_AT_HEAD`, and its `SKIP` message **names the commit** of the historical run
+it declined to grade — a skip that explains itself instead of a pass that lies.
+
+Fix 2, **give the slot a producer**: new **T6.7d** section in
+[code/test_phase6_provenance.py](code/test_phase6_provenance.py) runs a 1-epoch
+`mor` job through the real CLI via a new `_smoke_run()` helper. Gate 5 runs
+provenance *before* `test_gate5.py`, so a fresh at-HEAD single-expert run always
+exists and the dependence on timestamps is removed entirely rather than merely
+worked around.
+
+T6.7d also closed a genuine gap: the `updated_rules.md` §9 provenance list had only
+ever been asserted on a `more` run. `E=1` and `max_depth=1` are exactly where
+architecture-specific defects hide — cf. T8.3, where a head sized by `num_experts`
+passed at E=6 and hit a CUDA device-side assert at E=1. The 27-field list was
+extracted into `_required_fields(rc)` so both architectures are held to the
+identical list, and one of the new checks is that MoR's legitimately **zero**
+`routing_balance` is recorded as `0.0` and not dropped — `if not lw.get(...)` would
+read it as missing, which is the falsy-zero form of reporting a sentinel as a
+measurement.
+
+Cost: one extra ~49 s CPU MoR run inside the suite. Worth it.
+
+**The principle.** *Filesystem metadata is not experiment metadata.* An mtime, a
+directory ordering or a drive letter is a property of the substrate. Using one as
+evidence is the same error class as reporting a sentinel as a measurement — a value
+that looks like data but is an artifact of where it was stored. Any future test that
+picks "the latest run" must pick it by provenance.
+
+**Failure tracing.** A gate-5 routing-key failure on a MoR run: check *which
+directory it graded* before touching the metric writers. Print the run's
+`provenance.code_git_commit` and compare with `git_commit()`. If the suite reports
+`G5.2b SKIP`, no single-expert run at HEAD exists — T6.7d did not run or did not
+produce a directory, which is a gate-5 ordering problem, not a metrics problem.
+
+**Where to look.** [code/test_gate5.py](code/test_gate5.py) `_commit`, `_HEAD`,
+`_at_head`, `_pick`, `RUN_E1_AT_HEAD` and the G5.2b guard;
+[code/test_phase6_provenance.py](code/test_phase6_provenance.py) `_required_fields`,
+`_smoke_run`, the T6.7d block; `code/run_correctness_suite.py` `GATES` (provenance
+is pinned ahead of `test_gate5.py` on purpose).
+
+**Verified by.** Gate 5 `150 checks 150 pass 0 fail 0 skip PASS`.
+`test_phase6_provenance.py` 38 → 43 pass. `test_gate5.py` 38 pass / 1 fail → 39
+pass / 0 fail. The eleven-key contract confirmed directly on
+`runs/t_l03_mor_timing_seed44__fa9339bc` (all eleven present, all the string
+`'N/A'`).
+
+## T-L0.3 — an executed baseline for "arithmetic unchanged": **356**, not 350
+
+**What.** Established Gate L0, the regression fence the whole language migration is
+measured against: the full correctness suite, run to completion on this machine,
+**`TOTAL 356 356 0 0`, 5 gates, ALL GATES PASS**. Recorded before any language code
+exists, so "the arithmetic study still passes" is a falsifiable claim rather than an
+assurance.
+
+**Method.** Run the suite first, fix what it finds, run it again — do not write new
+code on top of a suite whose current state is unknown. Two pre-existing defects had
+to be fixed to reach a completing run: T-L0.3a (cross-drive `relpath` crashed gate
+4) and T-L0.3b (gate 5 graded pre-fix history). Both are recorded above.
+
+Both were **environment-dependent in the same way**, which is the transferable
+lesson: each was invisible on the machine the POC was developed on because that
+machine's filesystem happened to satisfy an assumption the code made silently — the
+repository and the temp directory on one drive; mtimes that tracked experiment
+order. Neither was a mistake in the architecture, the metrics or the science. They
+were mistakes about the substrate.
+
+The suite total therefore moved **350 → 356**:
+
+| | |
+|---|---|
+| 350 | the count at the close of the arithmetic study, still quoted in older notes |
+| +1 | gate 4 — the seeding suite now completes instead of crashing at check 51 |
+| +5 | gate 5 — the new T6.7d single-expert provenance producer |
+| **356** | measured on `C:\Users\vedan\anaconda3\python.exe` |
+
+Every stale `350` in `plan_language.md` (§0, §9, §11), `TASKS_LANGUAGE.md` and
+`README.md` was corrected to 356, each with the derivation beside it rather than a
+bare number — a reference count with no derivation is the thing that goes stale.
+
+Separately confirmed, so that no engine or metrics change is needed for the language
+phase: the whole `N/A` writer contract is intact at HEAD. All eleven routing and
+expert-diversity keys on a MoR run are **present** and are the **string** `"N/A"`.
+The arithmetic POC's published behaviour stands as written.
+
+**Failure tracing.** A gate count other than 356 is a STOP (`plan.md` §20), and the
+first question is *which* gate moved, not which language change caused it. A count
+that **drops** usually means a suite file stopped being discovered or crashed before
+its first marker — a gate reporting zero assertions FAILS by design. A count that
+**rises** without a new task is an accidentally duplicated check.
+
+**Where to look.** `code/run_correctness_suite.py` (`GATES`, `MARKER`, the
+zero-assertion rule); [ENVIRONMENT.md](ENVIRONMENT.md) §5; `plan_language.md` §0 for
+the 350 → 356 derivation; `TASKS_LANGUAGE.md` T-LX.0 for the obligation to re-run
+after every commit.
+
+**Verified by.** `C:/Users/vedan/anaconda3/python.exe code/run_correctness_suite.py`
+→ `TOTAL 356 356 0 0`, 5 gates, `ALL GATES PASS`.
+
+## T-L0.0 / T-L0.2 — the documented environment was another machine's, and ENVIRONMENT.md now exists
+
+**What.** `CLAUDE.md` §9 and `ARCHITECTURE.md` §9 instructed the reader to use
+`C:\Users\Hp\anaconda3\envs\more_env\python.exe` (torch 2.5.1) on an RTX 4060
+Laptop 8 GB. Neither exists here. Both were corrected to name the two real
+interpreters and the RTX 3050, a false in-source justification was corrected in
+three places, and [ENVIRONMENT.md](ENVIRONMENT.md) was written so a resumed session
+does not have to rediscover any of it.
+
+**Method.** The correction had to distinguish two kinds of stale reference, and
+this is the part worth remembering:
+
+*Instructions* were corrected. `CLAUDE.md` §9, `ARCHITECTURE.md` §9 (including all
+four quick-check bash blocks), the usage docstrings of
+`test_phase2_routing.py` / `test_phase3_halting.py` / `test_phase4_balance.py` /
+`test_phase5_dimensions.py`, and `README.md` §6 all tell a reader what to run. A
+wrong path there costs the next session its first command.
+
+*Records* were left alone. `changelog.md`, `TASKS.md`, `results/results.md`, and
+`ARCHITECTURE.md`'s scale caveat describe the machine the **arithmetic runs were
+actually produced on**, which really was the RTX 4060 with torch 2.5.1. Rewriting
+those would falsify the provenance of published numbers. `CLAUDE.md` §6: archive,
+never delete, evidence. The scale caveat gained one clause pointing at §9 so the
+apparent contradiction resolves for a reader rather than looking like a defect.
+
+The false-absence claim — *"No scipy/sklearn in this environment (checked)"* —
+appeared in `code/more/metrics.py` above `_to_contingency`, in `ARCHITECTURE.md`
+§T6.3, and in `code/test_phase6_routing_metrics.py`'s docstring, in each case as the
+**reason** the exact Hungarian assignment and the AMI chance correction are
+hand-written. sklearn 1.3.2 and scipy 1.14.1 are both importable from both
+interpreters, so the stated reason was false and the code looked like a workaround
+for a constraint that does not exist — an invitation for a future agent to "simplify"
+it into a library call.
+
+The implementations **stay**, with the real reasons recorded: they are exact at
+`E <= 15` (a greedy match is not the Hungarian match and must not be labelled as
+one), they are checked against brute force in `test_phase6_routing_metrics.py`, and
+keeping them local means the metric layer imports nothing beyond torch/numpy — so a
+metrics-only environment cannot silently produce a different Hungarian accuracy than
+the training environment did. Replacing working exact code to use a library is churn,
+not a fix. Only the justification was wrong.
+
+Three `automated/*.py` drivers hard-code the dead interpreter and were **deliberately
+not repointed**. Each also writes an absolute `c:\Users\Hp\Desktop\Waste\MoRE\...`
+path and a global `results.tsv` / `final_run_metrics.json` — outputs `CLAUDE.md` §5
+prohibits and `run_context.py` actively refuses. Repointing the interpreter would put
+a forbidden-output script one edit from runnable, which is worse than leaving it
+obviously broken. Each got a NOT-RUNNABLE banner naming why and saying what to write
+instead. `run_remaining_tests.py`'s banner also states that, despite the name, it is
+not part of the correctness suite.
+
+`ENVIRONMENT.md` records two facts that change later phases, both measured rather
+than assumed:
+
+1. **The HuggingFace stack is already installed** in both interpreters
+   (`datasets 4.6.1`, `transformers 4.51.3`, `tokenizers 0.21.0`,
+   `huggingface_hub 0.30.2`, `pyarrow 23.0.1`). Phase L-2 needs no installation and
+   no new pin. WikiText itself is **not** cached, so T-L2.0 is a real download.
+2. **`nltk 3.9.1` is present**, with `taggers/averaged_perceptron_tagger` and
+   `tokenizers/punkt` already downloaded to
+   `C:\Users\vedan\AppData\Roaming\nltk_data` — but **`corpora/universal_tagset` is
+   MISSING**. That settles T-L3.0's tagger question: use `nltk.pos_tag`'s Penn
+   Treebank tags with an explicit PTB→six-family map checked into
+   `code/more/lang_families.py`, **not** `pos_tag(tagset="universal")`, which would
+   hit the missing corpus and trigger a download at dataset-build time — making the
+   family definition a function of network state. The explicit map is also the better
+   artifact: it is the thing a reader can disagree with, and an unmapped tag can
+   raise instead of falling back to a catch-all (`CLAUDE.md` §2).
+
+**Failure tracing.** `No such file or directory` on an interpreter path means the doc
+was written on the old development machine; check `ENVIRONMENT.md` §1 first. A future
+"why is this Hungarian solver hand-written when scipy is installed" question is
+answered in `metrics.py` above `_to_contingency` — the answer is exactness plus
+import surface, not availability. If a family assignment ever changes without the
+code changing, suspect the nltk tagger version or its data package: the manifest
+pins both (T-L2.4) precisely so that is detectable.
+
+**Where to look.** [ENVIRONMENT.md](ENVIRONMENT.md) §1 (which interpreter), §2
+(measured versions), §3 (HF stack + the nltk/`universal_tagset` finding), §6 (the
+probe); `CLAUDE.md` §9; `ARCHITECTURE.md` §9 and §T6.3;
+[code/more/metrics.py](code/more/metrics.py) above `_to_contingency`;
+`automated/rerun_mor.py` for the NOT-RUNNABLE banner the other two reference.
+
+**Verified by.** `C:/Users/vedan/anaconda3/python.exe code/run_correctness_suite.py`
+after all edits → gate 1 19, gate 2 31, gate 3 27, gate 4 129, gate 5 150,
+`TOTAL 356 356 0 0`, `ALL GATES PASS`, 174 s. Both interpreters probed 2026-09-03:
+CPU `torch 2.6.0+cpu` / `cuda False`; CUDA `torch 2.6.0+cu126` / `cuda True` /
+CUDA 12.6 / `NVIDIA GeForce RTX 3050 6GB Laptop GPU` 6143 MiB cc 8.6 driver 596.08;
+identical in numpy 1.26.4, scipy 1.14.1, sklearn 1.3.2, pandas 2.2.1,
+matplotlib 3.10.0, wandb 0.25.0, datasets 4.6.1, transformers 4.51.3,
+tokenizers 0.21.0, huggingface_hub 0.30.2, pyarrow 23.0.1, nltk 3.9.1;
+spacy/stanza/flair absent in both.
+
+<!-- APPEND-MARKER-CL -->
+
+
+
+
+
+
 
 
 

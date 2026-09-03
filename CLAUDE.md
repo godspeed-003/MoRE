@@ -215,8 +215,18 @@ interpretation everywhere.
 
 ## 9. Repository conventions
 
-- Python interpreter: `C:\Users\Hp\anaconda3\envs\more_env\python.exe`
-  (torch 2.5.1 + CUDA). Anaconda base and `C:\Python314` lack `torch`.
+- Python interpreters — see [ENVIRONMENT.md](ENVIRONMENT.md) for the full record:
+  - **CPU / correctness gates:** `C:\Users\vedan\anaconda3\python.exe`
+    (Python 3.12.7, torch 2.6.0+**cpu**). Runs every `test_*.py` and
+    `run_correctness_suite.py`.
+  - **CUDA / training:** `D:\res\git\MoRE\.venv_cuda\Scripts\python.exe`
+    (torch 2.6.0+cu126, RTX 3050 6 GB Laptop). Built with
+    `--system-site-packages` so `datasets`/`transformers`/`wandb`/`nltk`/`sklearn`
+    come from base and only torch differs.
+
+  The `C:\Users\Hp\anaconda3\envs\more_env\python.exe` (torch 2.5.1) and the
+  RTX 4060 8 GB named here previously are from the machine the arithmetic POC was
+  developed on. Neither exists on this machine; corrected in T-L0.0.
 - Shell is Git Bash on Windows; the working directory persists between calls —
   **use absolute paths.**
 - One training system with an explicit `architecture = moe | mor | more` mode.

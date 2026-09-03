@@ -16,8 +16,11 @@ check below exists to keep those two questions apart:
   both low, AMI~0  no partition at all.
 
 The exact Hungarian solver and the AMI chance correction are implemented in
-more/metrics.py because neither scipy nor sklearn is installed in more_env, so
-they are checked here against brute force rather than against a library.
+more/metrics.py so that the metric layer imports nothing beyond torch/numpy, and
+so that the exactness claim is testable: they are checked below against brute
+force rather than against a library. (This docstring used to say they were local
+"because neither scipy nor sklearn is installed in more_env" -- both are in fact
+importable here; see ENVIRONMENT.md. Corrected in T-L0.0.)
 """
 
 import math

@@ -127,6 +127,36 @@ def git_dirty() -> bool | None:
     return None
 
 
+def _repo_relative(path: str) -> str:
+    """
+    `path` expressed relative to the repository root with forward slashes, or as
+    an absolute path when no relative expression exists.
+
+    T-L0.3: this was `os.path.relpath(directory, _REPO_DIR)` inline, and on
+    Windows `relpath` RAISES when the two paths are on different drives:
+
+        ValueError: path is on mount 'C:', start on mount 'D:'
+
+    That is not a hypothetical. `test_phase6_seeding.py` passes a
+    `tempfile.mkdtemp()` runs root, which lands on C:\\Users\\...\\Temp while
+    this repository is on D:, so `RunContext.create` raised before writing
+    anything and Gate 4 died mid-suite with 51 checks counted and no [FAIL]
+    marker -- a crash that the runner can only report as "output format not
+    recognised". It passed on the machine the POC was developed on solely
+    because the repo and the temp directory happened to share a drive there.
+
+    A run directory outside the repository is legitimate: a test using a temp
+    root, or a user putting `runs/` on a data disk. Provenance should then
+    record where the run actually is. The relative form is preserved whenever it
+    exists, because that is the short, portable string `export_results.py` and
+    `depth_null_model.py` put in their tables for runs under `runs/`.
+    """
+    try:
+        return os.path.relpath(path, _REPO_DIR).replace("\\", "/")
+    except ValueError:
+        return os.path.abspath(path).replace("\\", "/")
+
+
 def file_sha256(path: str) -> str | None:
     """SHA-256 of a file, or None if unreadable."""
     try:
@@ -502,7 +532,7 @@ class RunContext:
         prov["code_git_commit"] = git_commit()
         prov["code_git_dirty"]  = git_dirty()
         prov["config_hash"]     = config_hash(resolved_cfg)
-        prov["run_dir"]         = os.path.relpath(directory, _REPO_DIR).replace("\\", "/")
+        prov["run_dir"]         = _repo_relative(directory)
 
         # T6.7 (updated_rules.md 9): architecture, variant, run_name and the two
         # data versions are REQUIRED provenance. They already live elsewhere in

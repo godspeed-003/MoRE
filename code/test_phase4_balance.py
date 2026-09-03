@@ -3,7 +3,7 @@
 Verifies T4.1 - T4.3 (plan.md 6.1-6.3, CLAUDE.md 2 "Balance loss", CLAUDE.md 4).
 
 Run:
-    C:/Users/Hp/anaconda3/envs/more_env/python.exe code/test_phase4_balance.py
+    C:/Users/vedan/anaconda3/python.exe code/test_phase4_balance.py
 
 Design note. The defect this gate exists to prevent is a MAGNITUDE defect, and
 magnitude defects do not crash anything. The balance loss was SUMMED over every

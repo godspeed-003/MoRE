@@ -213,6 +213,67 @@ check("T6.7b ffn_mult is inside the hash -- it changes the parameter count",
       f"{config_hash(a)[:8]} vs {config_hash(d)[:8]}")
 
 # ---------------------------------------------------------------- T6.7c
+def _required_fields(rc: dict) -> dict:
+    """
+    The updated_rules.md 9 provenance list, resolved from the blocks a reader
+    would actually open, as {name: value}. A value of None means the field is
+    missing; `variant` is allowed to be the string "canonical".
+
+    T-L0.3: extracted from the T6.7c block so the identical field list can be
+    asserted on more than one architecture. It was checked on a `more` run only,
+    which leaves any E=1 or max_depth=1 specific provenance gap invisible -- the
+    same blind spot class as T8.3, where a head sized by num_experts passed at
+    E=6 and hit a CUDA device-side assert at E=1.
+    """
+    prov = rc.get("provenance", {})
+    mc, tc, lw = (rc.get("model", {}), rc.get("training", {}),
+                  rc.get("loss_weights", {}))
+    return {
+        "experiment_id":       prov.get("experiment_id"),
+        "experiment_group":    prov.get("experiment_group"),
+        "architecture":        prov.get("architecture"),
+        "variant":             prov.get("variant"),
+        "seed":                prov.get("seed"),
+        "dataset_version":     prov.get("dataset_version"),
+        "train_split_version": prov.get("train_split_version"),
+        "code_git_commit":     prov.get("code_git_commit"),
+        "config_hash":         prov.get("config_hash"),
+        "num_experts":         mc.get("num_experts"),
+        "max_depth":           mc.get("max_depth"),
+        "num_blocks":          mc.get("num_blocks"),
+        "d_model":             mc.get("d_model"),
+        "ffn_mult":            prov.get("ffn_mult"),
+        "batch_size":          tc.get("batch_size"),
+        "lr":                  tc.get("lr"),
+        "weight_decay":        tc.get("weight_decay"),
+        "routing_balance":     lw.get("routing_balance"),
+        "halting_weight":      prov.get("ponder_weight"),
+        "routing_supervision_enabled": prov.get("routing_supervision_enabled"),
+        "routing_supervision_weight":  prov.get("routing_supervision_weight"),
+        "router_noise_mode":   prov.get("resolved_router_noise"),
+        "router_noise_scale":  prov.get("router_noise_scale"),
+        "halt_target_mode":    prov.get("halt_target_mode"),
+        "resolved_epochs":     prov.get("resolved_epochs"),
+        "resolved_subset_fraction": prov.get("resolved_subset_fraction"),
+    }
+
+
+def _smoke_run(architecture: str, run_name: str, seed: int,
+               tag: str = "T6.7c") -> str | None:
+    """Run 1 epoch of `architecture` and return its run directory, or None."""
+    proc = subprocess.run(
+        [PY, "train.py", "--architecture", architecture, "--epochs", "1",
+         "--seed", str(seed), "--run_name", run_name],
+        cwd=CODE, env=dict(os.environ, WANDB_MODE="disabled"),
+        capture_output=True, text=True, timeout=3600,
+    )
+    check(f"{tag} the {architecture} smoke run exits 0", proc.returncode == 0,
+          (proc.stderr or "")[-400:])
+    dirs = sorted((d for d in os.listdir(RUNS) if d.startswith(run_name)),
+                  key=lambda d: os.path.getmtime(os.path.join(RUNS, d)))
+    return os.path.join(RUNS, dirs[-1]) if dirs else None
+
+
 print("\n-- T6.7c  a real run carries every required field -------------------")
 
 RUN_NAME = "t67_provenance_check"
@@ -249,35 +310,7 @@ if run_dirs:
     # updated_rules.md 9, field by field, resolved from the block a reader would
     # actually open. `variant` is allowed to be the string "canonical"; nothing
     # here is allowed to be None.
-    REQUIRED = {
-        "experiment_id":       prov.get("experiment_id"),
-        "experiment_group":    prov.get("experiment_group"),
-        "architecture":        prov.get("architecture"),
-        "variant":             prov.get("variant"),
-        "seed":                prov.get("seed"),
-        "dataset_version":     prov.get("dataset_version"),
-        "train_split_version": prov.get("train_split_version"),
-        "code_git_commit":     prov.get("code_git_commit"),
-        "config_hash":         prov.get("config_hash"),
-        "num_experts":         mc.get("num_experts"),
-        "max_depth":           mc.get("max_depth"),
-        "num_blocks":          mc.get("num_blocks"),
-        "d_model":             mc.get("d_model"),
-        "ffn_mult":            prov.get("ffn_mult"),
-        "batch_size":          tc.get("batch_size"),
-        "lr":                  tc.get("lr"),
-        "weight_decay":        tc.get("weight_decay"),
-        "routing_balance":     lw.get("routing_balance"),
-        "halting_weight":      prov.get("ponder_weight"),
-        "routing_supervision_enabled": prov.get("routing_supervision_enabled"),
-        "routing_supervision_weight":  prov.get("routing_supervision_weight"),
-        "router_noise_mode":   prov.get("resolved_router_noise"),
-        "router_noise_scale":  prov.get("router_noise_scale"),
-        "halt_target_mode":    prov.get("halt_target_mode"),
-        "resolved_epochs":     prov.get("resolved_epochs"),
-        "resolved_subset_fraction": prov.get("resolved_subset_fraction"),
-    }
-    missing = sorted(k for k, v in REQUIRED.items() if v is None)
+    missing = sorted(k for k, v in _required_fields(rc).items() if v is None)
     check("T6.7c every field in updated_rules.md 9 is present and not None",
           not missing, f"missing/None: {missing}")
 
@@ -319,6 +352,50 @@ if run_dirs:
     check("T6.7c no provenance value is the string 'None'",
           not [k for k, v in prov.items() if v == "None"],
           str([k for k, v in prov.items() if v == "None"]))
+
+# ---------------------------------------------------------------- T6.7d
+# T-L0.3: a HEAD-commit SINGLE-EXPERT run, for two reasons.
+#
+# 1. Gate 5's G5.2b block asserts the mirror-image metric contract -- that a MoR
+#    run reports every routing and expert-diversity quantity as the STRING "N/A",
+#    present rather than absent. It had no producer, so it fell back to whatever
+#    MoR directory sorted last by mtime. `runs/` is tracked, so a `git worktree
+#    add` rewrote all 132 mtimes into checkout order and the block graded
+#    `t83_mor_headfix_..._r2` from commit e5b0f6df -- from before the T8.1 fix
+#    that made those keys present-and-"N/A". It reported a defect the current
+#    writers do not have. Producing the run here, ahead of gate 5 in the same
+#    gate, removes the dependence on filesystem timestamps entirely.
+# 2. Provenance itself was only ever verified on a `more` run. E=1 and
+#    max_depth=1 are exactly where architecture-specific gaps hide (T8.3).
+print("\n-- T6.7d  provenance holds at E=1 too, not only on MoRE ------------")
+
+RUN_NAME_E1 = "t67d_provenance_check_mor"
+rd1 = _smoke_run("mor", RUN_NAME_E1, 44, tag="T6.7d")
+check("T6.7d the single-expert run produced a directory", rd1 is not None,
+      str(rd1))
+
+if rd1:
+    rc1 = json.load(open(os.path.join(rd1, "resolved_config.json"),
+                         encoding="utf-8"))
+    prov1 = _required_fields(rc1)
+    missing1 = sorted(k for k, v in prov1.items() if v is None)
+    check("T6.7d every updated_rules.md 9 field is present and not None at E=1",
+          not missing1, f"missing/None: {missing1}")
+    check("T6.7d the recorded architecture and expert count are MoR's",
+          prov1["architecture"] == "mor" and prov1["num_experts"] == 1,
+          f"{prov1['architecture']} / E={prov1['num_experts']}")
+    # MoR routes nothing, so apply_architecture zeroes the balance weight. Zero is
+    # a real resolved value here and must survive as 0.0, not be read as missing --
+    # `if not lw.get("routing_balance")` would treat it as absent, which is the
+    # falsy-zero variant of reporting a sentinel as a measurement.
+    check("T6.7d a legitimately zero weight is recorded as 0.0, not dropped",
+          rc1.get("loss_weights", {}).get("routing_balance") == 0.0,
+          str(rc1.get("loss_weights", {}).get("routing_balance")))
+    check("T6.7d ffn_mult is MoR's parameter-matched 24, not the default 4",
+          prov1["ffn_mult"] == 24, str(prov1["ffn_mult"]))
+    check("T6.7d the run is recognisably NOT canonical_phase_b (1 epoch)",
+          prov1["experiment_group"] != "canonical_phase_b",
+          str(prov1["experiment_group"]))
 
 print("\n" + "=" * 74)
 print(f"T6.6 / T6.7:  {PASS} passed, {FAIL} failed")

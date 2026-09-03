@@ -34,6 +34,7 @@ sys.path.insert(0, CODE)
 from more.model import MoREModel, CANONICAL_ROUTING_MODE
 from more.families import NUM_EXPERTS_CANONICAL, expert_labels, NUM_OP_TYPES
 from more.metrics import permutation_invariant_routing_metrics
+from more.run_context import git_commit
 
 PASS = 0
 FAIL = 0
@@ -75,6 +76,34 @@ cands = [d for d in glob.glob(os.path.join(RUNS, "*"))
          and os.path.exists(os.path.join(d, "resolved_config.json"))]
 cands.sort(key=os.path.getmtime)
 
+# T-L0.3: mtime is a property of the FILESYSTEM, not of the experiment. Any
+# clone, `git worktree add`, archive restore or file copy rewrites it, and
+# `runs/` is tracked (555 files), so after a checkout all 132 directories carry
+# mtimes minutes apart in an order that has nothing to do with when the runs
+# were produced. On the first language worktree that put
+# `t83_mor_headfix_..._r2` last -- a MoR run from commit e5b0f6df, i.e. from
+# BEFORE the T8.1 fix that made the flat val/routing_* keys present-and-"N/A"
+# instead of absent. G5.2b then failed, reporting a defect that the code under
+# test does not have: a run built at HEAD writes all eleven keys as the string
+# "N/A" (verified directly).
+#
+# The intrinsic key is `provenance.code_git_commit`. Gate 5 is a statement about
+# the code as it stands now, so it must read a run that THIS code produced; a run
+# from an older commit is not evidence about HEAD in either direction. Suites in
+# gate 5 run provenance-first precisely so those directories exist, so preferring
+# them costs nothing and removes the ordering dependence entirely.
+def _commit(d):
+    try:
+        return (_load(d)[1].get("provenance", {}) or {}).get("code_git_commit")
+    except Exception:                                        # noqa: BLE001
+        return None
+
+
+_HEAD = git_commit()
+_at_head = [d for d in cands if _commit(d) == _HEAD]
+print(f"HEAD {_HEAD[:8]}: {len(_at_head)} of {len(cands)} run dirs were produced "
+      f"by the code under test")
+
 
 def _experts(d):
     try:
@@ -100,15 +129,34 @@ def _depth(d):
 # the entropy comparison below, one metric later. The run selected for the full
 # block is therefore the newest one that has BOTH properties (i.e. MoRE), with
 # routing-only and single-expert runs used for their own targeted checks.
-_routing = [d for d in cands if _experts(d) >= 2]
-_full    = [d for d in cands if _experts(d) >= 2 and _depth(d) > 1]
-_single  = [d for d in cands if _experts(d) == 1]
-RUN    = (_full[-1] if _full else
-          (_routing[-1] if _routing else (cands[-1] if cands else None)))
-RUN_E1 = _single[-1] if _single else None
-print(f"\nreading run: {os.path.basename(RUN) if RUN else 'NONE FOUND'}")
+# T-L0.3: each slot is filled from the HEAD-commit runs when any exist, and only
+# then from history. `_pick` returns (dir, from_head) so a check that ends up
+# reading a historical run can say so instead of presenting it as a verdict on
+# the current code.
+def _pick(pred):
+    at_head = [d for d in _at_head if pred(d)]
+    if at_head:
+        return at_head[-1], True
+    older = [d for d in cands if pred(d)]
+    return (older[-1] if older else None), False
+
+
+_is_routing = lambda d: _experts(d) >= 2                     # noqa: E731
+_is_full    = lambda d: _experts(d) >= 2 and _depth(d) > 1   # noqa: E731
+_is_single  = lambda d: _experts(d) == 1                     # noqa: E731
+
+RUN, RUN_AT_HEAD = _pick(_is_full)
+if RUN is None:
+    RUN, RUN_AT_HEAD = _pick(_is_routing)
+if RUN is None:
+    RUN, RUN_AT_HEAD = _pick(lambda d: True)
+RUN_E1, RUN_E1_AT_HEAD = _pick(_is_single)
+
+print(f"\nreading run: {os.path.basename(RUN) if RUN else 'NONE FOUND'}"
+      f"{'' if RUN_AT_HEAD else '  [HISTORICAL -- not built at HEAD]'}")
 if RUN_E1:
-    print(f"single-expert cross-check run: {os.path.basename(RUN_E1)}")
+    print(f"single-expert cross-check run: {os.path.basename(RUN_E1)}"
+          f"{'' if RUN_E1_AT_HEAD else '  [HISTORICAL -- not built at HEAD]'}")
 
 metrics, rc = _load(RUN)
 prov = rc.get("provenance", {})
@@ -200,7 +248,14 @@ check("G5.2 raw and matched accuracy agree to within tolerance when the index "
 # CLAUDE.md 4 forbids that: it must be N/A, and N/A must be the STRING, never 0.0
 # or -1. Checked on a real MoR run rather than on a synthetic dict, because the
 # gating lives in metrics.paper_metrics_to_wandb and the writer in engine.py.
-if RUN_E1 is not None:
+#
+# T-L0.3: the run must have been built at HEAD. Grading a MoR directory from an
+# older commit says nothing about the current writers, and it is how this block
+# produced a false failure on the first language worktree (see the selection note
+# above). A SKIP naming the reason is the honest verdict when no HEAD-commit
+# single-expert run exists; inside the suite `test_phase6_provenance.py` produces
+# one first, so the check runs at full strength there.
+if RUN_E1 is not None and RUN_E1_AT_HEAD:
     m1, rc1 = _load(RUN_E1)
     _ROUTING_KEYS = ["val/routing_accuracy", "val/routing_hungarian_accuracy",
                      "val/routing_ami", "val/routing_purity",
@@ -257,8 +312,14 @@ if RUN_E1 is not None:
           len(_fam_depth) == NUM_EXPERTS_CANONICAL,
           f"{len(_fam_depth)} family depth keys: {sorted(_fam_depth)[:2]}...")
 else:
-    print("[SKIP] G5.2b  no single-expert (MoR) run directory found to "
-          "cross-check; run train.py --architecture mor to populate it")
+    _why = ("no single-expert (MoR) run directory found at all"
+            if RUN_E1 is None else
+            f"the only single-expert runs predate HEAD (newest is "
+            f"{os.path.basename(RUN_E1)} at "
+            f"{(_commit(RUN_E1) or 'unknown')[:8]}), and a pre-HEAD run is not "
+            f"evidence about the current metric writers")
+    print(f"[SKIP] G5.2b  {_why}; run "
+          f"`train.py --architecture mor --epochs 1` to populate it")
 
 # ---------------------------------------------------------------- 3
 print("\n-- 3  correct dimensions -------------------------------------------")

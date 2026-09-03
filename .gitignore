@@ -51,6 +51,25 @@ code/best_model.pt
 code/results.tsv
 code/final_run_metrics.json
 
+# --- Gate smoke runs (T-L0.3b) ----------------------------------------------
+# Gate 5 LAUNCHES two real 1-epoch training runs so that its provenance and
+# metric-contract checks grade a directory produced by the code under test rather
+# than whichever archived run sorted last by mtime. That is deliberate and is what
+# fixed T-L0.3b -- but it means every execution of the suite deposits a fresh
+# `__rN` directory, and the suite is expected to run after every commit (T-LX.0).
+#
+# These are regenerable gate artifacts, not evidence: nothing cites them, they are
+# 1-epoch proxies that may never enter a table, and the next suite run recreates
+# them. Tracking them would grow the repository without bound in exchange for
+# nothing citable. This is NOT a deletion (CLAUDE.md 6) -- the directories stay on
+# disk; only tracking is declined, exactly as for invalidated checkpoints above.
+#
+# `runs/t_l03_mor_timing_seed44__fa9339bc` is deliberately NOT covered: the
+# changelog cites it as the run on which the eleven-key `"N/A"` metric contract was
+# verified at HEAD, so it is evidence and is tracked.
+runs/t67_provenance_check*/
+runs/t67d_provenance_check*/
+
 # --- Editor / OS ------------------------------------------------------------
 .DS_Store
 Thumbs.db
