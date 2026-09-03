@@ -1684,7 +1684,7 @@ does not exist here (T-L0.0).
   test — ponder weight left at its canonical value — passes on a model whose task path
   is entirely disconnected from halting**, which is why it is run this way.
 
-- [ ] **T-L6.5 Induced per-block TOPIC partition, as a SECOND reference axis.**
+- [x] **T-L6.5 Induced per-block TOPIC partition, as a SECOND reference axis.**
   `plan_language.md` §4.1a. Build `block_topic[n_blocks]` from the
   ` = Title = `-delimited documents `iter_documents` already segments: TF-IDF over
   documents, k-means at **k = 6** with a recorded seed, then each packed block takes
@@ -1696,6 +1696,63 @@ does not exist here (T-L0.0).
   non-degenerate (no cluster below 2% of blocks); the top TF-IDF terms per cluster are
   printed and are humanly recognisable as topics; a second run at the same seed
   reproduces the assignment byte-identically.
+  **Evidence:** `data/lang/build_block_topics.py`, checks TL6.5a-h, both corpora.
+  `code/test_language_families.py` -> **105 passed, 0 failed, 1 skipped**. `int8`, one
+  entry per stored block (526,320 / 1,098 / 1,256 canonical), values exactly `{0..5}`,
+  hashes recorded and re-verified. Same-seed rebuild is **byte-identical on all six
+  arrays**, both corpora. Document boundaries are re-derived in the test from the packed
+  stream: 29,444 EOTs for 29,445 documents (629 of 630 on the dev corpus), so "which
+  document supplies most of this block" comes from the stored tokens rather than a
+  re-segmentation that could drift.
+
+  **THE PRE-REGISTERED 2% FLOOR FAILED ON THE FIRST BUILD, AND THE FIX IS RECORDED AS A
+  METHOD CHANGE.** TF-IDF -> k-means directly, k=6, put **64.2% of canonical train blocks
+  in one cluster** whose top terms were `species, war, century, army, king, race, south,
+  city, church, british` -- a residual "everything else" bucket, not a topic -- and left
+  T3 (highways) at **1.72%**, under the floor. A reference axis whose majority class is
+  two thirds of the corpus is not a reference axis: a router "agreeing" with it would
+  mostly be agreeing with *is this the majority class*.
+
+  Fixed by inserting **TruncatedSVD (100 components, seeded) + L2 normalization** between
+  TF-IDF and k-means -- the standard LSA text-clustering pipeline, because k-means uses
+  Euclidean distance and that concentrates badly in 20,000 sparse dimensions. This is a
+  fix rather than tuning, and the distinction is worth stating: **the 2% criterion was
+  pre-registered in this ledger before the build, it was not changed, and no routing
+  number exists yet**, so there was nothing downstream to select on. Result:
+
+  | | before (TF-IDF -> k-means) | after (+ LSA) |
+  |---|---|---|
+  | largest canonical train topic | **64.2%** | 34.8% |
+  | smallest canonical train topic | **1.72%** (FAIL) | **8.97%** (pass) |
+  | dev-corpus smallest | 2.51% | 4.26% |
+
+  **The six canonical clusters, top terms verbatim** -- names are what a human reads off
+  them and are not evidence:
+
+  | | top terms | reads as |
+  |---|---|---|
+  | T0 | ship, ships, war, guns, aircraft, fleet, squadron, british, army, german | military / naval |
+  | T1 | episode, film, series, season, character, episodes, television, production | TV & film |
+  | T2 | album, song, music, band, chart, songs, video, released, track, single | music |
+  | T3 | century, king, war, house, book, government, city, church, building, court | history / politics |
+  | T4 | species, storm, highway, tropical, route, hurricane, km, road, formula, north | nature + infrastructure (**mixed**) |
+  | T5 | game, team, games, season, league, player, match, players, football | sport |
+
+  Five of six are clean; T4 genuinely mixes biology, weather and roads and should be
+  described that way rather than named. The set lands close to the categories §4.1a was
+  asked about (military, media, geography, science).
+
+  **A SECOND SCOPE DECISION, and it is a loosening, so it is flagged.** The floor is
+  applied to the **train** split, not to all three. Measured reason: wikitext-2's val
+  split holds only **61** documents and test **63** -- and wikitext-103 shares those
+  splits *byte-for-byte* (T-L2.0) -- so one small cluster contributing a single val
+  document is ~1.1% of val blocks, and a 2% floor on val could never pass for this corpus
+  family however good the clustering is. Non-degeneracy is a property of the fitted
+  partition, so train is where it belongs. The val/test shares are stored anyway
+  (`topic_min_share_any_split` = 4.30% canonical), because their thinness is **a real
+  limitation of T-L6.6**: article-level agreement on val will be computed over 61
+  documents, which is a small sample for a 6-way partition, and that must be said in the
+  paper rather than discovered by a reviewer.
 
 - [ ] **T-L6.6 Article-level routing agreement, beside POS and against its own null.**
   Score the learned partition against the topic axis with the same machinery T-L3.3

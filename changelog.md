@@ -5176,6 +5176,81 @@ it is unrecoverable.
 `runs/langB_MoRE_seed42__91c9bba1/metrics.json` for the table above; `engine.py`
 `_expert_labels` for the label fix; `TASKS_LANGUAGE.md` T-L6.10 / T-L6.11.
 
+## T-L6.5 — an induced topic axis, and a pre-registered floor that failed first
+
+`data/lang/build_block_topics.py` (new), `code/test_language_families.py`.
+**105 passed, 0 failed, 1 skipped.** `plan_language.md` §4.1a's second reference axis:
+`block_topic_<split>.npy`, one `int8` topic per stored block, both corpora.
+
+**INDUCED, NOT GROUND TRUTH, and the artifact says so about itself.** WikiText ships no
+topic labels, so these clusters are k-means over TF-IDF document vectors with OUR k, OUR
+seed and OUR vectorizer settings. `topic_is_induced = True` and `topic_note` carry the
+caveat into the manifest, and TL6.5g asserts the wording is there -- a caveat that lives
+only in a plan file is one that gets dropped from a table. It is reported beside POS and
+against its own null (T-L6.6), never as truth. Cluster *names* are whatever a human reads
+off the top terms and are not evidence of anything.
+
+**Fitted on TRAIN, applied to val/test.** The vectorizer, the SVD and the k-means are all
+fit on train documents and then `transform`/`predict` on the held-out splits. Fitting the
+topic model on the split it is used to score is the same defect as a tokenizer fitted on
+validation text (T-L2.1).
+
+**THE 2% FLOOR FAILED ON THE FIRST BUILD.** TF-IDF -> k-means directly, k=6, put **64.2%
+of canonical train blocks in a single cluster** (top terms `species, war, century, army,
+king, race, south, city, church, british` -- a residual bucket, not a topic) and left the
+highways cluster at **1.72%**, under the pre-registered floor. A reference axis whose
+majority class is two thirds of the corpus is not a reference axis: a router "agreeing"
+with it would mostly be agreeing with *is this the majority class*.
+
+Fixed by inserting **TruncatedSVD (100 components, seeded) + L2 normalization** between
+TF-IDF and k-means. This is the standard LSA text-clustering pipeline and it is sklearn's
+own documented recipe: k-means uses Euclidean distance, which concentrates badly in 20,000
+sparse dimensions, so reducing to a dense low-rank space is the ordinary remedy rather
+than a trick. **The distinction from tuning matters and is recorded in the code:** the 2%
+criterion was pre-registered in `TASKS_LANGUAGE.md` before the build, the criterion was
+not changed, and no routing number exists yet -- there was nothing downstream to select
+on. The `topic_lsa.why` field in the manifest carries that reasoning too.
+
+| | before | after |
+|---|---|---|
+| largest canonical train topic | **64.2%** | 34.8% |
+| smallest canonical train topic | **1.72%** (FAIL) | **8.97%** (pass) |
+| dev-corpus smallest | 2.51% | 4.26% |
+
+**The six canonical clusters** -- five clean, one honestly mixed: military/naval
+(`ship, guns, aircraft, fleet, squadron`), TV & film (`episode, series, character`), music
+(`album, song, band, chart`), history/politics (`century, king, government, church,
+court`), sport (`game, team, league, player, football`), and **T4, which genuinely mixes
+biology, weather and roads** (`species, storm, highway, tropical, hurricane, route`) and
+should be described that way rather than named. The set lands close to the categories
+§4.1a was asked about.
+
+**A SECOND SCOPE DECISION, and it is a LOOSENING, so it is flagged rather than quietly
+applied.** The floor is checked on the **train** split, not on all three. Measured reason:
+wikitext-2's val split holds only **61** documents and test **63**, and wikitext-103
+shares those splits BYTE-FOR-BYTE (T-L2.0), so one small cluster contributing a single val
+document is ~1.1% of val blocks -- a 2% floor on val could never pass for this corpus
+family however good the clustering is. Non-degeneracy is a property of the fitted
+partition, so train is where it belongs. `topic_min_share_any_split` is stored anyway
+(4.30% canonical) because that thinness is **a real limitation of T-L6.6**: article-level
+agreement on val is computed over 61 documents, which is a small sample for a 6-way
+partition, and it belongs in the paper rather than in a reviewer's question.
+
+**Document boundaries come from the STORED stream.** The encoder inserts `eot_id` between
+documents and not after the last, so a token's document index is the number of EOTs before
+it. TL6.5h re-derives the count from the packed array rather than trusting it: 29,444 EOTs
+for 29,445 documents canonical, 629 for 630 dev. A block then takes the topic of the
+document supplying most of its tokens, because a 256-token block can straddle a boundary.
+
+Same-seed rebuild is **byte-identical on all six arrays**, both corpora -- which required
+`random_state` on the SVD as well as the k-means, and an explicit `n_init=10` so the
+result does not depend on the installed sklearn's default.
+
+**Where to look.** `build_block_topics.SVD_COMPONENTS` for the failure that motivated LSA;
+`fit_topics` for how top terms are recovered through the reduction
+(`centroid @ svd.components_`, so they stay readable TF-IDF vocabulary); `block_doc_index`
+when a block's topic looks wrong.
+
 <!-- APPEND-MARKER-CL -->
 
 

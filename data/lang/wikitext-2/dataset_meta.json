@@ -3,6 +3,82 @@
   "bigram_distinct_pairs": 565449,
   "bigram_smoothing": "backoff, absolute discounting D=0.75",
   "bigram_train_bigrams": 2694911,
+  "block_topic_by_split": {
+    "test": {
+      "block_share_by_topic": {
+        "0": 0.13757861635220126,
+        "1": 0.029874213836477988,
+        "2": 0.12028301886792453,
+        "3": 0.13836477987421383,
+        "4": 0.049528301886792456,
+        "5": 0.52437106918239
+      },
+      "blocks": 1272,
+      "blocks_by_topic": {
+        "0": 175,
+        "1": 38,
+        "2": 153,
+        "3": 176,
+        "4": 63,
+        "5": 667
+      },
+      "documents": 63,
+      "min_topic_share": 0.029874213836477988,
+      "sha256": "a20503369a2eea2cba0434fbd6d67cbf77c5c748f2d56e95d2a8c38715f19a9b"
+    },
+    "train": {
+      "block_share_by_topic": {
+        "0": 0.13175643583167093,
+        "1": 0.06925049871758336,
+        "2": 0.12054716443431177,
+        "3": 0.04255723377980431,
+        "4": 0.060986035907666,
+        "5": 0.5749026313289636
+      },
+      "blocks": 10527,
+      "blocks_by_topic": {
+        "0": 1387,
+        "1": 729,
+        "2": 1269,
+        "3": 448,
+        "4": 642,
+        "5": 6052
+      },
+      "documents": 630,
+      "min_topic_share": 0.04255723377980431,
+      "sha256": "3e2fc0e1f1b08ba97d73da9eb0a6a7b7be096dbf528e395f8987353250287603"
+    },
+    "val": {
+      "block_share_by_topic": {
+        "0": 0.109009009009009,
+        "1": 0.04864864864864865,
+        "2": 0.16576576576576577,
+        "3": 0.026126126126126126,
+        "4": 0.015315315315315315,
+        "5": 0.6351351351351351
+      },
+      "blocks": 1110,
+      "blocks_by_topic": {
+        "0": 121,
+        "1": 54,
+        "2": 184,
+        "3": 29,
+        "4": 17,
+        "5": 705
+      },
+      "documents": 61,
+      "min_topic_share": 0.015315315315315315,
+      "sha256": "ccd3c63042847b48df99da5ebe9dfd18aa4d2cfbab73555085501afe55cc1d98"
+    }
+  },
+  "block_topic_document_assignment": "majority document per block; document index = number of eot_id tokens before the token, which is exact because the encoder inserts the separator between documents only (verified: packed train holds train_documents - 1 EOTs on both corpora)",
+  "block_topic_files": {
+    "test": "data/lang/wikitext-2/block_topic_test.npy",
+    "train": "data/lang/wikitext-2/block_topic_train.npy",
+    "val": "data/lang/wikitext-2/block_topic_val.npy"
+  },
+  "block_topic_generator": "data/lang/build_block_topics.py",
+  "block_topic_generator_commit": "ac7daf8d343d03c16f1b969161193913d8d8dec4",
   "corpus": "wikitext-2",
   "dataset_version": "lang-wikitext-2-bpe8192-len256-9f870794",
   "decile_cut": "equal train TOKEN mass, most frequent = decile 0",
@@ -205,6 +281,7 @@
   "hf_revision": "b08601e04326c79dfdd32d625aee71d232d685c3",
   "is_canonical_corpus": false,
   "n_frequency_deciles": 10,
+  "n_topics": 6,
   "primary_metric_floor": 5.398304166059712,
   "raw_bytes": {
     "test": 1287656,
@@ -497,6 +574,123 @@
   "tokenizer_training_files": [
     "data/lang/wikitext-2/train_text.txt"
   ],
+  "topic_is_induced": true,
+  "topic_kmeans": {
+    "fitted_on": "train documents",
+    "n_clusters": 6,
+    "n_init": 10,
+    "random_state": 20260904
+  },
+  "topic_lsa": {
+    "explained_variance_ratio": 0.40762589219109746,
+    "kind": "TruncatedSVD",
+    "n_components": 100,
+    "random_state": 20260904,
+    "then": "L2 Normalizer",
+    "why": "added after a MEASURED failure: TF-IDF -> k-means directly put 64.2% of wikitext-103 train blocks in one residual cluster and left a topic at 1.72%, below the pre-registered 2% floor. k-means uses Euclidean distance, which concentrates badly in 20,000 sparse dimensions; LSA first is the standard remedy, not a trick. The criterion was not changed and no routing number existed yet, so there was nothing downstream to select on."
+  },
+  "topic_min_share": 0.010810810810810811,
+  "topic_min_share_any_split": 0.015315315315315315,
+  "topic_min_share_train": 0.04255723377980431,
+  "topic_non_degeneracy_note": "The 2% floor is applied to the TRAIN split, which is where the clustering is fitted and where 'six usable groups' is a property of the partition. val/test hold only 61/63 documents and wikitext-103 shares them byte-for-byte with wikitext-2, so one small cluster contributing a single val document is ~1.1% of val blocks and a 2% floor there could never pass for this corpus family. Their shares are stored above because that thinness is a real limitation of the article-level agreement in T-L6.6.",
+  "topic_non_degenerate": true,
+  "topic_note": "INDUCED, NOT GROUND TRUTH. k-means over TF-IDF document vectors -- our k, our seed, our vectorizer settings. WikiText ships no topic labels. Reported beside the POS axis and against its own shuffled null (T-L6.6), never as truth. Cluster names are whatever a human reads off the top terms and are not evidence. Fitted on TRAIN documents and APPLIED to val/test, so the reference partition does not depend on the split it scores.",
+  "topic_seed": 20260904,
+  "topic_top_terms": {
+    "0": [
+      "game",
+      "season",
+      "games",
+      "league",
+      "team",
+      "player",
+      "played",
+      "wins",
+      "somerset",
+      "match",
+      "scored",
+      "players"
+    ],
+    "1": [
+      "episode",
+      "series",
+      "season",
+      "episodes",
+      "character",
+      "television",
+      "viewers",
+      "homer",
+      "simpsons",
+      "said",
+      "bart",
+      "star"
+    ],
+    "2": [
+      "album",
+      "song",
+      "film",
+      "music",
+      "video",
+      "songs",
+      "chart",
+      "released",
+      "band",
+      "release",
+      "love",
+      "billboard"
+    ],
+    "3": [
+      "storm",
+      "tropical",
+      "hurricane",
+      "ship",
+      "winds",
+      "cyclone",
+      "km",
+      "mph",
+      "mm",
+      "fleet",
+      "ships",
+      "damage"
+    ],
+    "4": [
+      "species",
+      "genus",
+      "cm",
+      "birds",
+      "fruit",
+      "males",
+      "brown",
+      "fungus",
+      "spores",
+      "mushroom",
+      "common",
+      "females"
+    ],
+    "5": [
+      "church",
+      "highway",
+      "war",
+      "century",
+      "city",
+      "state",
+      "road",
+      "route",
+      "area",
+      "king",
+      "north",
+      "book"
+    ]
+  },
+  "topic_vectorizer": {
+    "kind": "TfidfVectorizer",
+    "max_df": 0.5,
+    "max_features": 20000,
+    "min_df": 5,
+    "n_terms_fitted": 14292,
+    "stop_words": "english",
+    "strip_accents": "unicode"
+  },
   "train_documents": 630,
   "train_text_bytes": 10914845,
   "uniform_ce": 9.010913347279288,

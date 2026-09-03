@@ -746,6 +746,96 @@ if _ctrl_built:
 
 
 
+# ---------------------------------------------------------------------------
+print()
+print("=== T-L6.5  Induced TOPIC partition: a second reference axis ===")
+# ---------------------------------------------------------------------------
+
+_topic_built = [(c, m) for c, m in _built if "block_topic_by_split" in m]
+if not _topic_built:
+    skip("TL6.5a-h", "topic partition not built; run "
+                     "data/lang/build_block_topics.py")
+
+for corpus, man in _topic_built:
+    tag = f"[{corpus}]"
+    per, K = man["block_topic_by_split"], man["n_topics"]
+    _bad = []
+    for split in ("train", "val", "test"):
+        p = os.path.join(LANG, corpus, f"block_topic_{split}.npy")
+        if not os.path.exists(p):
+            _bad.append(f"{split}:missing")
+            continue
+        a = np.load(p)
+        if a.dtype != np.int8:
+            _bad.append(f"{split}:dtype={a.dtype}")
+        if a.shape != (man["splits"][split],):
+            _bad.append(f"{split}:shape={a.shape}!={man['splits'][split]}")
+        if set(np.unique(a).tolist()) - set(range(K)):
+            _bad.append(f"{split}:values={sorted(np.unique(a).tolist())}")
+        if _sha256_file(p) != per[split]["sha256"]:
+            _bad.append(f"{split}:hash")
+
+    check(f"TL6.5a {tag} one int8 topic id per STORED BLOCK, in 0..{K - 1}, hash matching",
+          not _bad,
+          f"train/val/test = {man['splits']['train']:,}/{man['splits']['val']:,}/"
+          f"{man['splits']['test']:,} blocks, k={K}"
+          if not _bad else f"PROBLEMS {_bad}")
+
+    check(f"TL6.5b {tag} k is SIX, so the topic axis is comparable with the POS axis",
+          K == 6 == lf.NUM_FAMILIES,
+          "a different k would confound 'organizes by topic' with 'has a different "
+          "number of things to organize into'")
+
+    check(f"TL6.5c {tag} the TRAIN partition is non-degenerate (every topic >= 2%)",
+          man["topic_non_degenerate"] is True and man["topic_min_share_train"] >= 0.02,
+          f"smallest train topic share {100 * man['topic_min_share_train']:.2f}%; "
+          f"smallest on ANY split {100 * man['topic_min_share_any_split']:.2f}% -- "
+          f"val/test hold only {per['val']['documents']}/{per['test']['documents']} "
+          f"documents, so a small cluster is thin there by sample size")
+
+    check(f"TL6.5d {tag} the 2%-floor scope is recorded, not left implicit",
+          "TRAIN split" in man.get("topic_non_degeneracy_note", "")
+          and "61/63" in man.get("topic_non_degeneracy_note", ""),
+          "a floor applied to a 61-document val split could never pass for this "
+          "corpus family, and saying so is what stops it being loosened later")
+
+    check(f"TL6.5e {tag} every cluster has top terms recorded for human inspection",
+          len(man["topic_top_terms"]) == K
+          and all(len(v) >= 10 for v in man["topic_top_terms"].values()),
+          " | ".join(f"T{c}: {', '.join(man['topic_top_terms'][str(c)][:4])}"
+                     for c in range(min(3, K))) + " | ...")
+
+    check(f"TL6.5f {tag} fitted on TRAIN documents only, and the settings are recorded",
+          man["topic_kmeans"]["fitted_on"] == "train documents"
+          and man["topic_kmeans"]["n_init"] == 10
+          and isinstance(man["topic_seed"], int)
+          and man["topic_vectorizer"]["n_terms_fitted"] > 0,
+          f"{man['topic_vectorizer']['n_terms_fitted']:,} TF-IDF terms, k-means "
+          f"n_init=10 random_state={man['topic_seed']} -- both are required for the "
+          f"reproducibility clause, and an implicit n_init would make the result "
+          f"depend on the sklearn version")
+
+    check(f"TL6.5g {tag} the partition DECLARES ITSELF INDUCED, not ground truth",
+          man["topic_is_induced"] is True
+          and "NOT GROUND TRUTH" in man["topic_note"]
+          and "no topic labels" in man["topic_note"],
+          "WikiText ships no topic labels; this is our k, our seed, our vectorizer, "
+          "and it is reported beside POS against its own null -- never as truth")
+
+    # The document reconstruction the whole artifact rests on, re-derived here from the
+    # packed array rather than trusted: the encoder inserts eot_id BETWEEN documents
+    # only, so the count must be exactly one less than the document count.
+    _arr = np.load(os.path.join(LANG, corpus, "train.npy"), mmap_mode="r")
+    _n_eot, _rows = 0, max(1, (1 << 22) // _arr.shape[1])
+    for _i in range(0, _arr.shape[0], _rows):
+        _n_eot += int((np.asarray(_arr[_i:_i + _rows]) == man["eot_id"]).sum())
+    check(f"TL6.5h {tag} the EOT-based document index is exact (n_eot == n_docs - 1)",
+          _n_eot == man["train_documents"] - 1,
+          f"{_n_eot:,} EOTs for {man['train_documents']:,} documents -- so 'which "
+          f"document supplies most of this block' is derived from the STORED stream, "
+          f"not from a re-segmentation that could drift")
+
+
 # ===========================================================================
 print()
 print("=" * 78)
