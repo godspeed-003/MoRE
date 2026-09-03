@@ -335,6 +335,12 @@ def train(cfg: dict, run_epochs: int | None = None, ctx: "RunContext | None" = N
     # existing arithmetic run keeps emitting `val/routing_accuracy` unchanged.
     _task = resolve_task(cfg)
     _agree_key = routing_agreement_key(_task)
+    # T-L6.8: the label manifest follows the task. `expert_labels` from `.families`
+    # names the arithmetic op families; a language run must name POS families.
+    if _task == TASK_LANGUAGE:
+        from .lang_families import expert_labels as _expert_labels
+    else:
+        _expert_labels = expert_labels
     # T-L5.1: the trivial-baseline floor for THIS corpus, read from the dataset
     # manifest rather than from a config literal, so a run cannot quote a floor
     # measured on a different corpus. None when the dataset does not supply one --
@@ -1028,7 +1034,15 @@ def train(cfg: dict, run_epochs: int | None = None, ctx: "RunContext | None" = N
             # at E=1 an _E-wide vector indexed out of range, and at E=7 it
             # invented a seventh family. These are oracle family labels, so all
             # three architectures report the same six rows.
-            for i, label in enumerate(expert_labels(_F)):
+            #
+            # T-L6.8: and from the TASK's manifest. Before this fix a language run
+            # published `recursion/avg_depth_by_family/E1_ADD_SUB` -- arithmetic labels
+            # on language values -- because `expert_labels` is imported from
+            # `.families` at module scope. The numbers were right and the row names
+            # were from the other study, which is exactly the kind of thing that
+            # reaches a paper table unnoticed. Found in the first completed language
+            # run, `runs/langB_MoRE_seed42__91c9bba1`.
+            for i, label in enumerate(_expert_labels(_F)):
                 if family_depth_count[i] > 0:
                     family_avg_depth[label] = (
                         family_depth_sum[i] / family_depth_count[i]

@@ -12,13 +12,13 @@
   ],
   "model": {
     "d_model": 256,
-    "num_experts": 6,
+    "num_experts": 1,
     "max_depth": 7,
     "max_steps": 7,
     "step_feat_dim": 12,
     "num_blocks": 1,
     "dropout": 0.1,
-    "ffn_mult": 4,
+    "ffn_mult": 24,
     "routing_mode": "top1_sparse",
     "router_noise": "none",
     "router_noise_init": 0.1,
@@ -32,17 +32,17 @@
   "training": {
     "lr": 0.001,
     "weight_decay": 0.0001,
-    "batch_size": 8,
+    "batch_size": 64,
     "epochs": 1,
     "val_split": 0.1,
     "grad_clip": 1.0,
     "subset_fraction": 1.0,
-    "subset_seed": 42
+    "subset_seed": 43
   },
   "loss_weights": {
     "task": 1.0,
     "family_cls": 0.0,
-    "routing_balance": 0.001,
+    "routing_balance": 0.0,
     "step_routing": 0.0,
     "halting": 0.001,
     "halting_supervision": 0.0
@@ -57,7 +57,7 @@
     "train_split_version": "fixed-file-splits-v1",
     "subset_fraction": 1.0,
     "jsonl_path": "D:\\res\\git\\MoRE\\.claude\\worktrees\\english-language-dataset-migration-92946e\\data\\train.jsonl",
-    "subset_seed": 42,
+    "subset_seed": 43,
     "seq_len": 256,
     "vocab_size": 8192,
     "corpus": "wikitext-2"
@@ -65,28 +65,28 @@
   "logging": {
     "wandb_project": "micro-MoRE-poc",
     "log_interval": 2,
-    "run_name": "langB_MoRE_seed42",
-    "experiment_group": "lang_smoke"
+    "run_name": "langB_MoR_seed43",
+    "experiment_group": "lang_smoke2"
   },
-  "architecture": "more",
+  "architecture": "mor",
   "task": "language",
   "provenance": {
-    "seed": 42,
+    "seed": 43,
     "resolved_epochs": 1,
     "resolved_subset_fraction": 1.0,
-    "resolved_batch_size": 8,
-    "experiment_id": "langB_MoRE_seed42__91c9bba1",
-    "experiment_group": "lang_smoke",
-    "code_git_commit": "b6f5a669f5e6c3f8dffff1a0e31a00a4678a851b",
+    "resolved_batch_size": 64,
+    "experiment_id": "langB_MoR_seed43__c1873a66",
+    "experiment_group": "lang_smoke2",
+    "code_git_commit": "2bf8d463cf09a2616413573875634a69db248f4b",
     "code_git_dirty": true,
-    "config_hash": "91c9bba1874439cae3c8f95b3aadf0ebdfa91486d7a49a7bcab429f21882b0a5",
-    "run_dir": "runs/langB_MoRE_seed42__91c9bba1",
-    "architecture": "more",
+    "config_hash": "c1873a66943eb74805a99b53fd80d7d386fcb21839fbd07e1c8ad499689fc976",
+    "run_dir": "runs/langB_MoR_seed43__c1873a66",
+    "architecture": "mor",
     "variant": "language",
-    "run_name": "langB_MoRE_seed42",
+    "run_name": "langB_MoR_seed43",
     "dataset_version": "more6-v1-seed42-n70000-3c1087b6aad9",
     "train_split_version": "fixed-file-splits-v1",
-    "resolved_seed": 42,
+    "resolved_seed": 43,
     "seed_source": "cli",
     "seed_declared": true,
     "seed_set_canonical": [
@@ -104,7 +104,7 @@
     "determinism_exceptions": [
       "CUDA not available: CUDA generators were not seeded."
     ],
-    "wandb_run_id": "x00qx68p",
+    "wandb_run_id": "26044ylj",
     "device": "cpu",
     "halting_mode": "pure_act",
     "halting_supervision_enabled": false,
@@ -112,16 +112,13 @@
     "ponder_weight": 0.001,
     "resolved_routing_mode": "top1_sparse",
     "resolved_router_noise": "none",
-    "ffn_mult": 4,
+    "ffn_mult": 24,
     "routing_supervision_enabled": false,
     "routing_supervision_weight": 0.0,
     "family_supervision_enabled": false,
     "family_cls_weight": 0.0,
     "router_noise_scale": 0.0,
     "halt_target_mode": "pure_act",
-    "total_params": 5584908,
-    "nondeterministic_ops_observed": [
-      "none"
-    ]
+    "total_params": 5581063
   }
 }

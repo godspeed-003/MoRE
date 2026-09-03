@@ -1708,6 +1708,36 @@ does not exist here (T-L0.0).
   router that routes by topic scores above the topic null and near the POS null, and
   vice versa — i.e. the two axes are shown to be separable before either is quoted.
 
+- [ ] **T-L6.8 Family labels must follow the TASK, and the duplicate depth metrics
+  must be reconciled.** Both defects were found in the first completed language run,
+  `runs/langB_MoRE_seed42__91c9bba1`, which is what a real run buys over a suite.
+  (a) **FIXED in this commit:** the run published
+  `recursion/avg_depth_by_family/E1_ADD_SUB` — *arithmetic* labels on language values —
+  because `expert_labels` is imported from `.families` at engine module scope. Right
+  numbers, wrong study's row names, and exactly the kind of thing that reaches a paper
+  table unnoticed. The engine now resolves the label helper from the task.
+  (b) **STILL OPEN:** two keys measure "mean exit depth by family" and disagree —
+  `recursion/avg_depth_by_family/*` (2.0034485) and the new
+  `depth/mean_by_family/*` (2.0034746). Different populations (mine excludes the last
+  position, which has no next-token target) and different passes. Likewise
+  `depth_dist/step_*_pct` (train pass, `step_7 = 3.79%`) against `depth/hist/step_*`
+  (validation pass, `step_7 = 0`). Both pairs are legitimate separate measurements, but
+  four keys that all read as "the exit-depth distribution" is the two-copies-that-diverge
+  failure `changelog.md` already records once. **Verify:** every depth key states which
+  pass and which token population it covers, in its own name or in a `metrics.json`
+  note; no two keys can be read as the same quantity.
+
+- [ ] **T-L6.9 Wire `specialization_vs_control` into the validation pass.** T-L3.3 built
+  and unit-tested the shuffled control, but nothing calls it from `engine.py`, so
+  `metrics.json` carries `routing_ami` with **no null band beside it** — the same class of
+  gap as the dataset wiring (T-L7.4), and it matters immediately: the first language run
+  reported `routing_ami = 0.0181`, which is BELOW the 0.0527 chance level measured on
+  synthetic routers with these marginals. Without the per-run band, that number reads as
+  weak-but-present specialization when it is at or under the floor. **Verify:** every
+  language `metrics.json` carries `val/routing_control/ami_delta` and its band; the
+  first run's AMI is re-reported with `exceeds_null` and the verdict matches the manual
+  0.0527 comparison.
+
 - [ ] **T-L6.7 Span-level depth reporting.** `plan_language.md` §4.1b. Per-token
   recursion is kept, but "does the model spend more computation on harder *passages*"
   is answered as a measurement: `depth/mean_by_document`, and the within-document

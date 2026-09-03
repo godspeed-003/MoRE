@@ -5041,6 +5041,78 @@ which is close enough to the floor to look like fast learning.
 guards; `config.LANGUAGE_CORPUS_DEFAULT` when a run reads the wrong corpus; `cli.py`'s
 override loop when a string-valued language flag is added next.
 
+## First completed language run — the pipeline learns, and two defects surfaced
+
+`runs/langB_MoRE_seed42__91c9bba1` (MoRE, wikitext-2, 1 epoch, batch 8, seed 42, CPU,
+7 tok/s, `experiment_group = lang_smoke` so it can never enter a table). Not a
+scientific result -- one epoch on the DEV corpus -- but the first end-to-end language
+number, and it earned its keep by exposing two defects a green test suite had not.
+
+**It beats the floor, thinly.** `val_loss = 5.3567` nats/token against the dev corpus's
+bigram floor of 5.3983: `nats_below_bigram_floor = +0.0416`, perplexity 212.0, 7.728
+bits/token. So the LM path learns something a two-column count table does not -- after one
+epoch, by 0.04 nats. The canonical floor is 4.9849 and is the one that matters.
+
+**DEPTH COLLAPSED, and the instrumentation reported it correctly rather than flattering
+it.** Of 283,050 validation tokens: 1,088 at depth 1, **281,619 at depth 2**, 343 at depth
+3, and **zero** at depths 4-7 out of a budget of 7. `depth/std = 0.071`,
+`distinct_exit_depths = 3`. Mean depth by family spans **0.011 steps** across all six
+families (1.9928 … 2.0035) -- no per-family differentiation at all. This is the arithmetic
+POC's signature reproduced on language (93-97% at exactly 2 steps there, 99.5% here).
+
+**A METHODOLOGICAL CATCH worth recording.** All three depth correlations report
+`exceeds_null = 1`: logfreq +0.0948, surprisal -0.0948, model_loss +0.0431, against null
+bands of about +-0.004. Those are not false positives -- the tendency is real -- but at
+n = 283,050 the permutation null shrinks to +-0.004, so **statistical significance here
+carries almost no information about effect size**. With 99.5% of tokens at one depth, a
+rho of 0.095 is driven by the ~1,400 tokens that exited elsewhere. The null band needs its
+companion, and `depth/std`, `distinct_exit_depths` and `depth/hist` are it: the pair is
+interpretable, either number alone is not. Anyone quoting `exceeds_null` without the
+histogram is quoting the wrong half.
+
+Two internal consistency confirmations fell out of the same numbers.
+`spearman_vs_logfreq` and `spearman_vs_unigram_surprisal` are **exact negatives to 16
+digits**, which they must be (surprisal is monotone decreasing in frequency) -- and which
+also means the plan lists two metrics that are not independent evidence. And the sign is
+**contrary to the hypothesis**: rho vs log-frequency is POSITIVE, so more frequent tokens
+received slightly *more* depth, not less. Tiny, but the wrong direction.
+
+**No evidence of POS-aligned specialization.** `routing_agreement_with_pos = 0.0600`,
+`routing_hungarian_acc = 0.2973`, **`routing_ami = 0.0181`** -- below the **0.0527**
+chance level measured on synthetic routers with these marginals (T-L3.3). Load entropy
+0.7600 against the partition's own 0.8884, so the router is *more* imbalanced than POS is.
+Expert cosine similarity 0.028 mean / 0.044 max: barely differentiated after one epoch.
+`probe/family_ce = 1.803` nats against `ln(6) = 1.792`, i.e. the detached probe is at
+chance too -- which is the honest reading of a trunk that has had no family signal in its
+objective (T-L5.3) for one epoch.
+
+**DEFECT 1, FIXED HERE: arithmetic labels on a language run.** The run published
+`recursion/avg_depth_by_family/E1_ADD_SUB`, `E2_MULT_DIV`, `E3_MOD_POW`, ... on LANGUAGE
+values, because `expert_labels` is imported from `.families` at engine module scope. The
+numbers were right and the row names came from the other study. Nothing raised, no test
+covered it, and it would have put `E2_MULT_DIV` in a language paper table. The engine now
+resolves the label helper from the task (`lang_families.expert_labels` on language).
+
+**DEFECT 2, OPEN as T-L6.8(b): four keys that all read as "the exit-depth
+distribution".** `recursion/avg_depth_by_family/*` = 2.0034485 and the new
+`depth/mean_by_family/*` = 2.0034746 -- close but not equal, because mine excludes the
+last position (no next-token target). Likewise `depth_dist/step_7_pct = 3.79%` (train
+pass, and it matches `halt/forced_exit_rate` exactly) against `depth/hist/step_7 = 0`
+(validation pass). Both pairs are legitimate separate measurements of different
+populations, and that is precisely why the naming is dangerous: this is the
+two-copies-that-diverge failure already recorded once in this file. Every depth key needs
+to state its pass and its token population.
+
+**GAP, OPEN as T-L6.9:** `specialization_vs_control` is built and unit-tested but nothing
+calls it from `engine.py`, so `routing_ami` is published with **no null band beside it**.
+Same class of gap as the dataset wiring -- and it bites immediately, because 0.0181
+without the band reads as weak-but-present specialization rather than as at-or-below the
+floor.
+
+**Where to look.** `engine.py` `_expert_labels` for the label fix;
+`runs/langB_MoRE_seed42__91c9bba1/metrics.json` for every number above;
+`TASKS_LANGUAGE.md` T-L6.8 / T-L6.9 for what is still owed.
+
 <!-- APPEND-MARKER-CL -->
 
 
