@@ -383,6 +383,94 @@ check("TL5.4e depth_rho_model_loss exists now and reads N/A until Phase L-6",
 
 # ===========================================================================
 print()
+print("=== T-L6.8  Every depth key states its pass and its token population ===")
+# ===========================================================================
+
+from more.metrics import (DEPTH_KEY_PROVENANCE, depth_key_provenance,   # noqa: E402
+                          uncovered_depth_keys)
+import json as _json  # noqa: E402
+import glob as _glob  # noqa: E402
+
+check("TL6.8a longest-prefix matching, so a specific key is not claimed by a general one",
+      depth_key_provenance("depth/mean_by_family/L2_NOUN")["prefix"]
+      == "depth/mean_by_family/"
+      and depth_key_provenance("depth/hist/step_2")["prefix"] == "depth/hist/step_",
+      "depth/mean_by_family/ must win over any shorter depth/ prefix, or the note would "
+      "describe the wrong measurement")
+
+_passes = {k: v["pass"] for k, v in DEPTH_KEY_PROVENANCE.items()}
+check("TL6.8b the train-pass and validation-pass keys are DISTINGUISHED",
+      _passes["depth_dist/step_"] == "train"
+      and _passes["depth/hist/step_"] == "validation",
+      "depth_dist/step_7_pct matched halt/forced_exit_rate exactly while "
+      "depth/hist/step_7 was 0 -- both correct, over different passes, and that is "
+      "now stated rather than discovered")
+
+_norm = lambda t: t.lower().replace("-", " ")
+check("TL6.8c the two mean-depth-by-family keys name the difference between them",
+      "last position" in _norm(DEPTH_KEY_PROVENANCE["depth/mean_by_family/"]["note"])
+      and "last position" in
+      _norm(DEPTH_KEY_PROVENANCE["recursion/avg_depth_by_family/"]["note"])
+      and "N/A" in DEPTH_KEY_PROVENANCE["depth/allocation_error_"]["note"],
+      "2.0034746 vs 2.0034485 is the last-position exclusion and nothing else; a reader "
+      "comparing them without that would report a discrepancy")
+
+check("TL6.8d the spearman entry warns that exceeds_null is not an effect size",
+      "EFFECT SIZE" in DEPTH_KEY_PROVENANCE["depth/spearman_"]["note"],
+      "at n ~ 2.8e5 the permutation band is about +-0.004, so significance there says "
+      "almost nothing -- the note carries that with the number")
+
+_lang_runs = sorted(_glob.glob(os.path.join(REPO, "runs", "langB_*", "metrics.json")),
+                    key=os.path.getmtime, reverse=True)
+if not _lang_runs:
+    skip("TL6.8e-f", "no completed language run on disk")
+else:
+    _bad = {}
+    for _r in _lang_runs:
+        with open(_r, "r", encoding="utf-8") as fh:
+            _mj = _json.load(fh)
+        _u = uncovered_depth_keys(_mj.keys())
+        if _u:
+            _bad[os.path.basename(os.path.dirname(_r))] = _u
+    check("TL6.8e every depth key in every completed language run is covered",
+          not _bad,
+          f"{len(_lang_runs)} run(s) checked, 0 uncovered keys"
+          if not _bad else f"UNCOVERED {_bad}")
+
+    # The writer's claim is "the provenance ships in the run directory". ONE run carrying
+    # it demonstrates that; runs made before the writer existed cannot, and reporting
+    # those as a failure would be reporting the wrong thing. So: pass if any run has it,
+    # SKIP with the reason if none does, and fail only if a run has the uncovered-keys
+    # flag set -- which would mean the writer ran and found a gap.
+    _with_prov = []
+    _flagged = []
+    for _r in _lang_runs:
+        with open(_r, "r", encoding="utf-8") as fh:
+            _mj = _json.load(fh)
+        if isinstance(_mj.get("depth_key_provenance"), dict):
+            _with_prov.append((_r, len(_mj["depth_key_provenance"])))
+        if "depth_key_provenance_uncovered" in _mj:
+            _flagged.append(os.path.basename(os.path.dirname(_r)))
+
+    if _flagged:
+        check("TL6.8f no completed run reports an uncovered depth key", False,
+              f"runs flagging uncovered keys: {_flagged} -- add them to "
+              f"metrics.DEPTH_KEY_PROVENANCE")
+    elif _with_prov:
+        check("TL6.8f the provenance SHIPS in the run directory, not only in the source",
+              _with_prov[0][1] == len(DEPTH_KEY_PROVENANCE),
+              f"{_with_prov[0][1]} entries in "
+              f"{os.path.basename(os.path.dirname(_with_prov[0][0]))}/metrics.json, and "
+              f"no run flags an uncovered key -- a note that lives only in a module is "
+              f"one a reader of the artifact never sees")
+    else:
+        skip("TL6.8f provenance in a run directory",
+             f"{len(_lang_runs)} language run(s) on disk, all predating the writer; "
+             f"none flags an uncovered key. Re-run a language run to confirm.")
+
+
+# ===========================================================================
+print()
 print("=" * 78)
 print(f"{len(PASS)} passed, {len(FAIL)} failed, {len(SKIP)} skipped")
 if FAIL:

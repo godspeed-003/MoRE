@@ -1840,7 +1840,7 @@ does not exist here (T-L0.0).
   writing a zero. `updated_rules.md` §8's first-step routing decision is the signal used,
   so it is the same one the confusion matrix is built from rather than a second opinion.
 
-- [ ] **T-L6.8 Family labels must follow the TASK, and the duplicate depth metrics
+- [x] **T-L6.8 Family labels must follow the TASK, and the duplicate depth metrics
   must be reconciled.** Both defects were found in the first completed language run,
   `runs/langB_MoRE_seed42__91c9bba1`, which is what a real run buys over a suite.
   (a) **FIXED in this commit:** the run published
@@ -1858,8 +1858,41 @@ does not exist here (T-L0.0).
   failure `changelog.md` already records once. **Verify:** every depth key states which
   pass and which token population it covers, in its own name or in a `metrics.json`
   note; no two keys can be read as the same quantity.
+  **Evidence:** `code/test_lang_heads.py` -> **30 passed, 0 failed, 1 skipped**, checks
+  TL6.8a-f. Renaming was NOT available -- `recursion/avg_depth_by_family` and
+  `depth_dist/step_N_pct` belong to the arithmetic contract Gate L0 checks -- so the
+  provenance ships **as data**: `metrics.DEPTH_KEY_PROVENANCE` maps seven key prefixes to
+  `{pass, population, note}` and is written into every run's `metrics.json`, for both
+  tasks, because the ambiguity is not language-specific.
 
-- [ ] **T-L6.9 Wire `specialization_vs_control` into the validation pass.** T-L3.3 built
+  | key prefix | pass | population |
+  |---|---|---|
+  | `depth_dist/step_` | **train** | every token of every training batch |
+  | `depth/hist/step_` | validation | all positions except each block's last |
+  | `depth/mean_by_family/` | validation | mapped POS family, last position excluded |
+  | `recursion/avg_depth_by_family/` | validation | mapped family, last position **included** |
+  | `recursion/avg_depth_by_op/` | validation | mapped op code -- empty on language |
+  | `depth/spearman_` | validation | identical set to `depth/hist` |
+  | `depth/allocation_error_` | n/a | none -- structurally `N/A` on language |
+
+  So the 2.0034746 vs 2.0034485 disagreement is now named: **the last-position exclusion
+  and nothing else.** And `depth_dist/step_7_pct = 3.79%` against `depth/hist/step_7 = 0`
+  is train-versus-validation, which the table states rather than leaving to be
+  rediscovered.
+
+  `uncovered_depth_keys` casts a deliberately wide net -- anything whose name could be
+  read as an exit-depth quantity -- and the engine writes
+  `depth_key_provenance_uncovered` plus a named stderr warning if a key escapes the
+  registry. **Zero uncovered keys across all three completed language runs.** Matching is
+  longest-prefix, so `depth/mean_by_family/` is described by its own entry rather than by
+  a shorter `depth/` one, which TL6.8a pins.
+
+  TL6.8f is the one SKIP: all three completed runs predate the writer, so none carries the
+  block yet. It reports that as a skip with the count rather than as a pass or a failure,
+  and it will fail loudly if any future run flags an uncovered key. A fresh run is in
+  flight.
+
+- [x] **T-L6.9 Wire `specialization_vs_control` into the validation pass.** T-L3.3 built
   and unit-tested the shuffled control, but nothing calls it from `engine.py`, so
   `metrics.json` carries `routing_ami` with **no null band beside it** — the same class of
   gap as the dataset wiring (T-L7.4), and it matters immediately: the first language run
@@ -1869,6 +1902,24 @@ does not exist here (T-L0.0).
   language `metrics.json` carries `val/routing_control/ami_delta` and its band; the
   first run's AMI is re-reported with `exceeds_null` and the verdict matches the manual
   0.0527 comparison.
+  **Evidence:** wired in the T-L6.6 commit and demonstrated by
+  `runs/langB_MoRE_seed44__2ce26c0d`, which carries **21 POS-axis and 20 topic-axis keys**
+  with no `routing_control_error`. Two corrections to this Verify line as written, both
+  substantive:
+
+  1. **The key prefix is `val/routing_control_pos/*`, not `val/routing_control/*`.** There
+     are two axes now (T-L6.6), so the POS one is named for what it compares against.
+  2. **"matches the manual 0.0527 comparison" is the WRONG TEST and must not be
+     performed.** 0.0527 is the AMI a *POS-perfect* router scores against the control; the
+     control mean depends on **both** partitions, and for the seed-44 router it was
+     **0.0069**. A fixed constant would have called an AMI of 0.104 unremarkable when its
+     own null puts it at delta +0.097, z 28.5. The per-run band replaces the constant, and
+     `HANDOFF.md` -- which another agent follows -- was corrected because it carried the
+     bad advice.
+
+  The engine loads both reference artifacts once per run; a missing one prints a named
+  stderr warning and skips that axis rather than writing a zero, because absence means
+  "not measured" while 0.0 would mean "POS is no better than noise".
 
 - [ ] **T-L6.10 Rule out the embedding-norm confound before any depth claim.** Both
   smoke runs show `depth/spearman_vs_logfreq` **positive** — frequent tokens receive MORE

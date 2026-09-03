@@ -5357,6 +5357,55 @@ advice; the per-run band in `metrics.json` is the right baseline and is now alwa
 `runs/langB_MoRE_seed44__2ce26c0d/metrics.json` for both axes side by side;
 `TASKS_LANGUAGE.md` T-L6.6 Evidence for the numbers.
 
+## T-L6.8 / T-L6.9 — depth-key provenance shipped as data, and a Verify line corrected
+
+`code/more/metrics.py`, `code/more/engine.py`, `code/test_lang_heads.py`.
+**30 passed, 0 failed, 1 skipped.**
+
+**T-L6.8. Renaming was not available, so the provenance ships AS DATA.** Two of the four
+ambiguous keys -- `recursion/avg_depth_by_family` and `depth_dist/step_N_pct` -- belong to
+the arithmetic contract Gate L0 checks, so they cannot be renamed. Instead
+`metrics.DEPTH_KEY_PROVENANCE` maps seven key prefixes to `{pass, population, note}` and
+the engine writes it into every run's `metrics.json`, for BOTH tasks, because the ambiguity
+was never language-specific.
+
+The two disagreements are now named rather than left to be rediscovered:
+**2.0034746 vs 2.0034485 is the last-position exclusion and nothing else** (the last
+position of a block has no next-token target, so the new key drops it and the old one
+keeps it), and **`depth_dist/step_7_pct = 3.79%` against `depth/hist/step_7 = 0` is
+train-versus-validation** -- which is also why the former matches `halt/forced_exit_rate`
+exactly.
+
+`uncovered_depth_keys` casts a deliberately wide net -- anything whose name could be read
+as an exit-depth quantity -- and the engine writes `depth_key_provenance_uncovered` plus a
+named stderr warning if a key escapes the registry. **Zero uncovered keys across all three
+completed language runs.** Matching is longest-prefix so `depth/mean_by_family/` is
+described by its own entry rather than by a shorter `depth/` one.
+
+TL6.8f is the single skip, and it is skipped rather than passed or failed on purpose: all
+three completed runs predate the writer, so none carries the block. It reports that with
+the run count, passes as soon as one run has it, and **fails loudly if any run flags an
+uncovered key** -- which would mean the writer ran and found a gap.
+
+**T-L6.9. Wired, and its Verify line was WRONG IN TWO WAYS, both corrected rather than
+worked around.**
+
+1. The key prefix is `val/routing_control_pos/*`, not `val/routing_control/*` -- there are
+   two axes now, so the POS one is named for what it compares against.
+2. **"matches the manual 0.0527 comparison" is the wrong test and must not be performed.**
+   0.0527 is the AMI a *POS-perfect* router scores against the control. The control mean
+   depends on BOTH partitions, and for the seed-44 router it was **0.0069**. Against the
+   fixed constant, an AMI of 0.104 would have looked unremarkable; against its own null it
+   is delta +0.097 at z 28.5. `HANDOFF.md` carried the bad advice and was corrected,
+   because another agent follows that file.
+
+A missing reference artifact prints a named stderr warning and skips that axis rather than
+writing a zero: absence means "not measured", 0.0 would mean "POS is no better than noise".
+
+**Where to look.** `metrics.DEPTH_KEY_PROVENANCE` before adding any depth metric;
+`uncovered_depth_keys` for what counts as depth-ish; `TASKS_LANGUAGE.md` T-L6.8 for the
+prefix/pass/population table.
+
 <!-- APPEND-MARKER-CL -->
 
 

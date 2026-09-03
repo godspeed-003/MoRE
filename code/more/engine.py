@@ -38,7 +38,9 @@ from .metrics import (compute_expert_load_entropy,
                       language_depth_to_wandb,
                       specialization_vs_control,
                       article_agreement_vs_topic,
-                      control_comparison_to_wandb)
+                      control_comparison_to_wandb,
+                      DEPTH_KEY_PROVENANCE,
+                      uncovered_depth_keys)
 from .run_context import RunContext, resolve_overrides, ProxyGuardError
 from .seeding import (apply_seeding, make_generator, seed_worker,
                       nondeterministic_ops_observed)
@@ -1559,6 +1561,19 @@ def train(cfg: dict, run_epochs: int | None = None, ctx: "RunContext | None" = N
         # agreement with a linguistic prior rather than as accuracy, and a caption
         # that lives in a prose file is a caption that can be omitted from a table.
         metrics["routing_agreement_metric_key"] = _agree_key
+        # T-L6.8: four key families all read as "the exit-depth distribution" and two of
+        # them differ in the fifth decimal. Renaming is not available -- two of the four
+        # are in the arithmetic contract Gate L0 checks -- so the provenance ships AS DATA
+        # in every run directory, and `uncovered_depth_keys` refuses to let a new depth key
+        # escape it. Written for both tasks: the ambiguity is not language-specific.
+        metrics["depth_key_provenance"] = DEPTH_KEY_PROVENANCE
+        _uncov = uncovered_depth_keys(metrics.keys())
+        if _uncov:
+            # Recorded rather than raised: a run must not die because a metric name is
+            # undocumented, but it must not look documented either.
+            metrics["depth_key_provenance_uncovered"] = _uncov
+            print(f"[Train] depth keys with no provenance entry: {_uncov} -- add them to "
+                  f"metrics.DEPTH_KEY_PROVENANCE", file=sys.stderr)
         metrics["routing_agreement_caption"] = routing_agreement_caption(_task)
         # T6.3: the full permutation-invariant routing report, in the artifact the
         # exporter reads. Written even when undefined (E == 1) so the field list is

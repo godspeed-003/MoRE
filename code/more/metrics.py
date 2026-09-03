@@ -806,6 +806,111 @@ def compute_token_exit_depths(
 # more computation where IT finds the task hard, which is a behavioural claim rather
 # than a designed one.
 
+# ---------------------------------------------------------------------------
+# T-L6.8  Which pass and which tokens each depth key covers
+# ---------------------------------------------------------------------------
+#
+# FOUR key families all read as "the exit-depth distribution", and two of them differ in
+# the fifth decimal. That is the two-copies-that-diverge hazard `changelog.md` already
+# records once, and it was found in the first completed language run: 2.0034485 under one
+# name and 2.0034746 under another, both labelled "mean depth by family".
+#
+# They are legitimately different measurements -- different passes, different token
+# populations -- so the fix is not to delete one but to make it impossible to read them as
+# the same quantity. Renaming is not available: `recursion/avg_depth_by_family` and
+# `depth_dist/step_N_pct` are in the published arithmetic contract that Gate L0 checks. So
+# the provenance is published as data, written into every `metrics.json`, and
+# `code/test_lang_depth_keys.py` asserts every emitted depth key is covered by it.
+#
+# Longest prefix wins, so `depth/mean_by_family/` is matched by its own entry rather than
+# by `depth/`.
+DEPTH_KEY_PROVENANCE = {
+    "depth_dist/step_": {
+        "pass": "train",
+        "population": "every token of every training batch, all recursion steps",
+        "note": ("Accumulated in the training loop, so it includes tokens that hit the "
+                 "max-depth forced exit -- step_7_pct matches halt/forced_exit_rate "
+                 "exactly. NOT comparable with depth/hist, which is the validation pass."),
+    },
+    "depth/hist/step_": {
+        "pass": "validation",
+        "population": ("every position except each block's last, which has no next-token "
+                       "target and therefore no per-token loss"),
+        "note": ("The token-level exit-depth histogram over the whole validation split. "
+                 "Counts, not percentages, and over a different pass and population than "
+                 "depth_dist/*, so the two will not agree."),
+    },
+    "depth/mean_by_family/": {
+        "pass": "validation",
+        "population": ("positions with a mapped POS family (-1 excluded), last position "
+                       "of each block excluded"),
+        "note": ("Companion to depth/hist. Differs from "
+                 "recursion/avg_depth_by_family in the fifth decimal precisely because "
+                 "that one includes each block's last position."),
+    },
+    "recursion/avg_depth_by_family/": {
+        "pass": "validation",
+        "population": ("positions with step_mask true and a mapped oracle family, "
+                       "INCLUDING each block's last position"),
+        "note": ("The pre-existing arithmetic key, kept unchanged because Gate L0 checks "
+                 "the contract it belongs to. The last-position difference is the whole "
+                 "of its disagreement with depth/mean_by_family."),
+    },
+    "recursion/avg_depth_by_op/": {
+        "pass": "validation",
+        "population": "positions with a mapped operation code",
+        "note": ("Arithmetic only. Empty on language, because lang_families.ALL_OP_NAMES "
+                 "is [] -- there is no operation axis."),
+    },
+    "depth/spearman_": {
+        "pass": "validation",
+        "population": ("the same positions as depth/hist, so all three correlations are "
+                       "over one identical token set (T-L6.1)"),
+        "note": ("Each carries its own permutation null band. At n ~ 2.8e5 the band is "
+                 "about +-0.004, so exceeds_null says almost nothing about EFFECT SIZE -- "
+                 "read it with depth/std and depth/hist or not at all."),
+    },
+    "depth/allocation_error_": {
+        "pass": "n/a",
+        "population": "none",
+        "note": ("Structurally undefined on language: there is no per-token ground-truth "
+                 "depth for English (plan_language.md §5.1), so the value is the string "
+                 "N/A. A 0.0 here would read as perfect allocation against a curriculum "
+                 "that does not exist."),
+    },
+}
+
+
+def depth_key_provenance(key: str):
+    """The provenance record for one depth key, longest-prefix match, else None."""
+    best = None
+    for prefix, rec in DEPTH_KEY_PROVENANCE.items():
+        if key.startswith(prefix) and (best is None or len(prefix) > len(best[0])):
+            best = (prefix, rec)
+    return None if best is None else {"prefix": best[0], **best[1]}
+
+
+def uncovered_depth_keys(keys) -> list:
+    """Depth-ish keys with no provenance entry -- must be empty.
+
+    "Depth-ish" is deliberately broad: anything whose name could be read as an exit-depth
+    quantity. A key that escapes the registry is exactly the ambiguity this exists to
+    prevent, so the net is cast wide and the registry is what narrows it.
+    """
+    out = []
+    for k in keys:
+        if not (k.startswith("depth") or k.startswith("recursion/avg_depth")):
+            continue
+        # Scalars that describe the report itself rather than a per-unit measurement.
+        if k in ("depth/mean", "depth/std", "depth/n_tokens",
+                 "depth/distinct_exit_depths", "depth/report_error",
+                 "depth_key_provenance"):
+            continue
+        if depth_key_provenance(k) is None:
+            out.append(k)
+    return sorted(out)
+
+
 # Percentiles of the permutation null. Two-sided 95%: a rho inside this band is
 # indistinguishable from the same depth marginal paired at random.
 NULL_BAND_PERCENTILES = (2.5, 97.5)
