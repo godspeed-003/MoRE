@@ -5251,6 +5251,66 @@ result does not depend on the installed sklearn's default.
 (`centroid @ svd.components_`, so they stay readable TF-IDF vocabulary); `block_doc_index`
 when a block's topic looks wrong.
 
+## T-L6.6 / T-L6.9 — two reference axes, one implementation, and a null for each
+
+`code/more/metrics.py`, `code/more/engine.py`, `code/test_language_families.py`.
+**114 passed, 0 failed, 1 skipped.** Gate L0 `TOTAL 356 356 0 0`.
+
+**THE SEPARABILITY DEMONSTRATION, which had to come before either axis is quoted.**
+Three synthetic routers, each scored on both axes:
+
+| router | topic AMI (delta) | POS AMI (delta) | concentration |
+|---|---|---|---|
+| routes by topic | **1.0000** (+0.9963) | 0.0012 | 1.000 |
+| routes by POS | 0.0227 (+0.0231) | **1.0000** (+0.9473) | 0.325 |
+| random | -0.0029 (-0.0066) | 0.0000 (-0.0000) | 0.199 |
+
+Each axis is beaten by its own router and not by the other's, and a random router is at
+chance on both -- so neither is a metric that scores something highly by default. **The
+POS router's topic delta is +0.023: small but NOT zero.** The two axes are separable
+without being orthogonal, because different subjects use different noun/verb mixes. Said
+plainly here because otherwise a genuine topic result could be partly POS leakage, and the
+number to subtract is on the record.
+
+**`concentration` is not decoration and must be read first.** Article-level agreement is
+computed on a per-block MAJORITY expert, so a majority of 1/6 means the article was not
+routed anywhere in particular. Random scores 0.199 against chance 1/6 = 0.167; the topic
+router 1.000 by construction. Without it a high article-level AMI could describe a
+partition of coin flips, which is exactly the reading a reviewer would challenge.
+
+**The topic null is EXACT, unlike the per-type one.** Every stored block holds exactly
+`seq_len` tokens, so permuting block labels preserves each topic's token mass precisely --
+none of the greedy mass-matching plus swap-repair that T-L3.3 needed. Worth noting because
+it means the article-level band is tighter and cleaner than the token-level one.
+
+**ONE implementation, two callers.** `partition_agreement_vs_control(oracle, predicted,
+control_oracles, num_experts)` was factored out of `specialization_vs_control`; the
+per-token POS path and the per-article topic path differ only in what a unit is and how
+the oracle label reaches it. TL6.6i asserts there is exactly one definition. Two copies of
+these statistics would be the two-copies-that-diverge failure this file already records
+once -- and that failure landed the tolerance guard in the copy that never ran.
+
+**T-L6.9's substance is wired in the same commit.** The engine loads
+`token_family_shuffled.npy` and `block_topic_val.npy` once per run and writes both
+comparisons under `val/routing_control_pos/*` and `val/routing_control_topic/*`. A missing
+artifact prints a NAMED warning to stderr and skips that axis rather than writing a zero --
+absence is "not measured", a 0.0 would be "POS is no better than noise". The signal is
+`first_route`, i.e. `updated_rules.md` §8's authoritative first-step decision, so it is the
+same one the confusion matrix is built from rather than a second opinion. The routing
+accumulator collects WHOLE blocks in split order, which is why it needs its own id vector
+rather than reusing the depth one (that drops each block's last position, which has no
+next-token target).
+
+**T-L6.6 IS NOT TICKED.** Its Verify has two clauses. The separability clause is executed
+and passing; the "both agreement numbers and both null bands appear for every language
+run" clause needs a completed language run, and the one exercising it is still training on
+CPU. The box stays `[ ]` until that has actually run.
+
+**Where to look.** `metrics.partition_agreement_vs_control` for the shared statistics;
+`block_majority_expert` / `block_topic_concentration` for the article-level reduction and
+the number that makes it interpretable; `engine.py` `_lang_route` / `_lang_ids_full` for
+the accumulators and why there are two.
+
 <!-- APPEND-MARKER-CL -->
 
 

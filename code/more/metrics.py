@@ -245,31 +245,140 @@ def specialization_vs_control(predicted_expert, token_ids, token_family,
     ids = np.asarray(token_ids).ravel()
     pred = np.asarray(predicted_expert).ravel()
     draws = np.atleast_2d(np.asarray(control_draws))
+    return partition_agreement_vs_control(
+        tf[ids], pred, [draws[d][ids] for d in range(draws.shape[0])], num_experts)
 
+
+def partition_agreement_vs_control(oracle, predicted, control_oracles,
+                                   num_experts: int) -> dict:
+    """The comparison itself, over any UNIT -- a token, or a whole article.
+
+    Factored out of `specialization_vs_control` for T-L6.6, which scores the same
+    predictions against a per-BLOCK topic partition instead of a per-token POS one. The
+    two callers differ only in what a unit is and how the oracle label reaches it; the
+    statistics must be identical, and one implementation is how that stays true. Two
+    copies of this would be the two-copies-that-diverge failure `changelog.md` already
+    records once.
+
+    `oracle` and `predicted` are paired label vectors of the same length;
+    `control_oracles` is a list of same-length null label vectors.
+    """
     real_pim = permutation_invariant_routing_metrics(
-        confusion_from_pairs(tf[ids], pred, num_experts), num_experts)
+        confusion_from_pairs(oracle, predicted, num_experts), num_experts)
     ctrl_pims = [
         permutation_invariant_routing_metrics(
-            confusion_from_pairs(draws[d][ids], pred, num_experts), num_experts)
-        for d in range(draws.shape[0])
+            confusion_from_pairs(c, predicted, num_experts), num_experts)
+        for c in control_oracles
     ]
 
-    out = {"n_control_draws": int(draws.shape[0]), "metrics": {}}
+    out = {"n_control_draws": len(ctrl_pims), "n_units": int(np.asarray(oracle).size),
+           "metrics": {}}
     for key in CONTROL_COMPARED_METRICS:
         rv = real_pim.get(key)
         cvs = [p.get(key) for p in ctrl_pims]
-        if rv is None or any(v is None for v in cvs):
+        if rv is None or not cvs or any(v is None for v in cvs):
             out["metrics"][key] = {"real": rv, "control_mean": None,
                                   "control_std": None, "delta": None,
                                   "delta_z": None}
             continue
-        cm, cs = float(np.mean(cvs)), float(np.std(cvs, ddof=1)) if len(cvs) > 1 else 0.0
+        cm = float(np.mean(cvs))
+        cs = float(np.std(cvs, ddof=1)) if len(cvs) > 1 else 0.0
         delta = float(rv) - cm
         out["metrics"][key] = {
             "real": float(rv), "control_mean": cm, "control_std": cs,
             "delta": delta,
             "delta_z": (delta / cs) if cs > 0 else None,
         }
+    return out
+
+
+def block_majority_expert(predicted_expert, seq_len: int) -> np.ndarray:
+    """`block_expert[n_blocks]` -- the expert most of a block's tokens went to.
+
+    T-L6.6's unit of analysis. "Did this article's tokens concentrate on one expert" is
+    the article-level question, and a majority vote is the honest reduction: a block whose
+    tokens split evenly across six experts has no article-level expert, and the majority
+    then records whichever won rather than pretending to a concentration that is not
+    there. `block_topic_concentration` below is what says how meaningful the majority was.
+    """
+    p = np.asarray(predicted_expert).ravel()
+    if p.size % seq_len != 0:
+        raise ValueError(
+            f"{p.size} predictions do not divide into blocks of {seq_len}. T-L6.6 needs "
+            "the per-token predictions of WHOLE blocks to reduce them per article."
+        )
+    rows = p.reshape(-1, seq_len)
+    n_e = int(rows.max()) + 1 if rows.size else 1
+    counts = np.stack([(rows == e).sum(axis=1) for e in range(n_e)], axis=1)
+    return counts.argmax(axis=1).astype(np.int64)
+
+
+def block_topic_concentration(predicted_expert, seq_len: int) -> float | None:
+    """Mean share of a block's tokens that went to the block's MAJORITY expert.
+
+    Reported beside every article-level agreement number, because the agreement is
+    computed on a majority label and a majority of 1/6 means the article was not routed
+    anywhere in particular. At chance over E experts this is ~1/E plus sampling; at 1.0
+    every article went entirely to one expert. Without it, a high article-level AMI could
+    describe a partition of coin flips.
+    """
+    p = np.asarray(predicted_expert).ravel()
+    if p.size == 0 or p.size % seq_len != 0:
+        return None
+    rows = p.reshape(-1, seq_len)
+    n_e = int(rows.max()) + 1
+    counts = np.stack([(rows == e).sum(axis=1) for e in range(n_e)], axis=1)
+    return float((counts.max(axis=1) / seq_len).mean())
+
+
+def make_label_permutation_controls(labels, n_draws: int, seed: int = 0) -> list:
+    """`n_draws` permutations of `labels`, destroying the pairing only.
+
+    For a per-BLOCK partition this is exact rather than approximate, which the per-type
+    case (T-L3.3) had to work for: every stored block holds exactly `seq_len` tokens, so
+    permuting block labels preserves the token marginals of every topic EXACTLY. No
+    mass-matching repair is needed here.
+    """
+    a = np.asarray(labels).ravel()
+    rng = np.random.default_rng(seed)
+    return [rng.permutation(a) for _ in range(int(n_draws))]
+
+
+# T-L6.6: the two reference axes, and the order they must be presented in. POS first
+# because §4.4 makes the permutation-invariant metrics primary against it, topic second
+# because it is INDUCED (our k, our seed) and carries a weaker claim -- but both always,
+# because the question is "what does it organize by", not "does it reproduce POS".
+REFERENCE_AXES = ("pos", "topic")
+
+
+def article_agreement_vs_topic(predicted_expert, block_topic, seq_len: int,
+                               num_experts: int, n_draws: int = 10,
+                               seed: int = 0) -> dict:
+    """T-L6.6: did this ARTICLE's tokens concentrate on one expert, and is that real?
+
+    The article-level counterpart of `specialization_vs_control`. Per-token predictions
+    are reduced to one expert per block by majority vote, scored against the induced
+    topic partition, and compared with `n_draws` label permutations of that partition --
+    which is an exact marginal-matched null here, because every block holds exactly
+    `seq_len` tokens.
+
+    `concentration` is reported alongside and must be read first: an article-level
+    agreement computed on a majority label means nothing if the majority was 1/6.
+    """
+    bt = np.asarray(block_topic).ravel()
+    be = block_majority_expert(predicted_expert, seq_len)
+    if be.size != bt.size:
+        raise ValueError(
+            f"{be.size} blocks of predictions against {bt.size} topic labels. The topic "
+            "array is per stored block, so the predictions must cover whole blocks of "
+            "the same split in the same order."
+        )
+    out = partition_agreement_vs_control(
+        bt, be, make_label_permutation_controls(bt, n_draws, seed), num_experts)
+    out["concentration"] = block_topic_concentration(predicted_expert, seq_len)
+    out["n_blocks"] = int(bt.size)
+    out["axis"] = "topic"
+    out["axis_is_induced"] = True
     return out
 
 
@@ -286,6 +395,12 @@ def control_comparison_to_wandb(cmp: dict, prefix: str = "val/routing_control") 
             if rec.get(field) is not None:
                 log[f"{prefix}/{key}_{field}"] = rec[field]
     log[f"{prefix}/n_draws"] = cmp.get("n_control_draws")
+    # T-L6.6 extras, present only on the article-level (topic) comparison. Concentration
+    # is not optional decoration: an article-level agreement computed on a majority label
+    # is uninterpretable without knowing how large the majority was.
+    for k in ("concentration", "n_blocks"):
+        if cmp.get(k) is not None:
+            log[f"{prefix}/{k}"] = cmp[k]
     return log
 
 

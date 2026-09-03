@@ -24,7 +24,7 @@ import matplotlib.pyplot as plt
 
 from .families import expert_labels, ALL_OP_NAMES, NUM_OP_TYPES, NUM_EXPERTS_CANONICAL
 from .data import MoREDataset
-from .lang_data import MoRELanguageDataset
+from .lang_data import MoRELanguageDataset, LANG_ROOT
 from .model import MoEBlock, MoREWrapper, MoREModel
 from .metrics import (compute_expert_load_entropy,
                       compute_pairwise_cosine_sim,
@@ -35,7 +35,10 @@ from .metrics import (compute_expert_load_entropy,
                       make_routing_confusion_figure,
                       make_op_depth_bar_figure,
                       language_depth_metrics,
-                      language_depth_to_wandb)
+                      language_depth_to_wandb,
+                      specialization_vs_control,
+                      article_agreement_vs_topic,
+                      control_comparison_to_wandb)
 from .run_context import RunContext, resolve_overrides, ProxyGuardError
 from .seeding import (apply_seeding, make_generator, seed_worker,
                       nondeterministic_ops_observed)
@@ -368,6 +371,25 @@ def train(cfg: dict, run_epochs: int | None = None, ctx: "RunContext | None" = N
             _tok_family = _ds.token_family.numpy() if _ds.token_family is not None else None
             _log_freq = _ds.log_freq()
             _surprisal = _ds.unigram_surprisal()
+        # T-L6.6 / T-L6.9: the two reference artifacts, loaded ONCE from the corpus
+        # directory. Absent -> that axis is skipped and its keys are simply not written,
+        # which an exporter reads as "not measured" rather than as a zero difference.
+        _pos_control = _block_topic = None
+        _cdir = os.path.join(LANG_ROOT, dc.get("corpus", "wikitext-103"))
+        _pc = os.path.join(_cdir, "token_family_shuffled.npy")
+        _bt = os.path.join(_cdir, "block_topic_val.npy")
+        if os.path.exists(_pc):
+            _pos_control = np.load(_pc)
+        else:
+            print(f"[Train] no shuffled control at {_pc}: routing_ami will be "
+                  f"published WITHOUT its null band. Build it with "
+                  f"data/lang/build_shuffled_control.py.", file=sys.stderr)
+        if os.path.exists(_bt):
+            _block_topic = np.load(_bt)
+        else:
+            print(f"[Train] no topic partition at {_bt}: the second reference axis is "
+                  f"skipped. Build it with data/lang/build_block_topics.py.",
+                  file=sys.stderr)
     if _task != "arithmetic":
         print(f"[Train] task={_task}: the confusion diagonal is published as "
               f"{_agree_key}")
@@ -837,6 +859,11 @@ def train(cfg: dict, run_epochs: int | None = None, ctx: "RunContext | None" = N
             _lang_depth_ed: list = []
             _lang_depth_ids: list = []
             _lang_depth_loss: list = []
+            _lang_route: list = []
+            # All positions, unlike `_lang_depth_ids` which drops the last
+            # of each block (no next-token target). The routing comparison
+            # needs whole blocks, so it needs its own id vector.
+            _lang_ids_full: list = []
 
             with torch.no_grad():
                 for x_v, sm_v, se_v, so_v, fam_v, _, tgt_v in val_loader:
@@ -901,6 +928,16 @@ def train(cfg: dict, run_epochs: int | None = None, ctx: "RunContext | None" = N
                         for _k, _v in val_halt_stats.items():
                             val_halt_acc[_k] = val_halt_acc.get(_k, 0.0) + _v
                         val_halt_batches += 1
+
+                    # T-L6.6 / T-L6.9: the first-step routing decision over WHOLE
+                    # blocks, in split order. Whole blocks because the article-level
+                    # reduction needs every token of a block, and `updated_rules.md` §8
+                    # makes the FIRST step the authoritative routing decision, so this is
+                    # the same signal the confusion matrix below is built from rather
+                    # than a second opinion.
+                    if _task == TASK_LANGUAGE and first_route is not None:
+                        _lang_route.append(first_route.reshape(-1).detach().cpu())
+                        _lang_ids_full.append(x_v.reshape(-1).detach().cpu())
 
                     if first_route is None or depth_exits is None:
                         continue
@@ -979,6 +1016,37 @@ def train(cfg: dict, run_epochs: int | None = None, ctx: "RunContext | None" = N
                     val_halt_acc.get("mean_remainder", 0.0)
                     / max(val_halt_batches, 1)
                 )
+
+            # T-L6.6 / T-L6.9: BOTH reference axes, each against its own null. Wired
+            # here because a bare `routing_ami` is uninterpretable: the AMI floor for a
+            # 6-way partition with these marginals is ~0.05, not 0, so an unaccompanied
+            # 0.06 reads as weak specialization when it is at chance. POS first (§4.4
+            # makes it primary), topic second and labelled INDUCED -- the question is
+            # "what does it organize by", not "does it reproduce POS", so both always.
+            if (_task == TASK_LANGUAGE and _lang_route
+                    and mc["num_experts"] > 1):
+                try:
+                    _route = torch.cat(_lang_route).numpy()
+                    _ids_full = torch.cat(_lang_ids_full).numpy()
+                    if _pos_control is not None and _tok_family is not None:
+                        _pos_cmp = specialization_vs_control(
+                            _route, _ids_full, _tok_family, _pos_control,
+                            mc["num_experts"])
+                        val_depth_log.update(control_comparison_to_wandb(
+                            _pos_cmp, prefix="val/routing_control_pos"))
+                    if _block_topic is not None:
+                        _nb = _route.size // int(dc["seq_len"])
+                        _top_cmp = article_agreement_vs_topic(
+                            _route, _block_topic[:_nb],
+                            int(dc["seq_len"]), mc["num_experts"], n_draws=10,
+                            seed=seed)
+                        val_depth_log.update(control_comparison_to_wandb(
+                            _top_cmp, prefix="val/routing_control_topic"))
+                except Exception as _exc:      # pragma: no cover
+                    print(f"[Train] reference-axis comparison unavailable: "
+                          f"{type(_exc).__name__}: {_exc}", file=sys.stderr)
+                    val_depth_log["val/routing_control_error"] = (
+                        f"{type(_exc).__name__}: {_exc}")
 
             # T-L6.1 / T-L6.2: the correlational depth report that REPLACES
             # allocation error on language. Computed once per validation pass over the

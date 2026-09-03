@@ -1764,6 +1764,47 @@ does not exist here (T-L0.0).
   agreement numbers and both null bands appear for every language run; a synthetic
   router that routes by topic scores above the topic null and near the POS null, and
   vice versa — i.e. the two axes are shown to be separable before either is quoted.
+  **Status: the SEPARABILITY clause is verified; the every-run clause is pending an
+  in-flight CPU run.** Box stays `[ ]` until both have executed.
+
+  **Evidence (separability, executed).** `code/test_language_families.py` → **114 passed,
+  0 failed, 1 skipped**, checks TL6.6a–i. Three synthetic routers, scored on both axes:
+
+  | router | topic AMI (Δ vs null) | POS AMI (Δ vs null) | concentration |
+  |---|---|---|---|
+  | routes by topic | **1.0000** (+0.9963) | 0.0012 | 1.000 |
+  | routes by POS | 0.0227 (+0.0231) | **1.0000** (+0.9473) | 0.325 |
+  | random | −0.0029 (−0.0066) | 0.0000 (−0.0000) | 0.199 |
+
+  So each axis is beaten by its own router and not by the other's, and a random router is
+  at chance on both — neither axis scores anything highly by default. **The POS router's
+  topic Δ is +0.023, small but not zero: the two axes are separable without being
+  orthogonal**, because different subjects use different noun/verb mixes. That has to be
+  stated rather than rounded away, or a genuine topic result could be partly POS leakage.
+
+  **`concentration` is reported beside every article-level number and must be read
+  first.** It is the mean share of a block's tokens that went to the block's majority
+  expert. The agreement is computed on that majority label, so a majority of 1/6 means
+  the article was not routed anywhere in particular: random scores 0.199 against chance
+  1/6 = 0.167, the topic router 1.000 by construction. Without it a high article-level
+  AMI could describe a partition of coin flips.
+
+  **The topic null is EXACT here, unlike T-L3.3's.** Every stored block holds exactly
+  `seq_len` tokens, so a permutation of block labels preserves each topic's token mass
+  precisely — none of the mass-matching repair the per-type control needed.
+
+  **One implementation, two callers.** `partition_agreement_vs_control(oracle, predicted,
+  control_oracles, num_experts)` was factored out of `specialization_vs_control`, and
+  `article_agreement_vs_topic` calls the same function with articles as units. TL6.6i
+  asserts there is exactly one definition: two copies of these statistics would be the
+  two-copies-that-diverge failure `changelog.md` already records once.
+
+  Also wired in this commit (**T-L6.9's substance**): the engine now loads
+  `token_family_shuffled.npy` and `block_topic_val.npy` once per run and writes both
+  comparisons under `val/routing_control_pos/*` and `val/routing_control_topic/*`. A
+  missing artifact prints a named warning to stderr and skips that axis rather than
+  writing a zero. `updated_rules.md` §8's first-step routing decision is the signal used,
+  so it is the same one the confusion matrix is built from rather than a second opinion.
 
 - [ ] **T-L6.8 Family labels must follow the TASK, and the duplicate depth metrics
   must be reconciled.** Both defects were found in the first completed language run,

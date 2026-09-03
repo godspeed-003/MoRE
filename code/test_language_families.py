@@ -836,6 +836,111 @@ for corpus, man in _topic_built:
           f"not from a re-segmentation that could drift")
 
 
+# ---------------------------------------------------------------------------
+print()
+print("=== T-L6.6  Article-level agreement: two axes, each against its own null ===")
+# ---------------------------------------------------------------------------
+
+check("TL6.6a the block-majority reduction and its concentration are exact",
+      M.block_majority_expert(
+          np.array([0, 0, 0, 1, 1, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 3]), 8).tolist()
+      == [0, 3]
+      and abs(M.block_topic_concentration(
+          np.array([0, 0, 0, 1, 1, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 3]), 8) - 0.6875) < 1e-12,
+      "block 0 splits 3/2/3 so expert 0 wins on 3/8; block 1 is unanimous. "
+      "concentration = (3/8 + 8/8)/2 = 0.6875, and it is what says the first "
+      "majority meant almost nothing")
+
+_nd_raised = False
+try:
+    M.block_majority_expert(np.zeros(7), 8)
+except ValueError:
+    _nd_raised = True
+check("TL6.6b a prediction vector that is not whole blocks RAISES",
+      _nd_raised,
+      "the article-level reduction needs every token of a block; a silent truncation "
+      "would misalign the topic labels by a partial row")
+
+_ctl = M.make_label_permutation_controls(np.array([0, 0, 1, 1, 2, 2]), 4, seed=1)
+check("TL6.6c the topic null preserves the marginals EXACTLY, not approximately",
+      len(_ctl) == 4
+      and all(sorted(x.tolist()) == [0, 0, 1, 1, 2, 2] for x in _ctl),
+      "every stored block holds exactly seq_len tokens, so permuting block labels "
+      "preserves each topic's token mass exactly -- the mass-matching repair the "
+      "per-type control needed (T-L3.3) is unnecessary here")
+
+# The separability demonstration T-L6.6 asks for, on synthetic routers.
+if _topic_built:
+    _c, _m = _topic_built[0]
+    _real = np.load(os.path.join(LANG, _c, "token_family.npy"))
+    _draws = np.load(os.path.join(LANG, _c, "token_family_shuffled.npy"))
+    _bt = np.load(os.path.join(LANG, _c, "block_topic_val.npy"))
+    _val = np.load(os.path.join(LANG, _c, "val.npy"), mmap_mode="r")
+    _S, _nb = _val.shape[1], 400
+    _ids = np.asarray(_val[:_nb], dtype=np.int64).ravel()
+    _btn = _bt[:_nb]
+    _rng = np.random.default_rng(3)
+
+    _routers = {
+        "topic": np.repeat(_btn, _S),
+        "pos": np.clip(_real[_ids], 0, 5),
+        "random": _rng.integers(0, 6, _ids.size),
+    }
+    _res = {}
+    for _n, _p in _routers.items():
+        _t = M.article_agreement_vs_topic(_p, _btn, _S, 6, n_draws=10, seed=1)
+        _q = M.specialization_vs_control(_p, _ids, _real, _draws, 6)
+        _res[_n] = (_t["metrics"]["ami"], _q["metrics"]["ami"], _t["concentration"])
+
+    check(f"TL6.6d [{_c}] a TOPIC router beats the topic null and sits at the POS null",
+          _res["topic"][0]["real"] > 0.9 and _res["topic"][0]["delta"] > 0.5
+          and _res["topic"][1]["real"] < 0.05,
+          f"topic AMI {_res['topic'][0]['real']:.4f} (delta {_res['topic'][0]['delta']:+.4f}), "
+          f"POS AMI {_res['topic'][1]['real']:.4f}, concentration "
+          f"{_res['topic'][2]:.3f}")
+
+    check(f"TL6.6e [{_c}] a POS router beats the POS null and sits NEAR the topic null",
+          _res["pos"][1]["real"] > 0.9 and _res["pos"][1]["delta"] > 0.5
+          and _res["pos"][0]["real"] < 0.10,
+          f"POS AMI {_res['pos'][1]['real']:.4f} (delta {_res['pos'][1]['delta']:+.4f}), "
+          f"topic AMI {_res['pos'][0]['real']:.4f} (delta "
+          f"{_res['pos'][0]['delta']:+.4f}) -- small but NOT zero, so the two axes are "
+          f"separable without being orthogonal, and that has to be said rather than "
+          f"rounded away")
+
+    check(f"TL6.6f [{_c}] a RANDOM router is at chance on BOTH axes",
+          abs(_res["random"][0]["delta"]) < 0.05
+          and abs(_res["random"][1]["delta"]) < 0.05
+          and abs(_res["random"][2] - 1 / 6) < 0.06,
+          f"topic delta {_res['random'][0]['delta']:+.4f}, POS delta "
+          f"{_res['random'][1]['delta']:+.4f}, concentration {_res['random'][2]:.3f} "
+          f"against 1/6 = 0.167 -- so neither axis is a metric that scores anything "
+          f"highly by default")
+
+    check(f"TL6.6g [{_c}] the topic axis reports itself as INDUCED at comparison time",
+          _res is not None
+          and M.article_agreement_vs_topic(
+              _routers["random"], _btn, _S, 6, n_draws=2)["axis_is_induced"] is True,
+          "the caveat travels with the number, not only with the artifact")
+
+check("TL6.6h POS is FIRST in the reference-axis order, topic second",
+      M.REFERENCE_AXES == ("pos", "topic"),
+      "§4.4 makes the permutation-invariant metrics primary against POS; topic is "
+      "induced and carries a weaker claim, so it is reported second -- but always, "
+      "because the question is what the router organizes by")
+
+# One implementation, two callers: the statistics must not be able to diverge.
+with open(os.path.join(CODE, "more", "metrics.py"), "r", encoding="utf-8") as fh:
+    _msrc = fh.read()
+check("TL6.6i both axes go through ONE comparison implementation",
+      _msrc.count("def partition_agreement_vs_control") == 1
+      and "return partition_agreement_vs_control(" in _msrc
+      and "out = partition_agreement_vs_control(" in _msrc,
+      "specialization_vs_control (per token) and article_agreement_vs_topic (per "
+      "article) differ only in what a unit is; two copies of the statistics would be "
+      "the two-copies-that-diverge failure changelog.md already records once")
+
+
 # ===========================================================================
 print()
 print("=" * 78)
