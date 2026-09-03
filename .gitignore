@@ -70,6 +70,49 @@ code/final_run_metrics.json
 runs/t67_provenance_check*/
 runs/t67d_provenance_check*/
 
+# --- Language corpora (T-L2.2) ----------------------------------------------
+# `data/lang/<corpus>/` is BUILT, not authored: `data/lang/build_language_dataset.py`
+# reproduces it from a pinned HF dataset revision recorded in the manifest. So the
+# split here is between the files that DEFINE the dataset and the files that ARE it.
+#
+# TRACKED (the definition, ~550 KB per corpus):
+#   dataset_meta.json  -- hf_dataset/hf_config/hf_revision, generator_commit,
+#                         raw_lines, raw_bytes, unk_literal_occurrences, vocab_size,
+#                         seq_len, splits, token_counts, dropped_tail_tokens,
+#                         per-split sha256, dataset_version. Every number any
+#                         language result is conditioned on is in this file, and
+#                         `code/test_language_data.py` grades the .npy files against
+#                         the hashes it records -- so a fresh clone can VERIFY a
+#                         rebuild rather than merely repeat it.
+#   tokenizer.json     -- the fitted BPE. Deliberately tracked even though it is
+#                         regenerable: BPE merge order depends on the `tokenizers`
+#                         version's tie-breaking, so a rebuilt tokenizer is not
+#                         guaranteed byte-identical, and a different tokenizer makes
+#                         every recorded loss number incomparable. This is the one
+#                         build artifact that is cheaper to store than to trust.
+#
+# NOT TRACKED (the payload):
+#   *.npy        -- 6.6 MB for wikitext-2, ~260 MB for wikitext-103. Fully determined
+#                   by tokenizer.json + the pinned revision + seq_len, and hash-checked
+#                   against the manifest on every test run.
+#   *_text.txt   -- the materialized train text (10.9 MB / 539 MB). An intermediate
+#                   consumed only by the tokenizer trainer.
+#   *.bin        -- the raw uint16 stream `pack_split` writes before reshaping. Removed
+#                   on success; listed so a crashed build's leftover is never committed.
+#   _hf_cache/   -- 537 MB of `datasets` Arrow shards. HF's cache, not our artifact: it
+#                   sits under `data/lang/` only because the builder passes `cache_dir`
+#                   there to keep a 539 MB download off the `C:` system drive (T-L0.2).
+#                   The pinned `hf_revision` in each manifest is what makes the fetch
+#                   reproducible, so the cache carries nothing the manifest does not.
+#                   It staged itself on the first `git add data/lang/` -- hence the rule.
+#
+# As everywhere else in this file, this declines TRACKING, not existence -- the files
+# stay on disk (CLAUDE.md 6).
+data/lang/**/*.npy
+data/lang/**/*_text.txt
+data/lang/**/*.bin
+data/lang/_hf_cache/
+
 # --- Editor / OS ------------------------------------------------------------
 .DS_Store
 Thumbs.db

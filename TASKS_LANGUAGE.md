@@ -437,7 +437,7 @@ does not exist here (T-L0.0).
 
 ## Phase L-2 — Data pipeline  (`plan_language.md` §3)
 
-- [ ] **T-L2.0 Fetch WikiText.** `data/lang/build_language_dataset.py` downloads
+- [x] **T-L2.0 Fetch WikiText.** `data/lang/build_language_dataset.py` downloads
   `wikitext-103-raw-v1` (canonical) and `wikitext-2-raw-v1` (dev loop) via
   `datasets`. Raw variants only: the non-raw ones are pre-tokenized with `<unk>`
   substituted, which would put an artificial high-frequency type in the middle of
@@ -446,8 +446,46 @@ does not exist here (T-L0.0).
   leakage audit meaningful. **Verify:** the three splits load, their line counts
   and byte sizes are recorded in the manifest, and no split contains the literal
   token `<unk>`.
+  **Evidence:** both corpora fetched at HF revision `b08601e04326…` of
+  `Salesforce/wikitext`, pinned in each manifest. Verified by
+  `code/test_language_data.py` (TL2.0a–m on both corpora):
 
-- [ ] **T-L2.1 Byte-level BPE, V=8192, fitted on train only.** Two independent
+  | corpus | split | lines | nonempty | bytes | `<unk>` |
+  |---|---|---|---|---|---|
+  | wikitext-2 | train | 36,718 | 31,175 | 10,914,845 | **0** |
+  | wikitext-2 | val | 3,760 | 3,213 | 1,144,248 | **0** |
+  | wikitext-2 | test | 4,358 | 3,760 | 1,287,656 | **0** |
+  | wikitext-103 | train | 1,801,350 | 1,165,029 | 539,295,549 | **0** |
+  | wikitext-103 | val | 3,760 | 3,213 | 1,144,248 | **0** |
+  | wikitext-103 | test | 4,358 | 3,760 | 1,287,656 | **0** |
+
+  `<unk>` is **counted**, not asserted away: `raw_stats()` accumulates
+  `text.count("<unk>")` per split so the number reaches the manifest whether it is
+  zero or not. Zero everywhere confirms the `-raw-` choice empirically rather than
+  on the strength of the dataset card. Train/val byte ratio 9.5× (wikitext-2),
+  471.3× (wikitext-103).
+
+  **FINDING — the two corpora share byte-identical val and test splits.** Not
+  merely equal in size: hashing the raw row text of both corpora in memory gives
+  `val sha256 = 8ef749789ca0693435d20b3f81d5638c19edcebc5a68586dcf09bdf47ef9542f`
+  and `test sha256 = bbf94c53a05abe9ee670d3b6343608095822c85e26de37c70b24fc571964574a`
+  for **both** wikitext-2 and wikitext-103 (3,760 / 4,358 rows each). Verified with
+  a scratch script that reads through `fetch_splits()` and writes nothing into
+  `data/lang/`, deliberately: materializing a `val_text.txt` there would break
+  TL2.1e, which proves the tokenizer never saw held-out text *by the absence of
+  such a file*.
+
+  Consequence, and it is a methodological constraint on every later phase:
+  **wikitext-2 is a correctness corpus, never a model-selection corpus.** Any
+  hyperparameter, early-stopping point or architecture choice made by looking at
+  wikitext-2's val loss has been made by looking at wikitext-103's val set,
+  because they are the same 1,144,248 bytes. So dev-loop runs on wikitext-2 may
+  answer "does it run, are the shapes right, is the loss finite", and may never be
+  cited as an independent replication of a canonical result nor used to pick
+  anything that is then reported on the canonical corpus. `plan_language.md` §3
+  called wikitext-2 the "dev loop" without stating this; it is stated here.
+
+- [x] **T-L2.1 Byte-level BPE, V=8192, fitted on train only.** Two independent
   reasons, both recorded in the script's docstring: (a) fitting a tokenizer on
   val/test is tokenizer-level leakage — the merge table would encode the held-out
   text's statistics; (b) a stock GPT-2 vocabulary would put 50257×256 = 12.9 M
@@ -457,8 +495,39 @@ does not exist here (T-L0.0).
   **Verify:** the tokenizer round-trips a held-out paragraph exactly; the fitted
   vocab size is exactly 8192; the training corpus passed to the trainer is the
   train split alone (assert on the file list, not on intent).
+  **Evidence:** V = **8192** exactly on both corpora, `eot_id = 0`, held-out
+  round-trip exact on an 8,700-byte **val** paragraph (the builder *raises* if it
+  is not, so a build cannot complete with an inexact tokenizer). Fit time 18.4 s
+  (wikitext-2, 630 documents) and 170.7 s (wikitext-103, 29,445 documents).
+  Tokenizer hashes `2a7147479382…` and `6a1f1477f4d9…`, both re-verified against
+  the files by TL2.1b.
 
-- [ ] **T-L2.2 Pack to fixed-length blocks, drop the trailing partial.** Encode
+  The train-only property is checked three ways, none of which trusts the
+  builder's intent:
+  1. `tokenizer_training_files` has exactly one entry and it is
+     `data/lang/<corpus>/train_text.txt` (TL2.1c/d).
+  2. **No val or test text file exists in the corpus directory at all** (TL2.1e
+     globs `*_text.txt` and requires the set to be `{train_text.txt}`), so a
+     held-out file cannot have been passed by a path the manifest omits.
+     `write_train_text` materializes only the train split for exactly this reason.
+  3. The round-trip probe is drawn from val — held-out text the tokenizer must
+     handle without having been fitted on it — and TL2.1g re-runs an independent
+     round-trip through the saved file, since the build's own check is the builder
+     grading itself.
+
+  Byte-level is verified as *no-OOV-is-representable* rather than as
+  *no-`<unk>`-was-emitted*: TL2.1h encodes every printable ASCII byte
+  individually and requires a non-empty id list for each, confirming the 256-byte
+  initial alphabet survived training (TL2.1i).
+
+  **Document segmentation is lossless, measured:** `train_text_bytes` equals the
+  independent raw byte scan exactly — 10,914,845 and 539,295,549 — so joining HF
+  rows with `""` reproduces the corpus byte-for-byte and `iter_documents` drops
+  nothing. This matters because `_is_doc_start` is a heuristic on ` = title = `
+  headings; if it mis-split, the EOT positions would be wrong and this equality is
+  what says they are not.
+
+- [x] **T-L2.2 Pack to fixed-length blocks, drop the trailing partial.** Encode
   each split into one stream, cut into `seq_len`-length blocks, and **discard the
   final short block**. This is not laziness: an all-True `step_mask` means no
   `key_padding_mask`, which means the NaN path in attention over a fully-masked
@@ -468,6 +537,42 @@ does not exist here (T-L0.0).
   **Verify:** every stored block has length exactly `seq_len`; the dropped tail is
   `< seq_len` tokens and its size is recorded in the manifest;
   `np.load(mmap_mode="r")` opens without materializing the array.
+  **Evidence:** `seq_len = 256`, `uint16`, all three assertions checked on the
+  **stored arrays**, not on the builder's arithmetic — block length from
+  `a.shape[1]`, block count from `a.shape[0]`, and `isinstance(a, np.memmap)`.
+
+  | corpus | split | tokens | blocks | dropped tail |
+  |---|---|---|---|---|
+  | wikitext-2 | train | 2,695,045 | 10,527 | 133 |
+  | wikitext-2 | val | 284,328 | 1,110 | 168 |
+  | wikitext-2 | test | 325,675 | 1,272 | 43 |
+  | wikitext-103 | train | **134,737,951** | **526,320** | 31 |
+  | wikitext-103 | val | 281,335 | 1,098 | 247 |
+  | wikitext-103 | test | 321,583 | 1,256 | 47 |
+
+  Every tail `< 256`, and the accounting identity
+  `tokens == blocks × seq_len + dropped_tail` holds **exactly** for all six
+  split/corpus pairs (TL2.2g) — so nothing is lost except the tail that is
+  recorded. Total dropped across the canonical corpus: 325 tokens of 135,340,869,
+  i.e. 2.4 × 10⁻⁶. `dataset_version = lang-wikitext-2-bpe8192-len256-9f870794`
+  and `lang-wikitext-103-bpe8192-len256-800d6154`; per-split SHA-256 recorded and
+  re-verified against the files.
+
+  Memory behaviour is the reason this task is not cosmetic: the canonical
+  `train.npy` is 269 MB and opens as a `numpy.memmap`, and the encode path streams
+  uint16 to a raw `.bin` before reshaping — a Python list of 134.7 M ints would
+  have been ~3.6 GB. Peak build RSS stayed well inside the 6 GB card's host
+  budget. Encode wall-clock 194.6 s for the canonical train split.
+
+  **FINDING — per-token loss is not comparable across the two corpora.** The val
+  and test *text* is byte-identical (see T-L2.0), but each corpus has its own BPE,
+  so the same 1,144,248 bytes of val become 284,328 tokens under wikitext-2's
+  tokenizer and 281,335 under wikitext-103's: 4.024 vs 4.067 bytes/token, a 1.05%
+  difference in the **denominator** of any nats/token figure. The canonical
+  corpus's tokenizer is the more efficient one (fitted on 50× more text), so a
+  naive cross-corpus comparison flatters wikitext-103 by ~1% for free. Any
+  cross-corpus statement must therefore be in **bits per byte**, not nats per
+  token. Noted now because it is invisible once the numbers are in a table.
 
 - [ ] **T-L2.3 `MoRELanguageDataset` in `code/more/lang_data.py`.** Returns the
   same-arity tuple shape the engine already consumes, with the language meanings:

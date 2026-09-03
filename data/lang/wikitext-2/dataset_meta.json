@@ -1,0 +1,69 @@
+{
+  "corpus": "wikitext-2",
+  "dataset_version": "lang-wikitext-2-bpe8192-len256-9f870794",
+  "dropped_tail_tokens": {
+    "test": 43,
+    "train": 133,
+    "val": 168
+  },
+  "eot_id": 0,
+  "generator_commit": "9470ff273d126565e5c18a3661c5c7eae2e4a6af",
+  "generator_script": "data/lang/build_language_dataset.py",
+  "hf_config": "wikitext-2-raw-v1",
+  "hf_dataset": "Salesforce/wikitext",
+  "hf_revision": "b08601e04326c79dfdd32d625aee71d232d685c3",
+  "is_canonical_corpus": false,
+  "raw_bytes": {
+    "test": 1287656,
+    "train": 10914845,
+    "val": 1144248
+  },
+  "raw_lines": {
+    "test": 4358,
+    "train": 36718,
+    "val": 3760
+  },
+  "raw_nonempty_lines": {
+    "test": 2891,
+    "train": 23767,
+    "val": 2461
+  },
+  "roundtrip_probe_bytes": 8700,
+  "roundtrip_val_paragraph_exact": true,
+  "seq_len": 256,
+  "sha256": {
+    "test": "68af5a89f3d9b7581b7902d28522e289b15e44d8909bbe4379202e34c237fbc0",
+    "train": "b1a5e4d1d860b98d0d27a72ef766a5734cee2fb932a9bb53ed03fc20d525808a",
+    "val": "de112fe15f4c9ec7ebc93bc0716e55449cec6a04ac372f1e8286e526ce10c805"
+  },
+  "splits": {
+    "test": 1272,
+    "train": 10527,
+    "val": 1110
+  },
+  "splits_are_author_provided": true,
+  "storage": {
+    "dtype": "uint16",
+    "format": "npy",
+    "load": "np.load(mmap_mode='r')",
+    "on_disk_order": "corpus order; all shuffling is the DataLoader's",
+    "shape": "(n_blocks, seq_len)"
+  },
+  "token_counts": {
+    "test": 325675,
+    "train": 2695045,
+    "val": 284328
+  },
+  "tokenizer_sha256": "2a71474793824473859afb83884c4f34abda72ef187eccdf569345760b3e1e73",
+  "tokenizer_training_files": [
+    "data/lang/wikitext-2/train_text.txt"
+  ],
+  "train_documents": 630,
+  "train_text_bytes": 10914845,
+  "unk_literal_occurrences": {
+    "test": 0,
+    "train": 0,
+    "val": 0
+  },
+  "vocab_size": 8192
+}

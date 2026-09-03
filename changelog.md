@@ -4220,7 +4220,94 @@ the matrix, not during it.
 `runs/t_l03_mor_timing_seed44__fa9339bc__r3/metrics.json` versus
 `runs/t_l03_mor_timing_seed44__fa9339bc/metrics.json` for the comparison itself.
 
+## T-L2.0 / T-L2.1 / T-L2.2 — the language corpus, and the two ways it can lie
+
+`data/lang/build_language_dataset.py` (new), `code/test_language_data.py` (new),
+`.gitignore` (new `data/lang/` section). Both corpora built end to end;
+`code/test_language_data.py` → **65 passed, 0 failed, 0 skipped** on the CPU
+interpreter. Gate L0 unaffected — the language suites are deliberately **not**
+registered in `run_correctness_suite.py`, and the reason is written into both
+files' docstrings: Gate L0's entire content is "the arithmetic total is still
+356", so adding checks there would destroy the one number that says the published
+arithmetic study still holds.
+
+**Design: three stages that APPEND to one manifest.** `--stage fetch |
+tokenizer | pack`, each reading `dataset_meta.json`, adding its own keys, and
+writing it back (`save_manifest`). A stage never rewrites another stage's fields,
+so a re-run of `pack` cannot silently change the recorded `hf_revision` — and the
+canonical build, which takes ~6 minutes of encode, can be resumed without
+re-downloading 539 MB.
+
+**Every check is on measured file contents, never on the builder's intent.** This
+is the whole design principle of `test_language_data.py`, because a dataset defect
+is invisible at training time: a corpus with `<unk>` in it, a tokenizer fitted on
+validation text, a short trailing block that makes `step_mask` conditional — none
+of these raise, and all of them silently change what a loss number means. So:
+`<unk>` is *counted* by reading every line back (0 in all six split/corpus pairs,
+which confirms the `-raw-` choice empirically rather than on the dataset card);
+block length is asserted on `a.shape[1]` and block count on `a.shape[0]`; the
+tokenizer's training-file list is compared to the train path rather than trusted;
+and the "no OOV" property is checked as *no `<unk>` is representable* (every
+printable ASCII byte still encodes) rather than as *no `<unk>` was emitted*.
+
+**The train-only tokenizer property is proved by an ABSENCE.** `write_train_text`
+materializes only the train split's text, so TL2.1e can glob `*_text.txt` in the
+corpus directory and require the set to be exactly `{train_text.txt}`. That is
+strictly stronger than reading `tokenizer_training_files`: a held-out file cannot
+have been passed through a path the manifest omits, because no such file exists.
+Anyone tempted to dump a `val_text.txt` next to it for convenience will break this
+check — that is intentional, and the scratch script that hashed the val/test rows
+(below) reads through `fetch_splits()` in memory for exactly this reason.
+
+**Two findings that will corrupt a results table if forgotten.**
+
+1. **wikitext-2 and wikitext-103 ship byte-identical val and test splits.** Not
+   just equal sizes — equal SHA-256 over the row text:
+   `val 8ef74978…`, `test bbf94c53…`, 3,760 / 4,358 rows, in both corpora. So
+   wikitext-2 is a *correctness* corpus and never a model-selection corpus: any
+   hyperparameter or stopping point chosen on its val loss has been chosen on the
+   canonical corpus's val set. `plan_language.md` §3 called it the "dev loop"
+   without saying this.
+2. **Per-token loss is not comparable across the two corpora.** Same val bytes,
+   different BPE: 284,328 tokens under wikitext-2's tokenizer versus 281,335 under
+   wikitext-103's (4.024 vs 4.067 bytes/token). The canonical tokenizer is the more
+   efficient one, so a naive nats/token comparison flatters wikitext-103 by ~1% for
+   nothing. Cross-corpus statements must be in bits per byte.
+
+**Memory, because 134.7 M tokens is where the naive version dies.** `fetch_splits`
+returns HF `Dataset` objects rather than lists (1.8 M rows of Python strings is
+~1 GB); `_encode_stream_to_bin` streams uint16 to a raw `.bin` rather than
+accumulating ids (a list of 134.7 M ints is ~3.6 GB); `pack_split` then reshapes
+via `np.lib.format.open_memmap` in row batches and deletes the `.bin`. Canonical
+train: 134,737,951 tokens → 526,320 blocks of 256, dropped tail **31**, 269 MB
+`train.npy`, 194.6 s. The accounting identity
+`tokens == blocks × seq_len + dropped_tail` holds exactly for all six pairs, so
+the only loss is 325 tokens of 135.3 M across the canonical corpus, 2.4 × 10⁻⁶.
+
+**Document segmentation is lossless, and that is measured, not assumed.**
+`_is_doc_start` is a heuristic on ` = title = ` headings, and a mis-split would put
+the EOT separators in the wrong places — a defect no downstream check would catch.
+`train_text_bytes` equals the independent raw byte scan exactly (10,914,845 and
+539,295,549), so joining rows with `""` reproduces the corpus byte-for-byte.
+
+**`.gitignore`: the definition is tracked, the payload is not.**
+`dataset_meta.json` (every number a language result is conditioned on, including
+the per-split hashes the tests grade the arrays against) and `tokenizer.json` are
+tracked; `*.npy`, `*_text.txt`, `*.bin` are not. `tokenizer.json` is tracked
+*despite* being regenerable because BPE merge order depends on the `tokenizers`
+version's tie-breaking, so a rebuilt tokenizer is not guaranteed byte-identical —
+and a different tokenizer makes every recorded loss number incomparable. It is the
+one build artifact cheaper to store than to trust. As everywhere else in that file,
+this declines tracking, not existence (CLAUDE.md §6).
+
+**Where to look.** `data/lang/build_language_dataset.py` `iter_documents` /
+`_is_doc_start` when EOT placement looks wrong; `pack_split` when a block count
+disagrees with the manifest; `code/test_language_data.py` TL2.1e when someone
+wonders why a `val_text.txt` breaks the build's guarantees;
+`TASKS_LANGUAGE.md` T-L2.0–T-L2.2 Evidence for the full tables.
+
 <!-- APPEND-MARKER-CL -->
+
 
 
 
