@@ -59,10 +59,39 @@ Three things already measured that will change how you read your results:
   other, and every language load-entropy figure must be quoted against 0.8884.
 - **The AMI floor for a 6-way partition with these marginals is 0.0527, not 0.** An
   observed AMI of ~0.06 against POS is *at the floor*. Always report the shuffled-control
-  band next to the number.
+  band next to the number. (The control is built and unit-tested but **not yet wired into
+  the engine** — T-L6.9. Until it is, compare against 0.0527 by hand.)
 - **A mis-shifted LM loss reads ~5.6 nats at epoch 0** — below the uniform floor, close
   enough to 4.98 to look like fast learning. If an early loss looks too good, suspect the
   shift before believing it.
+
+### Two 1-epoch CPU smoke runs already exist. Read them as hypotheses, not results.
+
+`runs/langB_MoRE_seed42__91c9bba1` and `runs/langB_MoR_seed43__c1873a66`. Different
+seeds, one epoch, dev corpus — so any difference could be seed variance. What they show:
+
+| | MoRE (s42) | MoR (s43) |
+|---|---|---|
+| `val_loss` vs dev floor 5.3983 | 5.3567 (**+0.042 better**) | 5.6595 (**−0.261 worse**) |
+| `depth/std` | 0.071 | **0.497** |
+| depth hist, steps 1/2 | 1,088 / 281,619 | 156,157 / 126,893 |
+| per-family depth spread | 0.011 steps | **0.74 steps** |
+
+MoR allocates depth and predicts badly; MoRE predicts (barely) above the floor with depth
+collapsed to 99.5% at one step. If that survives real seeds and epochs it is an Outcome B
+shape. **Do not quote it before it does.**
+
+**And do not make any depth-allocation claim until T-L6.10 is done.** The
+frequency-depth correlation is *positive* in both arms — frequent tokens get more
+recursion, MoR gives L1_FUNCTION 1.85 steps against L2_NOUN 1.11 — which is the opposite
+direction to the hypothesis. The unexcluded explanation: a tied embedding trained for one
+epoch has larger row norms for frequent types, the halt head reads a state still carrying
+that component, so the halt logit is scale-correlated with frequency by construction.
+Partial out the embedding norm and track the correlation across epochs before interpreting
+it either way. Note that `exceeds_null = 1` does **not** settle this: at n = 283,050 the
+permutation band is ±0.004, so significance there says nothing about effect size — always
+read it with `depth/std` and `depth/hist`.
+
 
 `ffn_mult` for the language arms is frozen at `{moe: 4, mor: 24, more: 4}`, re-derived
 (not copied) with rel(non-embedding) 0.112%. MoRE at that shape is **5,584,908

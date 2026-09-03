@@ -5113,6 +5113,69 @@ floor.
 `runs/langB_MoRE_seed42__91c9bba1/metrics.json` for every number above;
 `TASKS_LANGUAGE.md` T-L6.8 / T-L6.9 for what is still owed.
 
+## MoR language smoke — the label fix confirmed, and a trade-off shape worth testing
+
+`runs/langB_MoR_seed43__c1873a66` (MoR, wikitext-2, 1 epoch, batch 64, seed 43, CPU,
+`experiment_group = lang_smoke2`). Resolved `num_experts = 1, ffn_mult = 24, max_depth = 7,
+variant = language`, so it IS the budget-matched arm the T-L6.3 derivation specifies.
+
+**The label fix is confirmed on a real run.** Every family key now reads
+`L1_FUNCTION … L6_NUM_SUBWORD`; no `E1_ADD_SUB` anywhere. Both
+`depth/mean_by_family/*` and `recursion/avg_depth_by_family/*` carry the language
+manifest's names.
+
+**Every routing metric is correctly `N/A` on the one-expert arm** --
+`routing_agreement_with_pos`, entropy, both cosine similarities, all six
+permutation-invariant keys. MoR makes no routing decision, so the arithmetic-era 0.1005
+would have been a fabricated measurement; the CLAUDE.md §4 contract is doing its job on the
+new task without a special case.
+
+**THE PRELIMINARY SHAPE, and it is a trade-off rather than a win.** One epoch each,
+DIFFERENT SEEDS, dev corpus, CPU -- this is not evidence, it is a hypothesis with a number
+attached:
+
+| | MoRE (seed 42) | MoR (seed 43) |
+|---|---|---|
+| `val_loss` nats/token | **5.3567** | 5.6595 |
+| vs dev bigram floor 5.3983 | **+0.042 better** | **-0.261 worse** |
+| perplexity | 212.0 | 287.0 |
+| `depth/std` | 0.071 | **0.497** |
+| depth histogram (steps 1/2) | 1,088 / 281,619 | **156,157 / 126,893** |
+| per-family depth spread | 0.011 steps | **0.74 steps** |
+| `spearman_vs_logfreq` | +0.095 | **+0.392** |
+| `spearman_vs_model_loss` | +0.043 | **+0.130** |
+| `probe/family_ce` (chance = ln 6 = 1.792) | 1.803 | 1.742 |
+
+So MoR **allocates depth substantially** -- a 55/45 split between depths 1 and 2, seven
+times MoRE's depth variance, and a 0.74-step spread across POS families -- while
+**predicting worse than a bigram table**. MoRE **beats the bigram table, barely**, with
+depth **collapsed** to 99.5% at one step. If that survives proper seeds and epochs it is
+an Outcome B shape: neither arm dominates, and the two behaviours it is supposed to
+combine appear in the two arms separately rather than together. It could equally be seed
+variance at one epoch.
+
+**A CONFOUND THAT MUST BE EXCLUDED BEFORE ANY DEPTH CLAIM (now T-L6.10).** The
+frequency-depth correlation is **POSITIVE in both arms**: frequent tokens get MORE
+recursion, and MoR gives L1_FUNCTION 1.85 steps against L2_NOUN 1.11. That is the opposite
+direction to the hypothesis, and there is a mundane explanation that has not been ruled
+out: after one epoch a tied token embedding has systematically larger row norms for
+frequent types, the halt head reads a hidden state still carrying that embedding
+component, so the halt logit is scale-correlated with frequency BY CONSTRUCTION. That is
+an initialization artifact wearing the shape of adaptive computation. The test is to
+partial out the per-token embedding norm and to track the correlation across epochs -- an
+artifact should weaken as training equalises the norms. **Until then no depth-allocation
+claim may be made in either direction**, and the `exceeds_null = 1` on all six
+correlations does not help, because at n = 283,050 the null band is +-0.004.
+
+**GAP (now T-L6.11): `metrics.json` carries no parameter count at all.** Gate L6 has to
+publish the three arms' totals and the MoR/MoRE gap on both the total and non-embedding
+counts, but the count only reaches `stdout.log` -- which is git-ignored, so on a pushed run
+it is unrecoverable.
+
+**Where to look.** `runs/langB_MoR_seed43__c1873a66/metrics.json` beside
+`runs/langB_MoRE_seed42__91c9bba1/metrics.json` for the table above; `engine.py`
+`_expert_labels` for the label fix; `TASKS_LANGUAGE.md` T-L6.10 / T-L6.11.
+
 <!-- APPEND-MARKER-CL -->
 
 

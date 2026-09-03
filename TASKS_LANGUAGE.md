@@ -1738,7 +1738,31 @@ does not exist here (T-L0.0).
   first run's AMI is re-reported with `exceeds_null` and the verdict matches the manual
   0.0527 comparison.
 
+- [ ] **T-L6.10 Rule out the embedding-norm confound before any depth claim.** Both
+  smoke runs show `depth/spearman_vs_logfreq` **positive** — frequent tokens receive MORE
+  recursion (MoR +0.392, MoRE +0.095), and per-family MoR gives L1_FUNCTION 1.85 steps
+  against L2_NOUN 1.11. That is the opposite direction to the hypothesis the metric was
+  built to test, and there is a mundane explanation that must be excluded first: a tied
+  token embedding trained for one epoch has systematically larger row norms for frequent
+  types, the halt head reads a hidden state that still carries that embedding component,
+  so the halt logit is scale-correlated with frequency **by construction**. That is an
+  initialization artifact, not adaptive computation. **Verify:** the frequency-depth
+  correlation is re-measured with the per-token embedding norm partialled out (or
+  equivalently, rho between depth and log-frequency *within* norm deciles); and the
+  correlation is tracked across epochs — an artifact should weaken as training equalises
+  the norms, a real behaviour should not. Until this is done, no depth-allocation claim
+  may be made in either direction.
+
+- [ ] **T-L6.11 `total_params` must reach `metrics.json`.** Gate L6 publishes the three
+  arms' parameter counts as a table and checks the MoR/MoRE gap on both the total and the
+  non-embedding count, but the smoke runs' `metrics.json` carries **no parameter key at
+  all** — the count is printed to `stdout.log`, which is git-ignored, so on a pushed run
+  it is unrecoverable. **Verify:** every run's `metrics.json` carries `total_params` and
+  `non_embedding_params`; the L6 table is built from those keys rather than from a
+  console line.
+
 - [ ] **T-L6.7 Span-level depth reporting.** `plan_language.md` §4.1b. Per-token
+
   recursion is kept, but "does the model spend more computation on harder *passages*"
   is answered as a measurement: `depth/mean_by_document`, and the within-document
   versus between-document variance of exit depth. If between-document variance is a
