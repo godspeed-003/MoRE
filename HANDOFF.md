@@ -85,30 +85,32 @@ MoR allocates depth and predicts badly; MoRE predicts (barely) above the floor w
 collapsed to 99.5% at one step. If that survives real seeds and epochs it is an Outcome B
 shape. **Do not quote it before it does.**
 
-**And do not make any depth-allocation claim until T-L6.10 is done — it is now ONE run
-away.** The partialling machinery is built and verified: every language run already emits
-`depth/embed_norm_logfreq_partial_norm` (the corrected number) beside
-`depth/embed_norm_depth_vs_norm` and `depth/embed_norm_logfreq_vs_norm` (the confound's
-strength). What is missing is the **across-epoch trend**, which needs a multi-epoch run and
-is why it fell to your machine: an artifact should weaken as training equalises the
-embedding row norms, a real behaviour should not. Run one arm for several epochs, plot
-`depth/embed_norm_logfreq_partial_norm` per epoch, and record it as T-L6.10 Evidence.
+**Depth allocation: T-L6.10 is CLOSED, and the answer changed the picture.** An 8-epoch
+GPU run (`runs/langB_MoRE_seed44__22474619`) shows the frequency-depth partial correlation
+STRENGTHENING across epochs: +0.193, +0.411, +0.442, +0.473 at epochs 2/4/6/8. The test was
+"an artifact should weaken as training equalises the embedding row norms, a real behaviour
+should not", so the artifact hypothesis is rejected -- this is learned. The direction is
+contrary to the original hypothesis and stands as measured: **frequent tokens receive more
+recursion.**
 
-Note the ledger's own Verify line offers "or equivalently, within norm deciles" — that is
-**false**, and measured: on a fully mediated synthetic case whose true partial is +0.016,
-the within-decile value is **+0.941**, i.e. ten bins would pass the confound straight
-through. Use `logfreq_partial_norm`; treat `..._within_bins_mean` (default 50 bins) as a
-cross-check where a LOW value is informative and a high one is not conclusive.
- The
-frequency-depth correlation is *positive* in both arms — frequent tokens get more
-recursion, MoR gives L1_FUNCTION 1.85 steps against L2_NOUN 1.11 — which is the opposite
-direction to the hypothesis. The unexcluded explanation: a tied embedding trained for one
-epoch has larger row norms for frequent types, the halt head reads a state still carrying
-that component, so the halt logit is scale-correlated with frequency by construction.
-Partial out the embedding norm and track the correlation across epochs before interpreting
-it either way. Note that `exceeds_null = 1` does **not** settle this: at n = 283,050 the
-permutation band is ±0.004, so significance there says nothing about effect size — always
-read it with `depth/std` and `depth/hist`.
+Two things I told you earlier are retracted by that run:
+
+- **"Depth collapses" was under-training, not the architecture.** `avg_depth` climbs
+  1.96 to 5.16 of a 7 budget over 8 epochs and `depth/std` reaches 1.174, against 0.071 at
+  one epoch. Do not quote the 99.5%-at-one-step histogram; it was epoch 1 of an untrained
+  model.
+- **The margin over the floor is not thin.** +0.042 nats at one epoch became **+0.666** at
+  eight (val_loss 4.7318 against the dev bigram floor 5.3983, perplexity 113.6 vs 221.0).
+
+Robust across the run: `depth/by_document/between_share` stays near **0.010**, so allocation
+is **within**-passage, not passage-level, however much total depth grows.
+
+Use `depth/embed_norm_logfreq_partial_norm`, which is also a per-epoch column in
+`results.tsv`. Note the ledger's Verify line offers "or equivalently, within norm deciles" --
+that is **false**, and measured: on a fully mediated synthetic case whose true partial is
++0.016, the within-decile value is **+0.941**, so ten bins would pass the confound straight
+through. Treat `..._within_bins_mean` (default 50 bins) as a cross-check where a LOW value is
+informative and a high one is not conclusive.
 
 
 `ffn_mult` for the language arms is frozen at `{moe: 4, mor: 24, more: 4}`, re-derived

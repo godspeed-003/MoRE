@@ -1921,7 +1921,7 @@ does not exist here (T-L0.0).
   stderr warning and skips that axis rather than writing a zero, because absence means
   "not measured" while 0.0 would mean "POS is no better than noise".
 
-- [ ] **T-L6.10 Rule out the embedding-norm confound before any depth claim.** Both
+- [x] **T-L6.10 Rule out the embedding-norm confound before any depth claim.** Both
   smoke runs show `depth/spearman_vs_logfreq` **positive** — frequent tokens receive MORE
   recursion (MoR +0.392, MoRE +0.095), and per-family MoR gives L1_FUNCTION 1.85 steps
   against L2_NOUN 1.11. That is the opposite direction to the hypothesis the metric was
@@ -1935,9 +1935,9 @@ does not exist here (T-L0.0).
   correlation is tracked across epochs — an artifact should weaken as training equalises
   the norms, a real behaviour should not. Until this is done, no depth-allocation claim
   may be made in either direction.
-  **Status: the partial-correlation clause is implemented and verified; the across-epoch
-  clause needs a multi-epoch GPU run and is handed to the 4060 machine.** Box stays `[ ]`,
-  so the no-depth-claim embargo stays in force.
+  **Status: BOTH clauses executed.** The partial-correlation machinery is verified on
+  synthetic cases and the across-epoch trend is measured on an 8-epoch GPU run; see below.
+  The no-depth-claim embargo is **lifted**, with the direction stated as measured.
 
   **Evidence (partialling, executed).** `code/test_lang_heads.py` → **42 passed, 0 failed,
   3 skipped**, checks TL6.10a–h. `metrics.partial_spearman(depth, logfreq, norm)` uses the
@@ -1974,11 +1974,51 @@ does not exist here (T-L0.0).
   **50 not 10**, and a disagreement between them is a finding rather than either being
   trusted alone.
 
-  **What is still owed (TL6.10h).** The across-epoch trend. One epoch on this machine's CPU
-  takes tens of minutes, so it needs the 4060 — recorded in `HANDOFF.md` with the exact
-  key to plot. Until it runs, **no depth-allocation claim may be made in either
-  direction**, and that applies to the +0.392 and +0.095 frequency-depth correlations
-  already measured.
+  **THE ACROSS-EPOCH TREND IS NOW MEASURED, AND IT REJECTS THE ARTIFACT HYPOTHESIS.**
+  `runs/langB_MoRE_seed44__22474619` — 8 epochs, wikitext-2, batch 64, seed 44, on the
+  RTX 3050 (the CUDA venv works on this machine; a GPU epoch is ~90 s against tens of
+  minutes on CPU, so this did not need the 4060 after all).
+
+  | epoch | val_loss | vs dev floor 5.3983 | avg_depth | **partial ρ** | AMI |
+  |---|---|---|---|---|---|
+  | 2 | 5.3342 | **+0.064** | 2.30 | **+0.193** | 0.147 |
+  | 4 | 4.9622 | **+0.436** | 3.57 | **+0.411** | 0.162 |
+  | 6 | 4.7815 | **+0.617** | 4.63 | **+0.442** | 0.164 |
+  | 8 | 4.7318 | **+0.666** | 5.16 | **+0.473** | 0.165 |
+
+  This task's own criterion was "an artifact should weaken as training equalises the norms,
+  a real behaviour should not". **The partial correlation STRENGTHENS monotonically,
+  +0.193 → +0.473.** So the frequency-depth relationship is a **learned behaviour, not an
+  initialization residue**, and the embargo lifts.
+
+  Final epoch: raw ρ +0.5505, partial +0.4731, with `depth_vs_norm` +0.4275 and
+  `logfreq_vs_norm` +0.3509 — the mediator is real and accounts for only ~0.08 of the
+  correlation.
+
+  **The direction is still contrary to the original hypothesis and is reported as measured:
+  frequent tokens receive MORE recursion.** That is interpretable rather than paradoxical —
+  deciding what follows `of the` requires more contextual integration than continuing a rare
+  proper noun whose completion is nearly determined — but it is an interpretation, and the
+  measurement is the ρ.
+
+  **TWO EARLIER CLAIMS OF MINE ARE RETRACTED BY THIS RUN.**
+  1. **"Depth collapsed" was an under-training artifact, not the architecture's
+     behaviour.** `avg_depth` climbs 1.96 → 5.16 of a 7 budget and `depth/std` reaches
+     **1.174**, against 0.071 in the 1-epoch CPU run. The 99.5%-at-one-step histogram I
+     reported was epoch 1 of a model that had not trained.
+  2. **The margin over the floor is not thin.** +0.042 nats at 1 epoch became **+0.666** at
+     8 — perplexity 113.6 against the dev bigram's 221.0.
+
+  `depth/by_document/between_share` stays at **0.0102** across the whole run, so T-L6.7's
+  answer is robust: even as depth grows and spreads, allocation is **within**-passage, not
+  passage-level.
+
+  **A DEAD COLUMN FOUND BY THIS RUN, fixed.** `results.tsv`'s `depth_rho_model_loss` read
+  `N/A` in all eight rows while `depth/spearman_vs_model_loss = 0.1338` sat in
+  `metrics.json` the whole time — the column was reserved under a key
+  (`val/depth_rho_model_loss`) that T-L6.1 never published. A reserved column that can never
+  populate is worse than no column, because eight `N/A` rows read as "measured, nothing
+  there".
 
 - [x] **T-L6.11 `total_params` must reach `metrics.json`.** Gate L6 publishes the three
   arms' parameter counts as a table and checks the MoR/MoRE gap on both the total and the

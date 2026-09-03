@@ -1474,7 +1474,14 @@ def train(cfg: dict, run_epochs: int | None = None, ctx: "RunContext | None" = N
         # depth a token received and the loss it incurred). The column exists now so
         # the header never has to be reordered later; it reads "N/A" until L-6
         # computes it, which is the honest value for "not measured yet".
-        _rho_str = _na(val_depth_log.get("val/depth_rho_model_loss"), ".6f")
+        # depth_rho_model_loss is Phase L-6's measurement (correlation between the
+        # depth a token received and the loss it incurred). T-L6.1 now computes it, and
+        # the key it publishes is `depth/spearman_vs_model_loss` -- NOT the
+        # `val/depth_rho_model_loss` this column was reserved under before that task
+        # existed. The mismatch made the column permanently "N/A" while the number was
+        # sitting in metrics.json all along: measured 0.1338 on the 8-epoch GPU run while
+        # eight consecutive rows of results.tsv read N/A.
+        _rho_str = _na(val_depth_log.get("depth/spearman_vs_model_loss"), ".6f")
         results_rows.append(
             f"{epoch}\t{epoch_task/n_batches:.6f}\t{val_str}\t"
             f"{entropy_str}\t{depth_str}\t"

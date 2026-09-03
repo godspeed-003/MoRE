@@ -5589,6 +5589,59 @@ an offline run does not have.
 **Where to look.** `measure_lang_throughput.one_config` for what is timed and why;
 `lang_throughput_more.json` for the full grid; `TASKS_LANGUAGE.md` T-L7.0 for the table.
 
+## T-L6.10 closed - the confound is REJECTED, and two of my earlier claims are retracted
+
+`runs/langB_MoRE_seed44__22474619` (MoRE, wikitext-2, 8 epochs, batch 64, seed 44, RTX 3050).
+Phase L-6 is now complete: every T-L6 box is ticked.
+
+**THE TEST AND ITS ANSWER.** T-L6.10's criterion was "an artifact should weaken as training
+equalises the norms, a real behaviour should not". The partial correlation between exit depth
+and log-frequency, with the embedding row norm partialled out, per epoch:
+
+| epoch | 2 | 4 | 6 | 8 |
+|---|---|---|---|---|
+| partial rho | +0.193 | +0.411 | +0.442 | +0.473 |
+
+It **STRENGTHENS monotonically**, so the embedding-norm artifact hypothesis is REJECTED and
+the frequency-depth relationship is a learned behaviour. Final epoch: raw rho +0.5505,
+partial +0.4731, `depth_vs_norm` +0.4275, `logfreq_vs_norm` +0.3509 - the mediator is real
+and accounts for only ~0.08 of the correlation. The embargo on depth-allocation claims lifts,
+and the direction stands as measured: **frequent tokens receive MORE recursion**, which is
+interpretable (deciding what follows `of the` needs more contextual integration than
+continuing a rare proper noun) but the interpretation is not the measurement.
+
+**TWO CLAIMS I MADE EARLIER ARE WRONG AND ARE RETRACTED HERE.**
+
+1. **"Depth collapsed" was under-training, not the architecture.** `avg_depth` climbs
+   1.96 -> 2.30 -> 2.89 -> 3.57 -> 4.21 -> 4.63 -> 5.04 -> 5.16 of a 7 budget, and
+   `depth/std` reaches **1.174** against 0.071 in the 1-epoch CPU run. The
+   99.5%-at-one-step histogram I reported was epoch 1 of a model that had not trained. It
+   should not be quoted, and `HANDOFF.md` has been corrected because it carried that claim
+   to another agent.
+2. **"It beats the floor, thinly" was also a 1-epoch artifact.** +0.042 nats became
+   **+0.666** by epoch 8 - val_loss 4.7318 against the dev bigram floor 5.3983, perplexity
+   113.6 against 221.0.
+
+What IS robust: `depth/by_document/between_share` stays at **0.0102** across the whole run.
+Even as total depth grows and spreads, allocation is **within**-passage rather than
+passage-level, so T-L6.7's answer holds independently of how much depth the model uses. AMI
+against POS also creeps up (0.147 -> 0.165) against control means near 0.007.
+
+**A DEAD COLUMN, FOUND BY THIS RUN AND FIXED.** `results.tsv`'s `depth_rho_model_loss` read
+`N/A` in all eight rows while `depth/spearman_vs_model_loss = 0.1338` sat in `metrics.json`
+the entire time. The column was reserved under `val/depth_rho_model_loss`, a key T-L6.1 never
+published - reserved before that task existed and never reconciled with it. A reserved
+column that can never populate is worse than no column: eight consecutive `N/A` rows read as
+"measured, nothing there" rather than as a wiring bug. It now reads the key the report emits.
+
+**A note on where the work happened.** T-L6.10h was handed to the 4060 in `HANDOFF.md` on the
+assumption that a multi-epoch run was out of reach here. It was not: `.venv_cuda` on this
+machine has a working RTX 3050 and a GPU epoch takes ~90 s. Every language smoke run before
+T-L7.0 was needlessly CPU-bound.
+
+**Where to look.** `runs/langB_MoRE_seed44__22474619/results.tsv` for the per-epoch trend;
+`engine.py` `_rho_str` for the key mismatch; `TASKS_LANGUAGE.md` T-L6.10 for the table.
+
 <!-- APPEND-MARKER-CL -->
 
 

@@ -33,11 +33,11 @@
     "lr": 0.001,
     "weight_decay": 0.0001,
     "batch_size": 64,
-    "epochs": 8,
+    "epochs": 4,
     "val_split": 0.1,
     "grad_clip": 1.0,
     "subset_fraction": 1.0,
-    "subset_seed": 44
+    "subset_seed": 45
   },
   "loss_weights": {
     "task": 1.0,
@@ -57,7 +57,7 @@
     "train_split_version": "fixed-file-splits-v1",
     "subset_fraction": 1.0,
     "jsonl_path": "D:\\res\\git\\MoRE\\.claude\\worktrees\\english-language-dataset-migration-92946e\\data\\train.jsonl",
-    "subset_seed": 44,
+    "subset_seed": 45,
     "seq_len": 256,
     "vocab_size": 8192,
     "corpus": "wikitext-2"
@@ -65,28 +65,28 @@
   "logging": {
     "wandb_project": "micro-MoRE-poc",
     "log_interval": 2,
-    "run_name": "langB_MoRE_seed44",
-    "experiment_group": "lang_gpu_trend2"
+    "run_name": "langB_MoRE_seed45",
+    "experiment_group": "lang_rho_fix"
   },
   "architecture": "more",
   "task": "language",
   "provenance": {
-    "seed": 44,
-    "resolved_epochs": 8,
+    "seed": 45,
+    "resolved_epochs": 4,
     "resolved_subset_fraction": 1.0,
     "resolved_batch_size": 64,
-    "experiment_id": "langB_MoRE_seed44__22474619",
-    "experiment_group": "lang_gpu_trend2",
-    "code_git_commit": "f7df2da7f8d47971ca3aee08f084f74e08410c4c",
+    "experiment_id": "langB_MoRE_seed45__d6025531",
+    "experiment_group": "lang_rho_fix",
+    "code_git_commit": "a29edd43daaef163d49ff3a34afc781ce0c09abf",
     "code_git_dirty": true,
-    "config_hash": "22474619492905676e01fd66fc496352759435b5fd32d3a8d4ec23976661beae",
-    "run_dir": "runs/langB_MoRE_seed44__22474619",
+    "config_hash": "d6025531368d3d1bf9f9422d2c68c0253648f449969c3b1f7785e602e8fb3f86",
+    "run_dir": "runs/langB_MoRE_seed45__d6025531",
     "architecture": "more",
     "variant": "language",
-    "run_name": "langB_MoRE_seed44",
+    "run_name": "langB_MoRE_seed45",
     "dataset_version": "more6-v1-seed42-n70000-3c1087b6aad9",
     "train_split_version": "fixed-file-splits-v1",
-    "resolved_seed": 44,
+    "resolved_seed": 45,
     "seed_source": "cli",
     "seed_declared": true,
     "seed_set_canonical": [
@@ -104,7 +104,7 @@
     "determinism_exceptions": [
       "none"
     ],
-    "wandb_run_id": "a7y1ki3s",
+    "wandb_run_id": "waf5klx4",
     "device": "cuda",
     "halting_mode": "pure_act",
     "halting_supervision_enabled": false,
@@ -121,9 +121,6 @@
     "halt_target_mode": "pure_act",
     "total_params": 5584908,
     "embedding_params": 2162688,
-    "non_embedding_params": 3422220,
-    "nondeterministic_ops_observed": [
-      "_histc_cuda"
-    ]
+    "non_embedding_params": 3422220
   }
 }
