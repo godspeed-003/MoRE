@@ -42,7 +42,12 @@ from .model import (CAPACITY_POLICY, CANONICAL_ROUTING_MODE,
                     ROUTER_NOISE_ANNEAL_STEPS_DEFAULT)
 from .metrics import halting_supervision_loss, depth_allocation_error
 from .families import op_target_depth_table
-from .config import resolve_halting_mode, CANONICAL_FAMILY_CLS_WEIGHT
+from .config import (resolve_halting_mode, CANONICAL_FAMILY_CLS_WEIGHT,
+                     resolve_task)
+# T-L3.2: the confusion diagonal is published under a task-dependent NAME. One
+# helper, so the log dict, the console line, the results.tsv header and the
+# metrics.json "N/A" contract cannot disagree about what it is called.
+from .metrics import routing_agreement_key, routing_agreement_caption
 
 # ---------------------------------------------------------------------------
 # 4. Training loop
@@ -267,6 +272,16 @@ def train(cfg: dict, run_epochs: int | None = None, ctx: "RunContext | None" = N
     # halting objective ran" cannot mean one thing to the guard and another to
     # provenance. See more/config.py:resolve_halting_mode.
     halting_mode = resolve_halting_mode(cfg)
+    # T-L3.2: resolved by the SAME helper the config layer and the proxy guard use,
+    # so "which task ran" cannot mean one thing to the guard and another to the
+    # metric names. Absence means arithmetic (config.py:resolve_task), so every
+    # existing arithmetic run keeps emitting `val/routing_accuracy` unchanged.
+    _task = resolve_task(cfg)
+    _agree_key = routing_agreement_key(_task)
+    if _task != "arithmetic":
+        print(f"[Train] task={_task}: the confusion diagonal is published as "
+              f"{_agree_key}")
+        print(f"[Train] {routing_agreement_caption(_task)}")
     target_halt_weight = lw["halting"]
     print(f"[Train] halting: ponder_weight={target_halt_weight}, "
           f"supervision={'ON' if halting_supervision_enabled else 'OFF (pure ACT)'}"
@@ -824,6 +839,7 @@ def train(cfg: dict, run_epochs: int | None = None, ctx: "RunContext | None" = N
                 family_avg_depth,
                 mc["num_experts"],
                 pim=pim,
+                task=_task,
             )
 
         # ---- Expert metrics (no grad) ----------------------------------
@@ -1038,8 +1054,8 @@ def train(cfg: dict, run_epochs: int | None = None, ctx: "RunContext | None" = N
         wandb.log(log_dict, step=epoch)
 
         routing_acc_str = (
-            f"{paper_log_dict['val/routing_accuracy']:.4f}"
-            if "val/routing_accuracy" in paper_log_dict
+            f"{paper_log_dict[_agree_key]:.4f}"
+            if _agree_key in paper_log_dict
             else "N/A"
         )
 
@@ -1076,12 +1092,17 @@ def train(cfg: dict, run_epochs: int | None = None, ctx: "RunContext | None" = N
             f"{hung_str}\t{ami_str}"
         )
 
-        # Flush results to disk every epoch so a partial run is still readable
+        # Flush results to disk every epoch so a partial run is still readable.
+        # T-L3.2: the routing column is NAMED from `_agree_key`, so a language
+        # results.tsv reads `routing_agreement_with_pos` and an arithmetic one
+        # reads `routing_accuracy` -- and no exporter can join the two columns by
+        # position and silently compare an agreement figure against an accuracy.
         with open(ctx.path("results.tsv"), "w") as f:
             f.write(
                 "epoch\ttrain_task_loss\tval_loss\t"
                 "expert_entropy_normalized\tavg_depth\t"
-                "mean_cos_sim\tmax_cos_sim\trouting_accuracy\t"
+                "mean_cos_sim\tmax_cos_sim\t"
+                f"{_agree_key.split('/', 1)[1]}\t"
                 "routing_hungarian_acc\trouting_ami\n"
             )
             f.write("\n".join(results_rows) + "\n")
@@ -1191,7 +1212,7 @@ def train(cfg: dict, run_epochs: int | None = None, ctx: "RunContext | None" = N
             # number -- but an exporter joining three architectures on a common
             # column set has to decide what a missing column means, and the whole
             # point of writing "N/A" is that it never has to.
-            for _k in ("val/routing_accuracy", "val/routing_hungarian_accuracy",
+            for _k in (_agree_key, "val/routing_hungarian_accuracy",
                        "val/routing_ami", "val/routing_purity",
                        "val/routing_macro_recall",
                        "val/routing_matched_macro_recall"):
@@ -1201,6 +1222,13 @@ def train(cfg: dict, run_epochs: int | None = None, ctx: "RunContext | None" = N
         metrics["routing_balance_normalization"] = (
             "mean over depth calls per block, then mean over blocks"
         )
+        # T-L3.2: the caption travels WITH the number, in the artifact the exporter
+        # and the paper draft read -- not only on the console, which nothing keeps.
+        # `plan_language.md` §4.4 requires the language figure to be captioned as
+        # agreement with a linguistic prior rather than as accuracy, and a caption
+        # that lives in a prose file is a caption that can be omitted from a table.
+        metrics["routing_agreement_metric_key"] = _agree_key
+        metrics["routing_agreement_caption"] = routing_agreement_caption(_task)
         # T6.3: the full permutation-invariant routing report, in the artifact the
         # exporter reads. Written even when undefined (E == 1) so the field list is
         # the same for every architecture and a missing key can never be mistaken

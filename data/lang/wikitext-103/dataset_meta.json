@@ -229,6 +229,235 @@
     "train": "5e3749d399386d5c080cf42dbc7f3781374925eaf9d2d788f63f8e5703fe775f",
     "val": "992661126e7739060875d73102e39bed080c1e50cfce9c3c645b384923b88d2b"
   },
+  "shuffled_control_draw_marginals": [
+    {
+      "token_share": {
+        "L1_FUNCTION": 0.279136781871143,
+        "L2_NOUN": 0.2990138619582282,
+        "L3_VERB": 0.05504964325433361,
+        "L4_MODIFIER": 0.06936875047327715,
+        "L5_PUNCT_SYM": 0.08877736462410153,
+        "L6_NUM_SUBWORD": 0.20865359781891651
+      },
+      "types": {
+        "L1_FUNCTION": 2506,
+        "L2_NOUN": 2484,
+        "L3_VERB": 613,
+        "L4_MODIFIER": 2,
+        "L5_PUNCT_SYM": 843,
+        "L6_NUM_SUBWORD": 1568
+      }
+    },
+    {
+      "token_share": {
+        "L1_FUNCTION": 0.28155599313910556,
+        "L2_NOUN": 0.29980682214481563,
+        "L3_VERB": 0.057985293486533515,
+        "L4_MODIFIER": 0.06559527805934252,
+        "L5_PUNCT_SYM": 0.08836606955200835,
+        "L6_NUM_SUBWORD": 0.20669054361819444
+      },
+      "types": {
+        "L1_FUNCTION": 2556,
+        "L2_NOUN": 2205,
+        "L3_VERB": 616,
+        "L4_MODIFIER": 370,
+        "L5_PUNCT_SYM": 739,
+        "L6_NUM_SUBWORD": 1530
+      }
+    },
+    {
+      "token_share": {
+        "L1_FUNCTION": 0.2815647025281132,
+        "L2_NOUN": 0.29982519527348145,
+        "L3_VERB": 0.05798570678799635,
+        "L4_MODIFIER": 0.06559526303019843,
+        "L5_PUNCT_SYM": 0.08841221653897643,
+        "L6_NUM_SUBWORD": 0.20661691584123412
+      },
+      "types": {
+        "L1_FUNCTION": 2107,
+        "L2_NOUN": 2033,
+        "L3_VERB": 605,
+        "L4_MODIFIER": 636,
+        "L5_PUNCT_SYM": 915,
+        "L6_NUM_SUBWORD": 1720
+      }
+    },
+    {
+      "token_share": {
+        "L1_FUNCTION": 0.28156404876034474,
+        "L2_NOUN": 0.29977948413169236,
+        "L3_VERB": 0.05795882716376823,
+        "L4_MODIFIER": 0.06559526303019843,
+        "L5_PUNCT_SYM": 0.08847560195423058,
+        "L6_NUM_SUBWORD": 0.20662677495976567
+      },
+      "types": {
+        "L1_FUNCTION": 2305,
+        "L2_NOUN": 2746,
+        "L3_VERB": 468,
+        "L4_MODIFIER": 355,
+        "L5_PUNCT_SYM": 875,
+        "L6_NUM_SUBWORD": 1267
+      }
+    },
+    {
+      "token_share": {
+        "L1_FUNCTION": 0.2815650406838555,
+        "L2_NOUN": 0.2998139985611248,
+        "L3_VERB": 0.05798570678799635,
+        "L4_MODIFIER": 0.06559524800105432,
+        "L5_PUNCT_SYM": 0.0884651191262188,
+        "L6_NUM_SUBWORD": 0.20657488683975025
+      },
+      "types": {
+        "L1_FUNCTION": 1869,
+        "L2_NOUN": 2584,
+        "L3_VERB": 688,
+        "L4_MODIFIER": 724,
+        "L5_PUNCT_SYM": 437,
+        "L6_NUM_SUBWORD": 1714
+      }
+    },
+    {
+      "token_share": {
+        "L1_FUNCTION": 0.281563507711157,
+        "L2_NOUN": 0.29985629057263047,
+        "L3_VERB": 0.058025346155567856,
+        "L4_MODIFIER": 0.06560335622429786,
+        "L5_PUNCT_SYM": 0.08834855308455636,
+        "L6_NUM_SUBWORD": 0.20660294625179046
+      },
+      "types": {
+        "L1_FUNCTION": 1702,
+        "L2_NOUN": 2473,
+        "L3_VERB": 654,
+        "L4_MODIFIER": 631,
+        "L5_PUNCT_SYM": 864,
+        "L6_NUM_SUBWORD": 1692
+      }
+    },
+    {
+      "token_share": {
+        "L1_FUNCTION": 0.28150467612656604,
+        "L2_NOUN": 0.2998377521233795,
+        "L3_VERB": 0.057985714302568395,
+        "L4_MODIFIER": 0.06559569887537742,
+        "L5_PUNCT_SYM": 0.08841710852538194,
+        "L6_NUM_SUBWORD": 0.20665905004672674
+      },
+      "types": {
+        "L1_FUNCTION": 2724,
+        "L2_NOUN": 2351,
+        "L3_VERB": 511,
+        "L4_MODIFIER": 645,
+        "L5_PUNCT_SYM": 814,
+        "L6_NUM_SUBWORD": 971
+      }
+    },
+    {
+      "token_share": {
+        "L1_FUNCTION": 0.2815654915581786,
+        "L2_NOUN": 0.29981022624595494,
+        "L3_VERB": 0.05798569927342429,
+        "L4_MODIFIER": 0.06560701582088693,
+        "L5_PUNCT_SYM": 0.08840485977293804,
+        "L6_NUM_SUBWORD": 0.2066267073286172
+      },
+      "types": {
+        "L1_FUNCTION": 2617,
+        "L2_NOUN": 2511,
+        "L3_VERB": 334,
+        "L4_MODIFIER": 710,
+        "L5_PUNCT_SYM": 368,
+        "L6_NUM_SUBWORD": 1476
+      }
+    },
+    {
+      "token_share": {
+        "L1_FUNCTION": 0.28161576404520294,
+        "L2_NOUN": 0.29975492651022817,
+        "L3_VERB": 0.05795974394155851,
+        "L4_MODIFIER": 0.06560339379715811,
+        "L5_PUNCT_SYM": 0.08841620677673576,
+        "L6_NUM_SUBWORD": 0.2066499649291165
+      },
+      "types": {
+        "L1_FUNCTION": 2380,
+        "L2_NOUN": 2521,
+        "L3_VERB": 322,
+        "L4_MODIFIER": 432,
+        "L5_PUNCT_SYM": 829,
+        "L6_NUM_SUBWORD": 1532
+      }
+    },
+    {
+      "token_share": {
+        "L1_FUNCTION": 0.2815655216164668,
+        "L2_NOUN": 0.2998104817414047,
+        "L3_VERB": 0.05792341098568965,
+        "L4_MODIFIER": 0.06559527054477048,
+        "L5_PUNCT_SYM": 0.08841710101080988,
+        "L6_NUM_SUBWORD": 0.2066882141008585
+      },
+      "types": {
+        "L1_FUNCTION": 2335,
+        "L2_NOUN": 2410,
+        "L3_VERB": 656,
+        "L4_MODIFIER": 486,
+        "L5_PUNCT_SYM": 741,
+        "L6_NUM_SUBWORD": 1388
+      }
+    }
+  ],
+  "shuffled_control_generator": "data/lang/build_shuffled_control.py",
+  "shuffled_control_generator_commit": "b1201f3efb1e4ec1e1e900cc06715fc80831d81b",
+  "shuffled_control_marginal_entropy_draws": [
+    0.8951314103695812,
+    0.8941335379282797,
+    0.8941503758476697,
+    0.8941709363218642,
+    0.8941776860929206,
+    0.8941472315522259,
+    0.8941607308701569,
+    0.8941573843941903,
+    0.8941448304732967,
+    0.8941114063290507
+  ],
+  "shuffled_control_marginal_entropy_real": 0.8941557591319386,
+  "shuffled_control_matched": "train TOKEN proportions (plan_language.md \u00a74.4)",
+  "shuffled_control_matched_note": "T-L3.3's wording says per-family TYPE counts; \u00a74.4 says observed TOKEN proportions, and this artifact implements \u00a74.4. Confusion-matrix entries are tokens, so AMI's and Hungarian accuracy's chance levels depend on the token marginals; a type-count-matched control would be roughly token-uniform against the real partition's 5.29x imbalance and would confound 'meaningless' with 'differently balanced'. Realised type counts are recorded below so the departure is visible.",
+  "shuffled_control_n_draws": 10,
+  "shuffled_control_real_marginals": {
+    "token_share": {
+      "L1_FUNCTION": 0.28156466495525295,
+      "L2_NOUN": 0.29981047422683266,
+      "L3_VERB": 0.057985714302568395,
+      "L4_MODIFIER": 0.06559525551562638,
+      "L5_PUNCT_SYM": 0.08841710852538194,
+      "L6_NUM_SUBWORD": 0.20662678247433772
+    },
+    "types": {
+      "L1_FUNCTION": 243,
+      "L2_NOUN": 3495,
+      "L3_VERB": 839,
+      "L4_MODIFIER": 658,
+      "L5_PUNCT_SYM": 38,
+      "L6_NUM_SUBWORD": 2743
+    }
+  },
+  "shuffled_control_seed": 20260903,
+  "shuffled_control_target_token_share": {
+    "L1_FUNCTION": 0.28156466495525295,
+    "L2_NOUN": 0.29981047422683266,
+    "L3_VERB": 0.057985714302568395,
+    "L4_MODIFIER": 0.06559525551562638,
+    "L5_PUNCT_SYM": 0.08841710852538194,
+    "L6_NUM_SUBWORD": 0.20662678247433772
+  },
+  "shuffled_control_unmapped_preserved": true,
+  "shuffled_control_worst_token_share_error": 0.0037734949576507665,
   "splits": {
     "test": 1256,
     "train": 526320,
@@ -255,6 +484,12 @@
   "token_family_file": "data/lang/wikitext-103/token_family.npy",
   "token_family_len": 8192,
   "token_family_sha256": "b705c73242b8de469db6f3fe12c1153f52b4a458a8962294c02a083abf72e1dd",
+  "token_family_shuffled_file": "data/lang/wikitext-103/token_family_shuffled.npy",
+  "token_family_shuffled_sha256": "d48db113b56e3b7eb245055d8b9b1a724e0be5ee819834609b34bf5481a2fead",
+  "token_family_shuffled_shape": [
+    10,
+    8192
+  ],
   "tokenizer_sha256": "6a1f1477f4d91dd7d0d7e6971d97570ecb7208bf9d8170ec189df4497fe5f693",
   "tokenizer_training_files": [
     "data/lang/wikitext-103/train_text.txt"

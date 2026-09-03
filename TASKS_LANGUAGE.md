@@ -1073,7 +1073,7 @@ does not exist here (T-L0.0).
   byte-for-byte, which it did.
 
 
-- [ ] **T-L3.2 Demote routing accuracy to `routing_agreement_with_pos`.**
+- [x] **T-L3.2 Demote routing accuracy to `routing_agreement_with_pos`.**
   STRICTER THAN ARITHMETIC (§4.4). On arithmetic, `OP_TO_EXPERT` is ground truth:
   the family genuinely is the right answer. A POS partition is a linguistic prior,
   not a functional one — nothing says the optimal expert split for next-token
@@ -1083,8 +1083,49 @@ does not exist here (T-L0.0).
   named `routing_accuracy`; `results.md` for language reports Hungarian/AMI/purity
   in the specialization section before any POS-agreement number; the agreement
   number's caption states it is agreement with a prior, not accuracy.
+  **Evidence:** checks TL3.2a–m (TL3.2n skipped, see below).
+  `code/test_language_families.py` → **89 passed, 0 failed, 1 skipped**. Gate L0
+  after the change: `TOTAL 356 356 0 0`, ALL GATES PASS — the arithmetic path is
+  untouched.
 
-- [ ] **T-L3.3 Mandatory shuffled-control partition (ablation G).** Build a second
+  **One helper, five call sites.** `metrics.routing_agreement_key(task)` returns
+  `val/routing_accuracy` for arithmetic and `val/routing_agreement_with_pos` for
+  language, and it is the *only* place either string appears: the W&B log dict, the
+  console line, the `results.tsv` header and the `metrics.json` `"N/A"` contract all
+  resolve through it. TL3.2m asserts `engine.py` no longer hard-codes the key
+  anywhere. The number is unchanged — TL3.2f pins the language value equal to the
+  arithmetic one and to the confusion diagonal, to 1e-15. Only the name moved.
+
+  **The default is arithmetic, and that is load-bearing.** Gate L0's G5.2b checks
+  the literal string `val/routing_accuracy` on a single-expert run, and
+  `resolve_task` makes absence mean arithmetic so no existing config's hash moves.
+  TL3.2g calls the log-dict builder with no `task` argument and requires all 46 keys
+  to match the explicit-arithmetic call. **An unknown task raises** rather than
+  defaulting (TL3.2d): a default would publish a language agreement figure under
+  `val/routing_accuracy`, silently, in the key the exporter joins on.
+
+  **The two spellings are deliberately different strings** (TL3.2c) so no exporter
+  can join a column of accuracies to a column of agreements and average them.
+
+  **"Primary" is now an object, not a convention.**
+  `metrics.LANGUAGE_SPECIALIZATION_ORDER` is
+  `hungarian_accuracy → ami → purity → matched_macro_recall → agreement_with_pos`,
+  with the agreement key **last**; TL3.2h pins the order and TL3.2i checks every
+  name in it is a key a real language log dict actually emits, so it is consumable
+  rather than aspirational. TL3.2n is the one skip: the language `results.md` writer
+  is Phase L-9, and this constant is the contract it must consume.
+
+  **The caption travels with the number, in the artifact.** `metrics.json` now
+  carries `routing_agreement_metric_key` and `routing_agreement_caption`, because a
+  caveat that lives only in a prose file is a caveat that gets omitted from a table
+  and a caveat that lives only on stdout is one nothing keeps. The language caption
+  opens `AGREEMENT WITH A PRIOR, NOT ACCURACY` and names the POS partition a
+  linguistic hypothesis rather than a functional ground truth; the arithmetic caption
+  still claims a functional ground truth, and TL3.2j/k require the two to make
+  different claims. The language caption also carries the T-L3.1 finding forward:
+  read load entropy against the partition's own **0.8884**, not against 1.0.
+
+- [x] **T-L3.3 Mandatory shuffled-control partition (ablation G).** Build a second
   `token_family_shuffled[V]` by permuting the family assignment across types while
   holding the per-family type counts fixed, and evaluate the same
   agreement/Hungarian/AMI/purity metrics against it. This is evaluation-time only
@@ -1094,6 +1135,73 @@ does not exist here (T-L0.0).
   control has identical per-family type counts to the real partition; both metric
   sets appear side by side for every language run; the difference is reported with
   its uncertainty, not just the raw pair.
+  **Evidence:** `data/lang/build_shuffled_control.py`, checks TL3.3a–l, both
+  corpora. `token_family_shuffled.npy` is `int8` `(10, 8192)` — **ten** independent
+  draws, not one, because T-L3.3 requires the difference with its uncertainty and a
+  single control gives a point estimate with no spread. Seed **20260903**, kept
+  separate from the frozen run seeds so a data artifact is never tied to a training
+  seed.
+
+  **THE VERIFY CLAUSE WAS NOT IMPLEMENTED AS WRITTEN, AND THE DEPARTURE IS THE POINT.**
+  T-L3.3 says "holding the per-family **type** counts fixed". `plan_language.md` §4.4
+  says "a random type-level 6-way partition with the observed family **token**
+  proportions". Those are different partitions, and on this corpus they are far
+  apart: L1_FUNCTION is 2.6% of types and 27.3% of tokens. **§4.4 is the correct
+  specification and this artifact implements it**, because every entry of the routing
+  confusion matrix is a *token*, so AMI's and Hungarian accuracy's chance levels
+  depend on the token marginals. A type-count-matched control would carry a roughly
+  token-uniform profile against the real partition's 5.29× imbalance, and the
+  comparison would then confound "meaningless" with "differently balanced" — exactly
+  the confusion the control exists to remove. The realised type counts are recorded
+  anyway (L1: 243 real vs ~2,506 control on wikitext-103) so the departure is
+  visible, and the manifest's
+  `shuffled_control_matched_note` states it. Marked `[x]` rather than `[!]` because
+  the *scientific* requirement is met and improved on; the ledger's wording is what
+  was wrong.
+
+  **Matching, measured:** worst per-family token-share error **9.74e-05**
+  (wikitext-2) and **3.77e-03** (wikitext-103) across all ten draws, recomputed in
+  the test from `train.npy` rather than read from the manifest. The quantity that
+  actually sets AMI's chance level is the marginal **entropy**, and that agrees to
+  1e-4: 0.894156 real vs 0.894249 ± 2.9e-04 control on the canonical corpus. Unmapped
+  types are **exactly** preserved in every draw (TL3.3c), so both metric sets are
+  computed over the same token population — otherwise the pair is not comparable.
+
+  **The control DISCRIMINATES, and that is verified now rather than assumed.** Two
+  synthetic routers, scored with no trained model in sight:
+
+  | router | AMI vs POS | AMI vs control | Δ |
+  |---|---|---|---|
+  | random 6-way | 0.0000 | −0.0000 ± 0.0000 | **+0.0000** |
+  | POS-perfect | 1.0000 | 0.0527 | **+0.9473** (z = 47.5) |
+
+  The control behaves as a floor for one and not the other, so it separates a real
+  partition from the metric's chance level — which is its entire job. **And it gives
+  the number the paper needs: the AMI floor for a 6-way partition with these
+  marginals is 0.0527, not 0.** An observed AMI of 0.06 against POS would be *at the
+  floor*, and without this control it would have read as weak specialization.
+
+  **How a draw is made.** Types are visited in seeded random order and each goes to
+  whichever family is furthest below its token-mass target; a repair pass then removes
+  the tail. Randomising the visit order is load-bearing — a frequency-ordered pass
+  would rebuild part of the real partition through the frequency-family correlation
+  (normalized MI 0.27, T-L2.6). The repair needed a **swap** operation, not just a
+  move: canonical draw 0 stalled at 1.4e-02 with one-way moves because the over-family
+  held no type small enough to transfer without overshooting, while the other nine
+  reached ~5e-05. A swap transfers an arbitrarily small *net* mass out of two large
+  types, so the granularity floor disappears; every selection is by mass alone and
+  never consults the real partition, so the repair cannot reintroduce POS structure.
+
+  **Side by side, with uncertainty.** `metrics.specialization_vs_control` scores the
+  same predicted assignments against POS once and against each draw, returning
+  `real`, `control_mean`, `control_std`, `delta` and `delta_z` for each of
+  `raw_accuracy`, `hungarian_accuracy`, `ami`, `purity`.
+  `control_comparison_to_wandb` flattens it and **omits** undefined entries rather
+  than writing 0.0 — a 0.0 in a "real minus control" column reads as "the POS
+  partition is no better than noise", which is a finding, not a missing value.
+  `delta_z` is `None` when the control has no spread, because a z with a zero
+  denominator is undefined, not large.
+
 
 ---
 

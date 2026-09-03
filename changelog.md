@@ -4598,6 +4598,116 @@ slot comments before changing the engine's unpacking;
 `build_language_dataset.MANIFEST_SCHEMA` when a manifest key is added;
 `set_out_root` before rebuilding anything in place.
 
+## T-L3.2 / T-L3.3 — the POS number is demoted, and given a floor to be read against
+
+`code/more/metrics.py`, `code/more/engine.py`, `data/lang/build_shuffled_control.py`
+(new), `code/test_language_families.py`, `plan_language.md` §3.1.
+**89 passed, 0 failed, 1 skipped.** Gate L0 after the metric-layer change:
+`TOTAL 356 356 0 0`, ALL GATES PASS — arithmetic untouched.
+
+**One helper owns the routing key's NAME, and five call sites read it.**
+`routing_agreement_key(task)` gives `val/routing_accuracy` for arithmetic and
+`val/routing_agreement_with_pos` for language, and is the only place either string
+appears: the W&B log dict, the console line, the `results.tsv` header, and the
+`metrics.json` `"N/A"` contract. TL3.2m asserts `engine.py` hard-codes it nowhere.
+The NUMBER is untouched — TL3.2f pins the language value equal to the arithmetic one
+and to the confusion diagonal at 1e-15. Only the name moved.
+
+**The default stays arithmetic, and that is load-bearing.** G5.2b checks the literal
+`val/routing_accuracy` on a single-expert run, and `resolve_task` makes absence mean
+arithmetic so no existing config's hash moves. TL3.2g calls the log-dict builder with
+no `task` and requires all 46 keys to match the explicit-arithmetic call. An unknown
+task **raises** (TL3.2d): a default would publish a language agreement figure under
+`val/routing_accuracy`, silently, in the key the exporter joins on. The two spellings
+are deliberately different strings so no exporter can average a column of accuracies
+against a column of agreements.
+
+**"Primary" became an object.** `LANGUAGE_SPECIALIZATION_ORDER` is
+`hungarian_accuracy -> ami -> purity -> matched_macro_recall -> agreement_with_pos`
+with the agreement key LAST, and TL3.2i checks every name in it is a key a real
+language log dict emits — consumable, not aspirational. The Phase L-9 results writer
+consumes this list rather than reimplementing the convention.
+
+**The caption travels in the artifact, not in prose.** `metrics.json` carries
+`routing_agreement_metric_key` and `routing_agreement_caption`. A caveat that lives
+only in a plan file gets omitted from a table; one that lives only on stdout is not
+kept at all. The language caption opens `AGREEMENT WITH A PRIOR, NOT ACCURACY`, names
+the POS partition a linguistic hypothesis rather than a functional ground truth, and
+carries the T-L3.1 finding forward: read load entropy against the partition's own
+0.8884, not against 1.0.
+
+**T-L3.3's Verify clause was not implemented as written, and the departure is the
+substance.** The ledger says "holding the per-family TYPE counts fixed";
+`plan_language.md` §4.4 says "the observed family TOKEN proportions". Those are
+different partitions and on this corpus they are far apart — L1_FUNCTION is 2.6% of
+types and 27.3% of tokens. **§4.4 is correct and is what got built.** Every entry of
+the routing confusion matrix is a TOKEN, so AMI's and Hungarian accuracy's chance
+levels depend on the token marginals; a type-count-matched control would be roughly
+token-uniform against the real partition's 5.29x imbalance, and the comparison would
+confound "meaningless" with "differently balanced" — the exact confusion the control
+exists to remove. Realised type counts are recorded anyway (L1: 243 real vs ~2,506
+control) so the departure is visible, and `shuffled_control_matched_note` states it.
+
+**THE NUMBER THE PAPER NEEDS: the AMI floor for a 6-way partition with these
+marginals is 0.0527, not 0.** Verified on two synthetic routers with no trained model:
+a random 6-way router scores AMI 0.0000 against POS and -0.0000 against the control
+(delta +0.0000); a POS-perfect router scores 1.0000 against POS and 0.0527 against the
+control (delta +0.9473, z = 47.5). So the control behaves as a floor for one and not
+the other — it separates a real partition from chance, which is its whole job. An
+observed AMI of 0.06 against POS would be AT the floor, and without this control it
+would have read as weak specialization.
+
+**Matching, measured rather than argued.** Worst per-family token-share error
+9.74e-05 (wikitext-2) and 3.77e-03 (wikitext-103) over ten draws, recomputed in the
+test from `train.npy` rather than read from the manifest. The quantity that actually
+sets AMI's chance level is the marginal ENTROPY, and it agrees to 1e-4: 0.894156 real
+vs 0.894249 +- 2.9e-04 control. Unmapped types are EXACTLY preserved in every draw,
+so both metric sets are computed over the same token population — otherwise the pair
+is not comparable.
+
+**The repair pass needed a SWAP, not just a move.** Types are visited in seeded random
+order and assigned to whichever family is furthest below its token-mass target;
+randomising the order is load-bearing, because a frequency-ordered pass would rebuild
+part of the real partition through the frequency-family correlation (normalized MI
+0.27). The greedy pass leaves a tail: with 3 types carrying ~4% of the canonical corpus
+each, one arriving late overshoots. One-way moves fixed nine of ten draws to ~5e-05 and
+left canonical draw 0 stalled at 1.4e-02, because the over-family held no type small
+enough to transfer without overshooting. A swap moves an arbitrarily small NET mass out
+of two large types, so the granularity floor disappears. Every selection is by mass
+alone and never consults the real partition, so the repair cannot reintroduce POS
+structure.
+
+**Ten draws, not one.** T-L3.3 requires the difference "with its uncertainty, not just
+the raw pair", and one control gives a point estimate with no spread.
+`specialization_vs_control` returns `real`, `control_mean`, `control_std`, `delta` and
+`delta_z` per metric; `control_comparison_to_wandb` OMITS undefined entries rather than
+writing 0.0, because a 0.0 in a "real minus control" column reads as "POS is no better
+than noise", which is a finding rather than a missing value. `delta_z` is `None` when
+the control has no spread — a z with a zero denominator is undefined, not large. Seed
+20260903, kept out of the frozen run-seed space so a data artifact is never tied to a
+training seed.
+
+**Corpus decision recorded in `plan_language.md` §3.1: FineWeb-Edu rejected as
+canonical, kept as the preferred Phase L-10 robustness ablation.** The case for it is
+real and it is about downstream capability — HuggingFace's ablations show 12-24%
+relative gains on MMLU/ARC/OpenBookQA over general web snapshots — but those ran at
+~1.8 B parameters, and this spec's frozen shape (`d_model` 256, 4 heads,
+`num_blocks` 1, `V` 8192, tied head) is single-digit millions. A model that size sits
+at chance on MMLU whatever it trained on, so the one axis FineWeb-Edu measurably wins
+on is one this paper cannot measure. Switching would cost the three properties that
+ARE load-bearing here: author-provided document-disjoint splits that Gate L2 audits as
+the dataset's property rather than ours; a floor a reader can situate in the WikiText
+literature; and no sampling decision for the proxy guard to enforce. The legitimate
+part of the objection — that a partition learned on encyclopedic register may be an
+artifact of it — is answered by a second corpus as a labelled ablation, not by moving
+the canonical arm.
+
+**Where to look.** `metrics.routing_agreement_key` when a routing key is misspelled in
+an artifact; `LANGUAGE_SPECIALIZATION_ORDER` before writing the language results
+section; `build_shuffled_control._repair` when a control draw's marginals drift;
+`specialization_vs_control` when a delta or its z looks wrong;
+`TASKS_LANGUAGE.md` T-L3.2/T-L3.3 Evidence for the synthetic-router table.
+
 <!-- APPEND-MARKER-CL -->
 
 

@@ -156,6 +156,41 @@ LLM-generated text, which would reintroduce exactly the "controlled synthetic
 benchmark" caveat the migration is meant to escape. It stays available as a
 labelled robustness ablation.
 
+**FineWeb-Edu was raised and rejected as canonical (decision recorded 2026-09-03).**
+The case for it is real and it is about downstream capability: HuggingFace's own
+ablations show `FineWeb-Edu` giving a 12–24% relative improvement on MMLU, ARC and
+OpenBookQA over general web snapshots. That result does not transfer to this study,
+and the reason is scale, not doubt about the result. Those ablations were run at
+roughly 1.8 B parameters; this spec's frozen shape is `d_model = 256`, 4 heads,
+`num_blocks = 1`, `V = 8192`, tied LM head — single-digit millions of parameters.
+A model that size sits at chance on MMLU (25%) whatever it trained on, so the one
+axis on which FineWeb-Edu is measurably better is an axis this paper cannot
+measure. Buying it would mean giving up the three properties that ARE load-bearing
+here:
+
+- **Author-provided document-disjoint splits.** Gate L2 audits split cleanliness as
+  a property of the dataset (zero exact-content overlap across all 526,320 canonical
+  train blocks). FineWeb-Edu ships no canonical val/test split, so we would construct
+  one — and near-duplicate contamination across a self-made split of a CommonCrawl
+  derivative becomes *our* claim to defend rather than the authors'. That is the most
+  dangerous reviewer objection available against a small-scale LM result, and it is
+  currently a one-line answer.
+- **A floor a reader can situate.** WikiText-103 perplexity is among the most-reported
+  numbers in LM research, so `primary_metric_floor = 4.9849` nats (ppl 146.2) sits in
+  a literature. At single-digit millions of parameters on FineWeb-Edu there is no
+  reference point at all, and "is 4.9 good" becomes unanswerable.
+- **No sampling decision.** FineWeb-Edu is used via a subsample, which makes *which
+  sample* and *which seed* provenance fields the proxy guard must enforce, and invites
+  "did you pick a favourable sample". WikiText-103 is used whole.
+
+The legitimate part of the objection — that a routing partition learned on
+encyclopedic register might be an artifact of that register — is answered by a
+**second corpus as a labelled robustness ablation**, exactly as TinyStories is above,
+not by moving the canonical arm. That gives "the specialization finding replicates on
+a differently-distributed corpus" while keeping the audit properties on the arm the
+headline table is drawn from. `FineWeb-Edu` is the preferred candidate for that
+ablation if Phase L-10 has budget.
+
 ### 3.2 Tokenizer — trained on the train split only, small vocab
 
 A **byte-level BPE** trained with `tokenizers` on the **train split alone**,

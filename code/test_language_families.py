@@ -483,13 +483,266 @@ except Exception as exc:      # pragma: no cover
 
 # ---------------------------------------------------------------------------
 print()
-print("=== T-L3.2 / T-L3.3  not yet built ===")
+print("=== T-L3.2  routing_accuracy is DEMOTED to routing_agreement_with_pos ===")
 # ---------------------------------------------------------------------------
 
-skip("TL3.2 routing_agreement_with_pos replaces routing_accuracy",
-     "metric-layer change not made yet")
-skip("TL3.3 shuffled-control partition (ablation G)",
-     "evaluation-time only; built after the metric layer is renamed")
+from more import metrics as M      # noqa: E402
+
+check("TL3.2a the language key is not named routing_accuracy",
+      M.routing_agreement_key("language") == "val/routing_agreement_with_pos"
+      and "routing_accuracy" not in M.routing_agreement_key("language"),
+      M.routing_agreement_key("language"))
+
+check("TL3.2b the ARITHMETIC key is unchanged, so Gate L0's contract still holds",
+      M.routing_agreement_key("arithmetic") == "val/routing_accuracy"
+      and M.routing_agreement_key() == "val/routing_accuracy",
+      "G5.2b checks this exact string on a single-expert run; the default has to "
+      "stay arithmetic for absence-means-arithmetic to survive")
+
+check("TL3.2c the two spellings are DIFFERENT, so no exporter can join them",
+      len(set(M.routing_agreement_keys_all())) == 2,
+      f"{M.routing_agreement_keys_all()} -- one column of accuracies and one of "
+      f"agreements cannot be silently averaged together")
+
+_task_raised = False
+try:
+    M.routing_agreement_key("vision")
+except KeyError:
+    _task_raised = True
+check("TL3.2d an unknown task raises rather than defaulting to a name",
+      _task_raised,
+      "a default here would publish a language agreement number under "
+      "val/routing_accuracy, silently, in the key the exporter joins on")
+
+# The real code path, not just the constant: build a synthetic confusion matrix and
+# ask the log-dict builder for both tasks.
+_conf = np.array([[8, 1, 0, 0, 0, 1],
+                  [1, 7, 1, 0, 1, 0],
+                  [0, 1, 9, 0, 0, 0],
+                  [0, 0, 1, 6, 2, 1],
+                  [1, 0, 0, 1, 8, 0],
+                  [0, 1, 0, 1, 0, 8]], dtype=np.int64)
+_acc = M.routing_accuracy_from_confusion(_conf, 6)
+_ld_lang = M.paper_metrics_to_wandb(_conf, _acc, {}, {}, 6, task="language")
+_ld_arith = M.paper_metrics_to_wandb(_conf, _acc, {}, {}, 6, task="arithmetic")
+_ld_default = M.paper_metrics_to_wandb(_conf, _acc, {}, {}, 6)
+
+_lang_offenders = [k for k in _ld_lang if "routing_accuracy" in k]
+check("TL3.2e a language log dict contains NO key spelled routing_accuracy",
+      not _lang_offenders
+      and "val/routing_agreement_with_pos" in _ld_lang,
+      f"{len(_ld_lang)} keys emitted, agreement published as "
+      f"val/routing_agreement_with_pos = {_ld_lang['val/routing_agreement_with_pos']:.4f}"
+      if not _lang_offenders else f"OFFENDERS {_lang_offenders}")
+
+check("TL3.2f the number itself is unchanged -- only the name moved",
+      abs(_ld_lang["val/routing_agreement_with_pos"]
+          - _ld_arith["val/routing_accuracy"]) < 1e-15
+      and abs(_ld_lang["val/routing_agreement_with_pos"] - _acc) < 1e-15,
+      f"both {_acc:.6f}, and equal to the confusion diagonal fraction")
+
+check("TL3.2g omitting `task` reproduces the arithmetic dict key-for-key",
+      set(_ld_default) == set(_ld_arith)
+      and all(_ld_default[k] == _ld_arith[k] for k in _ld_default
+              if isinstance(_ld_default[k], (int, float, str))),
+      f"{len(_ld_default)} keys identical -- an existing arithmetic caller that "
+      f"passes no task is byte-identical to before T-L3.2")
+
+# -- "primary" made mechanical ------------------------------------------------
+# §4.4 says the permutation-invariant metrics become PRIMARY for language and the
+# POS-agreement number is supplementary. `LANGUAGE_SPECIALIZATION_ORDER` is what
+# that means as an object a results writer can consume, rather than a convention
+# living in a prose file: the agreement key is LAST in it.
+_order = M.LANGUAGE_SPECIALIZATION_ORDER
+check("TL3.2h the permutation-invariant metrics come FIRST and agreement LAST",
+      _order[-1] == M.routing_agreement_key("language")
+      and {"val/routing_hungarian_accuracy", "val/routing_ami",
+           "val/routing_purity"} <= set(_order[:-1]),
+      " -> ".join(k.replace("val/routing_", "") for k in _order))
+
+check("TL3.2i every name in that order is a key the log dict actually emits",
+      all(k in _ld_lang for k in _order),
+      f"all {len(_order)} present in a real language log dict, so the order is "
+      f"consumable rather than aspirational")
+
+# -- the caption travels with the number --------------------------------------
+_cap = M.routing_agreement_caption("language")
+_cap_l = _cap.lower()
+check("TL3.2j the language caption says agreement-with-a-prior, NOT accuracy",
+      "not accuracy" in _cap_l and "prior" in _cap_l
+      and "linguistic hypothesis" in _cap_l
+      and "functional ground truth" in _cap_l,
+      _cap[:120] + "...")
+
+check("TL3.2k the arithmetic caption still claims a functional ground truth",
+      "functional ground truth" in M.routing_agreement_caption("arithmetic")
+      and "NOT ACCURACY" not in M.routing_agreement_caption("arithmetic"),
+      "the two captions make different claims, which is the whole point")
+
+# metrics.json is written by a real run, which needs the Phase L-4 model. What is
+# checkable now is that the writer names the caption at all -- asserted on the
+# source, because a caption that lives only on the console is a caption that never
+# reaches a table.
+with open(os.path.join(CODE, "more", "engine.py"), "r", encoding="utf-8") as fh:
+    _eng = fh.read()
+check("TL3.2l engine.py writes the key AND the caption into metrics.json",
+      'metrics["routing_agreement_caption"]' in _eng
+      and 'metrics["routing_agreement_metric_key"]' in _eng
+      and "routing_agreement_key(_task)" in _eng,
+      "so the artifact the exporter and the paper draft read carries the caveat, "
+      "not just stdout")
+
+check("TL3.2m no site in engine.py still hard-codes the routing key",
+      _eng.count('"val/routing_accuracy"') == 0
+      and _eng.count("'val/routing_accuracy'") == 0,
+      "the log dict, console line, results.tsv header and metrics.json N/A "
+      "contract all resolve it through routing_agreement_key(_task)")
+
+skip("TL3.2n results.md ordering",
+     "the language results writer does not exist yet (Phase L-9); "
+     "LANGUAGE_SPECIALIZATION_ORDER is the contract it must consume, and TL3.2h "
+     "pins it")
+
+
+# ---------------------------------------------------------------------------
+print()
+print("=== T-L3.3  Shuffled control (ablation G): the null the POS number needs ===")
+# ---------------------------------------------------------------------------
+
+_ctrl_built = [(c, m) for c, m in _built
+               if "token_family_shuffled_sha256" in m]
+if not _ctrl_built:
+    skip("TL3.3a-k", "control not built; run data/lang/build_shuffled_control.py")
+
+for corpus, man in _ctrl_built:
+    tag = f"[{corpus}]"
+    real = np.load(os.path.join(LANG, corpus, "token_family.npy"))
+    cpath = os.path.join(LANG, corpus, "token_family_shuffled.npy")
+    draws = np.load(cpath)
+    V = man["vocab_size"]
+    nd = man["shuffled_control_n_draws"]
+
+    check(f"TL3.3a {tag} the control is (n_draws, V) int8 with its hash recorded",
+          draws.shape == (nd, V) and draws.dtype == np.int8
+          and _sha256_file(cpath) == man["token_family_shuffled_sha256"],
+          f"shape {draws.shape}, {nd} independent draws, "
+          f"sha256 {man['token_family_shuffled_sha256'][:12]}")
+
+    check(f"TL3.3b {tag} every draw uses the same family alphabet as the real one",
+          all(set(np.unique(draws[d]).tolist()) <= set(range(6)) | {-1}
+              for d in range(nd)),
+          "no draw invents a seventh family or a second ignore label")
+
+    # The -1 population must be identical, or the two metric sets are computed over
+    # different token populations and the pair is not comparable.
+    check(f"TL3.3c {tag} the unmapped types are EXACTLY preserved in every draw",
+          all(np.array_equal(draws[d] < 0, real < 0) for d in range(nd))
+          and man["shuffled_control_unmapped_preserved"] is True,
+          f"{int((real < 0).sum())} types stay at -1, so both metric sets are "
+          f"computed over the same tokens")
+
+    check(f"TL3.3d {tag} no draw is the real partition, or a copy of another draw",
+          all(not np.array_equal(draws[d], real) for d in range(nd))
+          and len({draws[d].tobytes() for d in range(nd)}) == nd,
+          f"{nd} distinct partitions, none equal to POS")
+
+    # -- the marginals, recomputed from the arrays -----------------------------
+    _tr = np.load(os.path.join(LANG, corpus, "train.npy"), mmap_mode="r")
+    _cnt = np.zeros(V, dtype=np.int64)
+    _rows = max(1, (1 << 22) // _tr.shape[1])
+    for _i in range(0, _tr.shape[0], _rows):
+        _cnt += np.bincount(np.asarray(_tr[_i:_i + _rows], dtype=np.int64).ravel(),
+                            minlength=V)
+    _tot = float(_cnt[real >= 0].sum())
+    _share = lambda a: np.array([_cnt[a == f].sum() / _tot for f in range(6)])
+    _real_sh = _share(real)
+    _err = max(float(np.abs(_share(draws[d]) - _real_sh).max()) for d in range(nd))
+
+    check(f"TL3.3e {tag} the control matches the real TOKEN proportions",
+          _err < 5e-3 and abs(_err - man["shuffled_control_worst_token_share_error"])
+          < 1e-9,
+          f"worst per-family token-share error {_err:.2e} over {nd} draws "
+          f"(recomputed here from train.npy, matches the manifest)")
+
+    # The quantity that actually sets AMI's chance level.
+    _H = lambda p: float(-(p[p > 0] * np.log(p[p > 0])).sum() / math.log(6))
+    _hr, _hc = _H(_real_sh), [_H(_share(draws[d])) for d in range(nd)]
+    check(f"TL3.3f {tag} the control's marginal ENTROPY matches, which is what "
+          f"sets AMI's chance level",
+          abs(_hr - float(np.mean(_hc))) < 2e-3,
+          f"real {_hr:.6f} vs control {np.mean(_hc):.6f} "
+          f"(+-{np.std(_hc):.1e}) -- so a difference in AMI cannot be an artifact "
+          f"of differently balanced partitions")
+
+    # T-L3.3's wording says TYPE counts; §4.4 says TOKEN proportions. The manifest
+    # records which was implemented and why; this pins that the departure is real
+    # and declared rather than an accident.
+    check(f"TL3.3g {tag} the type-vs-token specification conflict is declared",
+          "TOKEN proportions" in man["shuffled_control_matched"]
+          and "T-L3.3" in man["shuffled_control_matched_note"]
+          and "§4.4" in man["shuffled_control_matched_note"],
+          "type counts differ from the real partition BY DESIGN "
+          f"(L1: {int((real == 0).sum())} real vs "
+          f"{int((draws[0] == 0).sum())} control), and the manifest says why")
+
+# -- the control actually DISCRIMINATES, shown on synthetic routers -----------
+# The point of ablation G is that it separates a real partition from the metric's
+# floor. That is testable now, with no trained model: score two synthetic routers
+# against POS and against the control and require the control to behave as a floor
+# for one and not the other. A control that could not do this would be decoration.
+if _ctrl_built:
+    _c, _m = _ctrl_built[0]
+    _real = np.load(os.path.join(LANG, _c, "token_family.npy"))
+    _draws = np.load(os.path.join(LANG, _c, "token_family_shuffled.npy"))
+    _val = np.load(os.path.join(LANG, _c, "val.npy"), mmap_mode="r")
+    _ids = np.asarray(_val[:400], dtype=np.int64).ravel()
+
+    _rng = np.random.default_rng(7)
+    _random_router = _rng.integers(0, 6, size=_ids.size)
+    _oracle_router = np.clip(_real[_ids], 0, 5)
+
+    _cmp_rand = M.specialization_vs_control(_random_router, _ids, _real, _draws, 6)
+    _cmp_pos = M.specialization_vs_control(_oracle_router, _ids, _real, _draws, 6)
+
+    _r_ami = _cmp_rand["metrics"]["ami"]
+    _p_ami = _cmp_pos["metrics"]["ami"]
+
+    check("TL3.3h a RANDOM router scores at the floor against BOTH partitions",
+          abs(_r_ami["delta"]) < 0.02,
+          f"AMI vs POS {_r_ami['real']:.4f}, vs control "
+          f"{_r_ami['control_mean']:.4f} +- {_r_ami['control_std']:.4f}, "
+          f"delta {_r_ami['delta']:+.4f} -- no apparent specialization, correctly")
+
+    check("TL3.3i a POS-PERFECT router beats the control by a wide margin",
+          _p_ami["real"] > 0.9 and _p_ami["delta"] > 0.5,
+          f"AMI vs POS {_p_ami['real']:.4f}, vs control "
+          f"{_p_ami['control_mean']:.4f}, delta {_p_ami['delta']:+.4f} "
+          f"(z = {_p_ami['delta_z']:.1f}) -- so the control is a floor, not a cap")
+
+    check("TL3.3j the control separates the two routers, which is its whole job",
+          _p_ami["delta"] - _r_ami["delta"] > 0.5,
+          f"delta(POS-perfect) {_p_ami['delta']:+.4f} vs delta(random) "
+          f"{_r_ami['delta']:+.4f}: an AMI of {_r_ami['real']:.3f} against POS "
+          f"would look like weak specialization WITHOUT the control")
+
+    check("TL3.3k every compared metric reports mean, std, delta and z together",
+          all(set(_cmp_pos["metrics"][k]) ==
+              {"real", "control_mean", "control_std", "delta", "delta_z"}
+              for k in M.CONTROL_COMPARED_METRICS)
+          and _cmp_pos["n_control_draws"] == _draws.shape[0],
+          f"{list(M.CONTROL_COMPARED_METRICS)} over "
+          f"{_cmp_pos['n_control_draws']} draws -- T-L3.3 requires the difference "
+          f"with its uncertainty, not the raw pair")
+
+    _log = M.control_comparison_to_wandb(_cmp_pos)
+    check("TL3.3l the comparison flattens to log keys with None omitted, not zeroed",
+          all(v is not None for v in _log.values())
+          and any(k.endswith("_delta") for k in _log)
+          and any(k.endswith("_control_std") for k in _log),
+          f"{len(_log)} keys under val/routing_control/ -- an undefined difference "
+          f"is absent, because 0.0 there would read as 'POS is no better than noise'")
+
+
 
 
 

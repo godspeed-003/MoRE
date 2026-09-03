@@ -95,11 +95,203 @@ def compute_pairwise_cosine_sim(model: MoREModel):
     return sum(sims) / len(sims), max(sims)
 
 
+# ---------------------------------------------------------------------------
+# T-L3.2  What the confusion diagonal is CALLED, per task
+# ---------------------------------------------------------------------------
+#
+# The quantity is the same on both tasks -- `mean(predicted_expert ==
+# oracle_expert)`, equal to the confusion diagonal within tolerance. What differs is
+# what it licenses you to say.
+#
+# ARITHMETIC. `families.OP_TO_EXPERT` is a FUNCTIONAL ground truth: `ADD` really does
+# belong with `SUB`, so disagreeing with it is genuinely worse routing.
+# `updated_rules.md` §8 makes this the authoritative first-step routing accuracy, and
+# that name is correct there.
+#
+# LANGUAGE. A POS partition is a LINGUISTIC PRIOR. Nothing says the optimal expert
+# split for next-token prediction is noun-versus-verb; a router that separated
+# "begins a rare multi-piece name" from "continues one" could be the better partition
+# while scoring near chance against POS. Calling the number "accuracy" would assert
+# something the experiment cannot support, so on language it is named for what it
+# measures (`plan_language.md` §4.4).
+#
+# There is also a measured reason the two cannot be read the same way. The language
+# oracle partition's OWN normalized load entropy is 0.8884, with a 5.29x
+# largest/smallest family token ratio (T-L3.1). A router that reproduced POS exactly
+# would score 0.8884 on load entropy, so the balance term and this agreement number
+# pull against each other -- which was not true on arithmetic, where the oracle
+# families were near-uniform by construction.
+ROUTING_AGREEMENT_KEYS = {
+    "arithmetic": "val/routing_accuracy",
+    "language":   "val/routing_agreement_with_pos",
+}
+
+ROUTING_AGREEMENT_CAPTIONS = {
+    "arithmetic": (
+        "Routing accuracy: mean(predicted_expert == oracle_expert) against "
+        "families.OP_TO_EXPERT, which is a functional ground truth for the "
+        "arithmetic op set. Equals the confusion diagonal fraction within tolerance."
+    ),
+    "language": (
+        "AGREEMENT WITH A PRIOR, NOT ACCURACY. mean(predicted_expert == "
+        "token_family[input_id]) against a majority-POS partition, which is a "
+        "linguistic hypothesis about a useful expert split rather than a functional "
+        "ground truth. A router may be better for next-token prediction and still "
+        "score low here. Read the permutation-invariant metrics first "
+        "(see LANGUAGE_SPECIALIZATION_ORDER), and read load entropy against the "
+        "partition's own 0.8884, not against 1.0."
+    ),
+}
+
+# T-L3.2 makes the permutation-invariant metrics PRIMARY for language, and this list
+# is what "primary" means mechanically: the order any language specialization report
+# must present them in, with the POS-agreement number LAST. Kept here rather than in
+# the results writer so the requirement is one checkable object instead of a
+# convention in a prose file -- `code/test_language_families.py` asserts the
+# agreement key is last, and the language results writer consumes this list.
+LANGUAGE_SPECIALIZATION_ORDER = (
+    "val/routing_hungarian_accuracy",
+    "val/routing_ami",
+    "val/routing_purity",
+    "val/routing_matched_macro_recall",
+    "val/routing_agreement_with_pos",
+)
+
+
+def routing_agreement_key(task: str = "arithmetic") -> str:
+    """The metric key the confusion diagonal is published under, for `task`.
+
+    RAISES on an unknown task rather than defaulting. A default here would publish a
+    language run's agreement number under `val/routing_accuracy`, which is the one
+    outcome T-L3.2 exists to prevent -- and it would do so silently, in a key the
+    exporter then joins across tasks.
+    """
+    if task not in ROUTING_AGREEMENT_KEYS:
+        raise KeyError(
+            f"unknown task {task!r}: expected one of "
+            f"{sorted(ROUTING_AGREEMENT_KEYS)}. The routing-metric NAME is "
+            "task-dependent (plan_language.md §4.4), so there is no safe default."
+        )
+    return ROUTING_AGREEMENT_KEYS[task]
+
+
+def routing_agreement_caption(task: str = "arithmetic") -> str:
+    """The caption that must accompany the number wherever it is presented."""
+    if task not in ROUTING_AGREEMENT_CAPTIONS:
+        raise KeyError(f"unknown task {task!r}")
+    return ROUTING_AGREEMENT_CAPTIONS[task]
+
+
+def routing_agreement_keys_all() -> tuple[str, ...]:
+    """Every task's spelling, for code that must recognise the number generically."""
+    return tuple(ROUTING_AGREEMENT_KEYS[t] for t in sorted(ROUTING_AGREEMENT_KEYS))
+
+
+# ---------------------------------------------------------------------------
+# T-L3.3 / ablation G  The shuffled control, evaluated beside the real partition
+# ---------------------------------------------------------------------------
+
+# Which metrics are compared against the control. The agreement figure is included
+# because its floor is exactly the thing in question, and the permutation-invariant
+# three because they are what §4.4 makes primary.
+CONTROL_COMPARED_METRICS = ("raw_accuracy", "hungarian_accuracy", "ami", "purity")
+
+
+def confusion_from_pairs(oracle, predicted, num_experts: int):
+    """`[num_experts, num_experts]` counts of (oracle family, predicted expert).
+
+    Rows are the oracle family, columns the predicted expert, matching
+    `routing_accuracy_from_confusion`'s diagonal convention. Tokens whose oracle
+    family is negative are DROPPED, not counted as a class -- `-1` is the documented
+    ignore label, and giving it a row would make the ignore share look like a family
+    the router failed at.
+    """
+    oracle = np.asarray(oracle).ravel()
+    predicted = np.asarray(predicted).ravel()
+    keep = oracle >= 0
+    o, p = oracle[keep].astype(np.int64), predicted[keep].astype(np.int64)
+    flat = np.bincount(o * num_experts + p, minlength=num_experts * num_experts)
+    return flat.reshape(num_experts, num_experts)
+
+
+def specialization_vs_control(predicted_expert, token_ids, token_family,
+                              control_draws, num_experts: int) -> dict:
+    """Both metric sets side by side, with the difference and its uncertainty.
+
+    T-L3.3. `control_draws` is the `(n_draws, V)` artifact
+    `data/lang/build_shuffled_control.py` writes: independent POS-independent
+    partitions with the same token marginals. The same predicted assignments are
+    scored against the real partition once and against each draw, so the only thing
+    that varies is the partition being agreed with.
+
+    WHAT THIS IS FOR, restated because a number without it is misleading. AMI of 0.31
+    against POS means nothing on its own -- it could be the floor for a 6-way
+    partition with these marginals. It is evidence of linguistic specialization only
+    if it exceeds AMI against a meaningless partition of the same shape. The
+    arithmetic study needed no such control because `OP_TO_EXPERT` is functional
+    truth; here it is the difference between a measurement and a number.
+
+    Returns, for each metric in `CONTROL_COMPARED_METRICS`:
+        real                the value against POS
+        control_mean/std    across the draws
+        delta               real - control_mean
+        delta_z             delta / control_std, or None when the control has no
+                            spread (a z with a zero denominator is not a large
+                            effect, it is an undefined one)
+    `None` propagates rather than being filled: at E == 1 the permutation-invariant
+    metrics are undefined and must stay that way (CLAUDE.md §4).
+    """
+    tf = np.asarray(token_family)
+    ids = np.asarray(token_ids).ravel()
+    pred = np.asarray(predicted_expert).ravel()
+    draws = np.atleast_2d(np.asarray(control_draws))
+
+    real_pim = permutation_invariant_routing_metrics(
+        confusion_from_pairs(tf[ids], pred, num_experts), num_experts)
+    ctrl_pims = [
+        permutation_invariant_routing_metrics(
+            confusion_from_pairs(draws[d][ids], pred, num_experts), num_experts)
+        for d in range(draws.shape[0])
+    ]
+
+    out = {"n_control_draws": int(draws.shape[0]), "metrics": {}}
+    for key in CONTROL_COMPARED_METRICS:
+        rv = real_pim.get(key)
+        cvs = [p.get(key) for p in ctrl_pims]
+        if rv is None or any(v is None for v in cvs):
+            out["metrics"][key] = {"real": rv, "control_mean": None,
+                                  "control_std": None, "delta": None,
+                                  "delta_z": None}
+            continue
+        cm, cs = float(np.mean(cvs)), float(np.std(cvs, ddof=1)) if len(cvs) > 1 else 0.0
+        delta = float(rv) - cm
+        out["metrics"][key] = {
+            "real": float(rv), "control_mean": cm, "control_std": cs,
+            "delta": delta,
+            "delta_z": (delta / cs) if cs > 0 else None,
+        }
+    return out
+
+
+def control_comparison_to_wandb(cmp: dict, prefix: str = "val/routing_control") -> dict:
+    """Flatten `specialization_vs_control` into log keys, `None` omitted.
+
+    Omitted rather than written as 0.0: an undefined difference is not a zero
+    difference, and a 0.0 in a "real minus control" column reads as "the POS
+    partition is no better than noise", which is a finding, not a missing value.
+    """
+    log: dict = {}
+    for key, rec in cmp.get("metrics", {}).items():
+        for field in ("real", "control_mean", "control_std", "delta", "delta_z"):
+            if rec.get(field) is not None:
+                log[f"{prefix}/{key}_{field}"] = rec[field]
+    log[f"{prefix}/n_draws"] = cmp.get("n_control_draws")
+    return log
+
+
 def routing_accuracy_from_confusion(confusion, num_experts: int) -> float:
     """
-    THE authoritative routing accuracy. Every caller must use this function.
-
-    Defined as mean(predicted_expert == oracle_expert) over exactly the tokens
+    THE authoritative routing accuracy. Every caller must use this function.    Defined as mean(predicted_expert == oracle_expert) over exactly the tokens
     the confusion matrix was built from, computed as the diagonal fraction so
     the reported scalar and the reported matrix cannot disagree by construction
     (updated_rules.md 8.2 / T6.2). Before this existed, the value was computed
@@ -579,6 +771,7 @@ def paper_metrics_to_wandb(
     family_avg_depth: dict[str, float],
     num_experts: int,
     pim: dict | None = None,
+    task: str = "arithmetic",
 ) -> dict:
     """
     Build W&B log dict with paper-ready figures and scalar diagnostics.
@@ -590,12 +783,17 @@ def paper_metrics_to_wandb(
     routing at all. Those are artifacts of the degenerate shape, not
     measurements, and CLAUDE.md 4 forbids reporting them. DEPTH metrics are not
     gated: MoR does allocate depth, and that is exactly its contribution.
+
+    T-L3.2: `task` selects only the NAME the confusion diagonal is published under
+    (`routing_agreement_key`), never the arithmetic. It defaults to "arithmetic" so
+    every existing caller keeps emitting `val/routing_accuracy` byte-identically --
+    Gate L0's 356 includes G5.2b, which checks that exact key.
     """
     log_dict: dict = {}
     routing_defined = num_experts >= 2
 
     if routing_defined and not math.isnan(routing_acc):
-        log_dict["val/routing_accuracy"] = routing_acc
+        log_dict[routing_agreement_key(task)] = routing_acc
 
     if routing_defined:
         row_totals = confusion.sum(axis=1)
