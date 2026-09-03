@@ -4884,6 +4884,96 @@ not near ln(V); `engine.py`'s `task_loss` branch for the shift; `_floor` for whe
 baseline comes from; `test_lang_heads.py` TLH.3b before touching anything about the
 probe.
 
+## T-L6.0 … T-L6.4 — GATE L3 and GATE L4 pass; depth gets a null band and no target
+
+`code/more/metrics.py`, `code/more/engine.py`, `code/more/lang_data.py`,
+`code/more/config.py`, `data/lang/build_depth_deciles.py`,
+`code/derive_lang_ffn_mult.py` (new), `code/test_lang_recursion.py` (new),
+`code/canonical_spec_language.json`. **11 passed, 0 failed** on the new gate suite;
+Gate L0 unchanged at `TOTAL 356 356 0 0`.
+
+**T-L6.0. The allocation-error keys are written as the STRING `"N/A"`, not omitted.**
+They are structurally undefined on language: `op_target_depth_table()` is empty by
+construction, so `val_depth_err_n` is 0 and the arithmetic branch never fires. Writing
+`"N/A"` makes the absence a statement an exporter can join on. A 0.0 or -1 there would
+read as perfect allocation against a curriculum that does not exist — §5.1's "single
+most misleading number this migration could produce".
+
+**T-L6.1. Spearman is hand-rolled, and the ties are the whole difficulty.** Exit depth
+is an integer, so on a collapsed-depth model almost every value is tied;
+`argsort().argsort()` gives ordinal ranks that break ties by ARRAY POSITION and would
+manufacture a confident rho out of batch arrival order. The arithmetic POC put 93-97% of
+tokens at exactly 2 steps, so this is the regime, not a corner case. Averaged ranks
+instead, **verified against `scipy.stats.spearmanr` to 1.7e-16 over 200 trials** with a
+third of them heavily tied — exactness measured rather than claimed, and the metric layer
+keeps its torch/numpy-only imports. Returns **`None`, not 0.0**, when either side is
+constant, because "measured no relationship" and "no relationship is definable" are
+different findings and the collapsed-depth model produces the second.
+
+New artifact `token_train_count.npy` (per-type train counts, hash in the manifest) so
+`log_freq` and `unigram_surprisal` derive from ONE source and cannot disagree about
+smoothing — the surprisal reads `unigram_smoothing` from the manifest so it describes the
+same distribution as the `unigram_ce` floor the run is quoted against. `log1p` rather
+than a masked log: 80 of 8192 canonical types are unseen, and `log(0)` in a rank vector
+is a NaN generator rather than an extreme value.
+
+**T-L6.2. The null band, and it discriminates:**
+
+| depth vector | rho | null band | exceeds? |
+|---|---|---|---|
+| 100% at depth 2 | **None** | — | undefined, correctly |
+| 97% at depth 2 (the POC's regime) | -0.0277 | [-0.0448, +0.0381] | **No** |
+| genuinely correlated | +0.8577 | [-0.0374, +0.0342] | **Yes** |
+
+The permutation destroys ONLY the pairing, so both marginals — including the tie
+structure that causes the problem — are preserved exactly. Ten... two hundred
+permutations per rho, `exceeds_null` is `None` rather than `False` when rho itself is
+undefined. `language_depth_to_wandb` omits undefined entries rather than zeroing them: a
+0.0 in `depth/spearman_vs_model_loss` would read as "measured: the model allocates
+compute unrelated to difficulty", which is a finding — and it is the specific finding the
+arithmetic POC made, so the two must stay distinguishable.
+
+**T-L6.3. Re-derived, and the answer is 24 — the same as arithmetic, for a structural
+reason.** `derive_lang_ffn_mult.py` prints the table and writes
+`lang_ffn_mult_derivation.json`. MoRE reference at E=6/mult 4: 5,584,908 total,
+3,422,220 non-embedding. Only ffn_mult 23/24/25 satisfy the 5% requirement on BOTH
+counts; 24 gives rel(total) 0.069% and rel(non-embedding) 0.112%. Attention (~263 K) and
+the tied 2,097,152-element embedding are added EQUALLY to every arm and cancel in
+`P_MoR - P_MoRE`, leaving the expert-stack condition `6 experts x mult 4` against
+`1 x mult 24` unchanged from arithmetic. `rel(non-emb) > rel(total)` at every row, which
+is T-L6.3's premise confirmed: the shared embedding sits in both numerator and
+denominator and shrinks the relative gap for free, so the total alone is too easy.
+**Insensitive to `seq_len`** (128/256/512/1024 all give 24) because the positional table
+is also identical across arms — Gate L5's seq_len decision and this one are independent.
+
+**GATE L3 PASSES, under attention.** One block object, 5 recursion calls, **1 distinct
+object id**: identity rather than tensor equality, because a stack of
+independently-initialised blocks could satisfy equality for a single step. Halting
+suppressed (`bias = -30`) → every token force-exits at `max_depth`, `early_exits = 0`;
+saturated (`bias = +30`) → every token exits at depth 1, `forced_exits = 0`. The two
+extremes bracket the mechanism, so a depth that never varied would fail one of them.
+Balance term across a 9x depth range (1/3/5/9): -0.7400 / -0.7056 / -0.6082 / -0.6082,
+relative spread 19.8% — T4.1's normalization property re-measured with attention in the
+loop. Two eval passes give bit-identical logits and exit markers, so no halted state is
+being rewritten by a still-active neighbour's attention output, which is the specific new
+risk attention introduces.
+
+**GATE L4 PASSES, and only the strong form was accepted.** The naive version of this test
+leaves `ponder_weight` at its canonical value and checks the halt heads have gradient —
+which they always do, because the ponder cost is an explicit function of the halt
+probabilities. **That version passes on a model whose task path is completely
+disconnected from halting.** So `ponder_weight = 0` and the backward pass comes from
+`task_loss` alone: all six halt heads have non-`None` weight gradients with nonzero norm
+(`8.42e-03 … 1.52e-02`), biases too, so the threshold is learnable. Separately the ponder
+cost alone reaches every head (`3.14e-02 … 7.26e-02`), so the two are independent paths
+rather than one wearing two names, and `expected_depth.requires_grad` is True — a boolean
+threshold may drive dispatch, but the objective keeps a differentiable route.
+
+**Where to look.** `metrics._average_ranks` when a depth correlation looks too confident;
+`spearman_with_null` when a rho is quoted without a band; `derive_lang_ffn_mult.py` when
+a parameter-budget gate fails; `test_lang_recursion.py` L4a before believing any claim
+that halting is learned from the task.
+
 <!-- APPEND-MARKER-CL -->
 
 

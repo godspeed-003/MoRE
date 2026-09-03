@@ -1560,14 +1560,14 @@ does not exist here (T-L0.0).
 
 ## Phase L-6 — Depth measurement without an invented target  (`plan_language.md` §5)
 
-- [ ] **T-L6.0 `depth/allocation_error_*` is `N/A` on language.** There is no
+- [x] **T-L6.0 `depth/allocation_error_*` is `N/A` on language.** There is no
   per-token ground-truth depth for English, and inventing one and then reporting
   agreement with it would be circular — the metric would measure the curriculum,
   not the model. The arithmetic keys must therefore emit `N/A`, not `0.0` and not
   `-1` (§8 sentinel rule). **Verify:** the language `metrics.json` carries `N/A`
   for every allocation-error key; the exporter renders it as `N/A`.
 
-- [ ] **T-L6.1 Substitute correlational depth metrics.** `depth/spearman_vs_logfreq`
+- [x] **T-L6.1 Substitute correlational depth metrics.** `depth/spearman_vs_logfreq`
   (train log-frequency), `depth/spearman_vs_unigram_surprisal` (frozen, from train
   counts), `depth/spearman_vs_model_loss` (the model's own per-token loss), plus
   `depth/mean_by_family` and `depth/hist`. These are non-circular in a way an
@@ -1577,7 +1577,7 @@ does not exist here (T-L0.0).
   computed over the identical token set, ties handled explicitly, with the token
   count and a permutation-based null band reported next to each rho.
 
-- [ ] **T-L6.2 Constant-depth null model is mandatory.** A model that halts at a
+- [x] **T-L6.2 Constant-depth null model is mandatory.** A model that halts at a
   near-constant depth can still produce a nonzero Spearman rho through nothing but
   tie-breaking noise. Reuse `code/depth_null_model.py`'s logic: resample depths
   from the observed marginal while destroying the per-token pairing, and report the
@@ -1585,7 +1585,7 @@ does not exist here (T-L0.0).
   **Verify:** the null band is present for every reported rho; a synthetic
   constant-depth run's rho falls inside its own null band.
 
-- [ ] **T-L6.3 Re-derive `ffn_mult.mor` for the language arms.** Attention adds
+- [x] **T-L6.3 Re-derive `ffn_mult.mor` for the language arms.** Attention adds
   ~263 K parameters to **all three** arms equally, which shifts the
   parameter-matched MoR solution. `CANONICAL_FFN_MULT` for arithmetic is
   `{moe: 4, mor: 24, more: 4}`; the language value must be recomputed, not copied.
@@ -1594,7 +1594,7 @@ does not exist here (T-L0.0).
   expert stack, and with a tied 8192×256 embedding the first alone is too easy to
   satisfy.
 
-- [ ] **T-L6.4 GATE L3 / GATE L4 — recursion and halting under attention.**
+- [x] **T-L6.4 GATE L3 / GATE L4 — recursion and halting under attention.**
   Attention is the change most likely to break the two invariants that took the
   longest to get right in the arithmetic POC. **Verify (L3):** identical block
   parameters at every depth (by object identity); halted states frozen bitwise;
@@ -1604,6 +1604,85 @@ does not exist here (T-L0.0).
   non-`None` with nonzero norm for every expert, from `task_loss` alone with the
   ponder weight set to zero, which is the only version of this test that proves the
   task path (not the ponder regularizer) supplies the gradient.
+
+  **Evidence for T-L6.0 – T-L6.4** (one block, because the five share their
+  measurements). `code/test_lang_recursion.py` → **11 passed, 0 failed** (GATE L3 +
+  GATE L4); Gate L0 unchanged at `TOTAL 356 356 0 0`.
+
+  **T-L6.0.** `val/depth_allocation_error_abs` and `_rel` are written as the string
+  `"N/A"` on language rather than left absent. They are *structurally* undefined —
+  `lang_families.op_target_depth_table()` is empty by construction, so
+  `val_depth_err_n` is 0 and the arithmetic branch never fires — and writing `"N/A"`
+  makes the absence a statement. A 0.0 or −1 there would read as perfect allocation
+  against a curriculum that does not exist, which §5.1 calls the single most misleading
+  number this migration could produce.
+
+  **T-L6.1.** `metrics.spearman_rho` is hand-rolled with **averaged ties** and
+  **matches `scipy.stats.spearmanr` to 1.7e-16** over 200 trials, one third of them
+  heavily tied. Not a formality: exit depth is an integer, so on a collapsed-depth model
+  almost every value is tied, and `argsort().argsort()` would break ties by array
+  position and manufacture a confident rho out of batch arrival order — the arithmetic
+  POC put 93–97% of tokens at exactly 2 steps. It returns **`None`, not 0.0**, when
+  either side is constant, because a 0.0 would read as "measured no relationship". Both
+  frozen difficulty vectors derive from a new hash-recorded artifact
+  `token_train_count.npy`, so `log_freq` and `unigram_surprisal` cannot disagree about
+  smoothing; `log1p` rather than a masked log, because 80 of 8192 canonical types are
+  unseen and `log(0)` in a rank vector is a NaN generator rather than an extreme value.
+
+  **T-L6.2 — the null band works, measured on synthetic depth vectors:**
+
+  | depth vector | rho | null band | exceeds? |
+  |---|---|---|---|
+  | 100% at depth 2 | **None** | — | undefined, correctly |
+  | 97% at depth 2 (the POC's regime) | −0.0277 | [−0.0448, +0.0381] | **No** |
+  | genuinely correlated | +0.8577 | [−0.0374, +0.0342] | **Yes** |
+
+  So a near-constant allocation's rho is correctly identified as indistinguishable from
+  its own marginal paired at random. The null permutes only the pairing, so the tie
+  structure that causes the problem is preserved exactly.
+
+  **T-L6.3 — re-derived, and it lands on 24, which is also the arithmetic value.**
+  `code/derive_lang_ffn_mult.py`, table in `code/lang_ffn_mult_derivation.json`. MoRE
+  reference at E=6, ffn_mult 4: **5,584,908** total / **3,422,220** non-embedding.
+
+  | ffn_mult | MoR total | rel(total) | MoR non-emb | rel(non-emb) | both < 5% |
+  |---|---|---|---|---|---|
+  | 23 | 5,449,735 | 2.420% | 3,287,047 | 3.950% | yes |
+  | **24** | **5,581,063** | **0.069%** | **3,418,375** | **0.112%** | **yes** |
+  | 25 | 5,712,391 | 2.283% | 3,549,703 | 3.725% | yes |
+
+  Only 23/24/25 satisfy both criteria and 24 is best on the non-embedding gap. **The
+  coincidence with arithmetic is structural, not a copy:** attention (~263 K) and the
+  tied 2,097,152-element embedding are added *equally* to every arm and cancel in
+  `P_MoR − P_MoRE`, leaving the expert-stack condition 6 experts at mult 4 against 1 at
+  mult 24 — unchanged. Note `rel(non-emb) > rel(total)` at every row, which confirms
+  this task's premise that the shared embedding makes the total-count criterion too
+  easy. Also measured: **completely insensitive to `seq_len`** (128/256/512/1024 all
+  give 24), so this field and Gate L5's `seq_len` are independent. Frozen into
+  `canonical_spec_language.json` and `config.CANONICAL_FFN_MULT_LANGUAGE`.
+
+  **T-L6.4 — GATE L3 PASSES.** One block object, 5 recursion calls, **1 distinct object
+  id** (identity, not tensor equality — a stack of independently-initialised blocks
+  could satisfy equality for a single step). Halting suppressed → all tokens force-exit
+  at `max_depth` with `early_exits = 0`; halting saturated → all tokens exit at depth 1
+  with `forced_exits = 0`. The two extremes bracket the mechanism, so a depth that never
+  varied would fail one of them. Balance term across a **9× depth range** (1/3/5/9):
+  −0.7400 / −0.7056 / −0.6082 / −0.6082, relative spread **19.8%** — it does not scale
+  with the budget, which is the T4.1 property re-measured under attention. Two eval
+  passes give bit-identical logits and exit markers, so no halted state is being
+  rewritten by a still-active neighbour's attention output.
+
+  **T-L6.4 — GATE L4 PASSES, in the strong form.** With **`ponder_weight = 0`**, so the
+  backward pass carries no explicit function of the halt probabilities, every one of the
+  six halt heads has a non-`None` weight gradient with nonzero norm:
+  `E1 8.42e-03, E2 1.52e-02, E3 1.12e-02, E4 1.04e-02, E5 1.15e-02, E6 5.40e-03`. The
+  bias gradients are nonzero too, so the halt threshold is learnable. Separately the
+  ponder cost alone also reaches every head (`3.14e-02 … 7.26e-02`), so the two are
+  independent paths rather than one wearing two names, and
+  `expected_depth.requires_grad` is True — a boolean threshold drives dispatch but the
+  objective keeps a differentiable route to the halt head. **The naive version of this
+  test — ponder weight left at its canonical value — passes on a model whose task path
+  is entirely disconnected from halting**, which is why it is run this way.
 
 - [ ] **T-L6.5 Induced per-block TOPIC partition, as a SECOND reference axis.**
   `plan_language.md` §4.1a. Build `block_topic[n_blocks]` from the

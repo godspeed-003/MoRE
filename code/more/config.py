@@ -462,6 +462,33 @@ CANONICAL_NUM_BLOCKS = 1
 # under-budgeted small baseline.
 CANONICAL_FFN_MULT = {"moe": 4, "mor": 24, "more": 4}
 
+# T-L6.3: the LANGUAGE arms' budget-matched widths, RE-DERIVED rather than copied.
+# `code/derive_lang_ffn_mult.py` prints the derivation and writes
+# `code/lang_ffn_mult_derivation.json`.
+#
+# The measured answer is also 24, and that coincidence has a structural cause worth
+# stating so nobody later reads this line as a copy-paste. Attention (~263 K params)
+# and the tied token embedding (2,097,152) are added EQUALLY to every arm, so both
+# cancel in the difference `P_MoR - P_MoRE`; what remains is the expert stack, whose
+# matching condition is 6 experts at mult 4 against 1 expert at mult 24 -- unchanged
+# from arithmetic. Measured at d_model 256, V 8192, 1 block, attention on:
+#
+#     ffn_mult   MoR total   rel(total)   MoR non-emb   rel(non-emb)
+#           23   5,449,735       2.420%     3,287,047         3.950%
+#           24   5,581,063       0.069%     3,418,375         0.112%   <- chosen
+#           25   5,712,391       2.283%     3,549,703         3.725%
+#
+# Only 23/24/25 satisfy T-L6.3's 5% requirement on BOTH counts, and 24 is best on the
+# non-embedding gap -- which is the criterion that is actually about the expert stack.
+# Note rel(non-emb) > rel(total) at every row: the shared embedding sits in both
+# numerator and denominator and shrinks the relative gap for free, which is exactly why
+# T-L6.3 demands both numbers rather than the total alone.
+#
+# Also measured: the answer is INSENSITIVE to seq_len (128/256/512/1024 all give 24),
+# because the positional table is identical across arms too. So Gate L5's still-open
+# seq_len decision and this one are independent and may be made in either order.
+CANONICAL_FFN_MULT_LANGUAGE = {"moe": 4, "mor": 24, "more": 4}
+
 
 def resolve_variant(cfg: dict) -> str:
     """
