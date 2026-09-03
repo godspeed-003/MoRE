@@ -452,12 +452,12 @@ does not exist here (T-L0.0).
 
   | corpus | split | lines | nonempty | bytes | `<unk>` |
   |---|---|---|---|---|---|
-  | wikitext-2 | train | 36,718 | 31,175 | 10,914,845 | **0** |
-  | wikitext-2 | val | 3,760 | 3,213 | 1,144,248 | **0** |
-  | wikitext-2 | test | 4,358 | 3,760 | 1,287,656 | **0** |
+  | wikitext-2 | train | 36,718 | 23,767 | 10,914,845 | **0** |
+  | wikitext-2 | val | 3,760 | 2,461 | 1,144,248 | **0** |
+  | wikitext-2 | test | 4,358 | 2,891 | 1,287,656 | **0** |
   | wikitext-103 | train | 1,801,350 | 1,165,029 | 539,295,549 | **0** |
-  | wikitext-103 | val | 3,760 | 3,213 | 1,144,248 | **0** |
-  | wikitext-103 | test | 4,358 | 3,760 | 1,287,656 | **0** |
+  | wikitext-103 | val | 3,760 | 2,461 | 1,144,248 | **0** |
+  | wikitext-103 | test | 4,358 | 2,891 | 1,287,656 | **0** |
 
   `<unk>` is **counted**, not asserted away: `raw_stats()` accumulates
   `text.count("<unk>")` per split so the number reaches the manifest whether it is
@@ -574,7 +574,7 @@ does not exist here (T-L0.0).
   cross-corpus statement must therefore be in **bits per byte**, not nats per
   token. Noted now because it is invisible once the numbers are in a table.
 
-- [ ] **T-L2.3 `MoRELanguageDataset` in `code/more/lang_data.py`.** Returns the
+- [x] **T-L2.3 `MoRELanguageDataset` in `code/more/lang_data.py`.** Returns the
   same-arity tuple shape the engine already consumes, with the language meanings:
   `input_ids [seq_len] long`, `step_mask [seq_len] bool` (all True),
   `step_experts [seq_len] long` from the POS lookup (`-1` = unmapped → ignore),
@@ -583,8 +583,61 @@ does not exist here (T-L0.0).
   block order is fixed so the manifest hash is stable. **Verify:** a batch has the
   documented dtypes and shapes; two DataLoader epochs at the same seed produce the
   same permutation, and different seeds produce different ones.
+  **Evidence:** checks TL2.3a–m, both corpora. The arity is **7**, and TL2.3a reads
+  that number out of `MoREDataset.__getitem__`'s source rather than hard-coding it,
+  so a change on the arithmetic side fails here instead of drifting.
 
-- [ ] **T-L2.4 Manifest with token- and type-level statistics.** Mirror
+  | slot | arithmetic | language | canonical value |
+  |---|---|---|---|
+  | 0 | `x [S,F]` float | `input_ids [256]` | int64, max id 8129 < 8192 |
+  | 1 | `step_mask [S]` bool | same | **all True** |
+  | 2 | `step_experts [S]` long | same | in `[-1, 5]`, `== token_family[input_ids]` |
+  | 3 | `step_ops [S]` long | same | **all −1** |
+  | 4 | `family` scalar long | same | **−1** |
+  | 5 | `depth` scalar long | same | 256 = `seq_len` |
+  | 6 | `target` scalar float | same | **NaN** |
+
+  The arity is preserved rather than a new signature introduced because
+  `engine.py:438` and the validation loop at 686 both unpack positionally, and a
+  second arity would force a second training loop — which `plan.md` §9 forbids.
+  Slots with no language meaning carry the documented ignore label instead of being
+  dropped.
+
+  **Slot 6 is NaN on purpose: it is a poison value, not a placeholder.** The LM
+  target is `input_ids[1:]` predicted from `input_ids[:-1]`, derived by shifting
+  inside the loss so the ids are not stored twice. The slot still has to hold
+  something collatable, and `0.0` or `-1.0` would let a mis-wired language loss
+  train silently against a constant and produce a plausible-looking curve. NaN makes
+  that defect surface on the first optimizer step. It is never logged and never
+  reported, so this is not a sentinel presented as a measurement (CLAUDE.md §4) — it
+  is a value that cannot be mistaken for one.
+
+  **Determinism is checked on the emitted block CONTENT, not on indices.** An index
+  permutation that were reproducible while `__getitem__` was not would pass an
+  index-level check and still be non-deterministic. Two epochs at seed 42 give
+  byte-identical first batches; seed 43 differs; with `shuffle=False`, block 0 of the
+  loader is block 0 of the file, so the manifest's per-split hash describes exactly
+  what the model reads. Reproducibility comes from
+  `seeding.make_generator(seed, "dataloader_shuffle")` unchanged — no new generator
+  purpose was added.
+
+  **The memory-map is opened per process, keyed on pid.** A `np.memmap` held as an
+  attribute is pickled by materializing it, so with `num_workers > 0` under Windows
+  spawn every worker would receive its own **269 MB** copy of the canonical train
+  split. Opened lazily in `_blocks()` instead. The lookup is validated on load rather
+  than trusted: a wrong length means it was built against a different tokenizer, and
+  a family index ≥ 6 would silently widen the oracle label space — the defect T8.3
+  fixed on the arithmetic side.
+
+  `more/__init__.py` exports `MoRELanguageDataset` and `TRAIN_SPLIT_VERSION`, and
+  **deliberately re-exports nothing from `.lang_families`**: the eight names above it
+  come from `.families` unconditionally, and putting a second manifest's labels in
+  the same namespace is how `EXPERT_FAMILY_LABELS` ends up meaning whichever module
+  imported last. `train_split_version = "wikitext-author-splits-v1"` is defined here,
+  which is what T-L2.4's `frozen_by` note said would supply it.
+
+
+- [x] **T-L2.4 Manifest with token- and type-level statistics.** Mirror
   `data/dataset_meta.json`'s schema: dataset version, tokenizer hash, per-split
   block counts and token counts, per-split SHA-256, `family_counts` at **both**
   the type level (how many vocabulary entries per family) and the token level (how
@@ -593,6 +646,53 @@ does not exist here (T-L0.0).
   tokens; a load-balance number read against the wrong denominator is
   uninterpretable. **Verify:** the manifest validates against the documented
   schema and its split hashes reproduce on a second build from the same seed.
+  **Evidence:** checks TL2.4a–d, both corpora. **50 schema keys across 6 build
+  stages**, all present with the declared type on both corpora; 8 per-split fields
+  each carrying exactly `{train, val, test}`; type-level counts over all six family
+  labels and token-level counts over all six labels for each of the three splits.
+
+  **"The documented schema" is now an object, not prose.**
+  `build_language_dataset.MANIFEST_SCHEMA` maps `key → (stage, type, required)`, so a
+  missing key names *which build stage* failed to write it. `validate_manifest`
+  returns a list of problems rather than raising, because the caller wants all of
+  them. The `bool`-is-a-subclass-of-`int` trap is handled in both directions: an
+  `int` field holding `True` is a problem, and JSON's habit of writing `1.0` as `1`
+  in a float slot is not.
+
+  The correspondence with the arithmetic manifest is written out in that constant's
+  comment rather than left as "mirrors", including the four fields language
+  legitimately lacks — `operation_counts` (no operation axis), `seed`, `train_frac`,
+  `test_frac` (nothing is sampled: the splits are author-provided). That last point
+  reinterprets the Verify clause: there is **no seed** to rebuild "from the same
+  seed" with, so the check is plain determinism, which is the stronger requirement.
+
+  **The rebuild clause is executed, not asserted.** TL2.4d builds wikitext-2 from
+  scratch through all three stages into a scratch out-root and compares nine fields.
+  All identical: `dataset_version = lang-wikitext-2-bpe8192-len256-9f870794`, all
+  three per-split SHA-256s, all token and block counts, the dropped tails, and —
+  the one that was not guaranteed — **`tokenizer.json` byte-identical**. So on a
+  fixed `tokenizers` version the BPE fit is deterministic; the `.gitignore` note
+  about merge-order tie-breaking is a cross-version caution and now says so. Dev
+  corpus only, because the code path is identical and rebuilding wikitext-103 would
+  cost ~6 minutes of encode for no extra information. `SKIP_REBUILD=1` skips the
+  ~20 s.
+
+  **A latent cross-drive defect fired on the first run of this check, and it is the
+  same one as T-L0.3a.** `fit_tokenizer` recorded its training-file list with
+  `os.path.relpath(train_text, _REPO)`, and on Windows `relpath` **raises** when the
+  two paths are on different drives: `ValueError: path is on mount 'C:', start on
+  mount 'D:'`. The repository is on `D:`; the scratch out-root is under
+  `C:\Users\...\Temp`. It was invisible while every build wrote under `data/lang/`.
+  Fixed with a local `_repo_relative()` helper mirroring
+  `more/run_context.py:_repo_relative` — relative form when one exists, absolute
+  otherwise. An off-drive rebuild therefore records absolute paths in *its* manifest,
+  which is correct, and is why TL2.1d grades only the canonical location.
+
+  **A number in this ledger was wrong and is corrected.** T-L2.0's Evidence table
+  gave wikitext-2's non-empty line counts as 31,175 / 3,213 / 3,760. The manifest and
+  TL2.0l's own output say **23,767 / 2,461 / 2,891**. The test was reading the right
+  values throughout; only the hand-written table was wrong — which is the case for
+  `updated_rules.md`'s "never hand-copy numbers into a results table".
 
 - [x] **T-L2.5 Trivial-baseline floors.** Compute, from the train split only and
   evaluated on val: `uniform_ce = ln(8192) ≈ 9.0109`, `unigram_ce`, and a
@@ -712,7 +812,7 @@ does not exist here (T-L0.0).
   measured value is published in the manifest; the trivial floors are present and
   finite; the manifest hash is reproducible.
   **Evidence: GATE L2 PASSES on both corpora.** `code/test_language_data.py` →
-  **104 passed, 0 failed, 0 skipped**; `code/test_language_families.py` →
+  **133 passed, 0 failed, 0 skipped**; `code/test_language_families.py` →
   **57 passed, 0 failed, 2 skipped** (the skips are T-L3.2/T-L3.3, not yet built);
   `code/test_language_task_axis.py` → **72 passed, 0 failed**. Checks TL2.7a–d.
 

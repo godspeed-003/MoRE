@@ -4515,6 +4515,89 @@ for the memory fixes; `majority` when parallel and serial builds disagree;
 `TASKS_LANGUAGE.md` T-L2.5–T-L2.7 and T-L3.1 Evidence for the full tables and the
 40-types-per-family spot sample.
 
+## T-L2.3 / T-L2.4 — Phase L-2 closed: the loader, the schema, and a rebuild
+
+`code/more/lang_data.py` (new), `code/more/__init__.py`,
+`data/lang/build_language_dataset.py` (`MANIFEST_SCHEMA`, `validate_manifest`,
+`set_out_root`, `_repo_relative`), `code/test_language_data.py`.
+**133 passed, 0 failed, 0 skipped.** Every box in Phase L-2 is now ticked.
+
+**`MoRELanguageDataset` keeps the engine's 7-tuple arity rather than introducing a
+signature.** `engine.py:438` and the validation loop at 686 both unpack positionally;
+a second arity would force a second training loop, which `plan.md` §9 forbids. TL2.3a
+reads the expected arity out of `MoREDataset.__getitem__`'s own source, so a change
+on the arithmetic side fails the language check instead of drifting past it. Slots
+with no language meaning carry the documented ignore label: `step_ops` all `-1`
+(the operation axis is *absent*, so every `step_ops >= 0` mask is empty and per-op
+metrics report `N/A`), `family` `-1` (a 256-token block has no lexical class, which is
+also why `family_cls_weight = 0.0`).
+
+**Slot 6 is NaN, and that is a poison value rather than a placeholder.** The LM target
+is derived by shifting `input_ids` inside the loss so the ids are not stored twice. The
+slot still has to hold something collatable, and `0.0` or `-1.0` would let a mis-wired
+language loss train silently against a constant and draw a plausible curve. NaN
+surfaces that on the first optimizer step. It is never logged, so this is the opposite
+of a sentinel reported as a measurement — it is a value that cannot be mistaken for one.
+
+**The memmap is opened per process, keyed on pid.** A `np.memmap` held as an attribute
+pickles by materializing, so `num_workers > 0` under Windows spawn would hand every
+worker its own **269 MB** copy of the canonical train split. The family lookup is
+validated on load rather than trusted: wrong length means a different tokenizer, and a
+family index >= 6 would silently widen the oracle label space — the T8.3 defect.
+
+**Determinism is checked on emitted block CONTENT, not on indices.** An index
+permutation that were reproducible while `__getitem__` was not would pass an
+index-level check and still be non-deterministic. Two epochs at seed 42 give identical
+first batches, seed 43 differs, and with `shuffle=False` block 0 of the loader is block
+0 of the file — so the manifest's per-split hash describes exactly what the model
+reads. No new generator purpose was added; `make_generator(seed,
+"dataloader_shuffle")` is the arithmetic one.
+
+**`more/__init__.py` re-exports nothing from `.lang_families`, on purpose.** The eight
+names above come from `.families` unconditionally; putting a second manifest's labels
+in the same namespace is how `EXPERT_FAMILY_LABELS` ends up meaning whichever module
+imported last. Language code imports `more.lang_families` by name.
+
+**"The documented schema" is now an object.** `MANIFEST_SCHEMA` maps
+`key -> (stage, type, required)` across 6 build stages and 50 keys, so a missing key
+names *which stage* failed to write it, and `validate_manifest` returns every problem
+rather than raising on the first. The `bool`-is-a-subclass-of-`int` trap is handled
+both ways. The comment beside it writes out the correspondence with
+`data/dataset_meta.json` instead of leaving "mirrors" as an assertion — including the
+four fields language legitimately lacks (`operation_counts`, `seed`, `train_frac`,
+`test_frac`). That last group reinterprets T-L2.4's Verify: there is **no seed** to
+rebuild "from the same seed" with, because nothing is sampled, so the check is plain
+determinism — the stronger requirement.
+
+**The rebuild clause is executed.** TL2.4d builds wikitext-2 from scratch through all
+three stages into a scratch out-root and compares nine fields: `dataset_version`, all
+three per-split SHA-256s, token and block counts, dropped tails, and — the one that
+was not guaranteed — **`tokenizer.json` byte-identical**. So on a fixed `tokenizers`
+version the BPE fit is deterministic; the `.gitignore` note about merge-order
+tie-breaking is a cross-version caution and now says so.
+
+**The T-L0.3a cross-drive defect was still latent in this file, and this check fired
+it.** `fit_tokenizer` recorded its training-file list with
+`os.path.relpath(train_text, _REPO)`, and Windows `relpath` **raises** across drives:
+`ValueError: path is on mount 'C:', start on mount 'D:'`. The repo is on `D:`, the
+scratch out-root under `C:\Users\...\Temp`. Invisible while every build wrote under
+`data/lang/`. Fixed with a local `_repo_relative()` mirroring
+`more/run_context.py:_repo_relative`. An off-drive rebuild therefore records absolute
+paths in ITS manifest, which is correct, and is why TL2.1d grades only the canonical
+location.
+
+**A ledger number was wrong and is corrected.** T-L2.0's Evidence table gave
+wikitext-2's non-empty line counts as 31,175 / 3,213 / 3,760; the manifest and
+TL2.0l's own output say **23,767 / 2,461 / 2,891**. The test read the right values
+throughout — only the hand-written table was wrong, which is the case for
+`updated_rules.md`'s "never hand-copy numbers into a results table".
+
+**Where to look.** `lang_data.py` `_blocks` when a DataLoader worker balloons;
+`_load_family_lookup` when a lookup/tokenizer mismatch is suspected; `__getitem__`'s
+slot comments before changing the engine's unpacking;
+`build_language_dataset.MANIFEST_SCHEMA` when a manifest key is added;
+`set_out_root` before rebuilding anything in place.
+
 <!-- APPEND-MARKER-CL -->
 
 

@@ -103,6 +103,12 @@ UNK_LITERAL = "<unk>"
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _REPO = os.path.abspath(os.path.join(_HERE, "..", ".."))
 
+# Where corpus directories are written. `data/lang/` is the canonical location and
+# the only one anything else resolves; `set_out_root` redirects it for T-L2.4's
+# rebuild-and-compare check. See that function for why the check cannot just
+# overwrite in place.
+_OUT_ROOT = _HERE
+
 
 def _sha256_bytes(b: bytes) -> str:
     return hashlib.sha256(b).hexdigest()
@@ -140,8 +146,191 @@ def _git_commit() -> str:
     return "unknown"
 
 
+# ---------------------------------------------------------------------------
+# T-L2.4  The manifest schema, as an object rather than as prose
+# ---------------------------------------------------------------------------
+#
+# `plan_language.md` §3 says the language manifest mirrors `data/dataset_meta.json`.
+# That is a claim about a file's shape, and a claim about a shape is worth nothing
+# unless something checks it -- so the shape lives here, and
+# `code/test_language_data.py` TL2.4 validates against it. Written as
+# `key -> (stage, type, required)` so a missing key names WHICH build stage failed
+# to write it rather than just being absent.
+#
+# The correspondence with the arithmetic manifest, stated so the "mirrors" claim is
+# auditable rather than asserted:
+#
+#   arithmetic            language                     why it differs
+#   ------------------    -------------------------    -----------------------------
+#   dataset_version       dataset_version              same role, different encoding
+#   sha256                sha256                       per-split, identical role
+#   splits                splits                       block counts, not row counts
+#   generator_script      generator_script             same
+#   generator_commit      generator_commit             same
+#   family_counts         family_counts_types +        language needs BOTH
+#                         family_counts_tokens         denominators (T-L2.4)
+#   trivial_baselines     uniform_ce/unigram_ce/        three named floors instead of
+#                         bigram_ce/primary_metric_floor  one dict
+#   depth_counts          decile_table                 arithmetic has an oracle depth
+#                                                      per program; language has only
+#                                                      a frequency decile, and it is
+#                                                      NOT canonical (§5)
+#   operation_counts      (absent)                     no operation axis
+#   seed                  (absent)                     no sampling: the splits are
+#                                                      author-provided, so there is
+#                                                      no seed to record. This is why
+#                                                      "reproduce on a second build
+#                                                      from the same seed" is checked
+#                                                      as plain determinism.
+#   test_frac/train_frac  (absent)                     same reason
+#   unique_programs       (absent)                     no program identity
+MANIFEST_SCHEMA = {
+    # -- fetch ---------------------------------------------------------------
+    "corpus":                       ("fetch", str, True),
+    "hf_dataset":                   ("fetch", str, True),
+    "hf_config":                    ("fetch", str, True),
+    "hf_revision":                  ("fetch", str, True),
+    "generator_script":             ("fetch", str, True),
+    "generator_commit":             ("fetch", str, True),
+    "is_canonical_corpus":          ("fetch", bool, True),
+    "splits_are_author_provided":   ("fetch", bool, True),
+    "raw_lines":                    ("fetch", dict, True),
+    "raw_nonempty_lines":           ("fetch", dict, True),
+    "raw_bytes":                    ("fetch", dict, True),
+    "unk_literal_occurrences":      ("fetch", dict, True),
+    # -- tokenizer -----------------------------------------------------------
+    "vocab_size":                   ("tokenizer", int, True),
+    "eot_id":                       ("tokenizer", int, True),
+    "tokenizer_sha256":             ("tokenizer", str, True),
+    "tokenizer_training_files":     ("tokenizer", list, True),
+    "roundtrip_val_paragraph_exact": ("tokenizer", bool, True),
+    "roundtrip_probe_bytes":        ("tokenizer", int, True),
+    "train_documents":              ("tokenizer", int, True),
+    "train_text_bytes":             ("tokenizer", int, True),
+    # -- pack ----------------------------------------------------------------
+    "seq_len":                      ("pack", int, True),
+    "splits":                       ("pack", dict, True),
+    "token_counts":                 ("pack", dict, True),
+    "dropped_tail_tokens":          ("pack", dict, True),
+    "sha256":                       ("pack", dict, True),
+    "storage":                      ("pack", dict, True),
+    "dataset_version":              ("pack", str, True),
+    # -- family lookup (T-L3.1) ---------------------------------------------
+    "family_labels":                ("family", list, True),
+    "token_family_sha256":          ("family", str, True),
+    "family_counts_types":          ("family", dict, True),
+    "family_counts_tokens":         ("family", dict, True),
+    "family_counts_types_unmapped": ("family", int, True),
+    "family_vote_stats":            ("family", dict, True),
+    "family_vote_stability":        ("family", dict, True),
+    "family_type_provenance":       ("family", dict, True),
+    "unmapped_token_budget":        ("family", float, True),
+    "unmapped_token_share_train":   ("family", float, True),
+    "unmapped_within_budget":       ("family", bool, True),
+    # -- floors (T-L2.5) -----------------------------------------------------
+    "uniform_ce":                   ("floors", float, True),
+    "unigram_ce":                   ("floors", float, True),
+    "bigram_ce":                    ("floors", float, True),
+    "primary_metric_floor":         ("floors", float, True),
+    "floors_units":                 ("floors", str, True),
+    "unigram_smoothing":            ("floors", str, True),
+    "bigram_smoothing":             ("floors", str, True),
+    # -- deciles (T-L2.6) ----------------------------------------------------
+    "token_decile_sha256":          ("deciles", str, True),
+    "n_frequency_deciles":          ("deciles", int, True),
+    "decile_table":                 ("deciles", list, True),
+    "decile_is_canonical":          ("deciles", bool, True),
+    "decile_purpose":               ("deciles", str, True),
+}
+
+# Keys whose value must be a dict with exactly these three split names.
+PER_SPLIT_KEYS = ("raw_lines", "raw_nonempty_lines", "raw_bytes",
+                  "unk_literal_occurrences", "splits", "token_counts",
+                  "dropped_tail_tokens", "sha256")
+
+
+def validate_manifest(manifest: dict, stages=None):
+    """`[problem, ...]` -- empty when the manifest matches `MANIFEST_SCHEMA`.
+
+    `stages` limits the check to the stages that have been run, so a
+    fetch-and-tokenizer-only corpus can be validated without pretending it should
+    already carry pack keys. Returns problems rather than raising: the caller is a
+    test that wants to report every one, not stop at the first.
+    """
+    problems = []
+    for key, (stage, typ, required) in MANIFEST_SCHEMA.items():
+        if stages is not None and stage not in stages:
+            continue
+        if key not in manifest:
+            if required:
+                problems.append(f"missing (stage {stage}): {key}")
+            continue
+        val = manifest[key]
+        # bool is a subclass of int, so an int field holding True would pass a naive
+        # isinstance check. Both directions are wrong and both are caught.
+        if typ is int and isinstance(val, bool):
+            problems.append(f"{key}: bool where int expected")
+        elif typ is float and isinstance(val, int) and not isinstance(val, bool):
+            pass          # JSON writes 1.0 as 1; an int in a float slot is fine
+        elif not isinstance(val, typ):
+            problems.append(f"{key}: {type(val).__name__} where "
+                            f"{typ.__name__} expected")
+    for key in PER_SPLIT_KEYS:
+        if key in manifest and set(manifest[key]) != set(SPLITS):
+            problems.append(f"{key}: keys {sorted(manifest[key])} != "
+                            f"{sorted(SPLITS)}")
+    return problems
+
+
+def _repo_relative(path: str) -> str:
+    """`path` relative to the repo root with forward slashes, else absolute.
+
+    The SAME defect T-L0.3a fixed in `more/run_context.py:_repo_relative`, and it
+    reached here by the same route: `os.path.relpath` RAISES on Windows when the two
+    paths are on different drives --
+
+        ValueError: path is on mount 'C:', start on mount 'D:'
+
+    -- and this repository is on `D:` while the natural scratch location is
+    `C:\\Users\\...\\Temp`. It was latent as long as every build wrote under
+    `data/lang/`, and it fired on the first run of T-L2.4's reproducibility check,
+    which builds into an out-root off-drive on purpose.
+
+    The relative form is kept whenever one exists, because that is the short portable
+    string `tokenizer_training_files` records and `test_language_data.py` TL2.1d
+    compares against. An off-drive rebuild therefore records absolute paths in ITS
+    manifest, which is correct -- that manifest describes a corpus that is not at the
+    canonical location -- and is why TL2.1d grades only `data/lang/`.
+    """
+    try:
+        return os.path.relpath(path, _REPO).replace("\\", "/")
+    except ValueError:
+        return os.path.abspath(path).replace("\\", "/")
+
+
 def corpus_dir(corpus: str) -> str:
-    return os.path.join(_HERE, corpus)
+    return os.path.join(_OUT_ROOT, corpus)
+
+
+def set_out_root(path: str) -> str:
+    """Redirect every write to `path/<corpus>/` instead of `data/lang/<corpus>/`.
+
+    Exists for exactly one caller: T-L2.4's reproducibility check, which rebuilds a
+    corpus from scratch and compares the per-split SHA-256s against the recorded
+    ones. That check has to write somewhere, and writing over the artifacts it is
+    grading would destroy the comparison if the rebuild differed -- the tracked
+    `tokenizer.json` and `token_family.npy` would be gone and the manifest would
+    already hold the new hashes.
+
+    Not a general feature: the canonical location is `data/lang/`, everything else
+    (`test_language_data.py`, the family/floor/decile builders, the dataset class)
+    resolves it from there, and a second copy of a 269 MB corpus is not something to
+    make convenient.
+    """
+    global _OUT_ROOT
+    _OUT_ROOT = os.path.abspath(path)
+    return _OUT_ROOT
+
 
 
 def manifest_path(corpus: str) -> str:
@@ -409,7 +598,7 @@ def fit_tokenizer(train_text: str, vocab_size: int, out_path: str) -> dict:
         "eot_id": tok.token_to_id(EOT_TOKEN),
         "tokenizer_sha256": _sha256_file(out_path),
         "tokenizer_training_files": [
-            os.path.relpath(train_text, _REPO).replace("\\", "/")],
+            _repo_relative(train_text)],
     }
 
 
@@ -602,11 +791,17 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--seq_len", type=int, default=DEFAULT_SEQ_LEN)
     p.add_argument("--cache_dir", default=None,
                    help="HF cache override; default is the user HF cache")
+    p.add_argument("--out_root", default=None,
+                   help="write <out_root>/<corpus>/ instead of data/lang/<corpus>/. "
+                        "For T-L2.4's rebuild-and-compare check only; see "
+                        "set_out_root()")
     return p
 
 
 def main(argv=None) -> int:
     args = build_parser().parse_args(argv)
+    if args.out_root:
+        print(f"[build] out_root -> {set_out_root(args.out_root)}")
     stages = STAGES if args.stage == "all" else (args.stage,)
     for stage in stages:
         if stage == "fetch":

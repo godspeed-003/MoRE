@@ -27,6 +27,7 @@ invocation of a test file, but silently not checking it would be worse.
 
 import json
 import os
+import subprocess
 import sys
 
 sys.path.insert(0, __file__.rsplit("\\", 1)[0].rsplit("/", 1)[0])
@@ -311,6 +312,210 @@ for corpus, man in present:
     check(f"TL2.2l {tag} on-disk order is corpus order, not shuffled",
           man.get("storage", {}).get("on_disk_order", "").startswith("corpus order"),
           man.get("storage", {}).get("on_disk_order"))
+
+
+# ===========================================================================
+print()
+print("=== T-L2.3  MoRELanguageDataset: the engine's tuple, language meanings ===")
+# ===========================================================================
+
+import torch  # noqa: E402
+from more.lang_data import MoRELanguageDataset, TRAIN_SPLIT_VERSION  # noqa: E402
+from more.seeding import make_generator  # noqa: E402
+from torch.utils.data import DataLoader  # noqa: E402
+
+_SLOTS = ("input_ids", "step_mask", "step_experts", "step_ops",
+          "family", "depth", "target")
+
+for corpus, man in present:
+    tag = f"[{corpus}]"
+    if "token_family_sha256" not in man:
+        skip(f"TL2.3a-i {tag}", "family lookup not built for this corpus")
+        continue
+
+    ds = MoRELanguageDataset(corpus, "train")
+    item = ds[0]
+    S = ds.seq_len
+
+    # Arity parity with the arithmetic dataset, read from ITS source rather than
+    # hard-coded, so a change there fails here instead of drifting.
+    import inspect  # noqa: E402
+    from more.data import MoREDataset  # noqa: E402
+    _arith_arity = inspect.getsource(MoREDataset.__getitem__).count('r["')
+    check(f"TL2.3a {tag} the tuple has the same arity the engine already unpacks",
+          len(item) == _arith_arity == 7,
+          f"language {len(item)}-tuple == arithmetic {_arith_arity}-tuple, so "
+          f"engine.py:438 needs no second training loop")
+
+    want = {
+        "input_ids":    ((S,), torch.int64),
+        "step_mask":    ((S,), torch.bool),
+        "step_experts": ((S,), torch.int64),
+        "step_ops":     ((S,), torch.int64),
+        "family":       ((),   torch.int64),
+        "depth":        ((),   torch.int64),
+        "target":       ((),   torch.float32),
+    }
+    bad = [n for n, x in zip(_SLOTS, item)
+           if (tuple(x.shape), x.dtype) != want[n]]
+    check(f"TL2.3b {tag} every slot has the documented shape and dtype",
+          not bad,
+          "  ".join(f"{n}{tuple(x.shape)}:{str(x.dtype).replace('torch.', '')}"
+                    for n, x in zip(_SLOTS, item))
+          if not bad else f"WRONG: {bad}")
+
+    check(f"TL2.3c {tag} step_mask is ALL TRUE, which is why the tail was dropped",
+          bool(item[1].all()),
+          "no key_padding_mask, so the NaN path over a fully-masked attention row "
+          "is unreachable and the ACT denominators are exact")
+
+    check(f"TL2.3d {tag} step_experts comes from the lookup and respects its range",
+          int(item[2].min()) >= -1 and int(item[2].max()) < 6
+          and torch.equal(item[2], ds.token_family[item[0]]),
+          f"values in [{int(item[2].min())}, {int(item[2].max())}], and equal to "
+          f"token_family[input_ids] element-wise")
+
+    check(f"TL2.3e {tag} step_ops is entirely -1: the operation axis is ABSENT",
+          bool((item[3] == -1).all()),
+          "so every step_ops >= 0 mask is empty and per-operation metrics report "
+          "N/A rather than 0.0")
+
+    check(f"TL2.3f {tag} family is -1: a 256-token block has no lexical class",
+          int(item[4]) == -1 and int(item[5]) == S,
+          f"family = -1 (the documented ignore label), depth = {int(item[5])} "
+          f"= seq_len (every position is real)")
+
+    check(f"TL2.3g {tag} target is NaN -- a poison value, not a placeholder",
+          bool(torch.isnan(item[6])),
+          "the LM target is derived by shifting input_ids inside the loss; 0.0 "
+          "here would let a mis-wired loss train silently against a constant")
+
+    check(f"TL2.3h {tag} ids are inside the vocabulary and len() matches the manifest",
+          int(item[0].max()) < ds.vocab_size and len(ds) == man["splits"]["train"],
+          f"{len(ds):,} blocks, max id {int(item[0].max())} < {ds.vocab_size}")
+
+    check(f"TL2.3i {tag} provenance is surfaced for the run context to stamp",
+          ds.dataset_version == man["dataset_version"]
+          and ds.train_split_version == TRAIN_SPLIT_VERSION
+          and ds.primary_metric_floor == man["primary_metric_floor"],
+          f"{ds.dataset_version} / {ds.train_split_version} / floor "
+          f"{ds.primary_metric_floor:.4f}")
+
+# -- shuffling belongs to the DataLoader, and is reproducible ----------------
+# The Verify clause: two epochs at the same seed give the same permutation, and
+# different seeds give different ones. Checked on the emitted block CONTENT rather
+# than on indices, because that is what a training step actually sees -- an
+# index permutation that were reproducible while `__getitem__` was not would pass
+# an index-level check and still be non-deterministic.
+if present:
+    _c = min((c for c, _ in present),
+             key=lambda c: dict(present)[c]["raw_bytes"]["train"])
+    if "token_family_sha256" in dict(present)[_c]:
+        _ds = MoRELanguageDataset(_c, "train")
+
+        def _first_batches(seed, n=3):
+            g = make_generator(seed, "dataloader_shuffle")
+            dl = DataLoader(_ds, batch_size=4, shuffle=True, generator=g,
+                            num_workers=0)
+            out = []
+            for i, b in enumerate(dl):
+                out.append(b[0][:, :4].tolist())
+                if i + 1 >= n:
+                    break
+            return out
+
+        a1, a2, b1 = _first_batches(42), _first_batches(42), _first_batches(43)
+        check(f"TL2.3j [{_c}] two epochs at seed 42 give the SAME permutation",
+              a1 == a2, "reproducible from seeding.make_generator alone")
+        check(f"TL2.3k [{_c}] seed 43 gives a DIFFERENT permutation",
+              b1 != a1, "so the seed is actually reaching the sampler")
+
+        _fixed = [next(iter(DataLoader(_ds, batch_size=4, shuffle=False)))[0].tolist()
+                  for _ in range(2)]
+        check(f"TL2.3l [{_c}] with shuffle=False the on-disk order is fixed",
+              _fixed[0] == _fixed[1]
+              and _fixed[0][0] == np.asarray(
+                  np.load(os.path.join(LANG, _c, "train.npy"),
+                          mmap_mode="r")[0], dtype=np.int64).tolist(),
+              "block 0 of the loader is block 0 of the file, so the manifest hash "
+              "describes what the model reads")
+
+        _b = next(iter(DataLoader(_ds, batch_size=8, shuffle=False)))
+        check(f"TL2.3m [{_c}] collation gives the batched shapes the engine expects",
+              [tuple(x.shape) for x in _b]
+              == [(8, _ds.seq_len)] * 4 + [(8,)] * 3,
+              " ".join(str(tuple(x.shape)) for x in _b))
+
+# ===========================================================================
+print()
+print("=== T-L2.4  Manifest schema, and a rebuild from scratch ===")
+# ===========================================================================
+
+for corpus, man in present:
+    tag = f"[{corpus}]"
+    problems = bld.validate_manifest(man)
+    check(f"TL2.4a {tag} the manifest validates against the documented schema",
+          not problems,
+          f"{len(bld.MANIFEST_SCHEMA)} keys across 6 stages, all present with the "
+          f"declared type" if not problems else "; ".join(problems[:6]))
+
+    check(f"TL2.4b {tag} every per-split field carries exactly train/val/test",
+          all(set(man[k]) == {"train", "val", "test"}
+              for k in bld.PER_SPLIT_KEYS if k in man),
+          f"{len(bld.PER_SPLIT_KEYS)} per-split fields checked -- a manifest with a "
+          f"fourth split, or a missing one, would otherwise read as valid")
+
+    # Both denominators, which is the whole point of T-L2.4.
+    check(f"TL2.4c {tag} family counts are present at BOTH the type and token level",
+          set(man["family_counts_types"]) == set(man["family_labels"])
+          and set(man["family_counts_tokens"]) == {"train", "val", "test"}
+          and all(set(v["by_family"]) == set(man["family_labels"])
+                  for v in man["family_counts_tokens"].values()),
+          "6 type counts + 6 token counts x 3 splits, plus the unmapped share")
+
+# -- the reproducibility clause, actually executed ---------------------------
+# Rebuilt from scratch into a scratch out-root -- see build_language_dataset.
+# `set_out_root` for why it cannot just overwrite in place. Dev corpus only: the
+# code path is identical for both, and rebuilding wikitext-103 would cost ~6 min of
+# encode for no extra information.
+if any(c == DEV_CORPUS for c, _ in present) and not os.environ.get("SKIP_REBUILD"):
+    import shutil          # noqa: E402
+    import tempfile        # noqa: E402
+    _scratch = tempfile.mkdtemp(prefix="more_l24_")
+    try:
+        _tracked = dict(present)[DEV_CORPUS]
+        _cache = os.path.join(LANG, "_hf_cache")
+        _rc = subprocess.run(
+            [sys.executable, "-X", "utf8",
+             os.path.join(LANG, "build_language_dataset.py"),
+             "--corpus", DEV_CORPUS, "--stage", "all",
+             "--out_root", _scratch,
+             "--cache_dir", _cache],
+            capture_output=True, text=True, cwd=REPO)
+        _rebuilt_path = os.path.join(_scratch, DEV_CORPUS, "dataset_meta.json")
+        if _rc.returncode != 0 or not os.path.exists(_rebuilt_path):
+            check(f"TL2.4d [{DEV_CORPUS}] a from-scratch rebuild completes", False,
+                  f"rc={_rc.returncode}: {_rc.stderr.strip()[-300:]}")
+        else:
+            with open(_rebuilt_path, "r", encoding="utf-8") as fh:
+                _rb = json.load(fh)
+            _same = [k for k in ("sha256", "dataset_version", "token_counts",
+                                 "splits", "dropped_tail_tokens",
+                                 "tokenizer_sha256", "raw_bytes",
+                                 "train_text_bytes", "eot_id")
+                     if _tracked.get(k) != _rb.get(k)]
+            check(f"TL2.4d [{DEV_CORPUS}] the per-split hashes reproduce on a "
+                  f"second build from scratch",
+                  not _same,
+                  f"dataset_version {_rb['dataset_version']}, all three split "
+                  f"SHA-256s identical, tokenizer.json byte-identical"
+                  if not _same else f"DIFFERED: {_same}")
+    finally:
+        shutil.rmtree(_scratch, ignore_errors=True)
+else:
+    skip("TL2.4d rebuild-from-scratch",
+         "dev corpus absent, or SKIP_REBUILD set (the rebuild costs ~20 s and "
+         "18 MB of scratch)")
 
 
 # ===========================================================================

@@ -23,6 +23,12 @@ from .families import (OP_TO_EXPERT, EXPERT_FAMILY_LABELS, FAMILY_TO_IDX,
                        ALL_OP_NAMES, OP_NAME_TO_IDX, NUM_OP_TYPES,
                        NUM_EXPERTS_CANONICAL, expert_labels)
 from .data import MoREDataset
+# T-L2.3. Deliberately NOT re-exporting anything from `.lang_families` here: the
+# eight names above come from `.families` unconditionally, and adding a second
+# manifest's labels to the same namespace is how `EXPERT_FAMILY_LABELS` ends up
+# meaning whichever module imported last. Language code imports
+# `more.lang_families` by name; see that module's `_ARITHMETIC_ONLY`.
+from .lang_data import MoRELanguageDataset, TRAIN_SPLIT_VERSION
 from .model import MoEBlock, MoREWrapper, MoREModel
 from .engine import train
 from .run_context import RunContext, resolve_overrides, ProxyGuardError
@@ -30,7 +36,8 @@ from .seeding import (seed_everything, apply_seeding, resolve_effective_seed,
                       make_generator, seed_worker, CANONICAL_SEED_SET)
 
 __all__ = [
-    "load_config", "MoREDataset", "MoEBlock", "MoREWrapper", "MoREModel",
+    "load_config", "MoREDataset", "MoRELanguageDataset", "TRAIN_SPLIT_VERSION",
+    "MoEBlock", "MoREWrapper", "MoREModel",
     "train", "RunContext", "resolve_overrides", "ProxyGuardError",
     "OP_TO_EXPERT", "EXPERT_FAMILY_LABELS", "FAMILY_TO_IDX",
     "ALL_OP_NAMES", "OP_NAME_TO_IDX", "NUM_OP_TYPES",
