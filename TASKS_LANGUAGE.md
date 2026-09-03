@@ -1207,7 +1207,7 @@ does not exist here (T-L0.0).
 
 ## Phase L-4 — Attention  (`plan_language.md` §6)
 
-- [ ] **T-L4.0 One shared causal-attention sublayer per `MoREWrapper`.** The model
+- [x] **T-L4.0 One shared causal-attention sublayer per `MoREWrapper`.** The model
   as it stands has **no attention at all** — it is a per-token FFN mixture with
   masked mean-pooling and a scalar regression head. Without attention the best
   achievable language model is a unigram model, and the entire MoE/MoR/MoRE matrix
@@ -1219,16 +1219,60 @@ does not exist here (T-L0.0).
   **Verify:** `sum(p.numel() for p in wrapper.attn.parameters())` appears once per
   wrapper regardless of `max_depth`; the same parameter tensors are used at depth 1
   and depth 7 (assert by identity, `is`, not by shape).
+  **Evidence:** `code/test_lang_causality.py` → **22 passed, 0 failed, 0 skipped**
+  (checks TLC.0a–e, TLC.2a–e, TLC.3a–g, TLC.4a–e). Gate L0 after the change:
+  `TOTAL 356 356 0 0`, ALL GATES PASS.
 
-- [ ] **T-L4.1 `attention=False` constructs no module.** Follow the
+  One `nn.MultiheadAttention(d_model, n_heads=4, batch_first=True)` plus its own
+  `attn_norm`, constructed once in `MoREWrapper.__init__`. At `d_model = 32` the
+  sublayer is **4,224 parameters = 4·d² + 4·d exactly**, and it is the same 4,224 at
+  `max_depth = 4` and `max_depth = 7` — the count does not grow with depth.
+
+  **The weight-sharing invariant is asserted by storage identity, not by shape.**
+  TLC.0d hooks `attn.forward` and records `data_ptr()` for `in_proj_weight`,
+  `out_proj.weight` and `attn_norm.weight` at every depth step: one distinct set of
+  pointers across four steps. Two distinct modules with equal shapes would pass a
+  shape check and silently break `updated_rules.md` §2.1, which is the invariant that
+  makes depth "computation through time" rather than a stack of depth-specific
+  networks — i.e. the invariant that makes the MoR and MoRE arms mean what they claim.
+
+  Learned absolute position embeddings live in `MoREModel`, not the wrapper, under the
+  same flag: `nn.Embedding(max_seq_len, d_model)`, added **once before the depth
+  loop**. Not per step, because position is a property of a token's place in the
+  sequence rather than of how much computation it has received, and re-adding it every
+  step would make the positional signal grow with depth. `attention=True` **requires**
+  `max_seq_len` and raises without it — a default would silently truncate or oversize
+  the table. Learned-absolute over RoPE/ALiBi per §6.6: both of those modify attention
+  scores, and any positional signal that varied with step count would confound the
+  depth analysis, which is the one measurement this study exists to make.
+
+- [x] **T-L4.1 `attention=False` constructs no module.** Follow the
   `router_noise_scale` precedent exactly: when the flag is off, the attribute is
   absent rather than present-and-unused, so the arithmetic `state_dict`, the
   arithmetic parameter counts, and Gate 4 are provably untouched rather than
   merely believed to be. **Verify:** an arithmetic `MoREWrapper`'s `state_dict()`
   key set is identical to the pre-change key set; `hasattr(wrapper, "attn")` is
   False; arithmetic parameter totals match T-L0.3.
+  **Evidence:** all three clauses hold. `hasattr(w, "attn")` and
+  `hasattr(w, "attn_norm")` are both **False** at `attention=False` (TLC.0a);
+  the state_dict key set gains exactly the six attention keys when the flag is on and
+  **loses nothing** (TLC.0b), so Gate 4's "no unexpected parameter in the canonical
+  checkpoint" check still means what it meant.
 
-- [ ] **T-L4.2 Explicit upper-triangular bool mask; `is_causal=True` forbidden.**
+  **Arithmetic parameter counts are byte-identical to the T-L0.3 baseline**, compared
+  per-tensor rather than by total — a compensating pair of shape changes would leave
+  the total intact. `diff` of the two JSON dumps is empty:
+
+  | arm | total_params | tensors |
+  |---|---|---|
+  | moe | 3,201,555 | 54 |
+  | mor | 3,197,710 | 24 |
+  | more | 3,201,555 | 54 |
+
+  So `README.md`'s published counts and the 0.120% MoR/MoRE budget residual stay
+  correct without any test being edited.
+
+- [x] **T-L4.2 Explicit upper-triangular bool mask; `is_causal=True` forbidden.**
   Build the mask explicitly and pass it as `attn_mask`. `is_causal` is a *hint* in
   PyTorch's API: whether it is honoured depends on the backend kernel selected at
   runtime, so a shape/backend change could silently make the model
@@ -1236,8 +1280,23 @@ does not exist here (T-L0.0).
   checked by the same code path on every backend. **Verify:** the mask is
   materialized as a bool tensor with the documented triangle orientation; a grep
   shows no `is_causal=True` anywhere in the language path.
+  **Evidence:** `MoREWrapper.causal_mask(S, device)` returns
+  `torch.triu(ones(S, S, bool), diagonal=1)` — entry `[i, j]` is `True`
+  (= disallowed) exactly when `j > i`, verified against an independently constructed
+  reference (TLC.2a). The **diagonal is allowed** (TLC.2b): `diagonal=1`, not
+  `diagonal=0`, so a token may attend to itself — excluding the self-position would be
+  a different model, not a stricter one. Cached per `(S, device)` in a **plain dict,
+  not a registered buffer** (TLC.2c): a buffer would enter `state_dict()` and make a
+  language checkpoint structurally dependent on the sequence length it last ran at.
 
-- [ ] **T-L4.3 Halted tokens stay attendable but frozen.** A halted position must
+  **The grep clause is implemented with `ast`, not string search, and the naive
+  version failed on its own documentation.** `"is_causal=True" in src` matches the
+  `causal_mask` docstring that explains why the hint is not used. TLC.2d walks the
+  parse tree of `model.py`, `engine.py` and `lang_data.py` for a call keyword actually
+  named `is_causal` with a literal `True`: none. TLC.2e separately confirms the mask
+  is *passed* (`attn_mask=self.causal_mask(`), so it cannot be built and discarded.
+
+- [x] **T-L4.3 Halted tokens stay attendable but frozen.** A halted position must
   remain visible as a *key/value* to still-active later positions (removing it
   would change the context of tokens that have not halted, coupling their
   predictions to unrelated tokens' halting decisions), while its own state is
@@ -1247,8 +1306,36 @@ does not exist here (T-L0.0).
   **Verify:** freezing holds bitwise — a halted position's state at depth `d+1`
   equals its state at depth `d`; the waste fraction is in `metrics.json` and is a
   measured value, never a sentinel.
+  **Evidence:** checks TLC.3a–g. Freezing is asserted **bitwise with
+  `torch.equal`** on the state the attention sublayer is handed at each depth step
+  (captured with a forward pre-hook): 24 positions, exit depths `{2, 3, 4}` over 4
+  captures, **zero violations**. TLC.3b makes the check non-vacuous — tokens really do
+  halt at three different depths, so there is something frozen to observe; if every
+  token halted at `max_depth` the assertion would be empty.
 
-- [ ] **T-L4.4 GATE L1 — causality and leakage.** The single most important gate
+  **"Attendable" is verified as behaviour, not as code.** TLC.3c perturbs an
+  early-halting position (position 0 of row 0, halting at depth 2) and requires later
+  positions in the same sequence to move: they move by **0.720**, six orders above the
+  1e-06 tiling floor. So halting early cannot blind position 40 to the word at
+  position 4 — which would couple one token's prediction to another token's halting
+  decision. Compared within the position's own batch row deliberately: the other row
+  shifts by ~2 ULP through the dispatch path of TLC.4e, which is not the effect under
+  test.
+
+  **The waste is measured, and it moves.** `route_stats.attn_query_waste_fraction`
+  reads **39.58%** (38 of 96 query slots) at `max_depth = 6`, and **exactly 0.0** at
+  `max_depth = 1` where nothing has halted yet (TLC.3f) — so the number is tracking the
+  halted fraction rather than reporting a constant. Deeper recursion wastes strictly
+  more (TLC.3g). Aggregated across blocks as one fraction over summed slots, not as a
+  mean of per-block fractions, so a block that ran seven depth steps contributes seven
+  steps' worth rather than one block's worth.
+
+  **On the arithmetic path the key is ABSENT, not 0.0** (TLC.3e). There is no attention
+  sublayer, so there is no waste; a `0.0` would be a sentinel standing in for "not
+  applicable", which CLAUDE.md §4 forbids. Consumers must read absence as N/A, exactly
+  as they already do for the routing keys at `E == 1`.
+
+- [x] **T-L4.4 GATE L1 — causality and leakage.** The single most important gate
   in the language migration: it is the direct analogue of the arithmetic
   target-in-input leakage audit. Perturb `input_ids[b, t+k]` for `k ≥ 1` and assert
   the logits at position `t` are **bit-identical**. Run it at multiple `t` and `k`,
@@ -1257,6 +1344,47 @@ does not exist here (T-L0.0).
   through the halting statistics. **Verify:** `code/test_lang_causality.py` passes;
   a deliberately broken variant (mask removed) **fails** it — a leakage test that
   has never failed has not been shown to be able to.
+  **Evidence: GATE L1 PASSES — 22 passed, 0 failed, 0 skipped.** Both clauses hold,
+  and the deliberately-broken variant fails by six orders of magnitude.
+
+  **THE VERIFY WORDING NEEDED AMENDING, AND THE AMENDMENT IS THE FINDING.**
+  `plan_language.md` §6.4 specifies **bit-identical** logits at positions `≤ t`.
+  Measured, that holds *exactly* only at `num_experts = 1, max_depth = 1`. Above it
+  there is a residual — and **it is not a causality defect**:
+
+  | configuration | masked | mask removed |
+  |---|---|---|
+  | E=1, depth 1 | **0.0 exactly** (`torch.equal` True) | 0.37 |
+  | E=1, depth 4 / 7 | 1.2e-07 (1 ULP) | 0.93 / 0.95 |
+  | E=6, depth 1 / 4 / 7 | 2.4e-07 (2 ULP) | 0.37 / 0.51 / 0.51 |
+
+  The cause is **grouped Top-1 dispatch**. When a perturbation flips the perturbed
+  token's expert, the per-expert row counts change — measured
+  `[9,6,4,3,2,0] → [8,7,5,2,2,0]` — so two `nn.Linear` GEMMs get different shapes and
+  tile differently, moving the shared rows in their last one or two bits. The same
+  happens for `E = 1` at depth > 1, where a changed halt decision changes `N_active`.
+
+  **The mechanism is proved, not asserted (TLC.4e):** `E=6, depth 1` **with attention
+  entirely absent** still shifts the past by 2.4e-07, while `E=1, depth 1` is exactly
+  0.0. That isolates the cause to the grouping and rules out the mask.
+
+  So the gate is three parts, which together assert *more* than a bare `torch.equal`
+  could: **TLC.4a** exact bit-identity where the confound is absent; **TLC.4b** an
+  8-ULP bound (9.5e-07) for every architecture, worst observed 2.4e-07; **TLC.4c** the
+  mask-removed variant exceeding that bound by ≥ 1e5 in all five configurations
+  (smallest ratio **2.1e+06**). A bare `torch.equal` would have been either
+  unachievable or — if the tolerance had been loosened without this explanation —
+  unfalsifiable. Marked `[x]` rather than `[!]` because the scientific requirement is
+  met and strengthened; the ledger's and plan's wording is what was imprecise, and
+  §6.4 now carries the amendment.
+
+  All three architectures are covered as required: MoE (E=6, depth 1), MoR (E=1, depth
+  7), MoRE (E=6, depth 7), plus MoRE at depth 4 and an attention-only E=1 depth-4 arm.
+  **MoR keeps attention** — `updated_objective.md` §4 defines it as recursion without
+  multiple experts, not as no context — and is just as causal. TLC.4d records that
+  `attention=False` is causal for a *different* reason worth separating: absence of any
+  cross-position path, so it could not leak even with a broken mask.
+
 
 ---
 

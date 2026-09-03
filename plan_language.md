@@ -533,6 +533,36 @@ checks in `data/dataset_meta.json:gate1_audit`, and it is the single most import
 new test in the migration. A model that fails it will show an implausibly good
 perplexity and nothing else will look wrong.
 
+**AMENDMENT (T-L4.4, measured 2026-09-03): bit-identity holds EXACTLY only at
+`num_experts = 1, max_depth = 1`, and the residual above that is not a causality
+defect.** Measured worst deviation at positions `<= t` over eight `(t, k)` pairs:
+
+| configuration | masked | mask removed |
+|---|---|---|
+| E=1, depth 1 | **0.0 exactly** | 0.37 |
+| E=1, depth 4/7 | 1.2e-07 (1 ULP) | 0.93–0.95 |
+| E=6, depth 1/4/7 | 2.4e-07 (2 ULP) | 0.37–0.51 |
+
+The cause is **grouped Top-1 dispatch**, not attention. When a perturbation flips
+the perturbed token's expert, the per-expert row counts change (measured:
+`[9,6,4,3,2,0] -> [8,7,5,2,2,0]`), so two `nn.Linear` GEMMs get different shapes and
+tile differently, which moves the shared rows in their last one or two bits. The same
+happens for `E = 1` at depth > 1, where a changed halt decision changes `N_active`.
+It is isolated by construction: `E=6, depth 1` **with attention entirely absent**
+still shifts the past by 2.4e-07, while `E=1, depth 1` is exactly 0.0.
+
+So the gate is written in three parts, which together assert more than a bare
+`torch.equal` could:
+
+1. **exact** bit-identity where the confound is absent (`E=1`, depth 1);
+2. a **bound of 8 ULP** (9.5e-07) everywhere else, with the mechanism *proved* by the
+   E=6-no-attention comparison rather than asserted;
+3. the mask-removed variant must exceed that bound by **>= 1e5** (measured smallest
+   ratio 2.1e+06), so the tolerance cannot be concealing a real leak.
+
+`torch.equal` alone would have been either unachievable or, if the tolerance had been
+loosened without explanation, unfalsifiable.
+
 ### 6.5 Arithmetic must be bit-identical
 
 `MoREWrapper(attention=False)` constructs **no** attention module. Not a module

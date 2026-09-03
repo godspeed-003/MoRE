@@ -372,6 +372,8 @@ class MoREWrapper(nn.Module):
         router_noise_init: float = ROUTER_NOISE_INIT_SCALE_DEFAULT,
         router_noise_anneal_steps: int = ROUTER_NOISE_ANNEAL_STEPS_DEFAULT,
         ffn_mult: int = 4,
+        attention: bool = False,
+        n_heads: int = 4,
     ):
         super().__init__()
         self.max_depth   = max_depth
@@ -406,6 +408,79 @@ class MoREWrapper(nn.Module):
 
         # LayerNorm applied after residual at each depth step
         self.layer_norm = nn.LayerNorm(d_model)
+
+        # ------------------------------------------------------------------
+        # T-L4.0 / T-L4.1  ONE causal self-attention sublayer, shared over depth
+        # ------------------------------------------------------------------
+        #
+        # WHY IT IS REQUIRED (plan_language.md §6.1). Without attention no token
+        # ever sees another, so the best achievable language model is the unigram
+        # distribution: every arm of the MoE/MoR/MoRE matrix would converge to
+        # `unigram_ce` and the comparison would measure nothing. For arithmetic it
+        # was the right minimal design; for causal LM its absence is degenerate.
+        #
+        # WHY EXACTLY ONE MODULE, CONSTRUCTED HERE. `updated_rules.md` §2.1: the
+        # same recursive block parameters at every recursion depth. A per-depth
+        # attention module would make depth a stack of depth-specific networks
+        # instead of computation through time, which is the invariant that makes
+        # the MoR and MoRE arms mean what they claim. This mirrors the Universal
+        # Transformer layout -- shared attention sublayer, then shared transition
+        # sublayer -- with the transition replaced by the Top-1 MoE block.
+        #
+        # WHY ABSENCE RATHER THAN A BYPASSED MODULE (T-L4.1, §6.5). Same reasoning
+        # as `router_noise_scale` above: with `attention=False` there is NO
+        # attribute, so the arithmetic `state_dict` key set, the arithmetic
+        # parameter counts and Gate 4's "no unexpected parameter" check are
+        # provably untouched rather than believed to be. A module bypassed by a
+        # forward-time flag would still be in the state_dict and still be in the
+        # optimizer.
+        self.attention = bool(attention)
+        self.n_heads   = int(n_heads)
+        if self.attention:
+            if d_model % self.n_heads != 0:
+                raise ValueError(
+                    f"d_model {d_model} is not divisible by n_heads "
+                    f"{self.n_heads}. nn.MultiheadAttention splits the model "
+                    "dimension across heads, so this is a config error, not a "
+                    "case to round."
+                )
+            self.attn = nn.MultiheadAttention(
+                d_model, self.n_heads, dropout=dropout, batch_first=True)
+            # Its own norm: the attention sublayer and the transition sublayer are
+            # separate residual blocks in the Universal Transformer layout, and
+            # sharing `layer_norm` between them would tie two different residual
+            # streams to one set of statistics.
+            self.attn_norm = nn.LayerNorm(d_model)
+            # Causal masks, cached per (S, device). A PLAIN DICT, not a buffer:
+            # a registered buffer would enter `state_dict()` and make a language
+            # checkpoint structurally dependent on the sequence length it last ran
+            # at. Same reasoning as `_router_noise_step`.
+            self._causal_cache: dict = {}
+
+    def causal_mask(self, seq_len: int, device) -> torch.Tensor:
+        """Upper-triangular bool mask, `True` = DISALLOWED. T-L4.2.
+
+        Orientation, stated because getting it backwards is silent: entry `[i, j]`
+        is `True` when `j > i`, so query position `i` may attend to key positions
+        `j <= i` and to nothing later. `nn.MultiheadAttention` treats a `True` entry
+        in a bool `attn_mask` as "not allowed to attend".
+
+        `is_causal=True` IS DELIBERATELY NOT USED. In PyTorch's API it is a *hint*:
+        whether it is honoured depends on which backend kernel gets selected at
+        runtime, so a shape, dtype or version change could silently make the model
+        non-causal. Everywhere else in this model a silent no-op would cost accuracy;
+        here it would mean TARGET LEAKAGE, and the run would look excellent with
+        nothing else out of place. An explicit mask goes through the same code path
+        on every backend, and Gate L1 perturbs future positions to check it.
+        """
+        key = (int(seq_len), str(device))
+        m = self._causal_cache.get(key)
+        if m is None:
+            m = torch.triu(
+                torch.ones(seq_len, seq_len, dtype=torch.bool, device=device),
+                diagonal=1)
+            self._causal_cache[key] = m
+        return m
 
     def forward(
         self,
@@ -505,9 +580,48 @@ class MoREWrapper(nn.Module):
             "entropy_term": 0.0, "switch_aux_term": 0.0,
         }
 
+        # T-L4.3: attention query waste, accumulated over the depth loop. Attention
+        # is computed at ALL S positions and its output discarded at halted ones, so
+        # some of the work is thrown away. That is a real cost and it is REPORTED
+        # rather than hidden -- `plan_language.md` §6.3 accepts it for clarity, on
+        # the grounds that a variable-length gather of queries would complicate the
+        # mask and the exactness of the depth accounting for no scientific gain.
+        attn_query_slots   = 0.0
+        attn_query_wasted  = 0.0
+
         for depth in range(1, self.max_depth + 1):
             if not active_mask.any():
                 break
+
+            # ---- 0. Causal self-attention over the FULL sequence ---------
+            # T-L4.0/4.2/4.3. Shared parameters at every depth: `self.attn` is
+            # constructed once, so this is the same tensors at depth 1 and depth 7.
+            #
+            # HALTED TOKENS STAY ATTENDABLE, AND STAY FROZEN. Attention runs over
+            # all S positions using each position's CURRENT state, so a halted
+            # position remains a valid key and value -- position 4 halting early
+            # must not blind position 40 to the word at position 4, which would
+            # couple one token's prediction to another token's halting decision.
+            # But nothing is WRITTEN at a halted position: the `torch.where` keeps
+            # `current_state` there, which is `updated_rules.md` §2.2's "halted
+            # states are frozen and are not recursively recomputed", enforced by
+            # the same mask the MoE write-back uses.
+            #
+            # No `key_padding_mask`: language packs to exactly `seq_len` with the
+            # trailing partial block dropped (T-L2.2), so `step_mask` is all True
+            # and a fully-masked attention row -- the NaN path -- is unreachable.
+            if self.attention:
+                seq = current_state.reshape(B, S, D)
+                attn_out, _ = self.attn(
+                    seq, seq, seq,
+                    attn_mask=self.causal_mask(S, x.device),
+                    need_weights=False,
+                )
+                attn_flat = self.attn_norm(current_state + attn_out.reshape(N, D))
+                current_state = torch.where(
+                    active_mask.unsqueeze(-1), attn_flat, current_state)
+                attn_query_slots  += float(N)
+                attn_query_wasted += float(N - int(active_mask.sum()))
 
             # ---- 1. Gather active tokens --------------------------------
             active_inputs = current_state[active_mask]    # [N_active, D]
@@ -683,6 +797,18 @@ class MoREWrapper(nn.Module):
             route_stat_totals["entropy_term"]    /= float(bal_calls)
             route_stat_totals["switch_aux_term"] /= float(bal_calls)
 
+        # T-L4.3: the attention query waste, as a MEASURED fraction. Emitted only
+        # when attention actually ran -- on the arithmetic path there is no
+        # attention sublayer, so there is no waste to report, and a 0.0 there would
+        # be a sentinel presented as a measurement (CLAUDE.md §4). Its consumers
+        # must treat the key's absence as "not applicable", exactly as they do for
+        # the routing keys at E == 1.
+        if self.attention and attn_query_slots > 0:
+            route_stat_totals["attn_query_slots"] = attn_query_slots
+            route_stat_totals["attn_query_wasted"] = attn_query_wasted
+            route_stat_totals["attn_query_waste_fraction"] = (
+                attn_query_wasted / attn_query_slots)
+
         # Normalise oracle CE by number of depth steps that contributed labels
         if oracle_depth_count > 0:
             oracle_routing_ce = oracle_routing_ce / oracle_depth_count
@@ -806,6 +932,9 @@ class MoREModel(nn.Module):
         # unified again; a caller that passes the model's expert count here
         # re-introduces the MoR crash.
         num_families: int = NUM_EXPERTS_CANONICAL,
+        attention: bool = False,
+        n_heads: int = 4,
+        max_seq_len: int | None = None,
     ):
 
         super().__init__()
@@ -840,9 +969,42 @@ class MoREModel(nn.Module):
                         router_noise=router_noise,
                         router_noise_init=router_noise_init,
                         router_noise_anneal_steps=router_noise_anneal_steps,
-                        ffn_mult=ffn_mult)
+                        ffn_mult=ffn_mult,
+                        attention=attention,
+                        n_heads=n_heads)
             for _ in range(num_blocks)
         ])
+
+        # ------------------------------------------------------------------
+        # T-L4.0  Learned absolute position embeddings
+        # ------------------------------------------------------------------
+        #
+        # Under the same flag as the attention sublayer, and for the same reason it
+        # is `absence` rather than a zeroed parameter: with `attention=False` there
+        # is no `pos_embed` attribute, so the arithmetic state_dict is untouched.
+        #
+        # WHY LEARNED ABSOLUTE, NOT RoPE OR ALiBi (§6.6). It is the simplest scheme
+        # that CANNOT interact with recursion depth. RoPE and ALiBi both modify
+        # attention scores, and any positional signal that varied with step count
+        # would confound the depth analysis -- the one measurement this study is
+        # built to make. A `[seq_len, d_model]` table added once, before the depth
+        # loop, is depth-invariant by construction.
+        #
+        # Added ONCE before the blocks, not per depth step: position is a property
+        # of the token's place in the sequence, not of how much computation it has
+        # received, and re-adding it every step would make the positional signal
+        # grow with depth.
+        self.attention = bool(attention)
+        if self.attention:
+            if max_seq_len is None:
+                raise ValueError(
+                    "attention=True requires max_seq_len: the positional table is "
+                    "[max_seq_len, d_model] and a default would silently truncate "
+                    "or oversize it. Pass the dataset's seq_len "
+                    "(dataset_meta.json:seq_len)."
+                )
+            self.max_seq_len = int(max_seq_len)
+            self.pos_embed = nn.Embedding(self.max_seq_len, d_model)
 
         # Regression head: predict normalised output scalar (from pooled repr)
         self.regression_head = nn.Sequential(
@@ -942,6 +1104,23 @@ class MoREModel(nn.Module):
         # Zero out pad positions after projection so they carry no signal
         h = h * step_mask.unsqueeze(-1).float()
 
+        # T-L4.0: positions added ONCE, before the depth loop -- see the
+        # `pos_embed` construction comment for why not per step. After the pad
+        # zeroing so a pad position stays exactly zero rather than carrying a
+        # position vector into attention as a key.
+        if self.attention:
+            _S = h.shape[1]
+            if _S > self.max_seq_len:
+                raise ValueError(
+                    f"sequence length {_S} exceeds max_seq_len {self.max_seq_len}: "
+                    "the positional table has no entry for those positions. "
+                    "Rebuild the model with the dataset's seq_len rather than "
+                    "letting the table wrap."
+                )
+            _pos = torch.arange(_S, device=h.device)
+            h = h + self.pos_embed(_pos).unsqueeze(0)
+            h = h * step_mask.unsqueeze(-1).float()
+
         total_bal_loss       = torch.tensor(0.0, device=x.device)
         total_ponder_cost    = torch.tensor(0.0, device=x.device)
         total_oracle_routing = torch.tensor(0.0, device=x.device)
@@ -1001,6 +1180,17 @@ class MoREModel(nn.Module):
             for k in ("max_load_fraction", "experts_called"):
                 route_stats_total[k] = max(route_stats_total[k],
                                            block_route_stats[k])
+            # T-L4.3: attention query waste, summed over blocks. Present only when
+            # the blocks actually have an attention sublayer, so the key's ABSENCE
+            # is what the arithmetic path reports -- not a 0.0, which would be a
+            # sentinel standing in for "not applicable" (CLAUDE.md §4). The
+            # fraction is recomputed from the summed slots below rather than
+            # averaged, because averaging per-block fractions would weight a block
+            # that ran two depth steps the same as one that ran seven.
+            for k in ("attn_query_slots", "attn_query_wasted"):
+                if k in block_route_stats:
+                    route_stats_total[k] = (route_stats_total.get(k, 0.0)
+                                            + block_route_stats[k])
             if block_idx == 0:
                 first_route_block0 = first_route
 
@@ -1016,6 +1206,13 @@ class MoREModel(nn.Module):
         total_bal_loss    = total_bal_loss / _nb
         route_stats_total["entropy_term"]    /= _nb
         route_stats_total["switch_aux_term"] /= _nb
+        # T-L4.3: one fraction over the summed slots, so a block that ran seven
+        # depth steps contributes seven steps' worth of waste rather than one
+        # block's worth.
+        if route_stats_total.get("attn_query_slots", 0.0) > 0:
+            route_stats_total["attn_query_waste_fraction"] = (
+                route_stats_total["attn_query_wasted"]
+                / route_stats_total["attn_query_slots"])
         halt_stats_total["mean_remainder"] /= _nb
         halt_stats_total["mean_halt_mass"] /= _nb
         _ex = halt_stats_total["forced_exits"] + halt_stats_total["early_exits"]

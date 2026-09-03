@@ -4708,6 +4708,99 @@ section; `build_shuffled_control._repair` when a control draw's marginals drift;
 `specialization_vs_control` when a delta or its z looks wrong;
 `TASKS_LANGUAGE.md` T-L3.2/T-L3.3 Evidence for the synthetic-router table.
 
+## T-L4.0 .. T-L4.4 — GATE L1 passes, and bit-identity turned out to need a footnote
+
+`code/more/model.py`, `code/test_lang_causality.py` (new), `plan_language.md` §6.4.
+**22 passed, 0 failed, 0 skipped.** Gate L0 after the change: `TOTAL 356 356 0 0`,
+ALL GATES PASS, and the arithmetic per-tensor parameter map is byte-identical to the
+T-L0.3 baseline (moe 3,201,555 / 54 tensors; mor 3,197,710 / 24; more 3,201,555 / 54).
+
+**Why this change had to happen at all.** The model had no attention anywhere. For
+arithmetic that was the right minimal design; for causal LM it is degenerate — with no
+cross-position path the best achievable model is the unigram distribution, every arm of
+the matrix would converge to `unigram_ce`, and the MoE/MoR/MoRE comparison would
+measure nothing.
+
+**One `nn.MultiheadAttention` plus its own norm per wrapper, and the sharing is
+asserted by STORAGE IDENTITY.** 4,224 params at `d_model = 32` = 4·d² + 4·d exactly,
+unchanged between `max_depth` 4 and 7. TLC.0d hooks `attn.forward` and records
+`data_ptr()` for `in_proj_weight`, `out_proj.weight` and `attn_norm.weight` at every
+depth step: one distinct set across four steps. Two distinct modules with equal shapes
+would pass a shape check and silently break `updated_rules.md` §2.1 — the invariant
+that makes depth computation through time rather than a stack, i.e. the invariant that
+makes the MoR and MoRE arms mean what they claim.
+
+**`attention=False` builds NOTHING, following the `router_noise_scale` precedent.**
+`hasattr(w, "attn")` is False; the state_dict gains exactly six keys when the flag is
+on and loses none. Compared per-tensor rather than by total, because a compensating pair
+of shape changes would leave a total intact.
+
+**THE INTERESTING PART: `plan_language.md` §6.4's "bit-identical" is achievable only
+at `num_experts = 1, max_depth = 1`, and the residual above it is not a leak.**
+
+| configuration | masked | mask removed |
+|---|---|---|
+| E=1, depth 1 | **0.0 exactly** | 0.37 |
+| E=1, depth 4 / 7 | 1.2e-07 (1 ULP) | 0.93 / 0.95 |
+| E=6, depth 1 / 4 / 7 | 2.4e-07 (2 ULP) | 0.37 / 0.51 / 0.51 |
+
+The cause is **grouped Top-1 dispatch**. A perturbation that flips the perturbed
+token's expert changes the per-expert row counts — measured `[9,6,4,3,2,0] ->
+[8,7,5,2,2,0]` — so two `nn.Linear` GEMMs get different shapes, tile differently, and
+move the shared rows in their last one or two bits. For `E = 1` at depth > 1 the same
+thing happens through `N_active` when a halt decision changes.
+
+**The mechanism is proved rather than assumed.** TLC.4e runs `E=6, depth 1` with
+attention ENTIRELY ABSENT and still measures a 2.4e-07 shift in the past, while
+`E=1, depth 1` is exactly 0.0. That isolates the cause to the grouping and clears the
+mask. Without this comparison, "we allow 2.4e-07" would have been an unexplained
+tolerance in the one test where a tolerance is dangerous.
+
+So the gate is three parts, which together assert MORE than `torch.equal` alone:
+exact bit-identity where the confound is absent; an 8-ULP bound (9.5e-07) for every
+architecture, worst observed 2.4e-07; and the mask-removed variant exceeding that
+bound by >= 1e5 in all five configurations (smallest ratio 2.1e+06). §6.4 now carries
+the amendment and the table.
+
+**A second test bug worth recording, because the naive form is the obvious one.**
+TLC.2d's first version was `"is_causal=True" in src` — and it FAILED, on the
+`causal_mask` docstring that explains why the hint is not used. It now walks the `ast`
+for a call keyword actually named `is_causal` with a literal `True`. A string search
+over source for a code property is a check that can be defeated by a comment.
+
+**Halted tokens: frozen bitwise, attendable behaviourally.** The freeze is asserted
+with `torch.equal` on the state the attention sublayer receives at each depth
+(forward pre-hook): 24 positions, exit depths {2,3,4} over 4 captures, zero
+violations, and TLC.3b confirms the tokens really do halt at different depths so the
+assertion is not empty. "Attendable" is checked as behaviour: perturbing an
+early-halting position (depth 2) moves later positions in its own sequence by
+**0.720**, six orders above the tiling floor — so halting early cannot blind position
+40 to the word at position 4, which would couple one token's prediction to another
+token's halting decision.
+
+**The waste is reported and it moves.** `route_stats.attn_query_waste_fraction` is
+39.58% at `max_depth = 6` (38 of 96 query slots) and exactly 0.0 at `max_depth = 1`,
+where nothing has halted — so it tracks the halted fraction rather than reporting a
+constant. Aggregated across blocks as one fraction over summed slots, not a mean of
+per-block fractions, so a block that ran seven depth steps contributes seven steps'
+worth. On the arithmetic path the key is ABSENT rather than 0.0: there is no attention
+sublayer, so there is no waste, and a 0.0 would be a sentinel standing in for "not
+applicable".
+
+**Position embeddings sit in `MoREModel`, not the wrapper**, under the same flag, and
+are added ONCE before the depth loop — position is a property of a token's place in the
+sequence, not of how much computation it has received, and re-adding per step would
+make the positional signal grow with depth. `attention=True` requires `max_seq_len` and
+raises without it; a default would silently truncate or oversize the table.
+Learned-absolute over RoPE/ALiBi because both of those modify attention scores, and a
+positional signal that varied with step count would confound the depth analysis.
+
+**Where to look.** `MoREWrapper.causal_mask` for the mask orientation and why
+`is_causal` is refused; the depth-loop step 0 block for the attend-then-freeze order;
+`route_stat_totals["attn_query_*"]` when the waste number looks wrong;
+`test_lang_causality.py` TLC.4e first, whenever a future Gate L1 failure needs
+splitting into "real leak" versus "dispatch tiling".
+
 <!-- APPEND-MARKER-CL -->
 
 
