@@ -90,11 +90,23 @@ runs/t67d_provenance_check*/
 #                         guaranteed byte-identical, and a different tokenizer makes
 #                         every recorded loss number incomparable. This is the one
 #                         build artifact that is cheaper to store than to trust.
+#   token_family.npy   -- 8 KB (int8 x 8192): the frozen oracle POS partition every
+#                         routing-agreement, Hungarian, AMI and purity number is
+#                         measured against (T-L3.1). Tracked for the tokenizer's
+#                         reason and then some -- rebuilding it costs ~15 min of
+#                         tagging plus a specific nltk model version, and a
+#                         different partition silently redefines what
+#                         `routing_agreement_with_pos` means.
 #
 # NOT TRACKED (the payload):
 #   *.npy        -- 6.6 MB for wikitext-2, ~260 MB for wikitext-103. Fully determined
 #                   by tokenizer.json + the pinned revision + seq_len, and hash-checked
-#                   against the manifest on every test run.
+#                   against the manifest on every test run. `token_decile.npy` is
+#                   covered by this rule and NOT by the exception above, deliberately:
+#                   it is a 2-second bincount over train.npy with no external
+#                   dependency, so it reproduces exactly. `token_family.npy` does not
+#                   -- it needs a specific nltk model -- which is the whole basis of
+#                   the distinction.
 #   *_text.txt   -- the materialized train text (10.9 MB / 539 MB). An intermediate
 #                   consumed only by the tokenizer trainer.
 #   *.bin        -- the raw uint16 stream `pack_split` writes before reshaping. Removed
@@ -109,6 +121,7 @@ runs/t67d_provenance_check*/
 # As everywhere else in this file, this declines TRACKING, not existence -- the files
 # stay on disk (CLAUDE.md 6).
 data/lang/**/*.npy
+!data/lang/**/token_family.npy
 data/lang/**/*_text.txt
 data/lang/**/*.bin
 data/lang/_hf_cache/

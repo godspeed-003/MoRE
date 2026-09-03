@@ -594,15 +594,69 @@ does not exist here (T-L0.0).
   uninterpretable. **Verify:** the manifest validates against the documented
   schema and its split hashes reproduce on a second build from the same seed.
 
-- [ ] **T-L2.5 Trivial-baseline floors.** Compute, from the train split only and
+- [x] **T-L2.5 Trivial-baseline floors.** Compute, from the train split only and
   evaluated on val: `uniform_ce = ln(8192) ≈ 9.0109`, `unigram_ce`, and a
   Katz-backoff `bigram_ce`. The lowest of these is `primary_metric_floor` and is
   written into the manifest. Without it a val loss of 5.4 nats/token is a number
   with no meaning. **Verify:** all three are finite, ordered
   `uniform ≥ unigram ≥ bigram`, and the unigram/bigram models are fitted on train
   counts alone (assert the fit never touches the val arrays).
+  **Evidence:** `data/lang/build_baseline_floors.py`, checks TL2.5a–g. All three
+  finite and correctly ordered on both corpora:
 
-- [ ] **T-L2.6 Frequency-decile depth table — built, and deliberately unused.**
+  | corpus | uniform | unigram | bigram | floor | bits/token | perplexity |
+  |---|---|---|---|---|---|---|
+  | wikitext-2 | 9.0109 | 7.1865 | **5.3983** | 5.3983 | 7.7881 | 221.0 |
+  | wikitext-103 | 9.0109 | 7.1982 | **4.9849** | 4.9849 | 7.1918 | 146.2 |
+
+  **The number the whole language study is measured against is 4.9849 nats/token.**
+  A canonical language run that does not beat it has learned nothing a two-column
+  count table could not, and on a 10–20 M-parameter budget that is a real
+  possibility rather than a formality — which is why the floor is computed before
+  the runs.
+
+  `uniform_ce` is checked against the closed form rather than against itself:
+  `ln(8192) = 9.010913` nats = **13.0000 bits exactly**, so a wrong `vocab_size`
+  would fail TL2.5c even though it would pass every other check here.
+
+  **The train-only property is proved by interception, not asserted.** TL2.5g wraps
+  `numpy.load` for the duration of `fit_unigram` *and* `fit_bigram` and records
+  every path handed to it: `numpy.load was called 2x, all on ['train.npy']`. So a
+  fit that read val — through any code path, including one the manifest does not
+  mention — shows up. TL2.5f additionally re-derives `unigram_ce` from the arrays
+  inside the test file and requires agreement to 1e-9 (`7.186473059` vs
+  `7.186473059`), which catches a writer that computed one number and recorded
+  another. The bigram is deliberately not re-derived: re-implementing its
+  discounting in the test would only check that the same author wrote the same
+  formula twice.
+
+  **Naming, corrected rather than glossed.** The plan says "Katz-backoff". What is
+  implemented is the **absolute-discounting** variant of the same backoff structure
+  — `max(c(v,w) − D, 0) / c(v)` for seen bigrams with `λ(v) = D·types_after(v)/c(v)`
+  of leftover mass on the unigram, `D = 0.75` — not Katz's original Good–Turing
+  discounting. The manifest records
+  `bigram_smoothing = "backoff, absolute discounting D=0.75"` so nobody reads
+  "Katz" and assumes Good–Turing. For a floor the difference is far below the
+  precision anyone quotes, and TL2.5e requires the smoothing string to be present.
+  Unigram smoothing is chosen by measurement, not by default: 80 of 8192 types are
+  unseen in wikitext-103's train split (151 in wikitext-2), so add-1 applies and is
+  recorded; with no zeros the builder would have used MLE and said so.
+
+  **Block boundaries are not sequence boundaries**, and the bigram model depends on
+  it. `pack_split` cuts one contiguous stream, so row *i*'s last token really was
+  adjacent to row *i+1*'s first — the fit and the evaluation both read each split as
+  one flat stream. Treating rows as independent would discard one bigram per block
+  and would not match how a trained model sees the data. Canonical train: 134,737,919
+  bigrams over 5,033,639 distinct context–continuation pairs, i.e. **7.5% of the
+  8192² possible pairs are observed**, which is why the backoff mass matters.
+
+  Also recorded in `code/canonical_spec_language.json`:
+  `protocol.primary_metric_floor` is now **4.98494701553838** rather than null, and
+  its note is corrected — it previously named the *unigram* entropy as the language
+  floor, which the plan's own §3 contradicts. It also had `ln(8192) = 9.0106`, which
+  is wrong in the fourth decimal.
+
+- [x] **T-L2.6 Frequency-decile depth table — built, and deliberately unused.**
   Produce a `token_target_depth[V]` table from train frequency deciles so
   ablation F (`supervised_curriculum`) is runnable, and write into the module
   docstring that it is **not** part of the canonical configuration and is a design
@@ -611,12 +665,93 @@ does not exist here (T-L0.0).
   per vocabulary id; the canonical language config's
   `loss_weights.halting_supervision` is `0.0` and `halt_target_mode` is the pure
   ACT mode.
+  **Evidence:** `data/lang/build_depth_deciles.py`, checks TL2.6a–j. `token_decile.npy`
+  is `int8`, length 8192, values exactly `{0..9}` on both corpora, hash recorded and
+  re-verified. `canonical_spec_language.json` has `halting_mode = "pure_act"` and
+  `family_cls_weight = 0.0`, and its `frozen_by` note states the stronger fact:
+  supervised_curriculum is **not available** on language at all, because a packed LM
+  sequence has no per-token complexity label to build a per-item oracle depth from.
 
-- [ ] **T-L2.7 GATE L2 — dataset integrity.** **Verify:** no train/val/test block
+  **Measurement and choice are in different files, on purpose.** The builder
+  produces `token_decile[V]` — a measured property of the train split. The
+  decile→depth mapping is a design choice and lives in
+  `lang_families.decile_target_depth(decile, max_depth)`, which takes `max_depth` as
+  an argument so the artifact does not hard-code a recursion budget it cannot know
+  at dataset-build time. At `max_depth = 7` the map is
+  `[1, 2, 2, 3, 4, 4, 5, 6, 6, 7]`; an out-of-range decile or `max_depth < 1`
+  raises, with no fallback.
+
+  **Deciles are cut at equal TOKEN mass, not equal type count**, and the canonical
+  numbers show why that was not a stylistic choice:
+
+  | decile | types | tokens | share | count range |
+  |---|---|---|---|---|
+  | 0 | **3** | 14,202,737 | 10.54% | 3,630,874–5,600,357 |
+  | 4 | 127 | 13,387,574 | 9.94% | 72,364–155,817 |
+  | 9 | **4,265** | 13,471,820 | 10.00% | 0–5,248 |
+
+  Three types carry 10.5% of the corpus; 4,265 types — 52% of the vocabulary — carry
+  the last 10%. Equal-type-count deciles would have put ~90% of corpus occurrences
+  in the single most-frequent decile, so the "curriculum" would have assigned one
+  depth to nearly every token the loss actually weights.
+
+  **The confound is measured, and it is milder than feared.**
+  `families.OP_TARGET_DEPTH` was deliberately built so target depth is *not* a
+  function of the expert index, so a model could not score well on depth by routing
+  alone. A frequency decile has no such protection — function words are frequent,
+  subword pieces are rare. The token-weighted normalized mutual information between
+  decile and POS family is **0.2724** on wikitext-103 (0.2811 on wikitext-2):
+  `I = 0.4364` nats against `H(decile) = 2.3016`, `H(family) = 1.6021`. So the two
+  are correlated but far from equivalent, and ablation F's depth numbers can be read
+  as carrying real information provided they are quoted against 0.27 rather than
+  against 0.
+
+- [x] **T-L2.7 GATE L2 — dataset integrity.** **Verify:** no train/val/test block
   overlap by exact-content hash; the tokenizer was fitted on train only; every
   block is full-length; the unmapped-token share is ≤ 2% (§4.3 budget) and its
   measured value is published in the manifest; the trivial floors are present and
   finite; the manifest hash is reproducible.
+  **Evidence: GATE L2 PASSES on both corpora.** `code/test_language_data.py` →
+  **104 passed, 0 failed, 0 skipped**; `code/test_language_families.py` →
+  **57 passed, 0 failed, 2 skipped** (the skips are T-L3.2/T-L3.3, not yet built);
+  `code/test_language_task_axis.py` → **72 passed, 0 failed**. Checks TL2.7a–d.
+
+  **Overlap is checked by exact content, not by hash.** Raw 512-byte block bytes are
+  used as dict keys — 2,354 held-out canonical blocks is 1.2 MB, so exactness costs
+  nothing and there is no collision argument to make. All **526,320** canonical
+  train blocks were streamed against that set (the 269 MB array stays memory-mapped):
+  **zero overlap**, and val/test share no block with each other either
+  (2,354 distinct blocks from 2,354 stored, so no duplicates within the held-out
+  data at all). This is the check that makes the author-provided splits' claimed
+  document-disjointness a measured fact for this build.
+
+  **"The manifest hash is reproducible"** is interpreted as the one hash the
+  manifest actually publishes: `dataset_version`. TL2.7c re-derives it from the
+  recorded per-split SHA-256 values and requires equality —
+  `lang-wikitext-103-bpe8192-len256-800d6154` and
+  `lang-wikitext-2-bpe8192-len256-9f870794`. So the version names the exact bytes,
+  and a silently rebuilt split changes it.
+
+  The five aggregate clauses (TL2.7d): tokenizer fitted on train only; every block
+  full-length; unmapped ≤ 2% (**1.2344%** canonical, 1.3011% dev); the measured
+  unmapped share published as a float; all four floor keys present and finite.
+
+  **A DEFECT FOUND AND FIXED WHILE RUNNING THIS GATE — a silent manifest clobber.**
+  `build_baseline_floors.py --corpus wikitext-103` finished while
+  `build_family_lookup.py --corpus wikitext-103` was still tagging. The lookup then
+  called `save_manifest` with the manifest snapshot it had loaded 25 minutes
+  earlier, **erasing `uniform_ce`, `unigram_ce`, `bigram_ce` and
+  `primary_metric_floor`.** Nothing raised; the JSON stayed valid. It surfaced only
+  because TL2.5 reports a missing floor as a `[SKIP]` naming the reason, so the
+  absence was visible in the output rather than merely absent — an argument for
+  skipping loudly instead of conditionally not checking. Fixed by
+  `bld.update_manifest(corpus, new_fields)`, which re-reads the on-disk manifest
+  immediately before merging, and all three stage builders now use it. The residual
+  race is stated in that function's docstring rather than papered over: two builders
+  whose read-and-write windows overlap can still lose keys, the window is now
+  milliseconds instead of minutes, and the operational rule is that two stage
+  builders must not run concurrently on the same corpus.
+
 
 ---
 
@@ -714,7 +849,7 @@ does not exist here (T-L0.0).
   PASS (T-LX.0 discharged; 173.8 s on the CPU interpreter).
 
 
-- [ ] **T-L3.1 Type-level `token_family[V]` from majority POS.** Tag the train
+- [x] **T-L3.1 Type-level `token_family[V]` from majority POS.** Tag the train
   split with nltk's averaged-perceptron tagger, take each vocabulary type's
   majority POS across its train occurrences, and freeze an `int8` lookup of length
   V. Type-level, not token-level: a per-occurrence oracle would make the "correct"
@@ -726,6 +861,117 @@ does not exist here (T-L0.0).
   is exactly the E7 catch-all the rules removed). **Verify:** the lookup has length
   V and dtype int8; the `-1` share matches the manifest; a spot sample of 40 types
   per family is linguistically sane on inspection.
+  **Evidence:** `data/lang/build_family_lookup.py`, checks TL3.1a–q. `int8`,
+  length 8192, values exactly `{-1, 0..5}`, hash recorded and re-verified, EOT
+  mapped to `-1` (a document separator is not a lexical class). Both the type-level
+  and token-level counts are **recounted from the array and the packed `.npy`
+  files** rather than read from the manifest, so a writer that recorded different
+  numbers than it computed fails. 100,285,152 words tagged on the canonical corpus
+  in 19.1 min with 6 workers.
+
+  | | wikitext-2 | wikitext-103 |
+  |---|---|---|
+  | types decided by corpus vote | 4,689 | **5,559** |
+  | types by surface-class fallback | 3,502 | 2,632 |
+  | types left `-1` | 180 (2.20% of V) | 176 (2.15% of V) |
+  | voted types that were contested | 45.1% | **63.1%** |
+  | half-vs-half majority disagreement | 2.40% | **1.61%** |
+  | **unmapped TRAIN-TOKEN share** | 1.3011% | **1.2344%** |
+
+  The two columns move in the directions more data should produce: more types earn a
+  standalone vote, more of them turn out to be genuinely ambiguous, and the majority
+  becomes *more* stable rather than less — 1.61% of 5,266 types flip between the
+  first and second half of the corpus. Halves rather than an interleaved split
+  deliberately: interleaving samples the same distribution twice and would converge
+  trivially, hiding any drift across the corpus.
+
+  **Canonical token-level family shares:** L1_FUNCTION 27.8%, L2_NOUN 29.6%,
+  L3_VERB 5.7%, L4_MODIFIER 6.5%, L5_PUNCT_SYM 8.7%, L6_NUM_SUBWORD 20.4%.
+
+  **FINDING — the oracle partition is not balanced, and the balance loss is
+  therefore in tension with the POS metric in a way it never was on arithmetic.**
+  The partition's own normalized load entropy is **H/log(6) = 0.8884** (wikitext-2
+  measurement; largest/smallest family token ratio **5.29×**). A router that
+  perfectly reproduced POS would score 0.8884, not 1.0 — so a router driven to 1.0
+  by the balance term must *disagree* with POS by construction. Every language
+  load-entropy number has to be read against the partition's own entropy, never
+  against 1.0. On arithmetic the oracle families were near-uniform by construction,
+  so this question did not arise. TL3.1l pins it.
+
+  **The type/token divergence T-L2.4 was written to guard against is extreme here:**
+  L1_FUNCTION is **2.6% of types and 27.3% of tokens** — a 10.7× ratio — and
+  L5_PUNCT_SYM is 0.57% of types and 8.9% of tokens. TL3.1k requires at least one
+  family to diverge by more than 10 percentage points, so the manifest's two
+  denominators are justified by measurement rather than by hypothesis.
+
+  **Whitespace tokenization, chosen by measurement.** `TreebankWordTokenizer` yields
+  1.0251× more tokens on wikitext-2, and the excess is entirely units that **do not
+  exist in the byte stream the BPE was fitted on**: it splits WikiText's own `@-@` /
+  `@.@` / `@,@` escapes into `@`+`-`+`@` (2,830 occurrences per ~330 k tokens),
+  rewrites `"` as Penn's ` `` `, splits `cannot` into `can`+`not`, and strips the
+  final period off `U.S.`. Tagging a unit that never appears in the corpus would
+  break the word-to-id alignment the vote depends on. WikiText is already
+  Moses-tokenized with spaces around punctuation, so whitespace *is* its
+  tokenization. Those `@-@` markers are ~0.86% of tokens and got an explicit
+  `CORPUS_MARKER_FORMS → L5` override, because the tagger has no opinion worth
+  having about them: `@-@` is not English, so the perceptron falls back on shape
+  features and emits whatever the context suggests.
+
+  **How a type earns a vote, and what earns nothing.** Each word is encoded *with
+  its leading space* (byte-level BPE distinguishes `" the"` from `"the"`); if it
+  encodes to exactly one id, that id gets one vote for the word's family. A word
+  that splits into several pieces votes for **nothing** — its part of speech is a
+  property of the word, and attributing it to an arbitrary piece would invent
+  information. On the canonical corpus 80.2% of word occurrences were single-id and
+  19.8% were multi-piece; 0.04% were tag-ignored (`FW`). All three are counted in
+  the manifest, because "how many occurrences were unusable" is the number that says
+  whether the vote had enough evidence.
+
+  **Determinism, verified rather than argued.** Vote counts merge associatively and
+  `majority()` breaks ties by lowest family index, never by dict order, so the
+  parallel and serial paths must agree. `--workers 1` and `--workers 6` produced
+  **byte-identical** lookups on wikitext-2 (both `sha256 731fc370ecd08d87`), and the
+  same hash survived the byte-range refactor below. TL3.1q checks the tie rule
+  directly; the end-to-end identity is recorded here rather than re-run in the suite,
+  because it costs two full corpus passes.
+
+  **Spot sample of 40 types per family (the Verify clause that needs a human).**
+  Linguistically sane throughout. L1: ` on ' for be it which who she than where
+  some This against may could though And We without my should himself upon above
+  must themselves Nor inside Both below Of onto Among Unlike Your unlike`. L3: ` including
+  elect want developed meet fight know born taking try constructed proposed`.
+  L5: `! # $ % & ' ( ) + , . / : ; < > @ ' .. ... @-@ @.@ @,@ £`. L6 is exactly
+  what it should be — `re ion ow se ose uc ians ator ilities` alongside ` 1998 1942
+  59 166` and word-initial fragments ` Par Mag Cath Tw Bor Gra Hug Shakespe Celt
+  tele prohib`. The 180 `-1` types are **replacement characters (lone UTF-8
+  continuation bytes) and C0 control characters** — precisely §4.3's "fragments that
+  have no POS", and nothing else.
+
+  Two observations from that inspection, recorded because they look like defects and
+  are not:
+  1. `'is'` **without** a leading space → L6_NUM_SUBWORD (2,662 train tokens), while
+     `' is'` → L1_FUNCTION (11,750). Correct: the space-less type is the word-internal
+     fragment of `basis`/`crisis`/`this`, and the leading-space distinction is doing
+     exactly the work it was introduced for.
+  2. Negated contraction stems (` wasn`, ` doesn`, ` didn`, ` don`, ` cannot`) land in
+     L3_VERB rather than L1, because the BE override is a closed list of full forms.
+     Total ~600 tokens of 2.69 M = **0.02%**. Left alone deliberately: adding only the
+     BE stems while excluding the DO/HAVE stems would trade a stated rule for a
+     0.002% effect.
+
+  **A memory defect found and fixed before the canonical build.** The first version
+  did `list(iter_chunks(...))` and materialized 1.8 M lines of the 539 MB corpus as
+  Python strings — **measured at 1,013 MB resident before a single word was tagged**,
+  and feeding a lazy generator to `imap_unordered` would not have helped, because the
+  pool drains its input as fast as it can into an unbounded queue. Workers were a
+  second 358 MB each, because importing `more.lang_families` runs `more/__init__.py`
+  and therefore torch — the exact leak TL3.0w documents. Both fixed: the parent now
+  passes `(index, start_byte, end_byte)` triples and each worker reads its own slice,
+  and the manifest is loaded by path. Measured after: parent **45 MB**, workers
+  **161 MB** each, **1,025 MB total against ~3,100 MB before**, and throughput went
+  up (104 k words/s). The refactor was gated on reproducing the pre-refactor lookup
+  byte-for-byte, which it did.
+
 
 - [ ] **T-L3.2 Demote routing accuracy to `routing_agreement_with_pos`.**
   STRICTER THAN ARITHMETIC (§4.4). On arithmetic, `OP_TO_EXPERT` is ground truth:

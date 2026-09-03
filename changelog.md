@@ -4395,6 +4395,126 @@ share looks wrong; `surface_class_family` when the unmapped share moves;
 `op_target_depth_table` when a language run reports a depth allocation error at all
 (it should report `N/A`).
 
+## T-L2.5 / T-L2.6 / T-L2.7 / T-L3.1 — GATE L2 passes, and the floor is 4.9849
+
+Four builders and two suites. `code/test_language_data.py` → **104 passed, 0 failed,
+0 skipped**; `code/test_language_families.py` → **57 passed, 0 failed, 2 skipped**
+(T-L3.2/3.3 unbuilt); `code/test_language_task_axis.py` → **72 passed, 0 failed**.
+New: `data/lang/build_family_lookup.py`, `data/lang/build_baseline_floors.py`,
+`data/lang/build_depth_deciles.py`. Changed:
+`data/lang/build_language_dataset.py` (`update_manifest`),
+`code/more/lang_families.py` (corpus markers, deciles),
+`code/canonical_spec_language.json` (`protocol.primary_metric_floor`).
+
+**THE NUMBER: `primary_metric_floor = 4.9849` nats/token** on wikitext-103 val
+(7.1918 bits, perplexity 146.2). Fitted on train, evaluated on val:
+uniform 9.010913 = ln 8192 = 13.0000 bits exactly, unigram 7.198213, backoff bigram
+4.984947. A canonical language run that does not beat 4.9849 has learned nothing a
+two-column count table could not. Frozen into
+`canonical_spec_language.json:protocol.primary_metric_floor`, whose note previously
+named the *unigram* as the language floor — which `plan_language.md` §3 contradicts —
+and had `ln(8192) = 9.0106`, wrong in the fourth decimal. Both corrected.
+
+**Naming corrected rather than glossed.** The plan says "Katz-backoff"; what is
+implemented is the **absolute-discounting** variant of the same backoff structure,
+`D = 0.75`, with `λ(v) = D·types_after(v)/c(v)` of leftover mass on the unigram — not
+Katz's Good–Turing discounting. `bigram_smoothing` records the actual method so
+nobody reads "Katz" and assumes Good–Turing. Unigram smoothing is picked by
+measurement, not default: 80 of 8192 types are unseen in canonical train, so add-1
+applies and is recorded; with no zeros the builder uses MLE and says so.
+
+**The train-only property is proved by interception.** TL2.5g wraps `numpy.load` for
+the duration of `fit_unigram` *and* `fit_bigram` and records every path: `called 2x,
+all on ['train.npy']`. A fit that read val through *any* path, including one the
+manifest does not mention, shows up. TL2.5f re-derives `unigram_ce` inside the test
+file and requires 1e-9 agreement, catching a writer that computed one number and
+recorded another. The bigram is deliberately not re-derived — re-implementing its
+discounting in the test would check only that the same author wrote the same formula
+twice.
+
+**GATE L2's overlap check is exact content, not hashes.** Raw 512-byte block bytes as
+dict keys: 2,354 held-out canonical blocks is 1.2 MB, so exactness costs nothing and
+there is no collision argument to make. All **526,320** canonical train blocks
+streamed against that set — zero overlap, and val/test share no block with each other
+either (2,354 distinct from 2,354 stored, so no duplicates inside the held-out data
+at all). "The manifest hash is reproducible" is read as the one hash the manifest
+publishes: `dataset_version` re-derives from the recorded per-split SHA-256s.
+
+**A SILENT MANIFEST CLOBBER, found by a SKIP.** `build_baseline_floors.py --corpus
+wikitext-103` finished while `build_family_lookup.py --corpus wikitext-103` was still
+tagging; the lookup then wrote back the manifest snapshot it had loaded 25 minutes
+earlier, **erasing all four floor keys**. Nothing raised, the JSON stayed valid, and
+no check failed — TL2.5 reported `[SKIP] floors not built for this corpus`, and the
+reason string is what made the absence visible instead of merely absent. That is the
+argument for skipping loudly rather than conditionally not checking. Fixed with
+`bld.update_manifest(corpus, new_fields)`, which re-reads the on-disk manifest
+immediately before merging; all three stage builders use it. The residual race is in
+that docstring rather than papered over: overlapping read-and-write windows can still
+lose keys, the window is now milliseconds instead of minutes, and two stage builders
+must not run concurrently on the same corpus.
+
+**FINDING — the oracle POS partition is not balanced, so the balance loss now fights
+the specialization metric.** `H/log(6) = 0.8884` for the partition itself;
+largest/smallest family token ratio **5.29×**. A router that perfectly reproduced POS
+scores 0.8884, so a router driven toward 1.0 by the balance term must *disagree* with
+POS by construction. On arithmetic the oracle families were near-uniform and this
+question did not arise. Every language load-entropy number must be quoted against the
+partition's own entropy, never against 1.0. TL3.1l pins it.
+
+**FINDING — the type/token divergence T-L2.4 guards against is extreme.**
+L1_FUNCTION is 2.6% of types and 27.3% of tokens (10.7×); L5_PUNCT_SYM is 0.57% of
+types and 8.9% of tokens. TL3.1k requires at least one family to diverge by >10
+points, so the manifest's two denominators are justified by measurement.
+
+**Whitespace tokenization, chosen by measurement.** `TreebankWordTokenizer` yields
+1.0251× more tokens, and every extra unit is one that **does not exist in the byte
+stream the BPE was fitted on**: it splits WikiText's `@-@`/`@.@`/`@,@` escapes into
+`@`+`-`+`@` (2,830 per ~330 k tokens), rewrites `"` as Penn's ` `` `, splits `cannot`,
+strips the period off `U.S.`. Tagging a unit absent from the corpus breaks the
+word-to-id alignment the vote depends on. Those markers are ~0.86% of tokens and got
+an explicit `CORPUS_MARKER_FORMS → L5` override, because the tagger has no opinion
+worth having about them — `@-@` is not English, so the perceptron falls back on shape
+features and emits whatever the context suggests.
+
+**Two memory defects fixed before the canonical build, both measured.**
+`list(iter_chunks(...))` materialized 1.8 M lines of the 539 MB corpus as Python
+strings: **1,013 MB resident before a word was tagged**. A lazy generator would not
+have fixed it — `Pool.imap_unordered` drains its input into an unbounded queue. Now
+the parent passes `(index, start_byte, end_byte)` triples and each worker reads its
+own slice. Separately, each of 6 workers was **358 MB** because importing
+`more.lang_families` runs `more/__init__.py` and pulls in torch — the exact leak
+TL3.0w documents — so the manifest is now loaded by path. After: parent 45 MB,
+workers 161 MB, **1,025 MB total against ~3,100 MB**, and throughput rose to 104 k
+words/s. The refactor was gated on reproducing the pre-refactor lookup byte-for-byte,
+which it did (`sha256 731fc370ecd08d87`, also identical between `--workers 1` and
+`--workers 6`).
+
+**Deciles are cut at equal TOKEN mass**, and the Zipf numbers show why that is not
+stylistic: 3 types carry 10.5% of the canonical corpus while 4,265 types (52% of V)
+carry the last 10%. Equal-type-count deciles would have assigned one depth to nearly
+every token the loss weights. The ablation-F confound is measured — decile-vs-family
+normalized MI **0.2724** — so depth allocation and routing are correlated but not
+near-equivalent claims, provided the number is quoted against 0.27 rather than 0.
+Measurement and choice are split across files on purpose: `token_decile.npy` is
+measured, `lang_families.decile_target_depth(decile, max_depth)` is the choice and
+takes `max_depth` as an argument so the artifact hard-codes no recursion budget.
+
+**Deliberately still null in `canonical_spec_language.json`.** `dataset_version` and
+`seq_len` stay unfrozen even though the corpus is built and Gate L2 passes: the
+version string encodes `-len256-`, and `seq_len` is Gate L5's to set from measured
+throughput and VRAM headroom on the actual GPU. Freezing now would either pre-empt
+that measurement or guarantee a re-freeze. Both `frozen_by` notes were rewritten to
+say the corpus IS built and what specifically still blocks each field, so a future
+reader does not read the nulls as an oversight.
+
+**Where to look.** `build_family_lookup.py` `chunk_offsets` / `_load_manifest_module`
+for the memory fixes; `majority` when parallel and serial builds disagree;
+`build_language_dataset.py` `update_manifest` when a manifest key goes missing;
+`build_baseline_floors.py` `evaluate_bigram` for the discounting formula;
+`lang_families.CORPUS_MARKER_FORMS` when L5's token share moves;
+`TASKS_LANGUAGE.md` T-L2.5–T-L2.7 and T-L3.1 Evidence for the full tables and the
+40-types-per-family spot sample.
+
 <!-- APPEND-MARKER-CL -->
 
 

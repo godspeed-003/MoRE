@@ -336,6 +336,30 @@ AUXILIARY_SURFACE_FORMS = frozenset({
     "not", "n't",                 # negative particle
 })
 
+# ---------------------------------------------------------------------------
+# 3a-bis. Corpus markers (T-L3.1)
+# ---------------------------------------------------------------------------
+#
+# CORPUS-SPECIFIC, unlike everything else in this module. WikiText escapes
+# intra-word punctuation so its whitespace tokenization stays reversible:
+# `well @-@ known` is "well-known", `1 @.@ 5` is "1.5", `1 @,@ 000` is "1,000".
+# Measured on wikitext-2's train split: 2,830 occurrences in the first ~330 k
+# whitespace tokens, i.e. ~0.86% -- frequent enough that a wrong family here moves
+# a load-balance number.
+#
+# They are punctuation standing in for punctuation, so L5. The reason they need an
+# override rather than the tagger's opinion is that the tagger has no opinion worth
+# having: `@-@` is not English, so the perceptron falls back on shape features and
+# emits whatever the surrounding context suggests. An arbitrary-but-consistent tag
+# would put ~0.9% of tokens in a family chosen by an accident of the tagger's
+# feature weights.
+#
+# Kept here rather than in the builder because every other surface-form -> family
+# decision is here, and splitting them across two files is how one of them ends up
+# not being applied.
+CORPUS_MARKER_FORMS = frozenset({"@-@", "@.@", "@,@"})
+
+
 
 def penn_to_family(tag: str, surface: str | None = None) -> int:
     """Family index for one tagged word occurrence, or `NO_FAMILY_IDX`.
@@ -351,8 +375,12 @@ def penn_to_family(tag: str, surface: str | None = None) -> int:
     The import guard makes this unreachable for the standard Penn tagset, so a
     raise here means a non-standard tagger.
     """
-    if surface is not None and surface.strip().lower() in AUXILIARY_SURFACE_FORMS:
-        return FAMILY_TO_IDX["L1"]
+    if surface is not None:
+        _s = surface.strip()
+        if _s in CORPUS_MARKER_FORMS:
+            return FAMILY_TO_IDX["L5"]
+        if _s.lower() in AUXILIARY_SURFACE_FORMS:
+            return FAMILY_TO_IDX["L1"]
     if tag in PENN_TO_FAMILY:
         return PENN_TO_FAMILY[tag]
     if tag in PENN_UNMAPPED:
@@ -418,12 +446,62 @@ def surface_class_family(surface: str) -> int:
 # ---------------------------------------------------------------------------
 # 4. The unmapped budget
 # ---------------------------------------------------------------------------
-
 # `plan_language.md` §4.3. The number that replaces arithmetic's `raise`: Gate L2
 # fails the build if more than this fraction of TRAIN TOKENS (not types -- a
 # family can be 2% of types and 40% of tokens) carries `NO_FAMILY_IDX`. Kept here
 # rather than in the gate so the manifest writer and the gate read one constant.
 UNMAPPED_TOKEN_BUDGET = 0.02
+
+N_FREQUENCY_DECILES = 10
+
+
+def decile_target_depth(decile, max_depth):
+    """Target recursion depth for a frequency decile. ABLATION F ONLY.
+
+    READ THIS BEFORE CITING ANY LANGUAGE DEPTH NUMBER.
+
+    This is a DESIGN CHOICE and it is NOT part of the canonical language
+    configuration. `plan_language.md` §5 is explicit that canonical language runs
+    invent no depth target: unlike arithmetic, where a naive sequential
+    decomposition gives a defensible number of sub-steps per operation, there is no
+    principled answer to "how many recursion steps should predicting the next token
+    take". Canonical language runs are pure ACT --
+    `loss_weights.halting_supervision = 0.0` -- and this function exists only so
+    ablation F (`supervised_curriculum`) is runnable and comparable with the
+    arithmetic one.
+
+    The mapping is linear from decile 0 (the most frequent tenth of corpus
+    occurrences) at depth 1, to decile 9 (the rarest tenth) at `max_depth`. The
+    hypothesis it encodes -- rarer tokens need more computation -- is a hypothesis,
+    not a measurement.
+
+    A WEAKNESS THIS SHARES WITH NOTHING IN ARITHMETIC, stated because it limits what
+    ablation F can show. `families.OP_TARGET_DEPTH` was built to be correlated with
+    but NOT a function of the expert index, precisely so a model could not score
+    perfectly on depth by routing alone. Here the decile is a pure function of
+    token frequency, and frequency is strongly associated with POS family --
+    function words are frequent, subword pieces are rare. So a language model that
+    merely routed by family would already predict much of this target. The
+    association is measured at build time and written to the manifest as
+    `decile_family_mutual_information`; ablation F's depth numbers must be read
+    against it rather than as independent evidence.
+    """
+    if max_depth < 1:
+        raise ValueError(f"max_depth must be >= 1, got {max_depth}")
+    if not (0 <= decile < N_FREQUENCY_DECILES):
+        raise ValueError(
+            f"decile must be in 0..{N_FREQUENCY_DECILES - 1}, got {decile}. "
+            "There is no fallback decile: an id with no decile is a build defect, "
+            "not a case to smooth over."
+        )
+    span = N_FREQUENCY_DECILES - 1
+    return 1 + int(round(decile * (max_depth - 1) / span))
+
+
+def decile_target_depth_table(max_depth):
+    """`[depth for each decile]`, so a caller maps `token_decile[V]` in one gather."""
+    return [float(decile_target_depth(d, max_depth))
+            for d in range(N_FREQUENCY_DECILES)]
 
 
 # ---------------------------------------------------------------------------

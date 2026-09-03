@@ -1,18 +1,211 @@
 {
+  "bigram_ce": 4.98494701553838,
+  "bigram_distinct_pairs": 5033639,
+  "bigram_smoothing": "backoff, absolute discounting D=0.75",
+  "bigram_train_bigrams": 134737919,
   "corpus": "wikitext-103",
   "dataset_version": "lang-wikitext-103-bpe8192-len256-800d6154",
+  "decile_cut": "equal train TOKEN mass, most frequent = decile 0",
+  "decile_family_mutual_information": {
+    "entropy_decile_nats": 2.3015685817293012,
+    "entropy_family_nats": 1.6021120483894509,
+    "mutual_information_nats": 0.4363838002116003,
+    "normalized": 0.27238032486571845
+  },
+  "decile_generator": "data/lang/build_depth_deciles.py",
+  "decile_generator_commit": "5aae2e3fd3245c0fae3fde96f13cd786a7897c41",
+  "decile_is_canonical": false,
+  "decile_purpose": "ablation F (supervised_curriculum) only. plan_language.md \u00a75: canonical language runs invent no depth target, so loss_weights.halting_supervision stays 0.0 and halting stays pure ACT. The decile->depth mapping is a DESIGN CHOICE and lives in code/more/lang_families.py:decile_target_depth, not in this artifact.",
+  "decile_table": [
+    {
+      "decile": 0,
+      "max_count": 5600357,
+      "min_count": 3630874,
+      "token_share": 0.10541009539111187,
+      "tokens": 14202737,
+      "types": 3
+    },
+    {
+      "decile": 1,
+      "max_count": 2737793,
+      "min_count": 1349984,
+      "token_share": 0.10182855724654202,
+      "tokens": 13720168,
+      "types": 7
+    },
+    {
+      "decile": 2,
+      "max_count": 1338685,
+      "min_count": 436646,
+      "token_share": 0.0957195568997948,
+      "tokens": 12897054,
+      "types": 17
+    },
+    {
+      "decile": 3,
+      "max_count": 431913,
+      "min_count": 156880,
+      "token_share": 0.09797333222896717,
+      "tokens": 13200723,
+      "types": 59
+    },
+    {
+      "decile": 4,
+      "max_count": 155817,
+      "min_count": 72364,
+      "token_share": 0.0993601059004028,
+      "tokens": 13387574,
+      "types": 127
+    },
+    {
+      "decile": 5,
+      "max_count": 72007,
+      "min_count": 35874,
+      "token_share": 0.0999684795490386,
+      "tokens": 13469545,
+      "types": 269
+    },
+    {
+      "decile": 6,
+      "max_count": 35870,
+      "min_count": 18815,
+      "token_share": 0.09984713286356209,
+      "tokens": 13453195,
+      "types": 526
+    },
+    {
+      "decile": 7,
+      "max_count": 18800,
+      "min_count": 9792,
+      "token_share": 0.09995288631440949,
+      "tokens": 13467444,
+      "types": 1016
+    },
+    {
+      "decile": 8,
+      "max_count": 9782,
+      "min_count": 5248,
+      "token_share": 0.09995448942658458,
+      "tokens": 13467660,
+      "types": 1903
+    },
+    {
+      "decile": 9,
+      "max_count": 5248,
+      "min_count": 0,
+      "token_share": 0.09998536417958656,
+      "tokens": 13471820,
+      "types": 4265
+    }
+  ],
+  "decile_types_unseen_in_train": 80,
   "dropped_tail_tokens": {
     "test": 47,
     "train": 31,
     "val": 247
   },
   "eot_id": 0,
+  "family_contested_types": 3508,
+  "family_counts_tokens": {
+    "test": {
+      "by_family": {
+        "L1_FUNCTION": 88814,
+        "L2_NOUN": 94257,
+        "L3_VERB": 18088,
+        "L4_MODIFIER": 21121,
+        "L5_PUNCT_SYM": 28018,
+        "L6_NUM_SUBWORD": 67585
+      },
+      "total_tokens": 321536,
+      "unmapped": 3653,
+      "unmapped_share": 0.01136109175955414
+    },
+    "train": {
+      "by_family": {
+        "L1_FUNCTION": 37469155,
+        "L2_NOUN": 39897212,
+        "L3_VERB": 7716436,
+        "L4_MODIFIER": 8729074,
+        "L5_PUNCT_SYM": 11766087,
+        "L6_NUM_SUBWORD": 27496813
+      },
+      "total_tokens": 134737920,
+      "unmapped": 1663143,
+      "unmapped_share": 0.012343540704799361
+    },
+    "val": {
+      "by_family": {
+        "L1_FUNCTION": 77954,
+        "L2_NOUN": 83944,
+        "L3_VERB": 16320,
+        "L4_MODIFIER": 17985,
+        "L5_PUNCT_SYM": 24269,
+        "L6_NUM_SUBWORD": 57044
+      },
+      "total_tokens": 281088,
+      "unmapped": 3572,
+      "unmapped_share": 0.012707764116575593
+    }
+  },
+  "family_counts_types": {
+    "L1_FUNCTION": 243,
+    "L2_NOUN": 3495,
+    "L3_VERB": 839,
+    "L4_MODIFIER": 658,
+    "L5_PUNCT_SYM": 38,
+    "L6_NUM_SUBWORD": 2743
+  },
+  "family_counts_types_unmapped": 176,
+  "family_labels": [
+    "L1_FUNCTION",
+    "L2_NOUN",
+    "L3_VERB",
+    "L4_MODIFIER",
+    "L5_PUNCT_SYM",
+    "L6_NUM_SUBWORD"
+  ],
+  "family_lookup_generator": "data/lang/build_family_lookup.py",
+  "family_lookup_generator_commit": "5aae2e3fd3245c0fae3fde96f13cd786a7897c41",
+  "family_lookup_tagger": "nltk averaged_perceptron_tagger_eng",
+  "family_lookup_word_tokenization": "whitespace (WikiText is Moses-tokenized)",
+  "family_manifest": "code/more/lang_families.py",
+  "family_surface_fallback_by_family": {
+    "L5_PUNCT_SYM": 8,
+    "L6_NUM_SUBWORD": 2449,
+    "UNMAPPED": 175
+  },
+  "family_type_provenance": {
+    "special": 1,
+    "surface": 2632,
+    "unmapped": 175,
+    "voted": 5559
+  },
+  "family_vote_stability": {
+    "agree": 5181,
+    "disagreement_rate": 0.016141283706798328,
+    "types_in_both_halves": 5266
+  },
+  "family_vote_stats": {
+    "multi_piece": 20769325,
+    "single_id": 80656346,
+    "tag_ignored": 41497,
+    "words": 101425671
+  },
+  "floors_eval_split": "val",
+  "floors_eval_tokens": 281088,
+  "floors_fitted_on": "train",
+  "floors_generator": "data/lang/build_baseline_floors.py",
+  "floors_generator_commit": "5aae2e3fd3245c0fae3fde96f13cd786a7897c41",
+  "floors_ordered_uniform_ge_unigram_ge_bigram": true,
+  "floors_units": "nats per token",
   "generator_commit": "9470ff273d126565e5c18a3661c5c7eae2e4a6af",
   "generator_script": "data/lang/build_language_dataset.py",
   "hf_config": "wikitext-103-raw-v1",
   "hf_dataset": "Salesforce/wikitext",
   "hf_revision": "b08601e04326c79dfdd32d625aee71d232d685c3",
   "is_canonical_corpus": true,
+  "n_frequency_deciles": 10,
+  "primary_metric_floor": 4.98494701553838,
   "raw_bytes": {
     "test": 1287656,
     "train": 539295549,
@@ -54,16 +247,31 @@
     "train": 134737951,
     "val": 281335
   },
+  "token_decile_dtype": "int8",
+  "token_decile_file": "data/lang/wikitext-103/token_decile.npy",
+  "token_decile_len": 8192,
+  "token_decile_sha256": "c0cc4361bee467d9527714b862a1ab66a4c253cc02dcb4c3582992351889dc01",
+  "token_family_dtype": "int8",
+  "token_family_file": "data/lang/wikitext-103/token_family.npy",
+  "token_family_len": 8192,
+  "token_family_sha256": "b705c73242b8de469db6f3fe12c1153f52b4a458a8962294c02a083abf72e1dd",
   "tokenizer_sha256": "6a1f1477f4d91dd7d0d7e6971d97570ecb7208bf9d8170ec189df4497fe5f693",
   "tokenizer_training_files": [
     "data/lang/wikitext-103/train_text.txt"
   ],
   "train_documents": 29445,
   "train_text_bytes": 539295549,
+  "uniform_ce": 9.010913347279288,
+  "unigram_ce": 7.19822725507796,
+  "unigram_smoothing": "add-1 (Laplace)",
+  "unigram_unseen_types": 80,
   "unk_literal_occurrences": {
     "test": 0,
     "train": 0,
     "val": 0
   },
+  "unmapped_token_budget": 0.02,
+  "unmapped_token_share_train": 0.012343540704799361,
+  "unmapped_within_budget": true,
   "vocab_size": 8192
 }

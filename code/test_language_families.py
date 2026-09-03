@@ -26,6 +26,8 @@ import side effects that cannot be tested from inside a process that has already
 imported torch.
 """
 
+import json
+import math
 import os
 import re
 import subprocess
@@ -33,6 +35,7 @@ import sys
 
 CODE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(CODE)
+LANG = os.path.join(REPO, "data", "lang")
 sys.path.insert(0, CODE)
 
 try:
@@ -293,15 +296,201 @@ check("TL3.0w the manifest file loads with no torch, nltk, numpy or datasets",
 
 # ---------------------------------------------------------------------------
 print()
-print("=== T-L3.1 .. T-L3.3  not yet built ===")
+print("=== T-L3.1  token_family[V]: frozen from majority POS, audited ===")
 # ---------------------------------------------------------------------------
 
-skip("TL3.1 token_family[V] from majority POS",
-     "builder not written yet; needs the nltk tagger over the train split")
+import numpy as np      # noqa: E402
+
+CORPORA = ("wikitext-2", "wikitext-103")
+
+
+def _manifest(corpus):
+    p = os.path.join(LANG, corpus, "dataset_meta.json")
+    if not os.path.exists(p):
+        return None
+    with open(p, "r", encoding="utf-8") as fh:
+        return json.load(fh)
+
+
+def _sha256_file(path):
+    import hashlib
+    h = hashlib.sha256()
+    with open(path, "rb") as fh:
+        for block in iter(lambda: fh.read(1 << 20), b""):
+            h.update(block)
+    return h.hexdigest()
+
+
+_built = [(c, m) for c in CORPORA
+          if (m := _manifest(c)) is not None and "token_family_sha256" in m]
+
+if not _built:
+    skip("TL3.1a-l", "no corpus has a family lookup yet; run "
+                     "data/lang/build_family_lookup.py")
+
+for corpus, man in _built:
+    tag = f"[{corpus}]"
+    path = os.path.join(LANG, corpus, "token_family.npy")
+    V = man["vocab_size"]
+    table = np.load(path)
+
+    check(f"TL3.1a {tag} the lookup has length V and dtype int8",
+          table.shape == (V,) and table.dtype == np.int8,
+          f"shape {table.shape} dtype {table.dtype} (V = {V})")
+
+    check(f"TL3.1b {tag} every entry is a real family or the ignore label",
+          set(np.unique(table).tolist()) <= set(range(6)) | {-1},
+          f"values = {sorted(np.unique(table).tolist())}")
+
+    check(f"TL3.1c {tag} the recorded hash matches the file on disk",
+          _sha256_file(path) == man["token_family_sha256"],
+          f"sha256 {man['token_family_sha256'][:12]}")
+
+    check(f"TL3.1d {tag} the EOT token is ignored, not given a family",
+          int(table[man["eot_id"]]) == -1,
+          f"token_family[{man['eot_id']}] = {int(table[man['eot_id']])} "
+          f"-- a document separator is not a lexical class")
+
+    # -- the -1 share, recounted rather than read ---------------------------
+    n_unmapped_types = int((table == -1).sum())
+    check(f"TL3.1e {tag} the manifest's unmapped TYPE count matches the array",
+          n_unmapped_types == man["family_counts_types_unmapped"],
+          f"{n_unmapped_types:,} of {V:,} types "
+          f"({100 * n_unmapped_types / V:.2f}%)")
+
+    recount = {lbl: int((table == f).sum())
+               for f, lbl in enumerate(man["family_labels"])}
+    check(f"TL3.1f {tag} every per-family TYPE count matches the array",
+          recount == man["family_counts_types"],
+          " ".join(f"{k.split('_')[0]}={v:,}" for k, v in recount.items()))
+
+    check(f"TL3.1g {tag} the type counts plus the unmapped ones account for V",
+          sum(recount.values()) + n_unmapped_types == V,
+          f"{sum(recount.values()):,} + {n_unmapped_types:,} = {V:,}")
+
+    # -- token-level, recomputed from the packed arrays ---------------------
+    # `plan_language.md` §4.3's budget is over TOKENS, so the check that matters
+    # gathers the lookup through the real corpus rather than trusting the writer.
+    tok_ok, tok_detail = True, []
+    for split in ("train", "val", "test"):
+        arr = np.load(os.path.join(LANG, corpus, f"{split}.npy"), mmap_mode="r")
+        counts = np.zeros(7, dtype=np.int64)
+        rows = max(1, (1 << 22) // arr.shape[1])
+        for i in range(0, arr.shape[0], rows):
+            fam = table[np.asarray(arr[i:i + rows], dtype=np.int64)]
+            counts += np.bincount(fam.ravel() + 1, minlength=7)
+        rec = man["family_counts_tokens"][split]
+        same = (int(counts.sum()) == rec["total_tokens"]
+                and int(counts[0]) == rec["unmapped"]
+                and all(int(counts[f + 1]) == rec["by_family"][lbl]
+                        for f, lbl in enumerate(man["family_labels"])))
+        tok_ok = tok_ok and same
+        tok_detail.append(f"{split} {int(counts[0]):,}/{int(counts.sum()):,}"
+                          f"={int(counts[0]) / max(1, int(counts.sum())):.4%}")
+    check(f"TL3.1h {tag} token-level family counts reproduce from the .npy files",
+          tok_ok, "  ".join(tok_detail))
+
+    # -- the §4.3 budget: measured, published, and bounded -------------------
+    share = man["unmapped_token_share_train"]
+    check(f"TL3.1i {tag} the unmapped TRAIN-TOKEN share is inside the 2% budget",
+          share is not None and share <= lf.UNMAPPED_TOKEN_BUDGET
+          and man["unmapped_within_budget"] is True,
+          f"{share:.4%} <= {lf.UNMAPPED_TOKEN_BUDGET:.0%} -- an ignore label "
+          f"whose share is unmeasured is the E7 catch-all in another costume")
+
+    check(f"TL3.1j {tag} the budget itself is recorded, not just the verdict",
+          man.get("unmapped_token_budget") == lf.UNMAPPED_TOKEN_BUDGET,
+          "so a later reader can tell a passing build from a loosened budget")
+
+    # -- type-level and token-level are genuinely different ------------------
+    # T-L2.4 requires both denominators on the grounds that "a family can be 2% of
+    # types and 40% of tokens". This checks that the justification is a measured
+    # fact about this corpus rather than a hypothetical.
+    mapped_tok = (man["family_counts_tokens"]["train"]["total_tokens"]
+                  - man["family_counts_tokens"]["train"]["unmapped"])
+    mapped_typ = sum(recount.values())
+    gaps = {lbl: (man["family_counts_tokens"]["train"]["by_family"][lbl] / mapped_tok
+                  - recount[lbl] / mapped_typ)
+            for lbl in man["family_labels"]}
+    worst = max(gaps, key=lambda k: abs(gaps[k]))
+    check(f"TL3.1k {tag} type share and token share diverge by more than 10 points "
+          f"for at least one family",
+          abs(gaps[worst]) > 0.10,
+          f"{worst}: {100 * recount[worst] / mapped_typ:.1f}% of types vs "
+          f"{100 * man['family_counts_tokens']['train']['by_family'][worst] / mapped_tok:.1f}% "
+          f"of tokens -- a load-balance number read against the wrong denominator "
+          f"is uninterpretable")
+
+    # -- the oracle partition is NOT balanced, and that has consequences -----
+    p = [man["family_counts_tokens"]["train"]["by_family"][lbl] / mapped_tok
+         for lbl in man["family_labels"]]
+    H = -sum(x * math.log(x) for x in p if x > 0) / math.log(6)
+    check(f"TL3.1l {tag} the oracle partition's own normalized entropy is < 1",
+          H < 0.95,
+          f"H/log(6) = {H:.4f}, largest/smallest family token ratio "
+          f"{max(p) / min(p):.2f}x -- so a router pushed to H=1.0 by the balance "
+          f"loss must DISAGREE with POS. Read every language load-entropy number "
+          f"against {H:.4f}, not against 1.0")
+
+    # -- provenance of each decision, and convergence ------------------------
+    prov = man["family_type_provenance"]
+    check(f"TL3.1m {tag} every vocabulary entry is accounted for by provenance",
+          prov["voted"] + prov["surface"] + prov["special"] == V,
+          f"{prov['voted']:,} voted + {prov['surface']:,} surface-class + "
+          f"{prov['special']:,} special = {V:,}")
+
+    vs = man["family_vote_stats"]
+    check(f"TL3.1n {tag} the words that could NOT vote are counted, not discarded "
+          f"silently",
+          vs["single_id"] + vs["multi_piece"] == vs["words"]
+          and vs["multi_piece"] > 0,
+          f"{vs['words']:,} words: {vs['single_id']:,} single-id "
+          f"({100 * vs['single_id'] / vs['words']:.1f}%), "
+          f"{vs['multi_piece']:,} multi-piece (no vote, by design), "
+          f"{vs['tag_ignored']:,} tag-ignored")
+
+    stab = man["family_vote_stability"]
+    check(f"TL3.1o {tag} the majority survives a first-half / second-half split",
+          stab["disagreement_rate"] is not None
+          and stab["disagreement_rate"] < 0.10,
+          f"{stab['disagreement_rate']:.4%} of {stab['types_in_both_halves']:,} "
+          f"types flip -- the corpus decided the majority, it is not sampling "
+          f"noise")
+
+    check(f"TL3.1p {tag} the tokenization and tagger used are on the record",
+          man.get("family_lookup_word_tokenization", "").startswith("whitespace")
+          and "perceptron" in man.get("family_lookup_tagger", ""),
+          f"{man.get('family_lookup_tagger')} over "
+          f"{man.get('family_lookup_word_tokenization')}")
+
+# `majority` decides ties by lowest family index rather than by insertion order,
+# which is what lets the parallel and serial builds agree. Checked on the function
+# because reproducing it end-to-end means two full corpus passes; the
+# workers=1-vs-6 byte-identity was verified once by hand and recorded in the
+# ledger.
+sys.path.insert(0, LANG)
+try:
+    import build_family_lookup as bfl      # noqa: E402
+    check("TL3.1q the majority vote breaks ties deterministically, lowest family "
+          "index first",
+          bfl.majority({3: 5, 1: 5, 5: 5}) == 1
+          and bfl.majority({5: 9, 0: 2}) == 5,
+          "a tie resolved by dict order would make the parallel and serial "
+          "builds disagree")
+except Exception as exc:      # pragma: no cover
+    check("TL3.1q majority tie-break", False, f"{type(exc).__name__}: {exc}")
+
+
+# ---------------------------------------------------------------------------
+print()
+print("=== T-L3.2 / T-L3.3  not yet built ===")
+# ---------------------------------------------------------------------------
+
 skip("TL3.2 routing_agreement_with_pos replaces routing_accuracy",
      "metric-layer change not made yet")
 skip("TL3.3 shuffled-control partition (ablation G)",
-     "depends on TL3.1's lookup")
+     "evaluation-time only; built after the metric layer is renamed")
+
 
 
 # ===========================================================================

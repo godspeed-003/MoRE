@@ -171,6 +171,36 @@ def save_manifest(corpus: str, manifest: dict) -> str:
     return p
 
 
+def update_manifest(corpus: str, new_fields: dict) -> dict:
+    """Merge `new_fields` into the manifest ON DISK, re-reading it immediately first.
+
+    USE THIS, NOT `save_manifest(corpus, man)` WITH A MANIFEST LOADED EARLIER.
+    Every stage builder loads the manifest at the top (for `vocab_size`, `eot_id`,
+    `splits`) and writes at the bottom, and the work in between can take half an
+    hour. Writing back the snapshot taken at the top silently deletes anything
+    another builder added in the meantime.
+
+    That is not hypothetical: `build_baseline_floors.py --corpus wikitext-103`
+    finished while `build_family_lookup.py --corpus wikitext-103` was still tagging,
+    and the lookup's later `save_manifest` wrote back a manifest loaded before the
+    floors existed -- erasing `uniform_ce`, `unigram_ce`, `bigram_ce` and
+    `primary_metric_floor`. Nothing raised. It was caught only because
+    `code/test_language_data.py` reports a missing floor as a SKIP with the reason,
+    so the absence was visible in the output rather than merely absent.
+
+    RESIDUAL RACE, stated rather than papered over: two builders whose
+    re-read-and-write windows overlap can still lose one set of keys. The window is
+    now milliseconds instead of minutes, and the operational rule is simply that two
+    stage builders must not be run concurrently on the SAME corpus. Different
+    corpora write different files and are safe.
+    """
+    man = load_manifest(corpus)
+    man.update(new_fields)
+    save_manifest(corpus, man)
+    return man
+
+
+
 # ===========================================================================
 # T-L2.0  Fetch
 # ===========================================================================

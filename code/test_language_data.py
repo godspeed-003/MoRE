@@ -315,6 +315,294 @@ for corpus, man in present:
 
 # ===========================================================================
 print()
+print("=== T-L2.5  Trivial floors: fitted on train, and PROVED not to see val ===")
+# ===========================================================================
+
+import math  # noqa: E402
+
+for corpus, man in present:
+    tag = f"[{corpus}]"
+    if "primary_metric_floor" not in man:
+        skip(f"TL2.5a-h {tag}", "floors not built for this corpus; run "
+                               "data/lang/build_baseline_floors.py")
+        continue
+
+    V = man["vocab_size"]
+    unif, unig, big = man["uniform_ce"], man["unigram_ce"], man["bigram_ce"]
+
+    check(f"TL2.5a {tag} all three floors are finite",
+          all(isinstance(x, float) and math.isfinite(x) for x in (unif, unig, big)),
+          f"uniform {unif:.4f}  unigram {unig:.4f}  bigram {big:.4f} nats/token")
+
+    check(f"TL2.5b {tag} they are ordered uniform >= unigram >= bigram",
+          unif >= unig >= big and man["floors_ordered_uniform_ge_unigram_ge_bigram"],
+          "each model strictly refines the one above it, so an inversion is a "
+          "fitting bug rather than a surprising corpus")
+
+    # ln(V) is the one floor with a closed form, so it is checked against the
+    # formula rather than against itself -- a wrong vocab_size would otherwise pass
+    # every other check here.
+    check(f"TL2.5c {tag} uniform_ce is exactly ln(vocab_size)",
+          abs(unif - math.log(V)) < 1e-12,
+          f"ln({V}) = {math.log(V):.6f} nats = {unif / math.log(2):.4f} bits, "
+          f"and log2(8192) = 13 exactly")
+
+    check(f"TL2.5d {tag} primary_metric_floor is the lowest of the three",
+          abs(man["primary_metric_floor"] - min(unif, unig, big)) < 1e-12,
+          f"{man['primary_metric_floor']:.4f} nats -- a model that does not beat "
+          f"this has learned nothing a count table could not")
+
+    check(f"TL2.5e {tag} the floors record their split, units and smoothing",
+          man.get("floors_eval_split") in ("val", "test")
+          and man.get("floors_units") == "nats per token"
+          and man.get("floors_fitted_on") == "train"
+          and bool(man.get("unigram_smoothing"))
+          and "discount" in man.get("bigram_smoothing", "").lower(),
+          f"{man.get('floors_eval_split')}, {man.get('unigram_smoothing')}, "
+          f"{man.get('bigram_smoothing')}")
+
+    # -- the number, re-derived rather than read -----------------------------
+    # A writer that computed one CE and recorded another would pass every check
+    # above. This refits the unigram from `train.npy` here and re-scores the eval
+    # split, so the manifest's `unigram_ce` has to match a number this file
+    # produced. The bigram is not re-derived -- its discounting is a design choice
+    # documented in the builder, and re-implementing it here would only test that
+    # the same author wrote the same formula twice.
+    try:
+        import numpy as _np
+        _c = _np.zeros(V, dtype=_np.int64)
+        _tr = _np.load(os.path.join(LANG, corpus, "train.npy"), mmap_mode="r")
+        _rows = max(1, (1 << 22) // _tr.shape[1])
+        for _i in range(0, _tr.shape[0], _rows):
+            _c += _np.bincount(
+                _np.asarray(_tr[_i:_i + _rows], dtype=_np.int64).ravel(),
+                minlength=V)
+        _p = _c.astype(_np.float64) + (0.0 if (_c == 0).sum() == 0 else 1.0)
+        _p /= _p.sum()
+        _lp = _np.log(_p)
+        _ev = _np.load(os.path.join(LANG, corpus, f"{man['floors_eval_split']}.npy"),
+                       mmap_mode="r")
+        _tot, _n = 0.0, 0
+        for _i in range(0, _ev.shape[0], _rows):
+            _t = _np.asarray(_ev[_i:_i + _rows], dtype=_np.int64).ravel()
+            _tot += float(_lp[_t].sum())
+            _n += _t.size
+        _mine = -_tot / _n
+        check(f"TL2.5f {tag} unigram_ce re-derives from the arrays to 1e-9",
+              abs(_mine - unig) < 1e-9 and _n == man["floors_eval_tokens"],
+              f"recomputed {_mine:.9f} vs recorded {unig:.9f} over {_n:,} "
+              f"{man['floors_eval_split']} tokens")
+    except Exception as exc:  # pragma: no cover
+        check(f"TL2.5f {tag} unigram_ce re-derivation", False,
+              f"{type(exc).__name__}: {exc}")
+
+# -- the train-only property, asserted on which FILES the fit opens ----------
+# Run once, on the dev corpus: the claim is about the code path, which is identical
+# for both corpora, and refitting a 134 M-token bigram model just to watch it open
+# files would cost minutes for no extra information. `numpy.load` is wrapped for the
+# duration of the fit and every path it is handed is recorded, so a fit that read
+# val -- through any code path, including one the manifest does not mention -- shows
+# up here.
+if present:
+    _probe_corpus = min((c for c, _ in present),
+                        key=lambda c: dict(present)[c]["raw_bytes"]["train"])
+    try:
+        sys.path.insert(0, LANG)
+        import numpy as _np2
+        import build_baseline_floors as bbf  # noqa: E402
+        _opened, _real_load = [], _np2.load
+
+        def _spy(path, *a, **kw):
+            _opened.append(os.path.basename(str(path)))
+            return _real_load(path, *a, **kw)
+
+        _np2.load = _spy
+        try:
+            _V = dict(present)[_probe_corpus]["vocab_size"]
+            bbf.fit_unigram(_probe_corpus, _V)
+            bbf.fit_bigram(_probe_corpus, _V)
+        finally:
+            _np2.load = _real_load
+        check(f"TL2.5g [{_probe_corpus}] the unigram AND bigram fits open "
+              f"train.npy and nothing else",
+              set(_opened) == {"train.npy"},
+              f"numpy.load was called {len(_opened)}x, all on "
+              f"{sorted(set(_opened))} -- val and test are never read during a fit")
+    except Exception as exc:  # pragma: no cover
+        check("TL2.5g the fits open train.npy only", False,
+              f"{type(exc).__name__}: {exc}")
+
+
+# ===========================================================================
+print()
+print("=== T-L2.6  Frequency deciles: built, and deliberately NOT canonical ===")
+# ===========================================================================
+
+from more import lang_families as _lf  # noqa: E402
+
+for corpus, man in present:
+    tag = f"[{corpus}]"
+    if "token_decile_sha256" not in man:
+        skip(f"TL2.6a-h {tag}", "decile table not built; run "
+                               "data/lang/build_depth_deciles.py")
+        continue
+
+    V = man["vocab_size"]
+    dpath = os.path.join(LANG, corpus, "token_decile.npy")
+    dec = np.load(dpath)
+
+    check(f"TL2.6a {tag} one decile entry per vocabulary id, int8",
+          dec.shape == (V,) and dec.dtype == np.int8,
+          f"shape {dec.shape} dtype {dec.dtype}")
+
+    check(f"TL2.6b {tag} every entry is a real decile 0..9, with no ignore label",
+          set(np.unique(dec).tolist()) == set(range(man["n_frequency_deciles"])),
+          f"values = {sorted(np.unique(dec).tolist())} -- unlike the family "
+          f"lookup there is no -1 here: every id has a train frequency, even zero")
+
+    check(f"TL2.6c {tag} the recorded hash matches the file",
+          bld._sha256_file(dpath) == man["token_decile_sha256"],
+          f"sha256 {man['token_decile_sha256'][:12]}")
+
+    # Equal token mass is the design claim; this is the realised deviation.
+    shares = [d["token_share"] for d in man["decile_table"]]
+    check(f"TL2.6d {tag} deciles carry approximately equal TOKEN mass",
+          all(0.08 <= s <= 0.13 for s in shares)
+          and man["decile_cut"].startswith("equal train TOKEN mass"),
+          "  ".join(f"d{i}={s:.1%}" for i, s in enumerate(shares)))
+
+    check(f"TL2.6e {tag} decile 0 holds far fewer TYPES than decile 9",
+          man["decile_table"][0]["types"] * 50 < man["decile_table"][-1]["types"],
+          f"{man['decile_table'][0]['types']} types carry "
+          f"{shares[0]:.1%} of the corpus, against "
+          f"{man['decile_table'][-1]['types']:,} for the last decile -- which is "
+          f"why equal-TYPE-count deciles would have been useless")
+
+    check(f"TL2.6f {tag} decile token counts sum to the train split's tokens",
+          sum(d["tokens"] for d in man["decile_table"])
+          == man["token_counts"]["train"] - man["dropped_tail_tokens"]["train"],
+          f"{sum(d['tokens'] for d in man['decile_table']):,} stored tokens")
+
+    check(f"TL2.6g {tag} the table declares itself NON-canonical, with the reason",
+          man.get("decile_is_canonical") is False
+          and "ablation F" in man.get("decile_purpose", "")
+          and "§5" in man.get("decile_purpose", ""),
+          "plan_language.md §5: canonical language runs invent no depth target")
+
+    mi = man.get("decile_family_mutual_information")
+    check(f"TL2.6h {tag} the ablation-F confound is measured, not assumed away",
+          mi is not None and mi.get("normalized") is not None,
+          f"decile-vs-family normalized MI = {mi['normalized']:.4f} "
+          f"-- read ablation F's depth numbers against this, since a frequency "
+          f"decile has none of OP_TARGET_DEPTH's protection against being "
+          f"predictable from the routing target" if mi else "absent")
+
+# The decile->depth mapping is the DESIGN CHOICE, and it lives apart from the
+# measured table on purpose. Checked here because a caller that got `max_depth`
+# wrong would silently supervise toward the wrong ceiling.
+check("TL2.6i the decile->depth map spans 1..max_depth and is monotone",
+      _lf.decile_target_depth(0, 7) == 1
+      and _lf.decile_target_depth(9, 7) == 7
+      and _lf.decile_target_depth_table(7)
+      == sorted(_lf.decile_target_depth_table(7)),
+      f"max_depth=7 -> {[int(x) for x in _lf.decile_target_depth_table(7)]}")
+
+_raised = 0
+for _bad in ((-1, 7), (10, 7), (0, 0)):
+    try:
+        _lf.decile_target_depth(*_bad)
+    except ValueError:
+        _raised += 1
+check("TL2.6j an out-of-range decile or max_depth raises, with no fallback",
+      _raised == 3,
+      "an id with no decile is a build defect, not a case to smooth over")
+
+
+# ===========================================================================
+print()
+print("=== T-L2.7  GATE L2: no split overlap, and the version reproduces ===")
+# ===========================================================================
+
+for corpus, man in present:
+    tag = f"[{corpus}]"
+    if "sha256" not in man:
+        skip(f"TL2.7a-c {tag}", "pack stage not run for this corpus")
+        continue
+
+    # -- no train/val/test overlap, by EXACT CONTENT -------------------------
+    # Raw block bytes as dict keys, not hashes: 2,354 held-out blocks of 512 bytes
+    # is 1.2 MB, so exactness costs nothing and there is no collision argument to
+    # make. Train is streamed against that set, so the 269 MB canonical split is
+    # never resident.
+    held = {}
+    for split in ("val", "test"):
+        arr = np.load(os.path.join(LANG, corpus, f"{split}.npy"), mmap_mode="r")
+        for i in range(arr.shape[0]):
+            held.setdefault(bytes(np.asarray(arr[i]).tobytes()), []).append(
+                (split, i))
+
+    cross = [v for v in held.values() if len({s for s, _ in v}) > 1]
+    check(f"TL2.7a {tag} val and test share no block",
+          not cross,
+          f"{len(held):,} distinct held-out blocks from "
+          f"{man['splits']['val'] + man['splits']['test']:,} stored")
+
+    tr = np.load(os.path.join(LANG, corpus, "train.npy"), mmap_mode="r")
+    hits, rows = [], max(1, (1 << 22) // tr.shape[1])
+    for i in range(0, tr.shape[0], rows):
+        block = np.asarray(tr[i:i + rows])
+        for j in range(block.shape[0]):
+            b = block[j].tobytes()
+            if b in held:
+                hits.append((i + j, held[b][0]))
+                if len(hits) > 8:
+                    break
+        if len(hits) > 8:
+            break
+    check(f"TL2.7b {tag} NO train block appears in val or test",
+          not hits,
+          f"{tr.shape[0]:,} train blocks checked against {len(held):,} held-out "
+          f"blocks, exact 512-byte comparison"
+          if not hits else f"OVERLAP: {hits[:8]}")
+
+    # -- dataset_version reproduces from the recorded per-split hashes -------
+    import hashlib as _hl
+    expect = (f"lang-{corpus}-bpe{man['vocab_size']}-len{man['seq_len']}-"
+              + _hl.sha256("".join(man["sha256"][s] for s in
+                                   ("train", "val", "test")).encode()
+                           ).hexdigest()[:8])
+    check(f"TL2.7c {tag} dataset_version re-derives from the per-split hashes",
+          man["dataset_version"] == expect,
+          f"{man['dataset_version']} -- so the version names the exact bytes, and "
+          f"a silently rebuilt split changes it")
+
+    # -- and the five clauses Gate L2 aggregates ----------------------------
+    gate = {
+        "tokenizer fitted on train only":
+            man["tokenizer_training_files"] == [f"data/lang/{corpus}/train_text.txt"],
+        "every block full-length":
+            all(np.load(os.path.join(LANG, corpus, f"{s}.npy"),
+                        mmap_mode="r").shape[1] == man["seq_len"]
+                for s in ("train", "val", "test")),
+        "unmapped token share <= 2%":
+            man.get("unmapped_within_budget") is True,
+        "unmapped share published":
+            isinstance(man.get("unmapped_token_share_train"), float),
+        "trivial floors present and finite":
+            all(isinstance(man.get(k), float) and math.isfinite(man[k])
+                for k in ("uniform_ce", "unigram_ce", "bigram_ce",
+                          "primary_metric_floor")),
+    }
+    failed = [k for k, v in gate.items() if not v]
+    check(f"TL2.7d {tag} GATE L2 verdict: all five dataset-integrity clauses hold",
+          not failed,
+          f"unmapped {man['unmapped_token_share_train']:.4%} <= 2%, floor "
+          f"{man['primary_metric_floor']:.4f} nats/token"
+          if not failed else f"FAILED CLAUSES: {failed}")
+
+
+# ===========================================================================
+print()
 print("=" * 78)
 print(f"{len(PASS)} passed, {len(FAIL)} failed, {len(SKIP)} skipped")
 if FAIL:
