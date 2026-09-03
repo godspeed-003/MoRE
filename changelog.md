@@ -4306,6 +4306,95 @@ disagrees with the manifest; `code/test_language_data.py` TL2.1e when someone
 wonders why a `val_text.txt` breaks the build's guarantees;
 `TASKS_LANGUAGE.md` T-L2.0–T-L2.2 Evidence for the full tables.
 
+## T-L3.0 — the POS family manifest, and two names it refuses to define
+
+`code/more/lang_families.py` (new), `code/test_language_families.py` (new).
+**24 passed, 0 failed, 3 skipped** (the skips are T-L3.1/3.2/3.3). Gate L0 after
+the preceding commit `0c3a883`: `TOTAL 356 356 0 0`, ALL GATES PASS.
+
+**Design: the same SHAPE as `families.py`, so nothing downstream needs plumbing.**
+Same six-wide label space, same `expert_labels` contract including the E=1 and E=7
+behaviour Gate 4 exists to protect, same `-1`-means-ignore convention with the same
+value, `EXPERT_FAMILY_LABELS` aliased rather than renamed. The intended end state is
+that a `task`-conditional import is the *only* difference between the arithmetic and
+language metric paths.
+
+**Two names are deliberately NOT defined, and they raise.** `more/__init__.py`
+re-exports eight names from `families.py`; `OP_TO_EXPERT` has no language meaning,
+because it maps the 16 arithmetic op codes to experts. `OP_TO_EXPERT = {}` for
+parity was rejected: an empty dict turns `OP_TO_EXPERT[op]` into a bare `KeyError`
+at whatever line indexes it, which reads as a missing operation rather than as a
+caller reaching for the arithmetic axis mid-language-run. A PEP 562 module
+`__getattr__` raises `AttributeError` with that explanation instead, driven by an
+`_ARITHMETIC_ONLY` registry (`OP_TO_EXPERT`, `OP_TARGET_DEPTH`).
+
+**The leak this does not close — Phase L-5 will need it.**
+`more/__init__.py` imports from `.families` unconditionally, so
+`from more import OP_TO_EXPERT` still yields the *arithmetic* mapping no matter what
+`lang_families` does. Only the direct attribute is guarded. Closing the other path
+means making the package export task-conditional, which is a Phase L-5 change and
+is written down here so it is not discovered by a wrong number.
+
+**The op axis is empty, not absent, and the emptiness is load-bearing.**
+`ALL_OP_NAMES = []`, `NUM_OP_TYPES = 0`, `op_target_depth_table() → []`.
+`engine.py:803` iterates `enumerate(ALL_OP_NAMES)`, so empty yields an empty
+`op_avg_depth`, which the metric layer reports as *absent* rather than `0.0` —
+CLAUDE.md §4's "no sentinel reported as a measurement", obtained for free rather
+than by a special case. An empty depth table also beats a zero-filled one: it
+cannot supervise depth whatever weight a future config sets, which turns
+`plan_language.md` §5 from a written rule into a mechanical one. A one-element dummy
+op would instead have produced a real-looking per-op depth number for an operation
+that does not exist. **Phase L-5 note in the docstring:**
+`depth_allocation_error(...)` receives this table with `step_ops`, so the language
+path must mask on `step_ops >= 0` or skip the call before indexing — an empty table
+indexed by anything raises, and that raise is preferable to a silent fallback.
+
+**The auxiliary override is the BE paradigm and nothing else.** §4.1 assigns
+auxiliary/copular verbs to L1, but Penn tags them `VB*` like main verbs, so some
+override is unavoidable. It covers `be/am/is/are/was/were/been/being` and the
+clitics `'s/'re/'m`, on the ground that BE has no English main-verb use other than
+the copula — so the override asserts nothing the manifest has not already asserted.
+`have` and `do` are **excluded on purpose** and land in L3 VERB: both have real
+main-verb uses, and choosing between them is precisely what T-L3.1's type-level
+majority vote is for. Hard-coding it would bypass the mechanism whose entire purpose
+is to make that call from the corpus rather than from an author's intuition. TL3.0r
+pins the consequence so a later reader cannot "fix" it without deciding. `not`/`n't`
+*are* overridden to L1: Penn tags them `RB`, which would file negation with
+open-class adverbs.
+
+**The L6-vs-`-1` boundary, which the plan leaves overlapping.** §4.1 sends "subword
+continuation pieces with no standalone POS" to L6; §4.3 sends "fragments that have
+no POS" to `-1`. `surface_class_family` draws the line and says it is a design
+choice: digits → L6, punctuation-only → L5, contains a letter → L6, everything else
+(whitespace-only, lone continuation bytes, unused vocabulary entries) → `-1`.
+Sending every no-evidence type to `-1` would make the 2% budget check vacuous;
+sending everything to L6 would make L6 a catch-all and reproduce E7. T-L3.1 writes
+each branch's share to the manifest so the split can be audited rather than trusted.
+
+**Five guards raise at import**, following `families.py`'s discipline: no `/` in a
+label, `NUM_FAMILIES == 6`, mapped and ignored tag sets disjoint, every mapped index
+in `0..5`, every family reachable from at least one tag, and full coverage of the
+45-tag standard Penn set. The reachability guard is the non-obvious one — a family
+no tag can reach yields a structurally empty confusion-matrix row, which reads as a
+routing failure rather than as a manifest defect.
+
+**Two test checks are not restatements of the module, and both caught something.**
+TL3.0e/f *parse* the `from .families import (...)` statements out of `metrics.py`
+and `__init__.py`, so the required name list comes from the consumer rather than
+from the test — adding an import there fails until someone classifies the new name.
+That is what surfaced `OP_TO_EXPERT`. TL3.0w loads the file **by path** in a clean
+subprocess and inspects `sys.modules`; the first version imported
+`more.lang_families` and reported torch and numpy, which was correct — the package
+`__init__` pulls them in. The docstring's "deliberately free of torch" was true of
+the file and false of the import, and a reader would have read it as "loading this
+is cheap"; both the probe and the docstring were corrected.
+
+**Where to look.** `code/more/lang_families.py` `_ARITHMETIC_ONLY` when an
+`AttributeError` names a family accessor; `PENN_TO_FAMILY` when a family's token
+share looks wrong; `surface_class_family` when the unmapped share moves;
+`op_target_depth_table` when a language run reports a depth allocation error at all
+(it should report `N/A`).
+
 <!-- APPEND-MARKER-CL -->
 
 

@@ -622,13 +622,97 @@ does not exist here (T-L0.0).
 
 ## Phase L-3 — Family lookup and routing semantics  (`plan_language.md` §4)
 
-- [ ] **T-L3.0 Six POS families in `code/more/lang_families.py`.** `L1 FUNCTION,
+- [x] **T-L3.0 Six POS families in `code/more/lang_families.py`.** `L1 FUNCTION,
   L2 NOUN, L3 VERB, L4 MODIFIER, L5 PUNCT_SYM, L6 NUM_SUBWORD`, mirroring
   `families.py`'s structure so `metrics.py` needs no new label plumbing. Six to
   keep the MoE axis width identical to arithmetic, so any difference between the
   two studies is not a difference in expert count. **Verify:** labels contain no
   `/` (W&B nesting rule); `NUM_FAMILIES == 6`; the module exposes the same
   accessor names `metrics.py` already imports from `families.py`.
+  **Evidence:** `code/test_language_families.py` → **24 passed, 0 failed, 3
+  skipped** (the 3 are T-L3.1/3.2/3.3, not yet built). All three Verify clauses
+  hold: no label contains `/`, `NUM_FAMILIES == 6`, and every one of the four
+  names `metrics.py` imports from `families.py` is present.
+
+  Two checks are deliberately not restatements of the module. **TL3.0e/f parse the
+  import statements out of `metrics.py` and `__init__.py` with a regex** and
+  require this module to satisfy whatever those files actually ask for today — so
+  adding an import there fails the check until someone classifies the new name,
+  instead of the check silently going out of date. **TL3.0w loads the file by path
+  in a clean subprocess** and inspects `sys.modules`, because "the manifest is
+  dependency-free" is a claim about import side effects that cannot be tested from
+  inside a process that already imported torch.
+
+  **Both of those checks failed on first run, and both failures were real.**
+  1. `__init__.py` re-exports **eight** names from `families.py`, and
+     `OP_TO_EXPERT` has no language meaning — it maps the 16 arithmetic op codes to
+     experts. Defining `OP_TO_EXPERT = {}` for parity was rejected: an empty dict
+     makes `OP_TO_EXPERT[op]` raise a bare `KeyError` at whatever line indexes it,
+     which reads as a missing operation rather than as a caller that reached for
+     the arithmetic axis while running language. Fixed with a PEP 562 module
+     `__getattr__` that **raises `AttributeError` naming the reason**, plus an
+     `_ARITHMETIC_ONLY` registry (`OP_TO_EXPERT`, `OP_TARGET_DEPTH`), and TL3.0f
+     rewritten to require every re-exported name to be *either* defined *or*
+     explicitly declared arithmetic-only. **A leak this does not close, recorded
+     because it will matter in Phase L-5:** `more/__init__.py` imports from
+     `.families` unconditionally, so `from more import OP_TO_EXPERT` still yields
+     the arithmetic mapping regardless. Only `lang_families.OP_TO_EXPERT` is
+     guarded; making the package export task-conditional is a Phase L-5 change.
+  2. Importing `more.lang_families` pulls in **torch and numpy** — not from this
+     file, but because `more/__init__.py` runs first and imports `engine`/`model`.
+     The docstring's "deliberately free of torch" was true of the file and false of
+     the import, and a reader would have taken it as "reading this is cheap". Fixed
+     both ways: the probe now loads by path via `importlib.util`, and the docstring
+     states the package-level truth explicitly.
+
+  Design decisions made here, all recorded in the module rather than left implicit:
+
+  - **`ALL_OP_NAMES = []`, `NUM_OP_TYPES = 0`, `op_target_depth_table() → []`.**
+    Language has no operation axis, and the emptiness is load-bearing:
+    `engine.py:803` iterates `enumerate(ALL_OP_NAMES)`, so an empty list yields an
+    empty `op_avg_depth` and the metric layer reports *absent* rather than `0.0`
+    (CLAUDE.md §4: no sentinel reported as a measurement). An empty depth table is
+    also stronger than a zero-filled one — it cannot supervise depth whatever
+    weight a later config sets, which is `plan_language.md` §5 made mechanical
+    instead of merely written down.
+  - **The auxiliary override is the BE paradigm only.** §4.1 puts auxiliary and
+    copular verbs in L1, but Penn tags them `VB*` like main verbs, so an override
+    is unavoidable. It covers `be/am/is/are/was/were/been/being` plus the clitics
+    `'s/'re/'m` — BE has no main-verb use in English other than the copula, so the
+    override adds no judgement the manifest has not already made. **`have` and
+    `do` are deliberately excluded and land in L3 VERB**, because both have
+    genuine main-verb uses and deciding between them is exactly the job of
+    T-L3.1's type-level majority vote; hard-coding it would bypass the mechanism
+    whose purpose is to make that call from the corpus. TL3.0r pins the
+    consequence so it cannot be "fixed" later without a decision.
+  - **`not` / `n't` → L1.** Penn tags them `RB`, which would put negation among
+    open-class adverbs; it is a closed-class particle and §4.1's L1 list names
+    particles.
+  - **`WRB` (how/where/when/why) → L1, `UH` → L1, `LS` → L5, `FW` → −1.** The
+    L1/L4 boundary is drawn at "closed grammatical class vs open modifier class",
+    which puts wh-adverbs with the other wh-words. `FW` is the one tag with no
+    English POS at all, so it spends ignore budget rather than assert a class the
+    tagger did not find.
+  - **The L6-vs-−1 boundary**, which §4.1 and §4.3 leave overlapping.
+    `surface_class_family` is consulted only for types the corpus never shows as a
+    standalone word: digits → L6, punctuation-only → L5, contains a letter → L6
+    (the "subword continuation piece" case), everything else → −1 (whitespace-only
+    pieces, lone continuation bytes, unused vocabulary entries). Stated as a design
+    choice: sending every no-evidence type to −1 would make the 2% budget check
+    vacuous, and sending everything to L6 would make L6 a catch-all and reproduce
+    E7. T-L3.1 writes the share each branch produces into the manifest so the split
+    is auditable.
+  - **Five import-time guards**, mirroring `families.py`'s raise-at-import
+    discipline: no `/` in a label, `NUM_FAMILIES == 6`, the mapped and ignored tag
+    sets disjoint, every mapped index in `0..5`, every family reachable from at
+    least one tag (a family nothing can reach gives an empty confusion-matrix row
+    that reads as a routing failure rather than a manifest defect), and full
+    coverage of the 45-tag standard Penn set. A bad edit fails on first import, not
+    after a six-minute dataset build.
+
+  Gate L0 after the Phase L-2 commit `0c3a883`: `TOTAL 356 356 0 0`, ALL GATES
+  PASS (T-LX.0 discharged; 173.8 s on the CPU interpreter).
+
 
 - [ ] **T-L3.1 Type-level `token_family[V]` from majority POS.** Tag the train
   split with nltk's averaged-perceptron tagger, take each vocabulary type's
