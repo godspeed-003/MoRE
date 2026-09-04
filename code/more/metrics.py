@@ -870,6 +870,28 @@ DEPTH_KEY_PROVENANCE = {
                  "about +-0.004, so exceeds_null says almost nothing about EFFECT SIZE -- "
                  "read it with depth/std and depth/hist or not at all."),
     },
+    "depth/by_document/": {
+        "pass": "validation",
+        "population": ("all positions except each block's last, grouped by document via "
+                       "the count of eot_id tokens before each position"),
+        "note": ("T-L6.7's within- vs between-document variance decomposition. `total`, "
+                 "`within` and `between` are token-weighted POPULATION variances and sum "
+                 "exactly, which `sum_matches_total` reports rather than assumes. "
+                 "`between_share` is the passage-level allocation number; per-document "
+                 "means are summarised (std/min/max) rather than logged one key each."),
+    },
+    "depth/embed_norm_": {
+        "pass": "validation",
+        "population": ("the same positions as depth/hist; the norm is per TYPE and is "
+                       "gathered by token id, read at THIS epoch"),
+        "note": ("T-L6.10's confound diagnostics. `logfreq_partial_norm` is the CORRECTED "
+                 "frequency-depth correlation and the number to quote; `depth_vs_norm` and "
+                 "`logfreq_vs_norm` are the confound's strength, published beside it so the "
+                 "correction is readable. `logfreq_within_bins_*` is a secondary "
+                 "assumption-free cross-check that UNDER-corrects (see "
+                 "spearman_within_bins), so a low value from it is informative and a high "
+                 "one is not conclusive."),
+    },
     "depth/allocation_error_": {
         "pass": "n/a",
         "population": "none",
@@ -902,9 +924,12 @@ def uncovered_depth_keys(keys) -> list:
         if not (k.startswith("depth") or k.startswith("recursion/avg_depth")):
             continue
         # Scalars that describe the report itself rather than a per-unit measurement.
+        # `depth_key_provenance_uncovered` is here because the flag's own name starts with
+        # `depth`, so without it the registry reports itself as uncovered forever -- which
+        # it did, on the first run that populated the flag.
         if k in ("depth/mean", "depth/std", "depth/n_tokens",
                  "depth/distinct_exit_depths", "depth/report_error",
-                 "depth_key_provenance"):
+                 "depth_key_provenance", "depth_key_provenance_uncovered"):
             continue
         if depth_key_provenance(k) is None:
             out.append(k)

@@ -121,6 +121,9 @@
     "halt_target_mode": "pure_act",
     "total_params": 5584908,
     "embedding_params": 2162688,
-    "non_embedding_params": 3422220
+    "non_embedding_params": 3422220,
+    "nondeterministic_ops_observed": [
+      "_histc_cuda"
+    ]
   }
 }

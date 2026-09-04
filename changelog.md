@@ -5642,6 +5642,57 @@ T-L7.0 was needlessly CPU-bound.
 **Where to look.** `runs/langB_MoRE_seed44__22474619/results.tsv` for the per-epoch trend;
 `engine.py` `_rho_str` for the key mismatch; `TASKS_LANGUAGE.md` T-L6.10 for the table.
 
+## Post-L6 cleanup - the registry caught my own additions, and two checks were over-strict
+
+`code/more/metrics.py`, `code/more/engine.py`, `code/test_lang_heads.py`.
+All six language suites green: **44 / 11 / 22 / 133 / 114 / 72 passed, 0 failed.**
+Gate L0 `TOTAL 356 356 0 0`.
+
+**THE DEPTH-KEY REGISTRY CAUGHT ITS OWN AUTHOR, which is the point of it.** Three runs came
+back flagging `depth_key_provenance_uncovered` with 20 keys: every `depth/by_document/*`
+from T-L6.7 and every `depth/embed_norm_*` from T-L6.10. I added both metric families and
+neither to the registry. TL6.8f failed loudly, exactly as designed. Two entries added.
+
+Then a self-reference: the flag `depth_key_provenance_uncovered` is itself `depth`-prefixed,
+so `uncovered_depth_keys` reported the registry as uncovering itself, forever. Excluded, with
+the reason in the code -- it only became reachable once a run actually populated the flag.
+
+**AND TL6.8f WAS THEN WRONG IN A SECOND WAY.** It read the flag out of the run and failed if
+present. But the flag is a HISTORICAL record: a run made against an older, smaller registry
+legitimately lists keys that were uncovered then and are covered now, so a fixed registry
+could never clear an old run's flag. It now re-derives coverage from the CURRENT registry
+instead of trusting the stored flag -- an old flag cannot fail a fixed registry, and a real
+gap still cannot hide. Zero uncovered keys across all six language runs.
+
+**TWO CHECKS WERE OVER-STRICT IN THE SAME WAY: they hard-coded a snapshot of something
+designed to grow.**
+
+1. `TL5.4b` asserted the appended `results.tsv` tail equals exactly three columns. T-L6.10h
+   appended a legitimate fourth (`depth_logfreq_partial_norm`) and the check failed -- which
+   is the opposite of what an append-only rule should do. It now checks the PREFIX and the
+   ORDER: a file written by an older commit legitimately has fewer columns, and what must
+   never happen is a column appearing before position 10 or the order changing.
+2. `TL6.8f` required the shipped provenance block to have exactly as many entries as the
+   current source. Growing the registry broke it. It now asserts the block ships and every
+   entry is a well-formed record; whether the CURRENT registry covers everything is TL6.8e's
+   job, and splitting the two is what makes both stable.
+
+**THE DEAD COLUMN IS CONFIRMED FIXED BY A RUN.** `runs/langB_MoRE_seed45__d6025531`
+populates `depth_rho_model_loss` at 0.178596 (epoch 2) and 0.146685 (epoch 4), where eight
+consecutive rows had read `N/A`.
+
+**A measurement for T-L7.1, taken from the 8-epoch run rather than assumed.** With
+`routing_balance = 0.001` carried from arithmetic, the weighted balance term sits at
+`balance_to_task_ratio = 8.1e-05` of the task loss (task 4.2695, balance 0.3462). The
+language spec's `_NULLS_NOTE` predicted "~1e-4 x the task loss, i.e. effectively OFF" -- that
+is now measured, not argued. Arithmetic's T4.2 target was 0.017, which on these magnitudes
+needs `0.017 x 4.2695 / 0.3462 = 0.21`, i.e. **210x the arithmetic value**. Recorded here as
+an input to T-L7.1, not frozen yet.
+
+**Where to look.** `metrics.DEPTH_KEY_PROVENANCE` before adding any depth metric;
+`uncovered_depth_keys` for the exclusion list and why the flag is on it;
+`test_lang_heads.py` TL5.4b / TL6.8f for how to write a check against a growing contract.
+
 <!-- APPEND-MARKER-CL -->
 
 

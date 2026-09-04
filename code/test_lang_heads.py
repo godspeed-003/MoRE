@@ -330,7 +330,10 @@ ARITH_COLUMNS_BEFORE_L5 = [
     "avg_depth", "mean_cos_sim", "max_cos_sim", "routing_accuracy",
     "routing_hungarian_acc", "routing_ami",
 ]
-NEW_COLUMNS = ["val_perplexity", "nats_below_bigram_floor", "depth_rho_model_loss"]
+# In append order. T-L6.10h added the fourth, and this list must GROW at the end rather than
+# be rewritten -- the whole rule being checked is that columns are only ever appended.
+NEW_COLUMNS = ["val_perplexity", "nats_below_bigram_floor", "depth_rho_model_loss",
+               "depth_logfreq_partial_norm"]
 
 import glob  # noqa: E402
 
@@ -351,9 +354,13 @@ else:
           f"existing reader index by position, so an insertion would silently "
           f"reinterpret published columns")
 
-    check("TL5.4b the three new columns are APPENDED at the end",
-          _hdr[len(ARITH_COLUMNS_BEFORE_L5):] == NEW_COLUMNS,
-          " ".join(NEW_COLUMNS))
+    _tail = _hdr[len(ARITH_COLUMNS_BEFORE_L5):]
+    check("TL5.4b the language columns are APPENDED in order, nothing inserted",
+          _tail == NEW_COLUMNS[:len(_tail)] and len(_tail) >= 3,
+          f"{len(_tail)} appended: {' '.join(_tail)}. A file written by an older commit "
+          f"legitimately has fewer, so this checks the PREFIX -- what must never happen is "
+          f"a column appearing before position {len(ARITH_COLUMNS_BEFORE_L5)} or the order "
+          f"changing")
 
     check("TL5.4c on an arithmetic run all three read N/A, never 0.0",
           len(_row) == len(_hdr)
@@ -449,20 +456,36 @@ else:
             _mj = _json.load(fh)
         if isinstance(_mj.get("depth_key_provenance"), dict):
             _with_prov.append((_r, len(_mj["depth_key_provenance"])))
-        if "depth_key_provenance_uncovered" in _mj:
-            _flagged.append(os.path.basename(os.path.dirname(_r)))
+        # The flag is a HISTORICAL record: a run made against an older, smaller registry
+        # legitimately carries keys that were uncovered THEN and are covered now. What must
+        # be empty is the set the CURRENT registry still misses -- re-derived here rather
+        # than read from the run, so an old flag cannot fail a fixed registry, and a real
+        # gap still cannot hide.
+        _still = uncovered_depth_keys(_mj.keys())
+        if _still:
+            _flagged.append((os.path.basename(os.path.dirname(_r)), _still))
 
     if _flagged:
-        check("TL6.8f no completed run reports an uncovered depth key", False,
-              f"runs flagging uncovered keys: {_flagged} -- add them to "
-              f"metrics.DEPTH_KEY_PROVENANCE")
+        check("TL6.8f no completed run has a depth key the CURRENT registry misses",
+              False,
+              f"{_flagged} -- add them to metrics.DEPTH_KEY_PROVENANCE")
     elif _with_prov:
+        _pr, _n = _with_prov[0]
+        with open(_pr, "r", encoding="utf-8") as fh:
+            _shipped = _json.load(fh)["depth_key_provenance"]
+        _wellformed = all(
+            isinstance(v, dict) and {"pass", "population", "note"} <= set(v)
+            for v in _shipped.values())
+        # NOT an exact count match against the current source: the registry grows, and a
+        # run written by an older commit legitimately shipped fewer entries. What matters is
+        # that the block is there and every entry is a real provenance record; whether the
+        # CURRENT registry covers everything is TL6.8e's job.
         check("TL6.8f the provenance SHIPS in the run directory, not only in the source",
-              _with_prov[0][1] == len(DEPTH_KEY_PROVENANCE),
-              f"{_with_prov[0][1]} entries in "
-              f"{os.path.basename(os.path.dirname(_with_prov[0][0]))}/metrics.json, and "
-              f"no run flags an uncovered key -- a note that lives only in a module is "
-              f"one a reader of the artifact never sees")
+              _n >= 7 and _wellformed,
+              f"{_n} well-formed entries in "
+              f"{os.path.basename(os.path.dirname(_pr))}/metrics.json "
+              f"(current source has {len(DEPTH_KEY_PROVENANCE)}; a run written by an older "
+              f"commit legitimately has fewer, and TL6.8e is what checks current coverage)")
     else:
         skip("TL6.8f provenance in a run directory",
              f"{len(_lang_runs)} language run(s) on disk, all predating the writer; "
