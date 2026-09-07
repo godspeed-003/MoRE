@@ -892,6 +892,52 @@ def _apply_language_block(cfg: dict, declared_family_cls=None) -> dict:
         stamped_arith = canonical_run_name(arch, None, TASK_ARITHMETIC)
         if log.get("run_name") in (None, stamped_arith):
             log["run_name"] = canonical_run_name(arch, None, TASK_LANGUAGE)
+
+    # LAST, because it reads dc["corpus"] and the line above is where that is
+    # settled for a config-file run. cli.py calls it a SECOND time after the
+    # `--corpus` override lands -- see the function's own docstring for why once is
+    # not enough.
+    stamp_language_dataset_versions(cfg)
+    return cfg
+
+
+def stamp_language_dataset_versions(cfg: dict) -> dict:
+    """Write the CORPUS's own version strings into `cfg["data"]`, in place.
+
+    T-L7.1a, a provenance defect fix. Before this existed, a `--task language` run
+    recorded `dataset_version = "more6-v1-seed42-n70000-3c1087b6aad9"` and
+    `train_split_version = "fixed-file-splits-v1"` -- the ARITHMETIC 70k-record
+    dataset -- while reading 526,320 blocks of WikiText. Both strings come from
+    `config.json`'s shared `data` block, `_apply_language_block` never replaced them,
+    and `MoRELanguageDataset` (which knows the right answer) is constructed inside
+    `engine.train()`, long after `RunContext.create` has already hashed the config
+    and stamped provenance. So the wrong strings were what every language run on disk
+    reported, and `export_results.py` filters admitted rows ON `dataset_version`.
+
+    OVERWRITES rather than `setdefault`, unlike every other field in
+    `_apply_language_block`. The value being replaced is not a protocol choice a
+    config file might legitimately make -- it is a MEASUREMENT of the bytes on disk,
+    derived in `build_language_dataset.py` from the per-split content hashes
+    (T-L2.7c). A config that declared a different one would be declaring that the
+    data is something it is not, and the correct response is to record what was
+    actually read. The arithmetic path never reaches this function.
+
+    CALLED TWICE, deliberately, and the duplication is the point rather than an
+    oversight. `cli.py` applies `--corpus` AFTER `apply_task`, so a
+    `--corpus wikitext-2` run stamped only here would carry the wikitext-103 version
+    string while reading wikitext-2 -- a subtler instance of the same defect, and one
+    that would have made the dev-corpus calibration runs claim canonical-corpus
+    provenance. Idempotent, so the second call is free when no override was given.
+    """
+    dc = cfg.setdefault("data", {})
+    from .lang_data import corpus_versions
+    dsv, tsv = corpus_versions(dc.get("corpus", LANGUAGE_CORPUS_DEFAULT))
+    # None means the corpus is not built on this machine (`data/lang/**/*.npy` is not
+    # tracked, so that is the normal state of a fresh clone). Leaving the arithmetic
+    # string in place would be worse than a null: the proxy guard REFUSES a canonical
+    # claim with no dataset_version, and silently accepts a wrong one.
+    dc["dataset_version"] = dsv
+    dc["train_split_version"] = tsv
     return cfg
 
 

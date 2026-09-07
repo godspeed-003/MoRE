@@ -17,7 +17,7 @@ import sys
 from .config import (load_config, apply_architecture, apply_task,
                      enforce_routing_mode, stamp_seed_into_run_name,
                      resolve_task, ARCHITECTURES, TASKS, TASK_ARITHMETIC,
-                     LANGUAGE_CORPORA,
+                     LANGUAGE_CORPORA, stamp_language_dataset_versions,
                      TASK_LANGUAGE)
 from .engine import train
 from .run_context import RunContext, resolve_overrides, ProxyGuardError
@@ -357,6 +357,15 @@ def main(argv=None, default_architecture: str | None = None) -> int:
                     "silently: id 65536 becomes id 0, which is a valid id for a "
                     "different token and would corrupt the corpus with no error."
                 )
+
+        # T-L7.1a. RE-STAMP the corpus version strings, because `--corpus` was
+        # applied above and `apply_task` ran before it. Without this a
+        # `--corpus wikitext-2` run records the wikitext-103 dataset_version --
+        # i.e. a dev-corpus run claiming canonical-corpus provenance, which is
+        # precisely the confusion T-L2.0 (shared val split) makes dangerous.
+        # Idempotent, so it costs nothing when no --corpus was given.
+        if task == TASK_LANGUAGE:
+            stamp_language_dataset_versions(raw_cfg)
 
         resolved = resolve_overrides(
             raw_cfg,

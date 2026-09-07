@@ -1,0 +1,38 @@
+{
+  "_note": "GATE L6 evidence for T-L7.2. Counts built through the engine.py:263 kwargs mapping from the frozen config_language.json, so they are the counts a canonical run prints. Non-embedding excludes tok_embed/pos_embed/lm_head; lm_head is TIED to tok_embed so named_parameters yields the shared tensor once.",
+  "spec_version": "L7.1-language-frozen",
+  "dataset_version": "lang-wikitext-103-bpe8192-len256-800d6154",
+  "tolerance": 0.05,
+  "arms": {
+    "moe": {
+      "total": 5584908,
+      "embedding": 2162688,
+      "non_embedding": 3422220,
+      "num_experts": 6,
+      "max_depth": 1,
+      "ffn_mult": 4
+    },
+    "mor": {
+      "total": 5581063,
+      "embedding": 2162688,
+      "non_embedding": 3418375,
+      "num_experts": 1,
+      "max_depth": 7,
+      "ffn_mult": 24
+    },
+    "more": {
+      "total": 5584908,
+      "embedding": 2162688,
+      "non_embedding": 3422220,
+      "num_experts": 6,
+      "max_depth": 7,
+      "ffn_mult": 4
+    }
+  },
+  "relative_gaps": {
+    "moe_vs_more_total": 0.0,
+    "moe_vs_more_non_embedding": 0.0,
+    "mor_vs_more_total": 0.0006884625494278509,
+    "mor_vs_more_non_embedding": 0.0011235396906101886
+  }
+}

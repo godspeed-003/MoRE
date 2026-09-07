@@ -1,0 +1,53 @@
+{
+  "stage": "weights",
+  "corpus": "wikitext-2",
+  "epochs": 3,
+  "seq_len": 256,
+  "batch_size": 64,
+  "seed": 44,
+  "dev_bigram_floor": 5.398304166059712,
+  "target_ratio_from_T4_2": 0.017,
+  "pos_partition_own_load_entropy": 0.8884,
+  "caveat": "CALIBRATION on the dev corpus. wikitext-2 shares its val split byte-for-byte with wikitext-103 (T-L2.0), so these runs may PICK a weight and may never be quoted as a result.",
+  "rows": [
+    {
+      "routing_balance": 0.001,
+      "halting": 0.001,
+      "val_loss": 5.2352476790144635,
+      "nats_below_floor": 0.16305648704524867,
+      "avg_depth": 2.697580575942993,
+      "load_entropy": 0.8533698320388794,
+      "balance_to_task_ratio": 7.3398858315162824e-06,
+      "ponder_cost": 0.3604322296200377,
+      "task_loss": 5.128986809470437,
+      "ami": 0.2850681906383516,
+      "run": "langB_MoRE_seed44__df42339b__r3"
+    },
+    {
+      "routing_balance": 0.001,
+      "halting": 0.107,
+      "val_loss": 5.334600758767343,
+      "nats_below_floor": 0.06370340729236901,
+      "avg_depth": 1.4760584831237793,
+      "load_entropy": 0.5492998957633972,
+      "balance_to_task_ratio": 0.0002549868846270036,
+      "ponder_cost": 0.25420188614816375,
+      "task_loss": 5.187591084566983,
+      "ami": 0.0025220741808334333,
+      "run": "langB_MoRE_seed44__7c2f1aa4__r2"
+    },
+    {
+      "routing_balance": 0.001,
+      "halting": 0.5,
+      "val_loss": 5.33061016099947,
+      "nats_below_floor": 0.06769400506024237,
+      "avg_depth": 1.0720765590667725,
+      "load_entropy": 0.2848132252693176,
+      "balance_to_task_ratio": 0.0003104042292509067,
+      "ponder_cost": 0.2501836238485394,
+      "task_loss": 5.180283991495768,
+      "ami": 0.02074485986360926,
+      "run": "langB_MoRE_seed44__7d975f07"
+    }
+  ]
+}

@@ -2151,7 +2151,7 @@ does not exist here (T-L0.0).
   the next. An 8-epoch real run at seq_len 256 / batch 64 is in flight for the end-to-end
   comparison.
 
-- [ ] **T-L7.1 Freeze the language protocol in one commit.** `seq_len`,
+- [x] **T-L7.1 Freeze the language protocol in one commit.** `seq_len`,
   `vocab_size`, `batch_size`, `lr`, `weight_decay`, `epochs`, `max_depth`,
   `num_blocks`, `d_model`, `n_heads`, `ffn_mult` per arm, and the loss weights are
   written into `code/canonical_spec_language.json` **together**, in a single
@@ -2163,6 +2163,100 @@ does not exist here (T-L0.0).
   **Verify:** no `null` remains in the spec; a language run with the frozen config
   is accepted as canonical; the same run with any single protocol field perturbed
   is **refused**.
+  **Evidence:** `code/canonical_spec_language.json` is at `spec_version
+  L7.1-language-frozen`; `code/config_language.json` is the new operator-facing
+  defaults file. `code/test_language_spec_freeze.py`: **59 passed, 0 failed, 0
+  skipped** on the CPU interpreter. `code/test_language_task_axis.py`: **74 passed,
+  0 failed** (72 → 74; TL1.3l/m/n asserted the spec *had* nulls and were rewritten
+  to the post-freeze invariant, with TL1.3n2/n3 added — the assertion moved rather
+  than being deleted, and the comment there records why).
+
+  Both directions of the Verify are covered explicitly. **Accepted:** TL7.1g/h/i
+  build the config through `cli.py`'s own call order (`load_config` →
+  `apply_architecture` → `apply_task` → `stamp_language_dataset_versions`) and
+  `assert_not_silent_proxy` returns `canonical_lang_b` on all three arms, resolving
+  to `variant = language`. **Refused:** TL7.1j perturbs each of the **17** enforced
+  fields *individually* and requires the refusal message to NAME the offending
+  field — not merely to refuse, because a refusal that does not say why sends the
+  operator to the wrong file. TL7.1k asserts that only `halting_mode`,
+  `task_weight` and `family_cls_weight` are unreachable through a config section.
+  TL7.1n refuses seed 99 (outside the frozen set).
+
+  | field | frozen value | set by |
+  |---|---|---|
+  | `epochs` | 3 | average depth still moving between epochs 2 and 3 at every calibration point |
+  | `batch_size` | 48 | per-arm VRAM measurement: MoR peaks 5,342 MiB of 6,143; batch 64 crosses into the T-L7.0 soft cliff (1.03 → 2.31 h/epoch) |
+  | `seq_len` / `vocab_size` | 256 / 8192 | the packed corpus |
+  | `lr` | 0.001 | best of {5e-4, 1e-3, 2e-3} *and* the only value stable across both dropout settings (2e-3 + dropout 0.1 diverges to 7.1957 with depth pinned at the 7.0 ceiling) |
+  | `weight_decay` | 1e-4 | carried, recorded as carried |
+  | `dropout` | 0.1 | a wash (0.0137 nats, one seed, dev corpus); frozen by decision with the contrary measurement in `frozen_by` and a labelled one-line ablation flagged |
+  | `routing_balance_weight` | 0.001 / 0.0 / 0.001 | measured, see below |
+  | `halting_weight` | 0.0 / 0.001 / 0.001 | measured, see below |
+  | `protocol.val_interval` | 1 | every epoch, so "best checkpoint" is not "last checkpoint" |
+
+  **THE HEADLINE RESULT OF THIS TASK IS A REJECTION, and it is paper-level rather
+  than a tuning detail.** This file's own `_NULLS_NOTE` predicted that the
+  arithmetic `0.001`, chosen so the weighted balance term sat at 0.017× the task
+  loss, would be "effectively OFF" against a ~5-nat cross-entropy and would
+  "silently turn adaptive depth into always-max depth". **Both predictions are
+  false**, measured on the dev corpus at seed 44, 3 epochs per point
+  (`code/calibrate_lang_weights.py`, `code/lang_calibration_weights.json`):
+
+  | balance weight (halting 0.001) | val_loss | AMI (control 0.0621) | load entropy |
+  |---|---|---|---|
+  | **0.001** | **5.2406** | **0.2907** | **0.8571** |
+  | 0.05 | 5.2991 | 0.3070 | — |
+  | 0.21 *(ratio-matched)* | 5.3097 | 0.2688 | 0.99+ |
+  | 1.0 | 5.3458 | 0.1807 | 0.99+ |
+
+  | halting weight (balance 0.001) | val_loss | avg depth | AMI |
+  |---|---|---|---|
+  | **0.001** | **5.2406** | **2.63** | **0.2907** |
+  | 0.03 | 5.2547 | 2.30 | 0.0050 |
+  | 0.107 *(ratio-matched)* | 5.3345 | 1.49 | 0.0025 |
+  | 0.5 | 5.3305 | 1.07 | 0.0205 |
+
+  The ratio-matched weights **switch off both behaviours the study exists to
+  measure**: depth collapses to 1.49 of a 7 budget and routing structure vanishes
+  (AMI 0.2907 → 0.0025, against a control floor of 0.0621 — i.e. *below* chance).
+  A matrix run at those weights would have produced a clean-looking Outcome C that
+  was an artifact of a loss weight. **The invariant that transfers across tasks is
+  absolute gradient magnitude, not the ratio to the task loss.**
+
+  Two secondary readings, both of which constrain interpretation later:
+  1. 0.001 sits at load entropy **0.8571, just below the oracle POS partition's own
+     0.8884** (T-L2.3), while every higher weight overshoots to 0.99+. Entropy and
+     AMI move in **opposite** directions across this sweep, which is exactly the
+     situation `CLAUDE.md` §2 forbids tuning toward maximal entropy for.
+  2. Raising the **halting** weight destroys **routing** structure (AMI 0.2907 →
+     0.0025 at 0.107). **Depth and expert differentiation are not independent knobs
+     in MoRE** — a coupling worth its own paragraph in the paper.
+
+  **Every number in this task is dev-corpus (wikitext-2) and may never be quoted as
+  a result.** T-L2.0 established that wikitext-2 shares its val split byte-for-byte
+  with wikitext-103, so these numbers may select but never report. Recorded in the
+  spec's `_T_L7_1_FREEZE_NOTE` so the next reader cannot mistake them for findings.
+
+  **Also fixed under this task (T-L7.1a, the provenance defect).** All 14 pre-fix
+  language runs on disk record the *arithmetic* `dataset_version` while having
+  consumed WikiText. `export_results.py` filters admitted rows on that field, so
+  those runs cannot be cited — their measured numbers are not wrong, their label
+  is. No published result is affected because the canonical matrix had not started.
+  Fixed by `lang_data.corpus_versions()` + `config.stamp_language_dataset_versions()`,
+  called twice: once inside `apply_task` and again from `cli.py` after `--corpus`
+  resolves, because the corpus is not known at the first call. Regression-tested by
+  TP1–TP7 in `test_language_spec_freeze.py`, which cover that wikitext-103 stamps
+  its own id, that `--corpus wikitext-2` **re-stamps** it, that an unbuilt corpus
+  yields `(None, None)` and that the `None` then *blocks* the canonical claim, that
+  the arithmetic path never reaches the stamper and its `config_hash` is stable at
+  `221251b9b42bed7d`, and that stamping is idempotent.
+
+  **One false claim in the spec was corrected rather than deleted.** The old
+  `val_interval_note` said changing the interval mid-matrix would split the
+  `config_hash` group. It would not: `config_hash` is computed over the resolved
+  config **minus `provenance` and `logging`** (measured), so a mid-matrix change is
+  invisible to the hash and must be caught by reading the field. The old wrong text
+  is quoted inside the correction.
 
 - [ ] **T-L7.2 GATE L6 / GATE L7 — parameter budget and floor.**
   **Verify (L6):** the MoR/MoRE parameter difference is < 5% on both the total and
@@ -2170,12 +2264,72 @@ does not exist here (T-L0.0).
   **Verify (L7):** a single short language run beats `primary_metric_floor` from
   T-L2.5. If it does not, the architecture matrix is not yet worth running and the
   gate-failure protocol applies — that is the whole point of having a floor.
+  **STATUS: GATE L6 PASSED. GATE L7 IN FLIGHT — the box stays unticked until its own
+  number lands.** L7 cannot be discharged by an assertion: a floor is beaten by a
+  training run or not at all. The run is MoRE, 1 epoch, seed 42, on the **canonical**
+  corpus (`langB_gate_l7`, deliberately non-canonical group because `epochs 3` is a
+  frozen field and "short" means non-canonical by definition), measured against
+  `primary_metric_floor = 4.98494701553838`. **Do not substitute the dev-corpus
+  figure 5.398304166059712 for it** — T-L2.0 established that wikitext-2 shares its
+  val split byte-for-byte with wikitext-103, so a dev number would be the same split
+  scored against the wrong floor.
+  **Evidence (L6):** `code/test_language_gate_l6_l7.py` — **28 passed, 0 failed, 0
+  skipped**; table also written to `code/lang_param_budget.json` so no number is
+  hand-copied. Counts are built through the **same** kwargs mapping the trainer uses
+  (`engine.py:263`) from the frozen `config_language.json`, not through a
+  hand-constructed model: a test that builds its own model can pass while the
+  trainer instantiates something else, which is how a budget mismatch would survive.
 
-- [ ] **T-L7.3 Input-parity test across the three arms.** §4's bit-identical-input
+  | arm | E | max_depth | ffn_mult | total | embedding | non-embedding |
+  |---|---|---|---|---|---|---|
+  | MoE | 6 | 1 | 4 | 5,584,908 | 2,162,688 | 3,422,220 |
+  | MoR | 1 | 7 | 24 | 5,581,063 | 2,162,688 | 3,418,375 |
+  | MoRE | 6 | 7 | 4 | 5,584,908 | 2,162,688 | 3,422,220 |
+
+  MoR vs MoRE: **0.0688%** on the total, **0.1124%** on the non-embedding count,
+  against the 5% tolerance. The non-embedding number is 1.6× the total-based one
+  from the same two models, which is why T-L6.3 asks for both — the tied 8192×256
+  token table plus the 256×256 positional table are identical across arms and so sit
+  in both the numerator and the denominator of a relative gap, shrinking it for free.
+  The embedding block is asserted **bit-identical in size** (not merely close) before
+  those gaps are read, since otherwise they would be computed against different
+  denominators.
+
+  **MoE and MoRE are exactly parameter-identical (5,584,908 vs 5,584,908, 0.0000%),
+  and that is a structural fact worth stating in the paper rather than a coincidence:
+  weight sharing means recursion depth costs no parameters.** Those two arms differ
+  *only* in how much computation they do, which makes MoE-vs-MoRE the cleanest
+  contrast in the study — the depth axis with the parameter axis held exactly, not
+  approximately, fixed.
+
+  Both anchors are pinned as assertions (`5,584,908` / `5,581,063`), so a future shape
+  change must be a deliberate re-derivation rather than a silent drift.
+
+- [x] **T-L7.3 Input-parity test across the three arms.** §4's bit-identical-input
   invariant is trivially checkable on language because all three arms consume the
   same `input_ids`: assert the tensors are equal for the same record index under
   all three configs. **Verify:** `torch.equal` on the input batch across MoE/MoR/
   MoRE at the same seed and index.
+  **Evidence:** in `code/test_language_gate_l6_l7.py` (same 28-check run, 0 failed).
+  Parity is checked at **three levels, because they fail independently**:
+  1. the **dataset tuple** at a fixed index (137) — all 7 slots bit-identical across
+     arms, with slot 6 compared under equal-NaN semantics rather than exempted, since
+     an exemption would also excuse a real difference;
+  2. the **first batch out of a seeded DataLoader** built exactly as `engine.py`
+     builds it (`make_generator(seed, "dataloader_shuffle")`, `seed_worker`) — this
+     is the level that catches an architecture-dependent *shuffle order*, which a
+     per-index check cannot see: identical datasets visited in different orders would
+     feed the arms different data while every level-1 check passed;
+  3. the **resolved data config** on `corpus`/`seq_len`/`vocab_size`/
+     `dataset_version`/`train_split_version`/`subset_fraction`, so the arms are not
+     reading different corpora and then agreeing about a batch by coincidence.
+
+  Two further assertions make the parity check non-vacuous. `input_ids` are all legal
+  vocabulary indices (`min 66, max 8046 < V = 8192`), so nothing expert-shaped — a
+  family id, an oracle expert index — has been packed into the token stream, which is
+  the concrete form §3's prohibition takes on language. And a **different** seed (43)
+  must produce a **different** first batch: without that, the parity above would also
+  pass on a loader that ignored its generator entirely, and would prove nothing.
 
 - [ ] **T-L7.4 One-command runner for the 4060 8 GB co-author machine.** The best
   GPU available to the project is Ayan's RTX 4060 Laptop (8 GB), not this machine's
@@ -2191,6 +2345,80 @@ does not exist here (T-L0.0).
   setup + **one** command reproduces the wikitext-2 dataset (hashes matching the tracked
   manifest) and completes a short language run; the 8 GB VRAM figure replaces the 6 GB
   one in the T-L7.0 table for the arms actually run there.
+  **Evidence:** `code/run_language_matrix.py`. `SETUP.md` and `HANDOFF.md` rewritten
+  for the frozen protocol. Verified on this machine end to end:
+  `run_language_matrix.py --preflight` → clean (9 checks); `--all --dry-run` → the
+  correct 15 commands in arm order; `--smoke` → **exit 0 in 7.6 min**, a real CUDA
+  MoRE run writing `runs/langB_MoRE_seed44__d915d7de/` with
+  `Total parameters: 5,584,908` and `val = 6.2367` after one epoch on the dev corpus.
+  (6.2367 is *above* the dev floor 5.3983 and that is expected — 219 optimizer steps
+  at batch 48. The smoke run's job is to prove the machine trains and writes a run
+  directory, not to beat a floor; Gate L7 is T-L7.2's.)
+
+  **The one command is `--all`, and it does five things a documented `train.py` line
+  cannot.**
+  1. **Preflight refuses instead of warning.** CUDA usability is established by
+     actually running a matmul, not by reading `torch.cuda.is_available()` — a driver
+     that reports True and then cannot launch a kernel is a real failure mode on this
+     project (`ENVIRONMENT.md` §4). It also checks the corpus manifest, the POS
+     lookup (without which the run trains fine and reports `N/A` for every routing
+     metric the study exists to measure), that the spec has no nulls, that
+     `assert_not_silent_proxy` **accepts** the frozen config on all three arms, that
+     W&B is either logged in or explicitly offline, and disk headroom for 15
+     checkpoints sized from a real checkpoint on disk rather than guessed.
+  2. **It removes the two quiet failure modes of a hand-typed launch.** Omitting
+     `--experiment_group canonical_lang_b` does not fail — the run completes, writes a
+     full directory, is stamped `exploratory`, and is then silently absent from the
+     headline table until the export comes up short. Omitting
+     `--config config_language.json` resolves against the *arithmetic* defaults, which
+     the guard does refuse, but only after `wandb.init`. Fifteen hand-typed commands
+     is fifteen chances at each.
+  3. **It is interruption-safe by skipping completed runs, not by resuming
+     checkpoints.** A 39 h matrix on a laptop will be interrupted. A run counts as
+     complete only with all four of: the right arm, the right seed, the canonical
+     group stamp, and a finished `metrics.json`. A directory holding a checkpoint but
+     no metrics is treated as **interrupted and re-run**, deliberately — its
+     checkpoint is a partially-trained model at an unknown epoch, which is exactly
+     the artifact that reaches a results table by accident.
+  4. **It stops at the first failure rather than looping around it** (`plan.md` §20),
+     and names the run that died. Completed runs stay intact and are skipped on
+     resume.
+  5. **It reads results back rather than computing them.** The summary table is read
+     out of each `metrics.json` and prints `N/A`, never a sentinel, for a missing
+     value; it then points at `seed_stats.py` / `export_results.py` for aggregation.
+     The driver deliberately does **not** become a second, weaker path to a results
+     table — those two refuse to mix dataset versions and config hashes, and this
+     does not.
+
+  Two things the runner refuses to offer: any flag that could change a frozen
+  protocol field, and a retry loop. `--smoke` is the only non-canonical path and it
+  cannot contaminate the matrix — wikitext-2 carries its own `dataset_version`, so the
+  guard would refuse it as canonical even if the group label were wrong.
+
+  **Two defects in this driver were found by running it rather than by reading it,
+  and both would have been invisible.** (a) The summary read `depth/mean` under the
+  name `depth/avg`, which does not exist — `.get()` would have printed `N/A` in every
+  row of every matrix, a missing-key bug that looks exactly like a legitimately
+  unmeasured metric. Verified against a real language `metrics.json` and corrected.
+  (b) The VRAM check refused any card under 7,000 MiB, which would have refused the
+  6,143 MiB 3050 that the **entire calibration phase ran on**. Split into a hard
+  refusal below 5,800 MiB (the measured 5,342 MiB peak of the MoR arm plus margin)
+  and a **warning** in the 5,800–7,000 range that names the two real consequences —
+  nothing else may use the GPU, and expect ~1.5× the epoch time of the 4060.
+
+  **The 8 GB re-measurement is left to the machine that has the card**, recorded in
+  `HANDOFF.md` as the first thing to write down. The 6 GB figures are labelled as
+  6 GB figures everywhere they appear rather than being presented as the protocol's
+  cost, and the runner prints its estimate as an explicit upper bound.
+
+  **WHY THIS BOX IS STILL `[ ]`.** Everything buildable here is built and executed.
+  The half that remains is the half that is *definitionally* not verifiable from this
+  machine: "on a machine that has never seen this repo". This repo has been seen here.
+  Only Ayan's machine can discharge that clause, by running `--preflight` then
+  `--smoke` on a fresh clone and confirming the dataset rebuild reproduces the tracked
+  manifest hashes. Ticking it from here would be asserting a result about a machine
+  that has not run yet — which is the exact failure mode the Evidence convention
+  exists to prevent.
 
 - [ ] **T-L7.5 Push after every gate that a REAL RUN validated.** Standing
   instruction, recorded here because it is a protocol rule rather than a one-off: the

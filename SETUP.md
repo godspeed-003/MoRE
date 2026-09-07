@@ -2,8 +2,9 @@
 
 Written for the machine that will actually run the canonical matrix (Ayan's RTX 4060
 Laptop, 8 GB). Everything here has been executed on a 3050 6 GB; the only expected
-difference is more VRAM headroom, which changes the numbers Gate L5 picks, not the
-steps.
+difference is more VRAM headroom, which buys speed rather than a different protocol —
+the protocol is **frozen** as of T-L7.1 and `batch_size 48` is one of the frozen
+fields, not a value to re-pick for your card.
 
 If a command below fails, **stop and report it** rather than working around it. Most of
 these steps exist because a silent success would produce numbers that look fine and
@@ -21,6 +22,27 @@ Two Python interpreters, deliberately:
 | **CUDA** — a venv with `torch==2.6.0+cu126` | training, timing, the seed matrix | the only place a run's numbers come from |
 
 `ENVIRONMENT.md` records the exact versions this was developed against.
+
+### If you are Ayan, you already have both, in one interpreter
+
+```text
+C:/Users/Hp/anaconda3/envs/more_env/python.exe      torch 2.5.1 + CUDA
+```
+
+That environment has CUDA torch **and** everything the gates need, so it serves both
+roles and you can **skip sections 2 and 3 entirely**. Two things follow from it:
+
+- **Use the full path.** That machine's Anaconda base and `C:\Python314` have no
+  `torch` at all, so a bare `python` fails at `import torch` rather than quietly
+  falling back to CPU — which is the good direction, but only if you notice.
+- **It is torch 2.5.1, not 2.6.0.** The `TOTAL 356 356 0 0` gate baseline was
+  established on 2.6.0. A different count on 2.5.1 is **not automatically a
+  regression** — diagnose it as a version difference before treating it as a code
+  defect, and record which one it was. Anything else and you will "fix" a working
+  codebase to match a number from a different torch.
+
+`ENVIRONMENT.md` §8 documents that machine specifically; §1–7 describe the 3050 the
+calibration ran on.
 
 ---
 
@@ -154,7 +176,17 @@ Takes ~4 minutes and launches two real 1-epoch arithmetic training runs.
 python code/test_lang_causality.py && python code/test_lang_heads.py && python code/test_lang_recursion.py && python code/test_language_families.py && python code/test_language_task_axis.py
 ```
 
-Expected: `22`, `25`, `11`, `89`, `72` passed, `0 failed` throughout.
+Expected: `22`, `25`, `11`, `89`, `74` passed, `0 failed` throughout.
+
+Then the two Phase L-7 suites, which check the frozen protocol rather than the code:
+
+```bash
+python code/test_language_spec_freeze.py && python code/test_language_gate_l6_l7.py
+```
+
+Expected: `59 passed, 0 failed, 0 skipped` and `28 passed, 0 failed, 0 skipped`. The
+second one prints the three arms' parameter-count table — **MoRE must be 5,584,908**.
+If it is not, the arms are not budget-matched and nothing downstream means anything.
 
 ## 8. W&B — settle this BEFORE the first canonical run
 
@@ -177,14 +209,28 @@ If you go offline, also set `WANDB_DIR` to somewhere **outside** the repo so no
 
 ## 9. Your first language run
 
-From inside `code/` (the config path is relative):
+Do **not** hand-write a `train.py` command. There is one entry point, and it checks
+everything that can be wrong before it spends a GPU-hour:
 
 ```bash
-cd code && python train.py --architecture more --task language --corpus wikitext-2 --epochs 1 --batch_size 8 --seed 42 --experiment_group lang_smoke
+python code/run_language_matrix.py --preflight
 ```
 
-Use the **CUDA** interpreter for anything you intend to quote. On the CPU one this takes
-tens of minutes; on a 4060 it should be a few minutes.
+That verifies CUDA is genuinely usable (it runs a real matmul, not just
+`is_available()`), the corpus is built, the POS lookup exists, the spec is frozen, the
+frozen config is **accepted by the proxy guard on all three arms**, W&B is settled,
+and there is disk room for 15 checkpoints. It refuses rather than warns. ~15 seconds.
+
+Then prove the machine can actually train, on the dev corpus, in about ten minutes:
+
+```bash
+python code/run_language_matrix.py --smoke
+```
+
+That run is stamped `langB_smoke` and **cannot** contaminate the matrix — wikitext-2
+carries its own `dataset_version`, so the guard would refuse it as canonical even if
+the label were wrong. Run it from the repo root; the runner resolves the config path
+itself.
 
 What a correct start looks like:
 
@@ -196,9 +242,16 @@ What a correct start looks like:
 [Train] halting: ponder_weight=0.001, supervision=OFF (pure ACT)
 ```
 
-`5,584,908` should match exactly for MoRE. If your parameter count differs, something in
+`5,584,908` must match exactly for MoRE. If your parameter count differs, something in
 the config resolved differently and the arms are no longer budget-matched — stop and
 report it.
+
+The canonical matrix itself is `--all`, and `HANDOFF.md` is the instructions for it.
+A hand-written `train.py` command is still possible and still works, but the two
+flags easiest to forget — `--config code/config_language.json` and
+`--experiment_group canonical_lang_b` — fail *quietly*: without the second, the run
+completes, writes a full directory, is stamped `exploratory`, and is then silently
+absent from the results table.
 
 ---
 
@@ -206,11 +259,14 @@ report it.
 
 | symptom | cause |
 |---|---|
-| `config.json not found` | run `train.py` from inside `code/`, not the repo root |
+| `ModuleNotFoundError: No module named 'torch'` on Ayan's machine | the bare `python` was used; only `C:/Users/Hp/anaconda3/envs/more_env/python.exe` has torch (§0) |
+| `config.json not found` | `train.py` was run from the repo root instead of inside `code/` — or just use `run_language_matrix.py`, which resolves the path itself |
 | `torch.cuda.is_available()` is `False` in `.venv_cuda` | the `--ignore-installed torch` step was skipped |
+| the guard says `experiment_group=exploratory` on a run you meant to be canonical | `--experiment_group canonical_lang_b` was omitted; this fails **quietly** and the run is then absent from the results table |
 | `LookupError: averaged_perceptron_tagger_eng` | step 4 not done |
 | `FileNotFoundError: .../train.npy` | step 5 not done for that corpus |
 | `data.seq_len = N but ... was packed at seq_len = 256` | the corpus on disk was built at a different length; repack or drop the override |
 | a hash mismatch in `test_language_data.py` | **STOP** — your corpus is not the one the numbers were measured on |
 | `UsageError: No API key configured` | step 8 |
 | `ValueError: path is on mount 'C:', start on mount 'D:'` | a path argument crossed drives; report it, this class of bug has bitten twice |
+| CUDA OOM on the MoR arm | do **not** lower `batch_size` — it is a frozen protocol field and changing it makes the run non-canonical. 48 peaks at a measured 5,342 MiB, so an 8 GB card has room; report the actual failure instead |

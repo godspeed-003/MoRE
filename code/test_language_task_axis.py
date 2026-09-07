@@ -766,24 +766,53 @@ check("TL1.3k an arithmetic run claiming canonical_lang_b is REFUSED too",
       _msg is not None and "WRONG GROUP FOR THE TASK" in _msg,
       "refused" if _msg else f"admitted as {_grp!r}")
 
-# ... and the right group for the right task must fail for the RIGHT reason:
-# the language spec is deliberately unfrozen, so the refusal must be about null
-# fields, never about the group.
+# ... and the right group for the right task must fail for the RIGHT reason.
+#
+# THIS TRIO CHANGED AT T-L7.1 AND THE CHANGE IS THE POINT. Before the freeze the
+# spec's `enforced_fields` held eight nulls, so `_claim` was refused with
+# "unfrozen fields (still null)" and these checks asserted exactly that -- the
+# guard blocking every canonical language claim was the mechanism working, not a
+# bug. T-L7.1 filled every null, so that refusal path is now unreachable and the
+# assertion had to move rather than be deleted: what must still be true is that a
+# config which does NOT match the frozen protocol is refused, for its FIELDS, by
+# the LANGUAGE spec. `_claim` builds an otherwise-default config with
+# dataset_version = "dummy", so it mismatches on the data identity at minimum.
+#
+# If this ever reports "admitted", the guard has stopped enforcing the frozen
+# protocol and any run can call itself canonical_lang_b -- read
+# run_context.py:assert_not_silent_proxy step 2 (field comparison) before
+# touching anything else.
 _msg, _grp = _claim(CANONICAL_GROUP_LANGUAGE, task=TASK_LANGUAGE)
-check("TL1.3l a language run claiming canonical_lang_b is refused for "
-      "UNFROZEN fields, not for its group",
+check("TL1.3l a non-matching language run claiming canonical_lang_b is refused "
+      "for its FIELDS, not for its group",
       _msg is not None and "WRONG GROUP" not in _msg
-      and "unfrozen fields (still null)" in _msg,
-      "refused on nulls" if _msg else f"admitted as {_grp!r}")
+      and "unfrozen fields (still null)" not in _msg,
+      "refused on field mismatch" if _msg else f"admitted as {_grp!r}")
 check("TL1.3m ... and the refusal names the language spec, not the arithmetic one",
       _msg is not None and "canonical_spec_language.json" in _msg,
       "names canonical_spec_language.json" if _msg else "not refused")
-check("TL1.3n ... listing exactly the enforced_fields nulls",
-      _msg is not None and all(
-          f in _msg for f in ("epochs", "batch_size", "lr", "weight_decay",
-                              "seq_len", "dropout")),
-      "epochs/batch_size/lr/weight_decay/seq_len/dropout all named"
-      if _msg else "not refused")
+check("TL1.3n ... naming the data identity it does not match",
+      _msg is not None and "dataset_version" in _msg,
+      "names data.dataset_version" if _msg else "not refused")
+
+# The post-T-L7.1 invariant that replaces the old null check. A null in this file
+# silently makes the guard refuse EVERY canonical language claim, which after the
+# freeze would look like a mysterious matrix that cannot start.
+_lang_nulls = sorted(k for k, v in spec_l["enforced_fields"].items()
+                     if v is None)
+_lang_arch_nulls = sorted(
+    f"{a}.{k}" for a, b in spec_l["architecture_variants"].items()
+    if not a.startswith("_") for k, v in b.items() if v is None)
+check("TL1.3n2 the language spec is fully frozen (T-L7.1): no null remains",
+      not _lang_nulls and not _lang_arch_nulls,
+      f"nulls = {_lang_nulls + _lang_arch_nulls}" if (_lang_nulls or
+                                                      _lang_arch_nulls)
+      else "enforced_fields and all three arch blocks fully populated")
+check("TL1.3n3 ... and every frozen field carries a frozen_by justification",
+      all(k in spec_l["frozen_by"] for k in spec_l["enforced_fields"]),
+      "one frozen_by entry per enforced field"
+      if all(k in spec_l["frozen_by"] for k in spec_l["enforced_fields"])
+      else f"missing = {sorted(set(spec_l['enforced_fields']) - set(spec_l['frozen_by']))}")
 
 # An exploratory label is still free on either task -- the cross-task refusal
 # must not have turned every unrecognised group into an error.

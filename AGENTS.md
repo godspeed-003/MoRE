@@ -1,4 +1,4 @@
-# CLAUDE.md — MoRE Repository Operating Rules
+# AGENTS.md — MoRE Repository Operating Rules
 
 **Authority.** This file is the working contract for all agent work in this
 repository. It condenses three governing documents, which remain authoritative

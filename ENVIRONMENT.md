@@ -2,11 +2,18 @@
 
 **Why this file exists.** `CLAUDE.md` §9 and `ARCHITECTURE.md` §9 named an
 interpreter (`C:\Users\Hp\anaconda3\envs\more_env\python.exe`, torch 2.5.1) and a
-GPU (RTX 4060 Laptop 8 GB) that do not exist on this machine. A future agent
+GPU (RTX 4060 Laptop 8 GB) that do not exist **on this machine**. A future agent
 following those instructions gets `No such file or directory` on its first
 command, and — worse — cannot tell whether a stale path means *"wrong path"* or
 *"you are on the wrong machine, stop"*. Written under **T-L0.2**; the correction
 of the two documents is **T-L0.0**.
+
+**Those paths are not stale — they are Ayan's machine.** T-L0.2 originally read
+them as a leftover. They are the co-author's RTX 4060 8 GB laptop, which is where
+the arithmetic POC was developed and where the language canonical matrix runs.
+Sections 1–7 below describe **Vedant's RTX 3050 6 GB** (the gate and calibration
+machine); §8 describes Ayan's. Neither supersedes the other; a path tells you
+which machine a log came from.
 
 The arithmetic study's runs in `runs/` and the numbers in `README.md` /
 `results/results.md` **were** produced on the RTX 4060 machine. Those references
@@ -246,6 +253,56 @@ Work happens in a git **worktree** at
 branch `claude/english-language-dataset-migration-92946e`. The stash stack is
 shared with the main checkout: never bare `git stash` / `git stash pop`. Use a
 temporary WIP commit to set work aside.
+
+---
+
+## 8. Ayan's machine — RTX 4060 8 GB, the canonical-matrix GPU
+
+Everything in §1–§7 is **Vedant's** RTX 3050 6 GB. This section is the second
+machine in the project. Ayan is a co-author on MoRE; his laptop is where the
+arithmetic POC was developed, and it is where the language canonical matrix
+(`experiment_group = canonical_lang_b`, 3 architectures × 5 seeds) is run.
+
+| | Value |
+|---|---|
+| interpreter | `C:\Users\Hp\anaconda3\envs\more_env\python.exe` |
+| torch | 2.5.1 + CUDA |
+| GPU | NVIDIA GeForce RTX 4060 Laptop, 8 GB |
+| Anaconda **base** | **no torch** |
+| `C:\Python314` | **no torch** |
+
+**The env path is mandatory, not a preference.** Both other interpreters on that
+machine lack torch entirely, so a bare `python code/train.py` fails at
+`import torch` rather than falling back to CPU. Every command in `HANDOFF.md`
+names the env interpreter explicitly for this reason.
+
+**One interpreter, both roles.** Unlike this machine there is no CPU/CUDA split
+there: `more_env` runs both `run_correctness_suite.py` and training. The **356**
+gate baseline was measured on Vedant's CPU interpreter (torch 2.6.0+cpu); a
+different count on `more_env` is not automatically a regression — torch 2.5.1 vs
+2.6.0 is a real difference — so the first thing the handoff does is record that
+machine's own baseline before any language work is judged against it.
+
+**Why the matrix goes here and not on the 3050.** 8 GB is the largest VRAM budget
+the project has continuous access to, and the frozen `batch_size` was tuned to it
+under T-L7.0/T-L7.1 rather than to the 6 GB card. The MoR arm is the memory-heavy
+one (`ffn_mult = 24`), and it is the arm that crosses the 6 GB line first: on the
+3050 at `batch_size 64` MoR peaks at 7,338 MiB and falls into the soft-cliff
+regime measured in T-L7.0 (2.31 h/epoch against MoRE's 1.11 h). The same shape at
+89.6% of 8 GB has **not** been measured on the 4060 — see `HANDOFF.md` for the
+one-command VRAM probe that must run there before the matrix starts.
+
+**A third card exists and is excluded on purpose.** The college-lab RTX 4060 8 GB
+is office-hours-only. Interrupted epochs aside, splitting one matrix across two
+physically different cards puts a per-machine confound inside the seed variance
+the paper reports as `mean ± std` (`CLAUDE.md` §5). It may be used for ablations
+that are labelled with their own machine, never for a subset of the canonical
+seeds.
+
+**Reading a traceback.** `C:\Users\Hp\...` → Ayan's machine.
+`C:\Users\vedan\...` or `D:\res\git\MoRE\.venv_cuda\...` → this machine. A
+mismatch between the path in a log and the machine you are on is information, not
+a bug to normalise away.
 
 
 

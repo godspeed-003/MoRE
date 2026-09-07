@@ -74,6 +74,48 @@ SPLITS = ("train", "val", "test")
 TRAIN_SPLIT_VERSION = "wikitext-author-splits-v1"
 
 
+def corpus_versions(corpus, lang_root=None):
+    """`(dataset_version, train_split_version)` for `corpus`, or `(None, None)`.
+
+    T-L7.1a. The two version strings have to reach `cfg["data"]` BEFORE
+    `RunContext.create` runs, because `assert_not_silent_proxy` reads them off the
+    config and `config_hash` covers the `data` block. `MoRELanguageDataset` already
+    exposes both -- but it is constructed inside `engine.train()`, which is after
+    the guard has already made its decision, so the attributes were never the thing
+    the run recorded. Every language run on disk before this function existed
+    therefore carried the ARITHMETIC `more6-v1-seed42-n70000-...` id while consuming
+    WikiText.
+
+    DELIBERATELY NON-FATAL when the corpus is absent, and this is the load-bearing
+    choice. `config.py:_apply_language_block` runs on every `--task language`
+    config, including in the correctness suites and on a machine that has cloned the
+    repo but not yet run `build_language_dataset.py` (`data/lang/**/*.npy` is not
+    tracked). Raising here would make `--task language` unusable before the build,
+    and defaulting to a guess would put an unmeasured string into provenance. So a
+    missing manifest yields `None`, which the proxy guard already refuses a canonical
+    claim on -- and `MoRELanguageDataset` raises the real, actionable error with the
+    build command in it when the run actually reaches for the data.
+
+    Reads the manifest DIRECTLY rather than instantiating the dataset: constructing
+    it memory-maps the split and loads the `[V]` family lookup, which is a lot of
+    work to answer a question two JSON keys away, and it would fail on a corpus whose
+    family stage has not run even though the version strings are already there.
+    """
+    root = os.path.abspath(lang_root or LANG_ROOT)
+    man_path = os.path.join(root, str(corpus), "dataset_meta.json")
+    if not os.path.exists(man_path):
+        return None, None
+    try:
+        with open(man_path, "r", encoding="utf-8") as fh:
+            man = json.load(fh)
+    except (OSError, ValueError):
+        return None, None
+    dsv = man.get("dataset_version")
+    # A manifest without the key is the pack stage not having run. Same treatment as
+    # a missing file: report absence, never invent.
+    return (dsv or None), (TRAIN_SPLIT_VERSION if dsv else None)
+
+
 class MoRELanguageDataset(Dataset):
     """One packed `seq_len`-token block per item, in the engine's 7-tuple shape.
 

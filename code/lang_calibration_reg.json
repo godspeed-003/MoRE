@@ -1,0 +1,62 @@
+{
+  "stage": "reg",
+  "corpus": "wikitext-2",
+  "epochs": 3,
+  "seq_len": 256,
+  "batch_size": 64,
+  "seed": 44,
+  "dev_bigram_floor": 5.398304166059712,
+  "target_ratio_from_T4_2": 0.017,
+  "pos_partition_own_load_entropy": 0.8884,
+  "caveat": "CALIBRATION on the dev corpus. wikitext-2 shares its val split byte-for-byte with wikitext-103 (T-L2.0), so these runs may PICK a weight and may never be quoted as a result.",
+  "rows": [
+    {
+      "lr": 0.0005,
+      "dropout": 0.0,
+      "val_loss": 5.577438357928852,
+      "nats_below_floor": -0.1791341918691396,
+      "avg_depth": 2.217993974685669,
+      "run": "langB_MoRE_seed44__91f762a2__r4"
+    },
+    {
+      "lr": 0.0005,
+      "dropout": 0.1,
+      "val_loss": 5.578846299970472,
+      "nats_below_floor": -0.1805421339107598,
+      "avg_depth": 2.2915825843811035,
+      "run": "langB_MoRE_seed44__f205e549__r2"
+    },
+    {
+      "lr": 0.001,
+      "dropout": 0.0,
+      "val_loss": 5.240622478347641,
+      "nats_below_floor": 0.15768168771207147,
+      "avg_depth": 2.627268075942993,
+      "run": "langB_MoRE_seed44__dfa43bde__r2"
+    },
+    {
+      "lr": 0.001,
+      "dropout": 0.1,
+      "val_loss": 5.254251848684775,
+      "nats_below_floor": 0.1440523173749373,
+      "avg_depth": 2.6600301265716553,
+      "run": "langB_MoRE_seed44__8ca3ef73__r2"
+    },
+    {
+      "lr": 0.002,
+      "dropout": 0.0,
+      "val_loss": 5.324797126838753,
+      "nats_below_floor": 0.07350703922095914,
+      "avg_depth": 1.255418300628662,
+      "run": "langB_MoRE_seed44__e99dc110__r2"
+    },
+    {
+      "lr": 0.002,
+      "dropout": 0.1,
+      "val_loss": 7.195738416963869,
+      "nats_below_floor": -1.797434250904157,
+      "avg_depth": 7.0,
+      "run": "langB_MoRE_seed44__4fb3cbf2__r2"
+    }
+  ]
+}

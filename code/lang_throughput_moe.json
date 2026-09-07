@@ -2,13 +2,13 @@
   "device": "NVIDIA GeForce RTX 3050 6GB Laptop GPU",
   "total_vram_gib": 5.99951171875,
   "torch": "2.6.0+cu126",
-  "arch": "more",
+  "arch": "moe",
   "shape": {
     "d_model": 256,
     "n_heads": 4,
     "num_blocks": 1,
     "vocab_size": 8192,
-    "max_depth": 7,
+    "max_depth": 1,
     "ffn_mult": 4
   },
   "timed_steps": 4,
@@ -16,22 +16,12 @@
   "tokens_per_sec_is_upper_bound": true,
   "rows": [
     {
-      "arch": "more",
-      "seq_len": 256,
-      "batch_size": 40,
-      "tokens_per_batch": 10240,
-      "tokens_per_sec": 31750.29386074699,
-      "peak_mib": 2601.7177734375,
-      "oom": false,
-      "note": ""
-    },
-    {
-      "arch": "more",
+      "arch": "moe",
       "seq_len": 256,
       "batch_size": 48,
       "tokens_per_batch": 12288,
-      "tokens_per_sec": 32333.253539540903,
-      "peak_mib": 3098.43310546875,
+      "tokens_per_sec": 91300.07879504035,
+      "peak_mib": 1913.76220703125,
       "oom": false,
       "note": ""
     }
