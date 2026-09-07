@@ -10,7 +10,7 @@ numbers out of a run directory into this file -- regenerate it.
 - predict-the-train-mean floor on val: `0.080914` (R^2 below is derived from it, not stored)
 - admitted runs: MoE 5/5 (seeds [42, 43, 44, 45, 46]), MoR 5/5 (seeds [42, 43, 44, 45, 46]), MoRE 5/5 (seeds [42, 43, 44, 45, 46])
 - git commit of the admitted runs: `f7166b4fa4f5dcf34d0284fcaa5a686ad4d835f9` (dirty=True)
-- refused directories: 226 (listed at the end; a refusal is the admission filter working)
+- refused directories: 228 (listed at the end; a refusal is the admission filter working)
 
 ## 1. Headline
 
@@ -77,21 +77,15 @@ Non-scalar metrics (the routing confusion matrix, the Hungarian assignment
 vector) are not table cells and are not shown here; they are carried in
 `results.json` under each run's `metrics_nonscalar`.
 
+13 of the 137 keys in the union are `N/A` in **all 3 columns** and are listed in the footnote below instead of being rendered as a row of `N/A` (T-LX.5). They remain in `results.csv`, `results_aggregate.csv` and every run's `metrics.json` unchanged. **No key is dropped for being `N/A` in only some columns** -- that asymmetry is the point of the table.
+
 ### `(no prefix)`
 
 | metric | MoE | MoR | MoRE |
 |---|---|---|---|
-| `architecture` | N/A | N/A | N/A |
 | `best_val_loss` | 0.0628 +- 0.0002 | 0.0625 +- 0.0001 | 0.0629 +- 0.0002 |
-| `config_hash` | N/A | N/A | N/A |
 | `epoch` | 50.0000 +- 0.0000 | 50.0000 +- 0.0000 | 50.0000 +- 0.0000 |
-| `experiment_group` | N/A | N/A | N/A |
-| `experiment_id` | N/A | N/A | N/A |
-| `halting_mode` | N/A | N/A | N/A |
 | `num_experts` | 6.0000 +- 0.0000 | 1.0000 +- 0.0000 | 6.0000 +- 0.0000 |
-| `router_noise` | N/A | N/A | N/A |
-| `routing_balance_normalization` | N/A | N/A | N/A |
-| `routing_mode` | N/A | N/A | N/A |
 
 ### `depth`
 
@@ -123,16 +117,13 @@ vector) are not table cells and are not shown here; they are carried in
 
 | metric | MoE | MoR | MoRE |
 |---|---|---|---|
-| `dispatch/capacity_policy` | N/A | N/A | N/A |
 | `dispatch/evals_per_token` | 1.0000 +- 0.0000 | 1.0000 +- 0.0000 | 1.0000 +- 0.0000 |
 | `dispatch/expert_evaluations` | 224450.0000 +- 0.0000 | 451444.8000 +- 3951.3249 | 463990.8000 +- 12426.5716 |
 | `dispatch/experts_called_max` | 6.0000 +- 0.0000 | 1.0000 +- 0.0000 | 6.0000 +- 0.0000 |
 | `dispatch/max_load_fraction` | 0.2371 +- 0.0166 | 1.0000 +- 0.0000 | 1.0000 +- 0.0000 |
 | `dispatch/overflow_rate` | 0.0000 +- 0.0000 | 0.0000 +- 0.0000 | 0.0000 +- 0.0000 |
 | `dispatch/overflow_tokens` | 0.0000 +- 0.0000 | 0.0000 +- 0.0000 | 0.0000 +- 0.0000 |
-| `dispatch/router_noise` | N/A | N/A | N/A |
 | `dispatch/router_noise_scale` | 0.0000 +- 0.0000 | 0.0000 +- 0.0000 | 0.0000 +- 0.0000 |
-| `dispatch/routing_mode` | N/A | N/A | N/A |
 | `dispatch/tokens_dispatched` | 224450.0000 +- 0.0000 | 451444.8000 +- 3951.3249 | 463990.8000 +- 12426.5716 |
 
 ### `expert_load`
@@ -224,7 +215,6 @@ vector) are not table cells and are not shown here; they are carried in
 | `val/loss` | 0.0633 +- 0.0002 | 0.0627 +- 0.0001 | 0.0632 +- 0.0002 |
 | `val/routing_accuracy` | 0.2016 +- 0.1578 | N/A | 0.1629 +- 0.1864 |
 | `val/routing_ami` | 0.5132 +- 0.0847 | N/A | 0.4907 +- 0.0736 |
-| `val/routing_collapsed_experts` | N/A | N/A | N/A |
 | `val/routing_f1/E1_ADD_SUB` | 0.3999 +- 0.2642 | N/A | 0.3419 +- 0.3973 |
 | `val/routing_f1/E2_MULT_DIV` | 0.2294 +- 0.3342 | N/A | 0.2582 +- 0.3777 |
 | `val/routing_f1/E3_MOD_POW` | 0.1353 +- 0.2606 | N/A | 0.1674 +- 0.2853 |
@@ -238,7 +228,6 @@ vector) are not table cells and are not shown here; they are carried in
 | `val/routing_f1_matched/E5_SHIFT` | 0.3752 +- 0.0260 | N/A | 0.2885 +- 0.1657 |
 | `val/routing_f1_matched/E6_SORT_STAT` | 0.5805 +- 0.1077 | N/A | 0.5512 +- 0.1261 |
 | `val/routing_hungarian_accuracy` | 0.5004 +- 0.0560 | N/A | 0.5258 +- 0.0612 |
-| `val/routing_hungarian_assignment` | N/A | N/A | N/A |
 | `val/routing_macro_recall` | 0.2157 +- 0.1414 | N/A | 0.1883 +- 0.1945 |
 | `val/routing_matched_macro_recall` | 0.5133 +- 0.0551 | N/A | 0.5491 +- 0.0984 |
 | `val/routing_precision/E1_ADD_SUB` | 0.3339 +- 0.2188 | N/A | 0.2950 +- 0.3739 |
@@ -278,6 +267,30 @@ vector) are not table cells and are not shown here; they are carried in
 | `val_offline/early_exit_rate` | N/A | 0.9986 +- 0.0030 | 0.9997 +- 0.0007 |
 | `val_offline/forced_exit_rate` | N/A | 0.0014 +- 0.0030 | 0.0003 +- 0.0007 |
 | `val_offline/mean_remainder` | N/A | 0.1283 +- 0.0402 | 0.2651 +- 0.0599 |
+
+### Keys omitted from the tables above, and why
+
+| key | reason | recorded value |
+|---|---|---|
+| `architecture` | categorical, not a measurement | `moe`, `mor`, `more` |
+| `config_hash` | categorical, not a measurement | 15 distinct values (one per run or per arm) -- read the `config_hash` column of `results.csv` |
+| `dispatch/capacity_policy` | categorical, not a measurement | `no_capacity_limit` |
+| `dispatch/router_noise` | categorical, not a measurement | `none` |
+| `dispatch/routing_mode` | categorical, not a measurement | `top1_sparse` |
+| `experiment_group` | categorical, not a measurement | `canonical_phase_b` |
+| `experiment_id` | categorical, not a measurement | 15 distinct values (one per run or per arm) -- read the `experiment_id` column of `results.csv` |
+| `halting_mode` | categorical, not a measurement | `pure_act` |
+| `router_noise` | categorical, not a measurement | `none` |
+| `routing_balance_normalization` | categorical, not a measurement | `mean over depth calls per block, then mean over blocks` |
+| `routing_mode` | categorical, not a measurement | `top1_sparse` |
+| `val/routing_collapsed_experts` | categorical, not a measurement | `none` |
+| `val/routing_hungarian_assignment` | categorical, not a measurement | 8 distinct values (one per run or per arm) -- read the `val/routing_hungarian_assignment` column of `results.csv` |
+
+**categorical** means the value is recorded and is not missing -- it is a
+label, so it has no mean and `cell()` exports it as `N/A`. Read it from the
+per-run columns of `results.csv`, not from this table. Rendering it as a
+row of `N/A` would assert the opposite of the truth, since `N/A` in this
+document means *does not exist or was refused*.
 
 ## 4. Ablation arms -- EXPLORATORY, NOT CANONICAL
 
@@ -476,6 +489,7 @@ skipped these would be indistinguishable from one that found nothing wrong.
 | `t67_provenance_check_seed44__6b711a59__r34` | experiment_group='exploratory' != 'canonical_phase_b' |
 | `t67_provenance_check_seed44__6b711a59__r35` | experiment_group='exploratory' != 'canonical_phase_b' |
 | `t67_provenance_check_seed44__6b711a59__r36` | experiment_group='exploratory' != 'canonical_phase_b' |
+| `t67_provenance_check_seed44__6b711a59__r37` | experiment_group='exploratory' != 'canonical_phase_b' |
 | `t67_provenance_check_seed44__6b711a59__r4` | experiment_group='exploratory' != 'canonical_phase_b' |
 | `t67_provenance_check_seed44__6b711a59__r5` | experiment_group='exploratory' != 'canonical_phase_b' |
 | `t67_provenance_check_seed44__6b711a59__r6` | experiment_group='exploratory' != 'canonical_phase_b' |
@@ -516,6 +530,7 @@ skipped these would be indistinguishable from one that found nothing wrong.
 | `t67d_provenance_check_mor_seed44__fa9339bc__r32` | experiment_group='exploratory' != 'canonical_phase_b' |
 | `t67d_provenance_check_mor_seed44__fa9339bc__r33` | experiment_group='exploratory' != 'canonical_phase_b' |
 | `t67d_provenance_check_mor_seed44__fa9339bc__r34` | experiment_group='exploratory' != 'canonical_phase_b' |
+| `t67d_provenance_check_mor_seed44__fa9339bc__r35` | experiment_group='exploratory' != 'canonical_phase_b' |
 | `t67d_provenance_check_mor_seed44__fa9339bc__r4` | experiment_group='exploratory' != 'canonical_phase_b' |
 | `t67d_provenance_check_mor_seed44__fa9339bc__r5` | experiment_group='exploratory' != 'canonical_phase_b' |
 | `t67d_provenance_check_mor_seed44__fa9339bc__r6` | experiment_group='exploratory' != 'canonical_phase_b' |

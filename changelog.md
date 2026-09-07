@@ -6099,6 +6099,121 @@ reports `admitted: 0  refused: 241` -- correctly, because no run has certified i
 `canonical_lang_b`. The aggregation path is built and tested; the 17-section fold needs
 the matrix.
 
+## T-LX.5 - the human table drops all-dead rows; the machine record keeps every one
+
+**Two requests that look like one, and conflating them undoes a fix.** `metrics.json`
+and `results.tsv` must keep the literal string `"N/A"`: an exporter joining
+MoE/MoR/MoRE rows on a common column set has to decide what a *missing* column means,
+that indecision is the defect the `"N/A"` contract closed (see the eleven-flat-routing-
+keys entry), and CLAUDE.md 4 forbids the `0.0` that would otherwise fill the gap. What
+should not carry dead rows is the *rendered* table. Those are different artifacts and
+this change touches only the second.
+
+**What was added.** `export_results.py:dead_rows(rows, agg, keys)` returns every key
+that renders `N/A` in **all** `len(ARCHES)` columns, mapped to a reason.
+`_write_md_tail` renders only the survivors in section 3 and appends a footnote table
+naming every dropped key. `write_json` records the same dict under
+`markdown_omitted_all_na_keys`, so the elision is auditable: `admitted_runs[*].metrics`
+in the same file still carries every dropped key, and a consumer can diff the two and
+see that nothing numeric was hidden. `results.csv` and `results_aggregate.csv` are
+unchanged in shape -- one column, respectively one row per arm, per dropped key.
+
+**Rule 3 survives, and is asserted.** A key that is `N/A` for *one* arm and numeric for
+another is never dropped. `depth/mean` renders `| N/A | 2.0377 | 2.0377 |` -- suppressed
+for MoE at `max_depth 1`, real on MoR and MoRE -- which is precisely the asymmetry
+`metric_keys()` takes the union rather than the intersection in order to show. Only rows
+dead in every column at once are elided. There is a test for each half.
+
+**THE INTERESTING PART: DROPPING IS THE MORE HONEST RENDERING, NOT THE MORE CONVENIENT
+ONE.** In this document `N/A` is *defined* to mean "the quantity does not exist for this
+configuration, or `engine.py` refused to state it". Applied to the arithmetic table's
+own output, that definition was **false in both halves for 13 rows**:
+
+```text
+| routing_mode | N/A | N/A | N/A |
+```
+
+Every run records `routing_mode = top1_sparse`. Nothing was refused and nothing is
+missing -- it is a categorical label, and `cell()` maps it to `N/A` because it is not a
+number. A reader applying the document's own stated definition would conclude the
+routing mode was **not recorded**, which is the opposite of the truth, and would
+conclude it about the single most load-bearing architectural constraint in
+`CLAUDE.md` 2. So the footnote splits the two reasons rather than lumping them:
+
+- **categorical** -- the value exists and is recorded, just not as a number. The
+  footnote prints the observed value(s) and points at the `results.csv` column. Past
+  three distinct values it prints the count and the pointer instead: `config_hash` and
+  `experiment_id` have one value per run, and pasting 15 of them (two being 64-char
+  hashes) made the footnote *less* readable than the row of `N/A` it replaced.
+- **structural** -- no admitted arm has the quantity at all.
+
+Classification reads the raw per-run metric, not `cell()`, because `cell()` has already
+collapsed every string to `N/A` and the string is exactly what tells the two apart.
+Suppressed keys cannot be misclassified by this: suppression only applies where the
+value is a constant or MoE depth, and such a key is numeric in another arm and therefore
+not dead.
+
+**The two tasks split differently, and that contrast is the check that the classifier is
+doing real work rather than pattern-matching a name.**
+
+| | union keys | dead | categorical | structural |
+|---|---|---|---|---|
+| arithmetic | 137 | 13 | 13 | **0** |
+| language | 222 | 20 | 15 | **5** |
+
+Arithmetic has **no** structural dead key: `depth_allocation_error_*` is genuinely
+measured there, against the operation-complexity curriculum. On language those four keys
+are structurally absent -- English has no per-token ground-truth recursion depth, so
+there is nothing to be right or wrong about, and a `0.0` would read as *perfect*
+allocation against a curriculum that does not exist. The structural explanatory
+paragraph is therefore emitted only when a structural key exists, so the arithmetic
+document does not carry a paragraph about a case it does not have.
+
+**The fifth structural key on language is `train/halting_supervision_loss`, and it is
+the one worth noticing.** It is `N/A` on all three arms because the language protocol
+runs **pure ACT with halt supervision OFF** (`halting: ponder_weight=0.001,
+supervision=OFF`, printed by every run). That is a protocol fact, not a gap: the key
+exists in the loss assembly and would carry a number if supervision were switched on, so
+a `0.0` there would read as "supervision was applied and cost nothing" -- a claim about
+the halting objective that no run made.
+
+**A correction to the task's own Verify line, recorded rather than quietly
+reinterpreted.** T-LX.5 says "a language `results.tsv` still contains
+`depth_allocation_error_*` as `N/A`". It does not, and never did: `results.tsv` is the
+per-epoch scalar log and carries **zero** columns matching `allocation` -- checked on
+`runs/langB_MoRE_seed44__d915d7de/results.tsv`. The machine records that do carry those
+four keys are `metrics.json` (each the string `"N/A"`) and the exported `results.csv`,
+and the invariant is discharged against those. `results.tsv` is untouched either way.
+
+**A mistake in the new test, of the kind that would have passed by accident.** The
+assertion "no allocation-error key is rendered as a table row" was written against the
+whole markdown -- but the footnote *is* a markdown table, so `| \`depth/allocation_error_abs\` |`
+appears in it legitimately and the check failed. The fix is to split the document at the
+footnote heading and ask the question of the metric tables only. Asking it of the whole
+file conflates "dropped from the tables" with "not mentioned anywhere", and the second is
+exactly what this task forbids -- the test had to be taught the difference the feature
+exists to make.
+
+**Verification: 73 passed, 0 failed, 0 skipped** (`code/test_language_export.py`, up
+from 60), of which 12 cover this task: the structural classification of all four
+allocation keys, their absence from the metric tables, their presence in the footnote,
+their survival in `results.csv` as `N/A` and in `results_aggregate.csv` as a row,
+`markdown_omitted_all_na_keys` matching the drop set, the `depth/mean` Rule 3 pair, the
+low-cardinality categorical value, and the high-cardinality count-plus-pointer.
+
+**No published arithmetic number moved.** `results/results.csv` and
+`results/results_aggregate.csv` are **byte-identical** (`git diff --quiet` passes on
+both). Pairwise verdicts unchanged: MoRE-MoE p=0.6587, MoRE-MoR p=0.0159, MoE-MoR
+p=0.0079. Only `results_tables.md` and `results.json` differ -- which is exactly the
+human-facing / machine-record split this task is about.
+
+**Where to look.** `export_results.py:dead_rows` to change what counts as dead or to add
+a reason -- and read its docstring first, because the `N/A` contract it must not relax is
+stated there. `_write_md_tail` for the footnote text and the three-value cap.
+`write_json`'s `markdown_omitted_all_na_keys` if a consumer needs the drop list.
+`test_language_export.py`'s `_FOOT` split if a footnote assertion starts matching a
+metric row or vice versa.
+
 <!-- APPEND-MARKER-CL -->
 
 

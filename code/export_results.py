@@ -500,6 +500,60 @@ def aggregate(rows: list[dict], keys: list[str]) -> dict:
     return out
 
 
+def dead_rows(rows: list[dict], agg: dict, keys: list[str]) -> dict:
+    """T-LX.5. Keys that render `N/A` in EVERY architecture column of section 3,
+    mapped to why -- so the human-facing table can drop them and still name them.
+
+    THIS IS NOT A RELAXATION OF THE `N/A` CONTRACT AND MUST NOT BECOME ONE. The
+    machine record keeps every one of these keys: `metrics.json` and `results.tsv`
+    are untouched, `results.csv` still carries a column per key, and
+    `results_aggregate.csv` still carries a row per (key, architecture) with `n_na`.
+    The `"N/A"` string is what closed the eleven-flat-routing-keys defect -- an
+    exporter joining MoE/MoR/MoRE on a common column set has to decide what a
+    *missing* column means -- and CLAUDE.md 4 forbids the 0.0 that would fill the
+    gap. Only the rendered markdown elides, and only rows that are dead in all
+    three columns at once.
+
+    WHY DROPPING IS THE MORE HONEST RENDERING, NOT THE MORE CONVENIENT ONE. In this
+    document `N/A` is *defined* to mean "the quantity does not exist for this
+    configuration, or engine.py refused to state it". For a row like
+    `| routing_mode | N/A | N/A | N/A |` that definition is false in both halves:
+    every run records `routing_mode = top1`, it is simply a categorical label that
+    `cell()` maps to `N/A` because it is not a number. A reader applying the stated
+    definition would conclude the routing mode was not recorded. So the footnote
+    separates the two reasons rather than lumping them:
+
+      categorical -- the value EXISTS and is recorded, just not as a number. The
+        footnote prints the observed value(s) so the fact is not lost, and points at
+        the provenance columns of `results.csv` where it lives as data.
+      structural  -- no admitted arm has the quantity. On language
+        `depth/allocation_error_*` is the case that matters: there is no per-token
+        ground-truth depth for English, so a 0.0 there would read as perfect
+        allocation against a curriculum that does not exist.
+
+    A key that is N/A for ONE arm and numeric for another is NEVER dropped: that
+    asymmetry is Rule 3 and is the whole reason `metric_keys()` takes the union
+    instead of the intersection.
+
+    Classification reads the raw per-run metric rather than `cell()`, because
+    `cell()` has already collapsed every string to `N/A` and the string is exactly
+    what distinguishes the two reasons. Suppressed keys cannot be misclassified by
+    this: suppression only applies where the value is a constant or MoE depth, and
+    such a key is numeric in another arm and therefore not dead at all.
+    """
+    out: dict = {}
+    for k in keys:
+        if any(agg[a]["metrics"][k]["n"] or agg[a]["metrics"][k]["n_bool"]
+               for a in ARCHES):
+            continue                       # a real number or a recorded flag exists
+        seen = sorted({v for r in rows
+                       for v in (r["metrics"].get(k),)
+                       if isinstance(v, str) and v != "N/A"})
+        out[k] = {"reason": "categorical" if seen else "structural",
+                  "values": seen}
+    return out
+
+
 def pairwise(agg: dict, key: str = PRIMARY) -> list[dict]:
     """Rule 4. All three ordered pairs, each with its own resolution floor."""
     res = []
@@ -706,7 +760,7 @@ def write_md(rows, refusals, agg, keys, pw, abl) -> Path:
     A("resolution limit and will not survive a multiple-comparison correction.")
     A("")
     _write_md_depth(L, rows, agg)
-    return _write_md_tail(L, refusals, agg, keys, abl)
+    return _write_md_tail(L, rows, refusals, agg, keys, abl)
 
 
 # T11.1 audit item 7. The keys, in report order, and the pairs worth testing.
@@ -815,8 +869,14 @@ def _write_md_depth(L: list, rows: list[dict], agg: dict) -> None:
     A("")
 
 
-def _write_md_tail(L: list, refusals, agg, keys, abl) -> Path:
-    """Sections 3-5: the full metric union, the ablations, the refusals."""
+def _write_md_tail(L: list, rows, refusals, agg, keys, abl) -> Path:
+    """Sections 3-5: the full metric union, the ablations, the refusals.
+
+    Takes `rows` as well as `agg` because T-LX.5's footnote has to distinguish a key
+    that is categorical from one that does not exist, and only the raw per-run
+    metrics still hold the string that tells them apart -- `agg` has already been
+    through `cell()`.
+    """
     A = L.append
     A("## 3. All metrics (union over admitted runs, grouped by key prefix)")
     A("")
@@ -828,8 +888,18 @@ def _write_md_tail(L: list, refusals, agg, keys, abl) -> Path:
     A("vector) are not table cells and are not shown here; they are carried in")
     A("`results.json` under each run's `metrics_nonscalar`.")
     A("")
+    dead = dead_rows(rows, agg, keys)
+    live = [k for k in keys if k not in dead]
+    if dead:
+        A(f"{len(dead)} of the {len(keys)} keys in the union are `N/A` in **all "
+          f"{len(ARCHES)} columns** and are listed in the footnote below instead of "
+          f"being rendered as a row of `N/A` (T-LX.5). They remain in "
+          f"`results.csv`, `results_aggregate.csv` and every run's `metrics.json` "
+          f"unchanged. **No key is dropped for being `N/A` in only some columns** -- "
+          f"that asymmetry is the point of the table.")
+        A("")
     groups: dict[str, list[str]] = {}
-    for k in keys:
+    for k in live:
         groups.setdefault(k.split("/")[0] if "/" in k else "(no prefix)", []).append(k)
     for g in sorted(groups):
         A(f"### `{g}`")
@@ -846,6 +916,43 @@ def _write_md_tail(L: list, refusals, agg, keys, abl) -> Path:
                 cells.append(s)
             A(f"| `{k}` | " + " | ".join(cells) + " |")
         A("")
+    if dead:
+        A("### Keys omitted from the tables above, and why")
+        A("")
+        A("| key | reason | recorded value |")
+        A("|---|---|---|")
+        for k, d in dead.items():
+            if d["reason"] != "categorical":
+                A(f"| `{k}` | quantity does not exist for any admitted arm | "
+                  f"none -- the string `N/A` in every run |")
+                continue
+            # A per-run identifier (experiment_id, config_hash, the Hungarian
+            # assignment vector) has one distinct value PER RUN, and pasting 15 of
+            # them -- two of which are 64-char hashes -- makes the footnote less
+            # readable than the row of N/A it replaced. Past a small count the
+            # honest answer is the count plus where to read them, which is the
+            # per-run CSV, one column, one row per run.
+            v = d["values"]
+            vals = (", ".join(f"`{x}`" for x in v) if len(v) <= 3 else
+                    f"{len(v)} distinct values (one per run or per arm) -- read the "
+                    f"`{k}` column of `results.csv`")
+            A(f"| `{k}` | categorical, not a measurement | {vals} |")
+        A("")
+        if any(d["reason"] == "categorical" for d in dead.values()):
+            A("**categorical** means the value is recorded and is not missing -- it is a")
+            A("label, so it has no mean and `cell()` exports it as `N/A`. Read it from the")
+            A("per-run columns of `results.csv`, not from this table. Rendering it as a")
+            A("row of `N/A` would assert the opposite of the truth, since `N/A` in this")
+            A("document means *does not exist or was refused*.")
+            A("")
+        if any(d["reason"] == "structural" for d in dead.values()):
+            A("**quantity does not exist** is a real, reportable negative, not a gap to")
+            A("fill. On the language task `depth/allocation_error_*` is the case to")
+            A("understand: English has no per-token ground-truth recursion depth, so")
+            A("there is nothing to be right or wrong about, and a `0.0` there would read")
+            A("as perfect allocation against a curriculum that does not exist. The")
+            A("correlational depth section replaces it; a filled-in number does not.")
+            A("")
 
     A("## 4. Ablation arms -- EXPLORATORY, NOT CANONICAL")
     A("")
@@ -965,6 +1072,11 @@ def write_json(rows, refusals, agg, keys, pw, abl) -> Path:
         ),
         "refusals": [{"run_dir": n, "reason": why} for n, why in refusals],
         "ablations_exploratory": abl,
+        # T-LX.5. What the MARKDOWN elided and why. It is recorded here, in the
+        # machine artifact, precisely so the elision is auditable: `metrics` above
+        # still carries every one of these keys per run, so a consumer can diff this
+        # list against the tables and see that nothing numeric was hidden.
+        "markdown_omitted_all_na_keys": dead_rows(rows, agg, keys),
     }
     path = OUT / "results.json"
     path.write_text(json.dumps(payload, indent=2), encoding="utf-8")

@@ -2621,7 +2621,7 @@ where compute forces it, and say so in the caption rather than presenting a
   `step_routing_weight = 0.0`; a run with a non-zero value is refused
   `canonical_lang_b`.
 
-- [ ] **T-LX.5 `N/A` stays in the machine record; the PAPER renderer drops
+- [x] **T-LX.5 `N/A` stays in the machine record; the PAPER renderer drops
   all-`N/A` columns.** These are different requests and conflating them would undo a
   fix. `metrics.json` and `results.tsv` must keep `"N/A"`, because an exporter joining
   MoE/MoR/MoRE rows on a common column set has to decide what a *missing* column means —
@@ -2632,4 +2632,58 @@ where compute forces it, and say so in the caption rather than presenting a
   rendering, and says in a footnote which ones it dropped and why. **Verify:** a
   language `results.tsv` still contains `depth_allocation_error_*` as `N/A`; the
   rendered language results table does not show them, and names them in a footnote.
+  **Evidence (2026-09-07, CPU interpreter): `test_language_export.py` 73 passed, 0
+  failed, 0 skipped**, of which 12 are this task. `export_results.py:dead_rows`
+  classifies each all-`N/A` key and `_write_md_tail` renders the survivors plus a
+  named footnote.
+  - **On language, 20 of the 222 union keys are dead in all three columns** — 15
+    categorical and 5 structural. Four of the structural five are the allocation-error
+    keys the Verify line names: `depth/allocation_error_abs`,
+    `depth/allocation_error_rel`, `val/depth_allocation_error_abs`,
+    `val/depth_allocation_error_rel`. All four are dropped from the rendered tables,
+    all four are named in the footnote as *quantity does not exist for any admitted
+    arm*, and all four are still present as the literal string `N/A` in the run's
+    `metrics.json`, in the exported `results.csv` (one column each, 15 rows), and in
+    `results_aggregate.csv` (one row per arm, with `n_na`). `results.json` additionally
+    records the drop list under `markdown_omitted_all_na_keys`, so the elision can be
+    diffed against the per-run metrics in the same file.
+  - **The fifth structural key is `train/halting_supervision_loss`**, and it is the one
+    worth noticing: it is `N/A` on all three arms because the language protocol runs
+    **pure ACT with halt supervision OFF** (`halting: ponder_weight=0.001,
+    supervision=OFF`, printed by every run). That is a protocol fact, not a gap — the
+    key exists in the loss assembly and would carry a number if supervision were ever
+    switched on, so a `0.0` there would read as "supervision was applied and cost
+    nothing".
+  - **Verify-line correction, recorded rather than silently reinterpreted.** The clause
+    says "a language `results.tsv` still contains `depth_allocation_error_*` as
+    `N/A`". `results.tsv` is the per-epoch scalar log and has **never** carried those
+    columns — checked on `runs/langB_MoRE_seed44__d915d7de/results.tsv`, which has zero
+    columns matching `allocation`. The machine record that does carry them is
+    `metrics.json` (four keys, each `"N/A"`) and the exported `results.csv`, and the
+    invariant is discharged against those. `results.tsv` is untouched by this change in
+    either case.
+  - **Rule 3 is preserved and tested.** A key that is `N/A` for *one* arm and numeric
+    for another is never dropped: `depth/mean` renders `| N/A | 2.0377 | 2.0377 |`,
+    which is the asymmetry `metric_keys()` takes the union instead of the intersection
+    to show. Only rows dead in all three columns at once are elided.
+  - **Two reasons are distinguished, because lumping them would print a falsehood.**
+    A row like `| routing_mode | N/A | N/A | N/A |` is not "unmeasured" — every run
+    records `routing_mode = top1_sparse`; it is a categorical label that `cell()` maps
+    to `N/A` because it is not a number. Since `N/A` is *defined* in this document as
+    "does not exist or was refused", that row asserts the opposite of the truth. The
+    footnote splits *categorical* (prints the observed value, or the count plus the
+    `results.csv` column when there is one value per run) from *structural* (no arm has
+    the quantity).
+  - **The contrast between the two tasks is itself the check that the classifier is
+    doing real work**: arithmetic has **13 dead keys, all categorical and 0 structural**
+    — `depth_allocation_error` is genuinely measured there against the operation-
+    complexity curriculum — while language has **15 categorical and 5 structural**. The
+    structural explanatory paragraph is emitted only when a structural key exists, so
+    the arithmetic document does not carry a paragraph about a case it does not have.
+  - **No published arithmetic number moved:** `results/results.csv` and
+    `results/results_aggregate.csv` are byte-identical after the change
+    (`git diff --quiet` passes on both); the three pairwise verdicts are unchanged
+    (MoRE−MoE p=0.6587, MoRE−MoR p=0.0159, MoE−MoR p=0.0079). Only `results_tables.md`
+    and `results.json` differ, which is exactly the human-facing/machine-record split
+    this task is about.
 

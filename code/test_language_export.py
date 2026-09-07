@@ -451,6 +451,91 @@ else:
           "already a validation-pass" in md)
     check("section 4 records that the arithmetic ablations were deliberately not "
           "ingested", "Not applicable on the language task" in md)
+
+    # --- T-LX.5: the machine record keeps "N/A"; the human table drops all-dead
+    # rows and NAMES them. These are different requests and conflating them undoes
+    # the eleven-flat-routing-keys fix, so both halves are asserted here.
+    dead = ex.dead_rows(rows, agg, keys)
+    alloc = [k for k in keys if "allocation_error" in k]
+    # The footnote is itself a markdown table, so "is this key rendered as a row"
+    # has to be asked of the METRIC tables only -- everything above the footnote
+    # heading. Asking it of the whole document conflates "dropped from the tables"
+    # with "not mentioned anywhere", and the second is exactly what T-LX.5 forbids.
+    _FOOT = "### Keys omitted from the tables above"
+    check("the footnote heading is present, which is what makes the split below "
+          "meaningful", _FOOT in md)
+    md_tables = md.split(_FOOT)[0]
+    md_foot = md.split(_FOOT)[-1]
+    _reasons = {}
+    for _d in dead.values():
+        _reasons[_d["reason"]] = _reasons.get(_d["reason"], 0) + 1
+    print(f"    dead rows on language: {len(dead)} of {len(keys)} union keys "
+          f"-> {_reasons}")
+    print(f"    structural (no arm has the quantity): "
+          f"{sorted(k for k, d in dead.items() if d['reason'] == 'structural')}")
+    check("there are allocation-error keys in the union at all (if this fails the "
+          "rest of T-LX.5 is vacuous)", bool(alloc), f"{alloc}")
+    check("every allocation-error key is classified STRUCTURAL: English has no "
+          "per-token ground-truth depth, so the quantity does not exist rather than "
+          "being unrecorded",
+          all(dead.get(k, {}).get("reason") == "structural" for k in alloc),
+          f"{ {k: dead.get(k, {}).get('reason') for k in alloc} }")
+    check("no allocation-error key is rendered as a table row in the markdown",
+          not any(f"| `{k}` |" in md_tables for k in alloc),
+          f"still rendered: {[k for k in alloc if f'| `{k}` |' in md_tables]}")
+    check("every dropped key is NAMED in the footnote, so dropping is not hiding",
+          all(f"`{k}`" in md_foot for k in dead),
+          f"unnamed: {[k for k in dead if f'`{k}`' not in md_foot]}")
+    check("the footnote states the reason a structural key has no number, in the "
+          "words that forbid filling it with 0.0",
+          "curriculum that does not exist" in md)
+
+    with p_runs.open(encoding="utf-8") as fh:
+        rr2 = list(_csv.DictReader(fh))
+    check("the MACHINE record still carries every dropped key: results.csv has a "
+          "column per allocation-error key and the value is literally N/A",
+          all(k in rr2[0] and all(r[k] == "N/A" for r in rr2) for k in alloc),
+          f"columns present={[k in rr2[0] for k in alloc]}")
+    with p_agg.open(encoding="utf-8") as fh:
+        ag_keys = {r["metric"] for r in _csv.DictReader(fh)}
+    check("results_aggregate.csv still carries a row per dropped key per arm",
+          all(k in ag_keys for k in alloc))
+
+    # Rule 3 must survive: a key that is N/A for ONE arm and numeric for another is
+    # the asymmetry the union exists to show, and must NOT be dropped. `depth/mean`
+    # is exactly that -- suppressed for MoE at max_depth 1, real on MoR and MoRE.
+    check("a key that is N/A for MoE only is NOT dropped -- that asymmetry is Rule 3",
+          "depth/mean" in keys and "depth/mean" not in dead
+          and "| `depth/mean` |" in md,
+          f"in keys={'depth/mean' in keys}, dead={'depth/mean' in dead}")
+    check("and its MoE cell in that row still reads N/A rather than a number",
+          any(l.startswith("| `depth/mean` |") and l.split("|")[2].strip() == "N/A"
+              for l in md.splitlines()),
+          next((l for l in md.splitlines()
+                if l.startswith("| `depth/mean` |")), "(row missing)"))
+    cat = {k: d for k, d in dead.items() if d["reason"] == "categorical"}
+    small = sorted(k for k, d in cat.items() if len(d["values"]) <= 3)
+    big = sorted(k for k, d in cat.items() if len(d["values"]) > 3)
+    if small:
+        k0 = small[0]
+        check("a CATEGORICAL dead key prints its recorded value, because `N/A` in "
+              "this document means does-not-exist and that would be false for it",
+              all(f"`{v}`" in md_foot for v in cat[k0]["values"]),
+              f"{k0} -> {cat[k0]['values']}")
+    else:
+        skip("categorical dead-key footnote", "no low-cardinality categorical key")
+    if big:
+        k1 = big[0]
+        # config_hash and experiment_id have one value per run. Pasting 15 of them,
+        # two being 64-char hashes, is less readable than the N/A row it replaced.
+        check("a per-run identifier is summarised by count plus a pointer to "
+              "results.csv rather than pasted 15 times into the footnote",
+              f"{len(cat[k1]['values'])} distinct values" in md_foot
+              and not any(len(v) > 40 and f"`{v}`" in md_foot
+                          for v in cat[k1]["values"]),
+              f"{k1} -> {len(cat[k1]['values'])} values")
+    else:
+        skip("high-cardinality footnote summary", "no per-run categorical key")
     check("all four refusals are listed in the document -- an exporter that hid them "
           "would be indistinguishable from one that found nothing wrong",
           all(n in md for n, _ in refusals), f"{len(refusals)} refusals")
@@ -475,6 +560,12 @@ else:
               for r in blob["admitted_runs"]),
           f"nonscalar keys on the first admitted run: "
           f"{sorted(blob['admitted_runs'][0].get('metrics_nonscalar', {}))}")
+    check("results.json records what the markdown elided, so the elision is "
+          "auditable against the per-run metrics in the same file",
+          set(blob["markdown_omitted_all_na_keys"]) == set(dead)
+          and all(blob["admitted_runs"][0]["metrics"][k] == "N/A" for k in alloc),
+          f"{len(blob.get('markdown_omitted_all_na_keys', {}))} recorded "
+          f"vs {len(dead)} dropped")
 
     # Headline sanity, read back from the written file rather than from memory.
     hl = [l for l in md.splitlines() if l.startswith("| MoRE |")]
