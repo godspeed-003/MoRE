@@ -365,8 +365,12 @@ def summarise(pairs):
               f"{os.path.basename(d)}")
     print("\n  'vs floor' is positive when the run BEATS the bigram baseline.")
     print("  Do not hand-copy these into a table. Aggregate with:")
-    print("      python code/seed_stats.py --group " + GROUP)
-    print("      python code/export_results.py --group " + GROUP)
+    print("      python code/export_results.py --task language")
+    print("  (that is the ONLY aggregation command. code/seed_stats.py is a library")
+    print("   with no CLI -- the exporter calls it. An earlier version of this line")
+    print("   printed `seed_stats.py --group ...` and `export_results.py --group ...`;")
+    print("   the first exited 0 printing nothing and the second exported the")
+    print("   ARITHMETIC matrix. Both are fixed, T-L10.0.)")
 
 
 def main(argv=None):

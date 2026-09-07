@@ -251,20 +251,43 @@ Provenance carries `experiment_id`, `experiment_group`, `architecture`, `variant
 and the resolved epochs / subset_fraction. That is what lets a figure be traced to
 an exact run six months from now.
 
-**Never hand-copy a number into a table.** After the matrix:
+**Never hand-copy a number into a table.** After the matrix, one command:
 
 ```bash
-C:/Users/Hp/anaconda3/envs/more_env/python.exe code/seed_stats.py --group canonical_lang_b
+C:/Users/Hp/anaconda3/envs/more_env/python.exe code/export_results.py --task language
 ```
 
-```bash
-C:/Users/Hp/anaconda3/envs/more_env/python.exe code/export_results.py --group canonical_lang_b
-```
+It writes `results/language/{results.csv,results_aggregate.csv,results.json,results_tables.md}`
+and prints the pairwise verdicts. `--task language` is what selects
+`canonical_spec_language.json`, the `canonical_lang_b` group and the nats-based
+derived columns; **without it you get the arithmetic matrix in `results/`**, which is
+15 rows of mean squared error under a heading that looks like your result. Add
+`--check` to see admissions and consistency without writing anything.
+
+`code/seed_stats.py` is a **library, not a command** — the exporter calls its exact
+randomization test. Running it directly now prints what to run instead and exits 2.
+Until T-L10.0 it exited 0 and printed nothing, and the earlier version of this
+section told you to run it; if you have an older checkout in front of you, that is
+why.
 
 Report **mean ± std**; one favourable seed is never evidence. Verdicts come from the
-exact randomization test in `seed_stats.py`, never from a k×std threshold. The
-exporter refuses to mix dataset versions or config hashes and emits `N/A` rather
-than fabricating.
+exact randomization test, never from a k×std threshold. The exporter refuses to mix
+dataset versions or config hashes, refuses a run stamped `task = arithmetic`, and
+emits `N/A` rather than fabricating.
+
+Three things it will refuse the whole export for, so they are worth avoiding rather
+than debugging at hour 39:
+
+- **more than one `code_git_commit` across the 15 runs.** Pull before you start the
+  matrix and then do not pull again until it is finished. A fix landing at hour 20
+  splits the matrix across a code change, and the arms stop being comparable.
+- **a seed-blind config difference within an arm** — the five seeds of an arm must
+  differ *only* in the seed. This is why you use `--all` rather than 15 hand-written
+  commands.
+- **a floor mismatch**: every run records its own margin over the bigram floor, and
+  the exporter checks it reproduces `spec floor − val/task_loss` exactly. The dev
+  corpus floor is 5.3983 and the canonical one 4.9849 — a 0.41 nat difference, larger
+  than any architecture gap this study can resolve.
 
 `stdout.log` and `*.pt` are git-ignored, so the citable pushed record is
 `config.json` + `resolved_config.json` + `metrics.json` + `results.tsv`. If a

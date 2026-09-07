@@ -52,12 +52,13 @@ The primary metric is the spec's `protocol.primary_metric` read under the spec's
 `best_val_loss` is exported as a secondary column so the selection-bias argument
 stays checkable, never as the headline.
 
-R^2 is derived here, never stored by a run: `1 - val/task_loss / primary_metric_floor`
-against the frozen predict-the-train-mean floor. It exists so a reader can see that
-all three architectures explain ~22% of target variance and that the entire
-between-architecture spread is a few percent of that -- the single most important
-piece of context for reading the matrix, and the one most easily lost when a table
-shows six decimal places of loss and nothing else.
+On ARITHMETIC, R^2 is derived here and never stored by a run:
+`1 - val/task_loss / primary_metric_floor` against the frozen predict-the-train-mean
+floor. It exists so a reader can see that all three architectures explain ~22% of
+target variance and that the entire between-architecture spread is a few percent of
+that -- the single most important piece of context for reading the matrix, and the
+one most easily lost when a table shows six decimal places of loss and nothing else.
+On LANGUAGE that same expression is not an R^2 and is not computed; see `derived()`.
 
 Ablation arms are NOT re-derived here. They are ingested from
 `automated/phase10_ablations_result.json`, which owns arm discovery, and are
@@ -65,32 +66,85 @@ written into a separately headed section that names its own reading rule and
 resolution floor. Canonical and exploratory numbers never share a table
 (CLAUDE.md 6).
 
+TWO TASKS, ONE EXPORTER. `--task language` swaps the spec to
+`canonical_spec_language.json` and the output directory to `results/language/`.
+Everything else -- the admission filter, the consistency rules, the N/A boundary,
+the randomization test -- is shared, because those four things are the reason this
+module exists and a second copy of them would drift from this one. What the task
+DOES change is the derived headline column: on arithmetic the floor is a
+predict-the-train-mean MSE and `1 - loss/floor` is an R^2, on language the floor is
+a bigram cross-entropy in nats and that same expression is not a variance ratio at
+all. See `derived()`.
+
+An arithmetic run and a language run can never land in one table: they differ in
+`experiment_group`, in `dataset_version` and in `task`, and all three are admission
+checks. That redundancy is deliberate -- one is a mean squared error and the other a
+per-token cross-entropy, and CLAUDE.md 6 forbids the mixture absolutely.
+
 Writes results/results.csv, results/results_aggregate.csv, results/results.json,
-results/results_tables.md. Read-only with respect to runs/.
+results/results_tables.md (under results/language/ for `--task language`).
+Read-only with respect to runs/.
 
 Usage:
-    python code/export_results.py                 # export
-    python code/export_results.py --check         # admissions + consistency only
+    python code/export_results.py                       # arithmetic export
+    python code/export_results.py --check               # admissions + consistency only
+    python code/export_results.py --task language       # the language matrix
+    python code/export_results.py --task language --check
 """
 from __future__ import annotations
 
 import csv
 import json
+import math
 import sys
 from pathlib import Path
 
 CODE = Path(__file__).resolve().parent
 ROOT = CODE.parent
 RUNS = ROOT / "runs"
-OUT = ROOT / "results"
-SPEC_PATH = CODE / "canonical_spec.json"
 PHASE10_RESULT = ROOT / "automated" / "phase10_ablations_result.json"
 
 sys.path.insert(0, str(CODE))
 import seed_stats as _seed_stats                                    # noqa: E402
 
+# Which task's canonical spec this invocation exports. Parsed from argv at IMPORT
+# time, not inside main(), because the spec supplies CANONICAL_GROUP / PRIMARY /
+# FLOOR and those are read by module-level defaults -- `pairwise(agg, key=PRIMARY)`
+# binds its default when the function is defined. A `configure()` called from main()
+# would leave that default pointing at the arithmetic spec while everything else
+# pointed at the language one, which is the silent-wrong-number failure mode this
+# whole module is built to prevent. A test that wants the language spec therefore
+# sets `sys.argv` before importing; `test_language_export.py` does exactly that and
+# says why.
+TASKS = {
+    "arithmetic": {"spec": "canonical_spec.json", "out": ("results",)},
+    "language": {"spec": "canonical_spec_language.json",
+                 "out": ("results", "language")},
+}
+
+
+def _task_from_argv(argv=None) -> str:
+    argv = list(sys.argv[1:] if argv is None else argv)
+    task = "arithmetic"          # absence means arithmetic, as everywhere else
+    for i, a in enumerate(argv):
+        if a == "--task" and i + 1 < len(argv):
+            task = argv[i + 1]
+        elif a.startswith("--task="):
+            task = a.split("=", 1)[1]
+    if task not in TASKS:
+        raise SystemExit(f"--task must be one of {sorted(TASKS)}, got {task!r}")
+    return task
+
+
+TASK = _task_from_argv()
+SPEC_PATH = CODE / TASKS[TASK]["spec"]
+OUT = ROOT.joinpath(*TASKS[TASK]["out"])
 SPEC = json.loads(SPEC_PATH.read_text())
 CANONICAL_GROUP = SPEC["canonical_group"]
+# The arithmetic spec has no `canonical_variant` key and its runs are stamped
+# `variant = canonical`; the language spec names `language`. Read it from the spec
+# so the admission check cannot be right for one task by hard-coding.
+CANONICAL_VARIANT = SPEC.get("canonical_variant") or "canonical"
 FROZEN_SEEDS = tuple(SPEC["seed_set"])
 CANON_DSV = SPEC["enforced_fields"]["dataset_version"]
 CANON_SPLIT = SPEC["enforced_fields"]["train_split_version"]
@@ -100,12 +154,21 @@ CHECKPOINT_RULE = SPEC["protocol"]["checkpoint_selection"]
 ARCHES = ("moe", "mor", "more")
 ARCH_LABEL = {"moe": "MoE", "mor": "MoR", "more": "MoRE"}
 
+# The run-recorded margin over the baseline floor, if the task records one. Language
+# runs write it from the corpus manifest; arithmetic runs have no such key, so the
+# cross-check in `consistency_errors` simply finds nothing to check there.
+FLOOR_MARGIN_KEY = ("val/nats_below_bigram_floor" if TASK == "language" else None)
+
 # Rule 3's one case that metrics.json cannot express. MoE's max_depth is 1, so
 # train/avg_recursion_steps is written as the float 1.0 -- true, but it is a
 # restatement of the architecture, not a measurement of learned depth, and beside
 # MoRE's 2.06 it reads as a comparison. Suppressed to N/A at the table boundary so
 # no run's metrics.json has to change meaning. Kept identical to the same table in
 # run_phase9_matrix.py; if you add an entry there, add it here.
+#
+# Task-independent on purpose: these keys are written by `engine.py`'s depth block,
+# which does not know what task it is running, so a key that is a constant for MoE
+# on arithmetic is a constant for MoE on language too.
 SUPPRESS_CONSTANT = {
     "moe": ("train/avg_recursion_steps", "train/ponder_cost",
             "depth/allocation_error_abs", "depth/allocation_error_rel",
@@ -117,14 +180,36 @@ SUPPRESS_CONSTANT = {
             "val/forced_exit_rate", "val/early_exit_rate", "val/mean_remainder"),
 }
 
+# The same argument by PREFIX, which the language metric layer made necessary. The
+# language runs carry ~40 depth keys the arithmetic runs never had -- `depth/mean`,
+# `depth/std`, `depth/hist/step_N`, `depth/mean_by_family/*`,
+# `depth/embed_norm_logfreq_partial_norm`, `depth/by_document/*` -- and at
+# max_depth 1 every one of them is a restatement of "MoE does not recurse", not a
+# measurement. Enumerating them would guarantee that the next key added to the depth
+# block is exported as a real MoE number by omission; the prefix cannot be forgotten.
+#
+# Safe on arithmetic as well, and applied there: the only two `depth/`-prefixed keys
+# an arithmetic run writes are the two allocation-error keys already listed above, so
+# this changes no published arithmetic cell.
+SUPPRESS_PREFIX = {
+    "moe": ("depth/",),
+}
+
 # Provenance fields copied verbatim into every exported row. updated_rules.md 9
 # requires the full list on the W&B run; the same list has to survive into the
 # offline table or a number in the paper cannot be traced back to a run directory.
+#
+# `task` is last and is resolved with a fallback: the language runs stamp the task at
+# the config top level but `provenance.task` is currently None, and an arithmetic run
+# carries no `task` key at all (T-L1.0's absence-means-arithmetic rule, which is what
+# keeps the 15 published config hashes intact). Exported anyway so that a row in a
+# CSV states which task's loss it is, instead of that being inferable only from the
+# group name.
 PROV_KEYS = (
     "experiment_id", "experiment_group", "architecture", "variant", "seed_declared",
     "resolved_seed", "dataset_version", "train_split_version", "config_hash",
     "code_git_commit", "code_git_dirty", "total_params", "resolved_epochs",
-    "resolved_subset_fraction",
+    "resolved_subset_fraction", "task",
 )
 
 # The config fields that legitimately differ across seeds, plus the run-identity
@@ -194,8 +279,18 @@ def admit(d: Path) -> tuple[dict | None, str | None]:
     if group != CANONICAL_GROUP:
         return None, f"experiment_group={group!r} != {CANONICAL_GROUP!r}"
     variant = prov.get("variant")
-    if variant != "canonical":
-        return None, f"variant={variant!r} != 'canonical'"
+    if variant != CANONICAL_VARIANT:
+        return None, f"variant={variant!r} != {CANONICAL_VARIANT!r}"
+    # The task the run actually trained on. `provenance.task` is not stamped (the
+    # language runs carry it at the config top level, arithmetic runs carry no `task`
+    # key at all -- T-L1.0's absence-means-arithmetic rule), so it is resolved here
+    # from the config rather than trusted from provenance. This check is REDUNDANT
+    # with the group and dataset_version checks above and is here anyway: one task's
+    # loss is a mean squared error and the other's a per-token cross-entropy, and a
+    # single mislabelled group name must not be the only thing standing between them.
+    run_task = rc.get("task") or "arithmetic"
+    if run_task != TASK:
+        return None, f"task={run_task!r} != {TASK!r} (exporting the {TASK} matrix)"
     if prov.get("seed_declared") is not True:
         return None, f"seed_declared={prov.get('seed_declared')!r} is not True"
     # architecture may live at the top level, inside provenance, or (for the
@@ -235,8 +330,10 @@ def admit(d: Path) -> tuple[dict | None, str | None]:
         "run_dir": d.name,
         "architecture": arch,
         "seed": seed,
+        "task": run_task,
         "offline_measured_at": off_at,
-        "provenance": {k: prov.get(k) for k in PROV_KEYS} | {"architecture": arch},
+        "provenance": {k: prov.get(k) for k in PROV_KEYS}
+        | {"architecture": arch, "task": run_task},
         "seed_blind_config": {k: v for k, v in flatten(rc).items()
                               if k not in SEED_KEYS},
         "metrics": {k: v for k, v in mt.items() if not isinstance(v, (dict, list))}
@@ -306,6 +403,37 @@ def consistency_errors(rows: list[dict]) -> list[str]:
             if diff:
                 errs.append(f"{arch}: seed-blind config differs between "
                             f"{arm[0]['run_dir']} and {r['run_dir']}: {diff}")
+
+    # The floor the RUNS measured themselves against must be the floor the SPEC
+    # names, or every derived column in this document is computed against a
+    # different baseline than the runs report. Language runs record
+    # `val/nats_below_bigram_floor` from the corpus manifest's own floor, and that
+    # quantity is linear in the loss, so `spec_floor - val/task_loss` must reproduce
+    # it exactly for every admitted run.
+    #
+    # This is not redundant with the dataset_version check, and the difference is the
+    # point: the spec and `data/lang/<corpus>/dataset_meta.json` are SEPARATE files.
+    # Editing `primary_metric_floor` in the spec without rebuilding the corpus leaves
+    # every admission check passing and silently shifts the margin column. Measured
+    # size of the trap: the dev corpus floor is 5.3983 and the canonical one 4.9849,
+    # so a mix-up moves every margin by 0.41 nats -- larger than any architecture gap
+    # this study can hope to resolve.
+    off = []
+    for r in rows:
+        rec, loss = r["metrics"].get(FLOOR_MARGIN_KEY), r["metrics"].get(PRIMARY)
+        if not isinstance(rec, (int, float)) or isinstance(rec, bool):
+            continue
+        if not isinstance(loss, (int, float)) or isinstance(loss, bool):
+            continue
+        if abs((FLOOR - loss) - rec) > 1e-6:
+            off.append(f"{r['run_dir']}: recorded {FLOOR_MARGIN_KEY}={rec:.6f} but "
+                       f"spec floor {FLOOR:.6f} - {PRIMARY} {loss:.6f} = "
+                       f"{FLOOR - loss:+.6f}")
+    if off:
+        errs.append("run-recorded floor margin disagrees with the spec's "
+                    f"primary_metric_floor in {len(off)} run(s) -- the runs and this "
+                    f"table are not measuring against the same baseline: "
+                    + "; ".join(off[:3]) + ("; ..." if len(off) > 3 else ""))
     return errs
 
 
@@ -329,6 +457,8 @@ def cell(row: dict, key: str):
     that excludes "N/A".
     """
     if key in SUPPRESS_CONSTANT.get(row["architecture"], ()):
+        return "N/A"
+    if key.startswith(SUPPRESS_PREFIX.get(row["architecture"], ())):
         return "N/A"
     if key not in row["metrics"]:
         return "N/A"                      # absent: this architecture has no such quantity
@@ -384,19 +514,62 @@ def pairwise(agg: dict, key: str = PRIMARY) -> list[dict]:
     return res
 
 
-def r2(mean) -> str:
-    """Fraction of val-target variance explained, against the frozen
-    predict-the-train-mean floor. Derived here and stored nowhere, so it can never
-    drift from the loss it is derived from."""
-    return "N/A" if mean is None else f"{1.0 - mean / FLOOR:.4f}"
+# The derived headline columns, and they are NOT the same quantity on the two tasks.
+#
+# ARITHMETIC: the floor is a predict-the-train-mean MSE, so `1 - loss/floor` is the
+# fraction of target variance explained -- a genuine R^2, and the context that stops
+# a six-decimal loss table from reading as a large difference.
+#
+# LANGUAGE: the floor is a backoff-BIGRAM CROSS-ENTROPY in nats (4.9849, = 7.1918
+# bits, = perplexity 146.2). `1 - CE/floor` is not a variance ratio and calling it
+# R^2 would be a fabricated statistic wearing a familiar name -- a reviewer would
+# read "R^2 = 0.13" as 13% of variance explained, which is not a claim the number
+# supports. What IS honest is what the spec's own `primary_metric_note` names: the
+# monotone transforms (bits/token = nats / ln 2, perplexity = exp nats) plus the
+# margin over the floor in nats, POSITIVE when the run beats the baseline. The
+# transforms carry no information the nats do not, so the verdict is still taken on
+# nats -- they are here because a reviewer reads perplexity.
+DERIVED_COLUMNS = {
+    "arithmetic": ("R^2 vs floor",),
+    "language": ("bits/token", "perplexity", "margin vs floor (nats)"),
+}[TASK]
+
+
+def derived(mean) -> dict:
+    """Task-appropriate derived columns for the headline. Computed here and stored by
+    no run, so they can never drift from the loss they are derived from.
+
+    ONE CAVEAT THAT MUST BE PRINTED, NOT ASSUMED. The perplexity column is
+    `exp(mean over seeds of nats)`, which is NOT the mean of the five per-seed
+    perplexities -- exp is convex, so the second is always the larger. Each run also
+    records its own `val/perplexity`, which appears in section 3 aggregated the other
+    way round, and the two will not agree in the last digits. Neither is wrong; they
+    answer different questions, and the verdict is taken on nats either way. The
+    margin column has no such problem: it is linear in the loss, which is why
+    `consistency_errors` can cross-check it against the run-recorded value."""
+    if mean is None:
+        return {k: "N/A" for k in DERIVED_COLUMNS}
+    if TASK == "language":
+        return {"bits/token": f"{mean / math.log(2):.4f}",
+                "perplexity": f"{math.exp(mean):.2f}",
+                "margin vs floor (nats)": f"{FLOOR - mean:+.4f}"}
+    return {"R^2 vs floor": f"{1.0 - mean / FLOOR:.4f}"}
 
 
 def load_ablations() -> dict | None:
     """Ingest the Phase 10 arms rather than rediscovering them. That driver owns arm
     discovery, its own per-arm seed sets and its own resolution floors; duplicating
     that here would create a second definition of the ablation table, which is the
-    exact failure this module exists to prevent."""
-    if not PHASE10_RESULT.exists():
+    exact failure this module exists to prevent.
+
+    ARITHMETIC ONLY, and the guard is load-bearing rather than tidy:
+    `automated/phase10_ablations_result.json` holds arithmetic MSE gaps against an
+    arithmetic MoRE baseline. Without the task check a language export would ingest
+    that file and print those gaps into a cross-entropy document -- the exact
+    unit-mixing CLAUDE.md 6 forbids, arriving through a path with no run directory to
+    refuse. Language ablations, when Phase L-9 produces them, get their own result
+    file and their own entry here."""
+    if TASK != "arithmetic" or not PHASE10_RESULT.exists():
         return None
     blob = load_json(PHASE10_RESULT)
     return None if "__error__" in blob else blob
@@ -454,16 +627,27 @@ def write_md(rows, refusals, agg, keys, pw, abl) -> Path:
     """
     L: list[str] = []
     A = L.append
-    A("# Exported results -- canonical Phase B")
+    A(f"# Exported results -- canonical {'language Phase L-B' if TASK == 'language' else 'Phase B'}")
     A("")
     A("GENERATED BY `code/export_results.py`. Do not edit by hand and do not copy")
     A("numbers out of a run directory into this file -- regenerate it.")
     A("")
+    A(f"- task: `{TASK}`  |  spec: `{SPEC_PATH.name}` at "
+      f"`{SPEC.get('spec_version')}`")
     A(f"- canonical group: `{CANONICAL_GROUP}`  |  frozen seeds: {list(FROZEN_SEEDS)}")
     A(f"- dataset_version: `{CANON_DSV}`  |  train_split_version: `{CANON_SPLIT}`")
     A(f"- primary metric: `{PRIMARY}` under checkpoint rule **{CHECKPOINT_RULE}**")
-    A(f"- predict-the-train-mean floor on val: `{FLOOR:.6f}` (R^2 below is derived "
-      f"from it, not stored)")
+    if TASK == "language":
+        A(f"- baseline floor on val: `{FLOOR:.6f}` nats/token -- the backoff BIGRAM "
+          f"(T-L2.5), = {FLOOR / math.log(2):.4f} bits, perplexity "
+          f"{math.exp(FLOOR):.1f}. A run that does not beat it has learned nothing a "
+          f"two-column count table could not. The derived columns below are monotone "
+          f"transforms of the nats; no verdict is taken on them.")
+        A("- **this is a per-token cross-entropy and the arithmetic tables are a mean "
+          "squared error. They may never appear in one table (CLAUDE.md 6).**")
+    else:
+        A(f"- predict-the-train-mean floor on val: `{FLOOR:.6f}` (R^2 below is derived "
+          f"from it, not stored)")
     A(f"- admitted runs: " + ", ".join(
         f"{ARCH_LABEL[a]} {agg[a]['n_seeds']}/{len(FROZEN_SEEDS)} "
         f"(seeds {agg[a]['seeds']})" for a in ARCHES))
@@ -475,17 +659,26 @@ def write_md(rows, refusals, agg, keys, pw, abl) -> Path:
     A("")
     A("## 1. Headline")
     A("")
-    A(f"| architecture | {PRIMARY} (mean +- std) | best_val_loss (secondary) "
-      f"| R^2 vs floor | params |")
-    A("|---|---|---|---|---|")
+    A(f"| architecture | {PRIMARY} (mean +- std) | best_val_loss (secondary) | "
+      + " | ".join(DERIVED_COLUMNS) + " | params |")
+    A("|---|---|---|" + "---|" * (len(DERIVED_COLUMNS) + 1))
     for a in ARCHES:
         m = agg[a]["metrics"]
         prm = m.get("prov/total_params", {"mean": None})
         pstr = "N/A" if prm["mean"] is None else f"{int(round(prm['mean'])):,}"
+        dv = derived(m[PRIMARY]["mean"])
         A(f"| {ARCH_LABEL[a]} | {fmt_ms(m[PRIMARY])} "
-          f"| {fmt_ms(m.get('best_val_loss', {'n': 0}))} "
-          f"| {r2(m[PRIMARY]['mean'])} | {pstr} |")
+          f"| {fmt_ms(m.get('best_val_loss', {'n': 0}))} | "
+          + " | ".join(dv[k] for k in DERIVED_COLUMNS) + f" | {pstr} |")
     A("")
+    if TASK == "language":
+        A("The derived columns are transforms of the mean nats, in that order: "
+          "`bits = nats / ln 2`, `perplexity = exp(nats)`, "
+          f"`margin = {FLOOR:.4f} - nats` (positive BEATS the bigram baseline).")
+        A("`exp` is convex, so the perplexity above is **not** the mean of the five")
+        A("per-seed perplexities -- each run's own `val/perplexity` is in section 3 and")
+        A("aggregates the other way round. The verdict is taken on nats either way.")
+        A("")
     A("`best_val_loss` is the minimum over evaluated epochs -- an order statistic")
     A("whose downward bias scales with each arm's per-epoch validation noise, which")
     A("is not matched across architectures. It is a secondary column so that")
@@ -544,17 +737,46 @@ def _write_md_depth(L: list, rows: list[dict], agg: dict) -> None:
     loss: the sidecar is computed from `checkpoint.pt`, which is the best-val
     checkpoint, while the primary metric is last-epoch. That caveat is printed,
     not implied.
+
+    THE FIRST PARAGRAPH IS AN ARITHMETIC STATEMENT. On language the depth block was
+    rebuilt in Phase L-6 to run on the validation pass and to record its own
+    provenance per key (`depth_key_provenance` in every language metrics.json), so
+    the premise "every other depth number here is training-time" is false there. The
+    language branch below says so instead of repeating it; printing the arithmetic
+    caveat over a language table would understate evidence that exists, which is the
+    same class of error as overstating evidence that does not.
     """
     A = L.append
     have = [r for r in rows if r.get("offline_measured_at")]
     A("## 2b. Depth on the validation pass (offline, from checkpoint)")
     A("")
-    if not have:
+    if TASK == "language":
+        # The paragraph below is an ARITHMETIC statement and would be false here.
+        # On language the depth block was rebuilt in Phase L-6 to run on the
+        # validation pass, and every key records its own pass and population in the
+        # run's `depth_key_provenance` registry -- so the offline sidecar is a
+        # redundancy on this task, not the only held-out depth source.
+        A("On the language task the `depth/*` block is **already a validation-pass**")
+        A("measurement: each key records its own pass, population and caveats in the")
+        A("run's `depth_key_provenance` (carried into `results.json` under each run's")
+        A("`metrics_nonscalar`). Read that registry before comparing two depth keys --")
+        A("`depth_dist/*` is the training loop, `depth/hist/*` is validation over a")
+        A("different population, and the two are documented not to agree.")
+        A("")
+        if not have:
+            A("No `val_depth_offline.json` sidecar present, which on this task removes")
+            A("a redundancy rather than the evidence: the held-out depth numbers are the")
+            A("`depth/*` rows in section 3.")
+            A("")
+            return
+    elif not have:
         A("No `val_depth_offline.json` sidecar found in any admitted run. Run")
         A("`python code/eval_val_depth.py` to produce them. Until then every depth")
         A("number in this document is a TRAINING-TIME measurement and any claim about")
         A("held-out depth allocation is unsupported.")
         A("")
+        return
+    if not have:
         return
     at = sorted({r["offline_measured_at"] for r in have})
     A(f"Source: `val_depth_offline.json` in {len(have)}/{len(rows)} admitted runs, "
@@ -628,7 +850,11 @@ def _write_md_tail(L: list, refusals, agg, keys, abl) -> Path:
     A("## 4. Ablation arms -- EXPLORATORY, NOT CANONICAL")
     A("")
     if abl is None:
-        A("`automated/phase10_ablations_result.json` not present; nothing ingested.")
+        A("`automated/phase10_ablations_result.json` not present; nothing ingested."
+          if TASK == "arithmetic" else
+          "Not applicable on the language task: the Phase 10 ablation file holds "
+          "arithmetic MSE gaps and is deliberately NOT ingested here (see "
+          "`load_ablations`). Language ablations get their own result file.")
     else:
         A("Ingested verbatim from `automated/phase10_ablations_result.json`. These arms")
         A("are stamped `exploratory` and MUST NOT be merged into section 1 or 2: they")
@@ -696,19 +922,24 @@ def write_json(rows, refusals, agg, keys, pw, abl) -> Path:
     runs/, and so a stale aggregate cannot outlive the numbers it came from."""
     payload = {
         "generated_by": "code/export_results.py (T11.1)",
+        "task": TASK,
+        "spec_file": SPEC_PATH.name,
         "spec_version": SPEC.get("spec_version"),
         "canonical_group": CANONICAL_GROUP,
+        "canonical_variant": CANONICAL_VARIANT,
         "frozen_seeds": list(FROZEN_SEEDS),
         "dataset_version": CANON_DSV,
         "train_split_version": CANON_SPLIT,
         "primary_metric": PRIMARY,
         "checkpoint_selection": CHECKPOINT_RULE,
         "primary_metric_floor": FLOOR,
+        "primary_metric_units": ("nats/token cross-entropy" if TASK == "language"
+                                 else "mean squared error"),
         "reading_rule": ("exact two-sided randomization test (code/seed_stats.py); "
                         "k x std thresholds are superseded (T11.0b)"),
         "admitted_runs": [
             {"run_dir": r["run_dir"], "architecture": r["architecture"],
-             "seed": r["seed"], "provenance": r["provenance"],
+             "seed": r["seed"], "task": r.get("task"), "provenance": r["provenance"],
              "offline_measured_at": r.get("offline_measured_at"),
              "metrics": {k: cell(r, k) for k in keys},
              "metrics_nonscalar": r["metrics_nonscalar"]}
@@ -716,7 +947,7 @@ def write_json(rows, refusals, agg, keys, pw, abl) -> Path:
                                                  r["seed"]))],
         "aggregate": {
             a: {"seeds": agg[a]["seeds"], "n_seeds": agg[a]["n_seeds"],
-                "r2_vs_floor": r2(agg[a]["metrics"][PRIMARY]["mean"]),
+                "derived_vs_floor": derived(agg[a]["metrics"][PRIMARY]["mean"]),
                 "metrics": agg[a]["metrics"]}
             for a in ARCHES},
         "pairwise": pw,
@@ -742,6 +973,10 @@ def write_json(rows, refusals, agg, keys, pw, abl) -> Path:
 
 def main() -> int:
     check_only = "--check" in sys.argv
+    print(f"task = {TASK}   spec = {SPEC_PATH.name} ({SPEC.get('spec_version')})")
+    print(f"canonical group = {CANONICAL_GROUP}   variant = {CANONICAL_VARIANT}   "
+          f"seeds = {list(FROZEN_SEEDS)}")
+    print(f"output dir = {OUT.relative_to(ROOT)}")
     if not RUNS.exists():
         print(f"REFUSED: {RUNS} does not exist")
         return 2
@@ -781,7 +1016,7 @@ def main() -> int:
         print("\n--check: admissions and consistency only, nothing written.")
         return 0
 
-    OUT.mkdir(exist_ok=True)
+    OUT.mkdir(parents=True, exist_ok=True)
     abl = load_ablations()
     written = [write_runs_csv(rows, keys), write_agg_csv(agg, keys),
                write_md(rows, refusals, agg, keys, pw, abl),

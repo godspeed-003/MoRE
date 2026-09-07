@@ -5942,6 +5942,163 @@ repo", and this repo has been seen here. Only Ayan's machine can discharge that 
 `run_language_matrix.py:finished_run` for the four-part completeness test if a run is being
 wrongly skipped or wrongly repeated.
 
+## T-L10.0a - the two commands in the handoff did nothing, and neither of them failed
+
+**The defect.** `HANDOFF.md` told the operator to aggregate the finished 15-run matrix
+with `code/seed_stats.py --group canonical_lang_b` followed by
+`code/export_results.py --group canonical_lang_b`. **Neither command worked. Neither
+command errored.**
+
+1. `code/seed_stats.py` is a 156-line pure library. No `main()`, no argparse, no
+   `if __name__ == "__main__"`. Invoking it imported the module, defined five
+   functions, and exited **0 having printed nothing at all**. An operator 39
+   GPU-hours in reads that silence as "no significant differences found".
+2. `code/export_results.py` never had a `--group` flag. `argparse` was not used for
+   it; `--group canonical_lang_b` was simply ignored. The module read
+   `SPEC_PATH = CODE / "canonical_spec.json"` at import time (line 93 before this
+   change) and set `CANONICAL_GROUP = SPEC["canonical_group"]` -> `canonical_phase_b`.
+   Actual observed output of the documented command:
+   `scanned 241 directories`, `admitted: 15`, `refused: 226`, every language refusal
+   reading `experiment_group='exploratory' != 'canonical_phase_b'`. It wrote
+   `results/results.csv` -- **the published arithmetic matrix, 15 rows of mean squared
+   error** -- and printed three pairwise verdicts. Nothing in that output says
+   "arithmetic". It looks exactly like a successful language export.
+
+This is worse than a crash by the full width of the failure: a crash costs a
+diagnosis, this costs the paper.
+
+**The fix: one exporter, parameterized by task.** `CLAUDE.md` §9 forbids parallel
+implementations, and the admission filter, the consistency rules, the `N/A` boundary
+and the exact randomization test are the entire reason the module exists -- a second
+copy drifts from the first at the first bug fix. So `export_results.py` now takes
+`--task {arithmetic,language}` and looks *every* task-specific value up:
+
+```python
+TASKS = {
+    "arithmetic": {"spec": "canonical_spec.json",          "out": ("results",)},
+    "language":   {"spec": "canonical_spec_language.json", "out": ("results", "language")},
+}
+TASK = _task_from_argv()          # parsed at IMPORT time, deliberately
+```
+
+**Why argv is parsed at import time and not in `main()`.** Module-level default
+arguments bind when the function is *defined*: `def pairwise(agg, key=PRIMARY)`
+captures `PRIMARY` at def-time. A `configure()` called from `main()` would leave
+`PRIMARY` pointing at the arithmetic spec's primary metric while `CANONICAL_GROUP`
+pointed at the language one -- a half-configured module, which is a worse failure than
+either whole configuration. The `_task_from_argv` helper is written to be callable with
+an explicit list so the test suite can drive it without touching `sys.argv` twice.
+
+**Four further defects found by running it, all of which would have reached the paper.**
+
+1. **The arithmetic ablation table was ingested unconditionally.** `load_ablations()`
+   read `automated/phase10_ablations_result.json` with no task guard, so
+   `results/language/results_tables.md` §4 would have printed arithmetic MSE gaps
+   against an arithmetic MoRE baseline inside a cross-entropy document -- and it would
+   have arrived through the one path in the module with **no run directory to refuse**,
+   so none of the three cross-task barriers could see it. Now gated on
+   `TASK != "arithmetic" or not PHASE10_RESULT.exists()`, with an alternate §4
+   paragraph, and a test that asserts `load_ablations() is None` on language *while the
+   file is present on disk* (asserting it on a missing file proves nothing).
+2. **`1 - loss/floor` was labelled `R^2` for both tasks.** On arithmetic the floor is
+   the variance of the target and that expression is a genuine variance ratio. On
+   language the floor is a backoff-bigram cross-entropy; `1 - CE/CE_bigram` is not a
+   variance ratio and is not R^2 by any definition. A reviewer reading "R^2 = 0.10"
+   would be reading a fabricated statistic wearing a familiar name. Replaced by a
+   per-task `DERIVED_COLUMNS` table: arithmetic keeps `R^2 vs floor`; language gets
+   `bits/token`, `perplexity`, `margin vs floor (nats)`.
+3. **`variant != "canonical"` was hard-coded in `admit()`.** The arithmetic spec has no
+   `canonical_variant` key and its runs are stamped `canonical`; language runs are
+   stamped `variant = language` by design. Every single language run would have been
+   refused with a message about the variant, which reads like a run-stamping bug and
+   would have been debugged in the run pipeline rather than in the exporter. Now
+   `CANONICAL_VARIANT = SPEC.get("canonical_variant") or "canonical"`.
+4. **`_write_md_depth()` printed a caveat that is false on language.** Its text asserts
+   that every depth number in the document is a **training-time** measurement, which is
+   true of arithmetic's `depth_dist/*`. The language `depth/*` block is computed in the
+   validation pass and carries its own `depth_key_provenance` map recording that. The
+   arithmetic caveat would have understated evidence that actually exists -- the same
+   class of error as overstating evidence that does not, and the docstring now says so.
+
+**Two checks added that did not exist before.**
+
+- **Cross-task refusal.** A run stamped `task = arithmetic` is refused from a language
+  export even when group, variant, seed, dataset_version and config_hash are all
+  canonical, and vice versa. This is the third independent barrier between an MSE and a
+  cross-entropy in one table (`experiment_group`, `dataset_version`, now `task`). The
+  redundancy is deliberate and is tested by a fixture that is canonical in every
+  respect *except* `task`.
+- **Floor-margin cross-check.** The spec's `primary_metric_floor` and the corpus's
+  `data/lang/<corpus>/dataset_meta.json` are separate files. A spec edited without
+  rebuilding the corpus -- or a run trained on the dev corpus and exported against the
+  canonical spec -- shifts every margin by **0.41 nats** (dev 5.3983 vs canonical
+  4.9849), which is larger than any architecture gap this study can resolve.
+  `consistency_errors()` now requires each run's recorded
+  `val/nats_below_bigram_floor` to reproduce `FLOOR - val/task_loss` to 1e-6 and fails
+  the **whole export** otherwise. Verified against the real smoke run, whose
+  `-0.8384` correctly matches the dev floor and not the canonical one.
+
+**MoE depth suppression is by prefix, not by enumeration.** `SUPPRESS_PREFIX =
+{"moe": ("depth/",)}` beside the existing `SUPPRESS_CONSTANT`. A language run carries
+~54 keys under `depth/`, every one of them a restatement of "MoE does not recurse" at
+`max_depth 1`. Enumerating them guarantees that the next depth key added to the engine
+leaks into the MoE column as a real number. The prefix table is intentionally *not*
+task-keyed: those keys come from the engine's depth block, which does not know the task.
+
+**`seed_stats.py` stays a library and now says so.** Reading `runs/` is the exporter's
+job and duplicating it in a stats module is how a second, weaker path to a results table
+gets born. It gained a `__main__` block that prints the module's purpose, prints both
+`export_results.py` invocations, echoes whatever arguments were ignored, and
+`raise SystemExit(2)`. A library that exits 0 printing nothing is strictly worse than
+one that errors.
+
+**Verification: 60 passed, 0 failed, 0 skipped** -- `code/test_language_export.py`. It
+synthesizes 15 fixture run directories whose metric *key set* is copied from a real
+language `metrics.json` on disk, then puts them through the shipped
+`admit` / `consistency_errors` / `aggregate` / `cell` / `pairwise` / `derived` and all
+four writers. What is faked: the run directories and the loss values. What is not faked:
+the metric key shapes, and every line of exporter logic under test.
+
+**A mistake in the test itself, worth recording because it is the subtle kind.** Donor
+selection was `sorted(os.listdir(...))` plus `break`, which picked
+`langB_MoRE_seed42__91c9bba1` -- a **pre-Phase-L-6** run with 158 scalar keys, 34 under
+`depth/`, and no `depth_key_provenance` registry. The suite was therefore testing the
+exporter against a key set the canonical matrix will never produce, and one assertion
+failed for that reason and not because of a code defect. Fixed to newest-by-mtime (now
+`langB_MoRE_seed44__d915d7de`: 221 scalars, 54 depth keys, 9 registry prefixes) plus an
+explicit assertion that the donor carries the registry, so the suite fails loudly rather
+than silently regressing to history. **A fixture drawn from the oldest artifact on disk
+tests the past.**
+
+**No arithmetic number moved, demonstrated rather than asserted.**
+`results/results_aggregate.csv` is **byte-identical** after the refactor
+(`git diff --quiet` passes). `results/results.csv` gains exactly one column (`task`).
+`results/results_tables.md` differs by one added `task:` provenance line plus 112 new
+refusal rows, which are the language run directories that now exist on disk. The three
+pairwise verdicts are unchanged: MoRE-MoE p=0.6587, MoRE-MoR p=0.0159, MoE-MoR p=0.0079.
+
+**The three documentation sites that carried the wrong commands are corrected**, since a
+fixed tool with stale instructions is still a broken handoff:
+`code/run_language_matrix.py:summarise` (the two dead commands it printed at the end of
+every matrix), `HANDOFF.md` "Recording results" (now one command, plus the three
+whole-export refusal causes worth avoiding rather than debugging at hour 39), and
+`SETUP.md` §7 (run `test_language_export.py` **before** the matrix, not after) with
+three new rows in the bite-table.
+
+**Where to look.** `export_results.py:TASKS` / `_task_from_argv` to add a task.
+`export_results.py:admit` for a run being wrongly refused -- it returns the reason
+string, so run `--check` and read it before changing anything. `export_results.py:cell`
+plus `SUPPRESS_PREFIX` / `SUPPRESS_CONSTANT` for a column showing `N/A` that should
+carry a number. `export_results.py:consistency_errors` for a whole-export refusal.
+`export_results.py:derived` / `DERIVED_COLUMNS` for the per-task columns.
+`test_language_export.py:DONOR` if the fixture key set ever looks unlike a real run.
+
+**T-L10.0 itself stays `[ ]`.** Its Verify line requires all 17 `updated_objective.md`
+sections present with every number traceable to a run id, and `--check` currently
+reports `admitted: 0  refused: 241` -- correctly, because no run has certified itself
+`canonical_lang_b`. The aggregation path is built and tested; the 17-section fold needs
+the matrix.
+
 <!-- APPEND-MARKER-CL -->
 
 

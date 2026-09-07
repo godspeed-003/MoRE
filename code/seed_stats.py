@@ -154,3 +154,35 @@ def format_row(label: str, res: dict | None, alpha: float = 0.05) -> str:
             f"d={res['cohens_d']:+.2f} p={res['p_value']:.4f} "
             f"(floor {res['min_p']:.4f}{at_floor})  {verdict}")
 
+
+if __name__ == "__main__":
+    # THIS MODULE IS A LIBRARY AND HAS NO CLI, ON PURPOSE: it computes a test from
+    # two lists of numbers and knows nothing about run directories, admission or
+    # provenance. Reading runs/ is `export_results.py`'s job, and it is the only
+    # sanctioned path from a run directory to a number in a table.
+    #
+    # This block exists because the alternative is WORSE THAN AN ERROR. Before it,
+    # `python code/seed_stats.py --group canonical_lang_b` -- a command that was
+    # written into HANDOFF.md and printed by run_language_matrix.py -- exited 0 and
+    # printed absolutely nothing. An operator who had just spent 39 GPU-hours would
+    # have read that silence as "no differences found". A non-zero exit naming the
+    # right command cannot be misread.
+    import sys as _sys
+
+    print(__doc__.strip().splitlines()[0])
+    print()
+    print("code/seed_stats.py is a LIBRARY, not a command. It has no CLI and")
+    print("running it computes nothing. To aggregate runs into a results table:")
+    print()
+    print("    python code/export_results.py                    # arithmetic matrix")
+    print("    python code/export_results.py --task language    # language matrix")
+    print()
+    print("That exporter calls perm_test()/mean_std() from this file, applies the")
+    print("admission and consistency rules, and writes results/ (results/language/")
+    print("for --task language). Its stdout carries the same pairwise verdict lines")
+    print("this module formats.")
+    if len(_sys.argv) > 1:
+        print()
+        print(f"ignored arguments: {_sys.argv[1:]}")
+    raise SystemExit(2)
+

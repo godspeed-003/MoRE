@@ -2495,6 +2495,64 @@ where compute forces it, and say so in the caption rather than presenting a
 
 ## Phase L-10 — Reporting  (`plan_language.md` §14)
 
+- [x] **T-L10.0a The exporter can target the language matrix at all.** Prerequisite
+  for T-L10.0, split out because it turned out to be *unbuilt* rather than merely
+  unrun. `HANDOFF.md` told the operator to aggregate the finished matrix with
+  `code/seed_stats.py --group canonical_lang_b` and
+  `code/export_results.py --group canonical_lang_b`. **Neither command worked, and
+  neither failed.** `seed_stats.py` is a 156-line pure library with no `main()` and
+  no argparse: it exited 0 and printed nothing. `export_results.py` never had a
+  `--group` flag; it ignored the argument, read `canonical_spec.json` at module
+  level (`SPEC_PATH = CODE / "canonical_spec.json"`, `CANONICAL_GROUP =
+  SPEC["canonical_group"]`, line 93 before the fix) and exported the **arithmetic**
+  matrix into `results/` — `scanned 241 directories, admitted: 15, refused: 226`,
+  every refusal `experiment_group='exploratory' != 'canonical_phase_b'`. An operator
+  who had just spent 39 GPU-hours would have read 15 rows of mean squared error as
+  their language result.
+  **Verify:** `python code/test_language_export.py` → 60 passed, 0 failed, 0 skipped;
+  `python code/export_results.py --task language --check` names the language spec and
+  refuses (nothing canonical exists yet); `python code/export_results.py` still
+  produces a byte-identical `results/results_aggregate.csv`.
+  **Evidence (2026-09-07, CPU interpreter):**
+  - `test_language_export.py` → **60 passed, 0 failed, 0 skipped**. It synthesizes 15
+    fixture runs from the *newest* real language `metrics.json` on disk (221 scalar
+    keys, 54 under `depth/`, `depth_key_provenance` present) and puts them through
+    the shipped `admit`/`consistency_errors`/`aggregate`/`cell`/`pairwise`/`derived`
+    and all four writers. The first version of that fixture drew the *oldest* run
+    (`langB_MoRE_seed42__91c9bba1`, 158 scalars, no depth registry) and so tested the
+    exporter against history rather than the contract — hence newest-by-mtime plus an
+    explicit registry assertion.
+  - `export_results.py --task language --check` → `task = language`,
+    `spec = canonical_spec_language.json (L7.1-language-frozen)`,
+    `canonical group = canonical_lang_b   variant = language`,
+    `output dir = results\language`, `admitted: 0     refused: 241`,
+    `REFUSED: no run certified itself as canonical -- nothing to export.` Correct:
+    the matrix has not been run.
+  - Arithmetic regression: `results/results_aggregate.csv` **byte-identical** to the
+    committed file (`git diff --quiet` passes), so no published number moved. The
+    only arithmetic changes are one added `task` provenance column in `results.csv`
+    and 112 new refusal rows, which are the language run directories that now exist.
+  - Four defects found *by running it*, all fixed: (1) the arithmetic Phase 10
+    ablation file was ingested unconditionally and would have printed arithmetic MSE
+    gaps into a cross-entropy document, through a path with no run directory to
+    refuse; (2) `1 - loss/floor` was labelled `R^2` for both tasks — on language the
+    floor is a bigram cross-entropy and that expression is not a variance ratio, so a
+    reviewer reading "R^2 = 0.10" would be reading a fabricated statistic;
+    (3) `variant != "canonical"` was hard-coded and refuses every language run, which
+    are stamped `variant = language`; (4) `_write_md_depth` printed "every depth
+    number in this document is a TRAINING-TIME measurement", which is an arithmetic
+    statement — the language depth block is validation-pass and records its own
+    per-key provenance.
+  - Two checks added that did not exist: a run stamped `task = arithmetic` is refused
+    from the language export even when group, variant, seed and dataset_version are
+    all canonical; and the run-recorded `val/nats_below_bigram_floor` must reproduce
+    `spec floor − val/task_loss` exactly, which catches a spec floor edited without
+    rebuilding the corpus (dev 5.3983 vs canonical 4.9849 = 0.41 nats, larger than
+    any architecture gap this study can resolve).
+  - `code/seed_stats.py` gained a `__main__` block that prints the right command and
+    exits 2. It stays a library — reading `runs/` is the exporter's job — but a
+    library that exits 0 printing nothing is worse than one that errors.
+
 - [ ] **T-L10.0 `results/language/{results.csv,results.json,results.md}`.** All 17
   sections from `updated_objective.md`, with the three language-specific foldings:
   allocation error replaced by the correlational depth section; routing accuracy
@@ -2502,6 +2560,10 @@ where compute forces it, and say so in the caption rather than presenting a
   control; the trivial-baseline floor stated before any loss number.
   **Verify:** all 17 sections present; every number traceable to a run id; measured
   facts and interpretation visibly separated.
+  **BLOCKED ON THE MATRIX, not on code.** The exporter now targets the language spec
+  (T-L10.0a) and writes the four artifacts, but `--check` correctly refuses because
+  no run has certified itself `canonical_lang_b`. The 17-section fold and the
+  paper-facing `results.md` are the remaining work and both need real numbers.
 
 - [ ] **T-L10.1 Paper-safe claims and explicitly unsupported claims.** Write both
   lists. Specifically forbidden (§13): calling the depth correlations "complexity

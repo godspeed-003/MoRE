@@ -188,6 +188,19 @@ Expected: `59 passed, 0 failed, 0 skipped` and `28 passed, 0 failed, 0 skipped`.
 second one prints the three arms' parameter-count table — **MoRE must be 5,584,908**.
 If it is not, the arms are not budget-matched and nothing downstream means anything.
 
+Finally the reporting path, which is worth running **before** the matrix rather than
+after it:
+
+```bash
+python code/test_language_export.py
+```
+
+Expected `60 passed, 0 failed, 0 skipped`. It builds 15 fixture runs from the newest
+real language `metrics.json` on disk and puts them through the real exporter, so it
+proves the aggregation command works *before* 39 GPU-hours depend on it. If it
+**skips** everything, you have no finished language run to borrow a key set from —
+do `--smoke` (§9) first and re-run.
+
 ## 8. W&B — settle this BEFORE the first canonical run
 
 An unconfigured W&B kills the run in `wandb.init` **after** the run directory has been
@@ -270,3 +283,6 @@ absent from the results table.
 | `UsageError: No API key configured` | step 8 |
 | `ValueError: path is on mount 'C:', start on mount 'D:'` | a path argument crossed drives; report it, this class of bug has bitten twice |
 | CUDA OOM on the MoR arm | do **not** lower `batch_size` — it is a frozen protocol field and changing it makes the run non-canonical. 48 peaks at a measured 5,342 MiB, so an 8 GB card has room; report the actual failure instead |
+| `code/seed_stats.py` prints instructions and exits 2 | it is a library with no CLI; use `export_results.py --task language`. Before T-L10.0 it exited 0 printing nothing |
+| the exporter wrote 15 rows of MSE into `results/` | `--task language` was omitted, so it exported the arithmetic matrix; language output goes to `results/language/` |
+| `CONSISTENCY FAILURE ... admitted rows span 2 values of code_git_commit` | the matrix was split across a `git pull`. Pull before you start and not again until the 15 runs are done |
