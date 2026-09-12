@@ -158,6 +158,24 @@ class MoRELanguageDataset(Dataset):
         self.dataset_version = self.manifest["dataset_version"]
         self.train_split_version = TRAIN_SPLIT_VERSION
         self.primary_metric_floor = self.manifest.get("primary_metric_floor")
+        # The oracle POS partition's OWN normalized load entropy, on THIS corpus.
+        #
+        # It is a reference constant with a direction attached: a router measuring
+        # load entropy just BELOW it is matching the balance the data actually has,
+        # and one at 0.99+ is buying uniformity the data does not have -- which is the
+        # reasoning T-L7.1 used to justify `routing_balance_weight = 0.001`. So the
+        # comparison flips sign around it, and the corpora do NOT agree:
+        # wikitext-2 (dev) 0.8884 vs wikitext-103 (canonical) 0.8942. Carried as an
+        # attribute, and published per run, so no reader ever compares a canonical
+        # run's entropy against the dev corpus's constant -- the same class of error
+        # as the 0.41-nat floor mismatch the exporter now cross-checks.
+        #
+        # The key is `shuffled_control_marginal_entropy_real` because the shuffled
+        # control (T-L3.3) draws label permutations that preserve the real family
+        # marginals, so it had to compute the real partition's entropy to match it.
+        # Absent -> None, never a substituted constant.
+        self.pos_partition_load_entropy = self.manifest.get(
+            "shuffled_control_marginal_entropy_real")
 
         self.token_family = self._load_family_lookup(require_families)
         self._array = None

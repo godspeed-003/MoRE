@@ -998,6 +998,16 @@ does not exist here (T-L0.0).
   against 1.0. On arithmetic the oracle families were near-uniform by construction,
   so this question did not arise. TL3.1l pins it.
 
+  **CORRECTED BY T-LX.6 — the value above is the DEV corpus's, and the canonical
+  corpus's is different.** wikitext-103 canonical is **0.894156** with a **5.17×**
+  token ratio, against wikitext-2 dev's 0.888442 / 5.29×. The gap is 0.006 and it
+  still matters, because this constant is a threshold with a direction: a run at
+  load entropy 0.890 reads as *below* the partition on canonical (matching the
+  balance the data has) and *above* it on dev (buying uniformity the data does not
+  have) — opposite conclusions from the same measurement. Every language run now
+  publishes its own corpus's value as `val/routing_pos_partition_load_entropy`;
+  quote that, not either literal.
+
   **The type/token divergence T-L2.4 was written to guard against is extreme here:**
   L1_FUNCTION is **2.6% of types and 27.3% of tokens** — a 10.7× ratio — and
   L5_PUNCT_SYM is 0.57% of types and 8.9% of tokens. TL3.1k requires at least one
@@ -1124,6 +1134,9 @@ does not exist here (T-L0.0).
   still claims a functional ground truth, and TL3.2j/k require the two to make
   different claims. The language caption also carries the T-L3.1 finding forward:
   read load entropy against the partition's own **0.8884**, not against 1.0.
+  *(T-LX.6: that literal is the dev corpus's; the caption now points at the per-run
+  key `val/routing_pos_partition_load_entropy` and names both corpora, canonical
+  0.8942 / dev 0.8884.)*
 
 - [x] **T-L3.3 Mandatory shuffled-control partition (ablation G).** Build a second
   `token_family_shuffled[V]` by permuting the family assignment across types while
@@ -1150,7 +1163,8 @@ does not exist here (T-L0.0).
   specification and this artifact implements it**, because every entry of the routing
   confusion matrix is a *token*, so AMI's and Hungarian accuracy's chance levels
   depend on the token marginals. A type-count-matched control would carry a roughly
-  token-uniform profile against the real partition's 5.29× imbalance, and the
+  token-uniform profile against the real partition's 5.29× imbalance *(dev figure;
+  canonical is 5.17× and T-LX.6 made the manifest note compute it per corpus)*, and the
   comparison would then confound "meaningless" with "differently balanced" — exactly
   the confusion the control exists to remove. The realised type counts are recorded
   anyway (L1: 243 real vs ~2,506 control on wikitext-103) so the departure is
@@ -2687,3 +2701,65 @@ where compute forces it, and say so in the caption rather than presenting a
     and `results.json` differ, which is exactly the human-facing/machine-record split
     this task is about.
 
+
+- [x] **T-LX.6 A per-corpus constant may not live in prose.** The oracle POS
+  partition's own normalized load entropy was written into five documents as the single
+  number `0.8884` — *"read every language load-entropy figure against the partition's
+  own 0.8884, not against 1.0"*. That is the **wikitext-2 dev** measurement. The
+  **canonical wikitext-103** value is **0.894156**, and the documents quoting 0.8884
+  were describing canonical runs. **Verify:** no module computes against a hard-coded
+  partition entropy; every language run publishes its own corpus's value; the two
+  corpora are shown to disagree, and the number re-derives from that corpus's own
+  family token marginals.
+  **Evidence (2026-09-12, CPU interpreter): `test_language_data.py` 137 passed / 0
+  failed / 0 skipped and `test_lang_heads.py` 47 passed / 0 failed / 1 skipped**, of
+  which 5 checks are this task (TL2.3n/o/p, TLX.6a/b/c). All seven language suites pass
+  (137 / 114 / 74 / 11 / 22 / 28 / 59 / 47) and Gate L0 is **TOTAL 356 356 0 0, ALL
+  GATES PASS**.
+  - **The measured disagreement, both corpora, two independent derivations.**
+    `shuffled_control_marginal_entropy_real` is **0.888442277795757** (wikitext-2) and
+    **0.894155759131938** (wikitext-103); recomputing `H/log(6)` from each manifest's
+    own `family_counts_tokens["train"]["by_family"]` reproduces both to `<1e-9`
+    (asserted by TL2.3p). The largest/smallest family token ratio is **5.2855×** dev
+    and **5.1704×** canonical — so the widely-quoted **5.29×** is also the dev figure.
+  - **WHY 0.006 MATTERS: this constant is a threshold with a direction, not a
+    tolerance.** T-L7.1 justified `routing_balance_weight = 0.001` on the reading that
+    its load entropy 0.857 sits *just below* the partition's own value — matching the
+    balance the data actually has, where every higher weight overshoots to 0.99+ and
+    buys uniformity the corpus does not contain. A canonical run measuring **0.890**
+    therefore reads as *below* the partition against 0.8942 (weight behaving as
+    intended) and *above* it against 0.8884 (weight over-balancing). Same measurement,
+    opposite conclusion about the objective. TL2.3o asserts the disagreement itself,
+    because a check that only compared each corpus to its own manifest would also pass
+    for an implementation returning one shared value.
+  - **No run is invalidated.** The constant was never an operand: it appeared in
+    comments, captions, a ledger finding, `HANDOFF.md`, and as a recorded field in the
+    dev-corpus calibration JSON. Nothing computed with it, so no loss, metric, weight
+    or verdict changes. What was wrong was the *instruction to readers* — and the
+    calibration runs it guided were themselves on wikitext-2, where 0.8884 is correct.
+  - **The fix is structural, so no document can go stale again.**
+    `lang_data.MoRELanguageDataset` exposes `pos_partition_load_entropy` beside
+    `primary_metric_floor`, `engine.py` reads it with `getattr` and publishes
+    `val/routing_pos_partition_load_entropy` at every validation — absent rather than
+    substituted when a corpus has no shuffled-control stage. TLX.6c asserts no
+    `0.888`/`0.894` literal survives in engine *code* (comments are exempt: they are the
+    rationale, and a whole-file substring check would push the next person to delete the
+    explanation to make a test pass).
+  - **`build_shuffled_control.py` had the same defect in the justification it writes
+    into the manifest** — the note said "the real partition's 5.29x imbalance" on both
+    corpora. It now computes the ratio from that corpus's own marginals and records it as
+    `shuffled_control_real_token_imbalance_ratio`. **Both frozen control artifacts were
+    rebuilt and reproduce byte-identically**: `token_family_shuffled_sha256` is
+    `53da4423…1807c00` (wikitext-2) and `d48db113…81a2fead` (wikitext-103) before and
+    after, so only the prose and the new numeric key changed. `dataset_version` is
+    derived from the split arrays alone and is unmoved (TL2.7c).
+  - **`calibrate_lang_weights.py` now reads both of its corpus constants from the
+    manifest** rather than pasting them. The literals were *correct* there — that script
+    pins `CORPUS = "wikitext-2"` — but they were correct by coincidence of which corpus
+    the script happens to point at, which is precisely how 0.8884 escaped into five
+    documents about a different one. Re-derived values are identical to the frozen
+    literals: floor `5.398304166059712`, entropy `0.888442277795757`.
+  - **Where the dev value legitimately stays.** `canonical_spec_language.json` records
+    0.8884 inside an explicitly dev-corpus calibration record; the spec is frozen and is
+    not edited for a documentation defect. `HANDOFF.md`, `TASKS_LANGUAGE.md` and the
+    `metrics.py` caption now name both corpora and point at the per-run key.

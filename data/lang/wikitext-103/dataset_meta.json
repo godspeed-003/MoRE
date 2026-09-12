@@ -489,7 +489,7 @@
     }
   ],
   "shuffled_control_generator": "data/lang/build_shuffled_control.py",
-  "shuffled_control_generator_commit": "b1201f3efb1e4ec1e1e900cc06715fc80831d81b",
+  "shuffled_control_generator_commit": "82e521d4a311512de6cda0745b6eff455f6da0d4",
   "shuffled_control_marginal_entropy_draws": [
     0.8951314103695812,
     0.8941335379282797,
@@ -504,7 +504,7 @@
   ],
   "shuffled_control_marginal_entropy_real": 0.8941557591319386,
   "shuffled_control_matched": "train TOKEN proportions (plan_language.md \u00a74.4)",
-  "shuffled_control_matched_note": "T-L3.3's wording says per-family TYPE counts; \u00a74.4 says observed TOKEN proportions, and this artifact implements \u00a74.4. Confusion-matrix entries are tokens, so AMI's and Hungarian accuracy's chance levels depend on the token marginals; a type-count-matched control would be roughly token-uniform against the real partition's 5.29x imbalance and would confound 'meaningless' with 'differently balanced'. Realised type counts are recorded below so the departure is visible.",
+  "shuffled_control_matched_note": "T-L3.3's wording says per-family TYPE counts; \u00a74.4 says observed TOKEN proportions, and this artifact implements \u00a74.4. Confusion-matrix entries are tokens, so AMI's and Hungarian accuracy's chance levels depend on the token marginals; a type-count-matched control would be roughly token-uniform against this corpus's real 5.17x largest/smallest family token imbalance and would confound 'meaningless' with 'differently balanced'. Realised type counts are recorded below so the departure is visible.",
   "shuffled_control_n_draws": 10,
   "shuffled_control_real_marginals": {
     "token_share": {
@@ -524,6 +524,7 @@
       "L6_NUM_SUBWORD": 2743
     }
   },
+  "shuffled_control_real_token_imbalance_ratio": 5.170419608223279,
   "shuffled_control_seed": 20260903,
   "shuffled_control_target_token_share": {
     "L1_FUNCTION": 0.28156466495525295,

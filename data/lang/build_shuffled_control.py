@@ -27,7 +27,9 @@ are very far apart: L1_FUNCTION is 2.6% of types and 27.3% of tokens.
 what the metrics are computed over: every entry of the routing confusion matrix is a
 TOKEN, so AMI's and Hungarian accuracy's chance levels depend on the TOKEN marginals.
 A control that matched type counts would carry a token profile nothing like the real
-partition's -- roughly uniform instead of 5.29x imbalanced -- and the comparison would
+partition's -- roughly uniform instead of ~5x imbalanced (5.29x on wikitext-2, 5.17x on
+wikitext-103; the exact ratio is per corpus and is computed at build time rather than
+written down here, T-LX.6) -- and the comparison would
 then confound "meaningless" with "differently balanced", which is precisely the
 confusion the control exists to remove. The realised type counts are recorded anyway,
 so the departure from T-L3.3's looser wording is visible rather than silent.
@@ -279,6 +281,15 @@ def main(argv=None):
     h_real = _norm_entropy(real_stats["token_share"])
     h_ctrl = [_norm_entropy(s["token_share"]) for s in stats]
 
+    # T-LX.6. The largest/smallest family token ratio is CORPUS-SPECIFIC, and the note
+    # written into the manifest below used to quote the literal `5.29x` -- which is the
+    # wikitext-2 dev figure, where canonical wikitext-103 is 5.17x. Computed from this
+    # corpus's own marginals so the artifact's justification can never describe a
+    # different corpus than the one it was built from. Same class of defect as the
+    # partition-entropy constant: a per-corpus quantity frozen into prose.
+    _shares = [real_stats["token_share"][lbl] for lbl in LANG_FAMILY_LABELS]
+    imbalance = (max(_shares) / min(_shares)) if min(_shares) > 0 else float("inf")
+
     print(f"[control] {corpus}: {N_DRAWS} draws, seed {CONTROL_SEED}, "
           f"{int((real >= 0).sum()):,} mapped types "
           f"({int((real < 0).sum()):,} left at -1)")
@@ -311,10 +322,14 @@ def main(argv=None):
             "proportions, and this artifact implements §4.4. Confusion-matrix "
             "entries are tokens, so AMI's and Hungarian accuracy's chance levels "
             "depend on the token marginals; a type-count-matched control would be "
-            "roughly token-uniform against the real partition's 5.29x imbalance and "
-            "would confound 'meaningless' with 'differently balanced'. Realised type "
+            f"roughly token-uniform against this corpus's real {imbalance:.2f}x "
+            "largest/smallest family token imbalance and would confound "
+            "'meaningless' with 'differently balanced'. Realised type "
             "counts are recorded below so the departure is visible."
         ),
+        # T-LX.6: recorded rather than left implicit in the note, so a reader comparing
+        # corpora gets the ratio as a number instead of parsing a sentence.
+        "shuffled_control_real_token_imbalance_ratio": float(imbalance),
         "shuffled_control_target_token_share": {
             LANG_FAMILY_LABELS[f]: float(target[f]) for f in range(NUM_FAMILIES)},
         "shuffled_control_real_marginals": real_stats,

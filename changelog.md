@@ -6214,6 +6214,115 @@ stated there. `_write_md_tail` for the footnote text and the three-value cap.
 `test_language_export.py`'s `_FOOT` split if a footnote assertion starts matching a
 metric row or vice versa.
 
+## T-LX.6 - a threshold with a direction was quoted from the wrong corpus
+
+**The defect.** Five documents instructed the reader to compare every language
+load-entropy figure against "the oracle POS partition's own 0.8884, not against 1.0":
+`code/more/metrics.py`'s `ROUTING_AGREEMENT_CAPTIONS["language"]` and the comment above
+it, `HANDOFF.md`'s "What you are measuring against", `TASKS_LANGUAGE.md`'s T-L3.1 finding
+and T-L3.2 caption clause, and `code/calibrate_lang_weights.py`. `0.8884` is the
+**wikitext-2 dev** value. The **canonical wikitext-103** value is **0.894156**, and the
+documents quoting it were describing canonical runs. The largest/smallest family token
+ratio has the same problem: **5.2855x** dev, **5.1704x** canonical, quoted everywhere as
+"5.29x" -- including inside `build_shuffled_control.py`'s manifest note, which is written
+onto BOTH corpora.
+
+**Measured, two independent derivations per corpus.**
+`shuffled_control_marginal_entropy_real` in `data/lang/<corpus>/dataset_meta.json` is
+`0.888442277795757` (wikitext-2) and `0.894155759131938` (wikitext-103). Recomputing
+normalized entropy `H/log(6)` from each manifest's own
+`family_counts_tokens["train"]["by_family"]` over the six MAPPED families reproduces both
+to `<1e-9`. (Over the mapped families only -- including the `-1` unmapped bucket would
+compute a 6-way normalized entropy over 7 categories.)
+
+**WHY 0.006 IS NOT A ROUNDING CONCERN.** This constant is not a tolerance, it is a
+threshold whose SIDE carries the claim. T-L7.1 justified `routing_balance_weight = 0.001`
+on the reading that its measured load entropy 0.857 sits *just below* the partition's own
+value -- the router matching the imbalance the data actually has -- while every higher
+weight overshoots to 0.99+ and buys uniformity the corpus does not contain (and AMI falls
+as entropy rises, 0.291 -> 0.181). A canonical run measuring **0.890** reads as *below*
+the partition against 0.8942 and *above* it against 0.8884. Same number, opposite
+conclusion about whether the balance term is doing what the protocol says it does.
+
+**No run is invalidated, and that is a fact about the defect's shape, not a reprieve.**
+The constant was never an operand. It appears in comments, a caption, ledger prose,
+`HANDOFF.md`, and as a recorded field in `code/lang_calibration_*.json`. No loss, metric,
+weight, checkpoint or verdict consumed it, so nothing recomputes. What was wrong was the
+INSTRUCTION TO READERS -- and the calibration runs that instruction guided were themselves
+on wikitext-2, where 0.8884 is the right number. The damage was entirely prospective: the
+canonical matrix has not run yet, and its entropy figures would have been read against the
+wrong side of the threshold.
+
+**The fix is structural, because a corrected constant in prose is the same defect with a
+better value.** `more/lang_data.py:MoRELanguageDataset.__init__` exposes
+`pos_partition_load_entropy` from the manifest beside `primary_metric_floor`;
+`more/engine.py` reads it with `getattr(_ds, "pos_partition_load_entropy", None)` beside
+`_floor` and publishes `log_dict["val/routing_pos_partition_load_entropy"]` at every
+validation, beside `val/nats_below_bigram_floor`. `None` -> the key is ABSENT, never
+substituted: a default would put another corpus's threshold into a run's own record, which
+is the defect, not a smaller version of it.
+
+**`build_shuffled_control.py` wrote the stale ratio into the manifest of every corpus it
+built.** `shuffled_control_matched_note` said "roughly token-uniform against the real
+partition's 5.29x imbalance" regardless of which corpus produced it. It now computes
+`imbalance = max(share)/min(share)` from that corpus's own `real_stats["token_share"]`,
+interpolates it into the note, and records it as
+`shuffled_control_real_token_imbalance_ratio` so a reader gets a number instead of parsing
+a sentence.
+
+**Both frozen control artifacts were rebuilt and reproduce BYTE-IDENTICALLY** --
+`token_family_shuffled_sha256` is
+`53da44236844c413da864405123e4bc03fff9347dfa2313e7fa35dfc81807c00` (wikitext-2) and
+`d48db113b56e3b7eb245055d8b9b1a724e0be5ee819834609b34bf5481a2fead` (wikitext-103) before
+and after, so the `(10, 8192)` int8 draw array is unchanged and only the prose plus the new
+numeric key moved. `dataset_version` is derived from the split arrays' hashes alone
+(TL2.7c) and is unmoved, so no `config_hash` and no admitted-run decision changes. This is
+why rebuilding a frozen artifact was acceptable at all: the SHA was recorded first and
+checked after.
+
+**`calibrate_lang_weights.py` now reads both corpus constants through
+`_manifest_const()`.** `DEV_FLOOR` and the new `POS_PARTITION_OWN_LOAD_ENTROPY` come from
+`data/lang/<CORPUS>/dataset_meta.json`, and the JSON record gains
+`pos_partition_own_load_entropy_corpus` so the record names which corpus its threshold
+belongs to. The literals were CORRECT there -- that script pins `CORPUS = "wikitext-2"` --
+but they were correct by coincidence of where the script points, which is exactly how
+0.8884 escaped into five documents about a different corpus. Re-derived values are
+identical to the frozen literals: floor `5.398304166059712`, entropy `0.888442277795757`.
+Falls back rather than raising on a missing manifest: this script writes a JSON record, and
+a missing key should leave that record honest about the absence, not abort a grid.
+
+**Five checks, and one of them is the one that matters.** `test_language_data.py` TL2.3n
+asserts `ds.pos_partition_load_entropy` IS the manifest value (identity, not a literal --
+a test carrying its own copy of the constant is the same defect one layer down). TL2.3p
+re-derives it from the family token marginals. **TL2.3o asserts the two corpora DISAGREE**:
+without it, TL2.3n is satisfied by an implementation returning one shared value for every
+corpus, which is the bug. `test_lang_heads.py` TLX.6a/b assert the engine publishes the key
+and omits rather than defaults it.
+
+**A mistake in the new tests, worth recording because it would have taught the wrong
+lesson.** TLX.6c first searched the whole of `engine.py` for `"0.888"`/`"0.894"` and failed
+-- on the explanatory COMMENT that names both corpora, which is the fix's rationale. A
+substring check over a whole file makes the cheapest way to pass be "delete the
+explanation". It now strips `#` tails and checks executable code only. Same shape as the
+T-LX.5 footnote-vs-table error: an assertion that does not distinguish the artifact it is
+about from the prose describing it.
+
+**Verification.** Gate L0 `TOTAL 356 356 0 0`, ALL GATES PASS (CPU interpreter). All seven
+language suites pass: `test_language_data.py` 137/0/0, `test_language_families.py` 114/0/1,
+`test_language_task_axis.py` 74/0/0, `test_lang_recursion.py` 11/0/0,
+`test_lang_causality.py` 22/0/0, `test_language_gate_l6_l7.py` 28/0/0,
+`test_language_spec_freeze.py` 59/0/0, `test_lang_heads.py` 47/0/1,
+`test_language_export.py` 73/0/0.
+
+**Where to look.** `more/lang_data.py` `pos_partition_load_entropy` to change where the
+constant comes from -- read its comment first, it states the direction the comparison
+carries. `more/engine.py` beside `_floor` for publication and the `is not None` guard.
+`data/lang/build_shuffled_control.py` `imbalance` for the manifest note. If a canonical
+number ever has to be quoted without a run in hand, take it from
+`data/lang/wikitext-103/dataset_meta.json`, never from this file or from `HANDOFF.md`.
+`canonical_spec_language.json` still records 0.8884 inside an explicitly dev-corpus
+calibration block; that is correct and the spec is frozen -- do not "fix" it.
+
 <!-- APPEND-MARKER-CL -->
 
 

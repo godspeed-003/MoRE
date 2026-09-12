@@ -128,10 +128,11 @@ the ratio to the task loss.
 
 Two secondary readings worth carrying into how you interpret your results:
 
-- 0.001 sits at load entropy 0.857, just *below* the oracle POS partition's own
-  0.884. Every higher weight overshoots to 0.99+. Entropy and AMI move in
-  **opposite** directions across this sweep — which is exactly why CLAUDE.md §2
-  forbids tuning toward maximal entropy.
+- 0.001 sits at load entropy 0.857, just *below* the **dev** corpus's own POS
+  partition entropy of 0.8884. Every higher weight overshoots to 0.99+. Entropy and
+  AMI move in **opposite** directions across this sweep — which is exactly why
+  CLAUDE.md §2 forbids tuning toward maximal entropy. (The canonical corpus's
+  partition entropy is 0.8942, not 0.8884; see the next section.)
 - Raising the **halting** weight destroys **routing** structure (AMI 0.291 →
   0.003). Depth and expert differentiation are **not independent knobs** in MoRE.
 
@@ -150,10 +151,17 @@ nothing a two-column count table could not.** The dev-corpus figure is 5.3983 an
 
 Four things already measured that change how you read your numbers:
 
-- **The oracle POS partition's own normalized load entropy is 0.884, not 1.0**, with
-  a 5.29× largest/smallest family token ratio. A router that perfectly reproduced
-  POS would score 0.884. Quote every language load-entropy figure against 0.884, not
-  against 1.0.
+- **The oracle POS partition's own normalized load entropy is ~0.89, not 1.0**, with
+  a ~5.2× largest/smallest family token ratio. A router that perfectly reproduced POS
+  would score ~0.89, so quote every language load-entropy figure against that and
+  never against 1.0. **The exact value is per corpus and the corpora disagree in a
+  way that flips the comparison's sign** (T-LX.6): wikitext-103 canonical **0.8942**,
+  wikitext-2 dev **0.8884**. A run measuring 0.890 is *below* the partition on
+  canonical and *above* it on dev — opposite readings of whether the balance term is
+  buying uniformity the data does not have. So do not carry a constant from this
+  document: every language run now publishes its own corpus's value as
+  `val/routing_pos_partition_load_entropy` in `metrics.json`, and that is the number
+  to quote beside that run's entropy.
 - **AMI has a nonzero floor and it is PER RUN.** Every language `metrics.json`
   carries `val/routing_control_pos/ami_control_mean` and its std beside `ami_real`.
   Use those; do not use a fixed constant. A `delta_z` of `None` means the control had

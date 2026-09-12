@@ -387,6 +387,40 @@ check("TL5.4e depth_rho_model_loss exists now and reads N/A until Phase L-6",
       "the column is reserved so the header never has to be reordered later; N/A is "
       "the honest value for 'not measured yet'")
 
+# -- T-LX.6: the load-entropy comparison target is PUBLISHED BY THE RUN -----------
+# The defect: `0.8884` is the wikitext-2 partition entropy and was quoted in five
+# documents beside canonical wikitext-103 numbers, whose value is 0.8942. It is a
+# threshold with a direction -- a run at 0.890 reads below the partition on canonical
+# and above it on dev -- so the wrong constant inverts the claim that the balance term
+# is matching the data's own imbalance rather than overriding it. The fix is structural:
+# the run publishes its own corpus's value, so no document can go stale.
+check("TLX.6a the engine publishes the corpus's own partition load entropy",
+      "val/routing_pos_partition_load_entropy" in _eng
+      and 'getattr(_ds, "pos_partition_load_entropy", None)' in _eng,
+      "read off the dataset beside primary_metric_floor and logged per validation, so "
+      "every language metrics.json carries the number its own entropy must be read "
+      "against")
+
+check("TLX.6b and it is ABSENT rather than substituted when the corpus has no "
+      "shuffled-control stage",
+      "if _pos_entropy is not None:" in _eng,
+      "a default would put another corpus's threshold into a run's own record, which "
+      "is the defect being closed, not a smaller version of it")
+
+# The engine must not USE either corpus's value: a literal in an expression is the whole
+# bug. Comments naming both values are the opposite -- they are why the fix exists -- so
+# the check is on code, with `#` tails stripped, rather than on the file's text. A
+# whole-file substring search fails on the explanatory comment and would push the next
+# person to delete the explanation to make a test pass.
+_code_lines = [ln.split("#", 1)[0] for ln in _eng.splitlines()]
+_bad_consts = sorted({c for c in ("0.888", "0.894")
+                      for ln in _code_lines if c in ln})
+check("TLX.6c no corpus-specific partition-entropy literal is USED in engine.py",
+      not _bad_consts,
+      "the engine computes and reports; the constant belongs to the corpus manifest "
+      "(both values do appear in a comment, which is the fix's rationale, not a value)"
+      if not _bad_consts else f"FOUND LITERALS IN CODE: {_bad_consts}")
+
 
 # ===========================================================================
 print()

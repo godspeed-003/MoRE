@@ -116,11 +116,21 @@ def compute_pairwise_cosine_sim(model: MoREModel):
 # measures (`plan_language.md` §4.4).
 #
 # There is also a measured reason the two cannot be read the same way. The language
-# oracle partition's OWN normalized load entropy is 0.8884, with a 5.29x
-# largest/smallest family token ratio (T-L3.1). A router that reproduced POS exactly
-# would score 0.8884 on load entropy, so the balance term and this agreement number
-# pull against each other -- which was not true on arithmetic, where the oracle
+# oracle partition is NOT near-uniform: its own normalized load entropy is ~0.89, with
+# a ~5.2x largest/smallest family token ratio (T-L3.1). A router that reproduced POS
+# exactly would score ~0.89 on load entropy, so the balance term and this agreement
+# number pull against each other -- which was not true on arithmetic, where the oracle
 # families were near-uniform by construction.
+#
+# THE EXACT VALUE IS PER CORPUS AND THE CORPORA DO NOT AGREE (T-LX.6):
+# wikitext-2 (dev) 0.8884, wikitext-103 (canonical) 0.8942. That gap is small in
+# absolute terms and decisive in direction -- a run measuring 0.890 is just BELOW the
+# partition on canonical and just ABOVE it on dev, i.e. "matching the balance the data
+# has" versus "buying uniformity it does not", which is the exact reading T-L7.1 used
+# to justify routing_balance_weight = 0.001. So no constant is written here: every
+# language run publishes its own corpus's value as
+# `val/routing_pos_partition_load_entropy`, read from that corpus's
+# `dataset_meta.json` by `MoRELanguageDataset`.
 ROUTING_AGREEMENT_KEYS = {
     "arithmetic": "val/routing_accuracy",
     "language":   "val/routing_agreement_with_pos",
@@ -138,10 +148,13 @@ ROUTING_AGREEMENT_CAPTIONS = {
         "linguistic hypothesis about a useful expert split rather than a functional "
         "ground truth. A router may be better for next-token prediction and still "
         "score low here. Read the permutation-invariant metrics first "
-        "(see LANGUAGE_SPECIALIZATION_ORDER), and read load entropy against the "
-        "partition's own 0.8884, not against 1.0."
+        "(see LANGUAGE_SPECIALIZATION_ORDER), and read load entropy against this "
+        "corpus's own partition entropy -- published per run as "
+        "val/routing_pos_partition_load_entropy, ~0.89 and NOT 1.0. It differs "
+        "between corpora (dev 0.8884, canonical 0.8942), so use the run's value."
     ),
 }
+
 
 # T-L3.2 makes the permutation-invariant metrics PRIMARY for language, and this list
 # is what "primary" means mechanically: the order any language specialization report

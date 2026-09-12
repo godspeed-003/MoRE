@@ -25,7 +25,9 @@ depth DOWN, and the balance term pushes the router toward uniform load. A 100x i
 not a rescaling, it is a different objective: at `halting = 0.001` the 8-epoch run reached
 `avg_depth = 5.16` of 7, and there is no way to know from a ratio what it reaches at 0.107.
 So each candidate is RUN, and the numbers that decide are behavioural -- `avg_depth`,
-`expert_load_entropy_normalized` against the POS partition's own 0.8884, and whether
+`expert_load_entropy_normalized` against the POS partition's own entropy on THIS corpus
+(0.8884 on the dev corpus; read from the manifest, not pasted -- canonical wikitext-103
+is 0.8942 and the difference flips the sign of the comparison, T-LX.6), and whether
 `val_loss` still beats the corpus floor.
 
 DEV CORPUS, SHORT RUNS, AND THAT IS A STATED LIMITATION. wikitext-2 at 3 epochs is ~4 min
@@ -59,7 +61,37 @@ TARGET_RATIO = 0.017
 SEQ_LEN, BATCH = 256, 64
 EPOCHS = 3
 CORPUS = "wikitext-2"
-DEV_FLOOR = 5.398304166059712      # wikitext-2 bigram floor, T-L2.5
+
+
+def _manifest_const(key, fallback=None):
+    """A corpus-specific constant read from `CORPUS`'s manifest, not pasted in.
+
+    T-LX.6. Both constants below are per corpus, and the second one disagrees between
+    corpora by an amount that FLIPS the reading of a load-entropy figure (wikitext-2
+    0.888442, wikitext-103 0.894156): a run at 0.890 is above the partition on one and
+    below it on the other. `CORPUS` is pinned to the dev corpus here, so a literal was
+    correct on the day it was written and would have been silently wrong the moment
+    anyone repointed the script -- which is exactly how the 0.8884 constant got into
+    five documents describing canonical runs.
+
+    Falls back rather than raising: this script writes a JSON record, and a missing
+    manifest key should leave that record honest about the absence, not abort a grid.
+    """
+    path = os.path.join(os.path.dirname(CODE), "data", "lang", CORPUS,
+                        "dataset_meta.json")
+    try:
+        with open(path, "r", encoding="utf-8") as fh:
+            return json.load(fh).get(key, fallback)
+    except (OSError, ValueError):
+        return fallback
+
+
+DEV_FLOOR = _manifest_const("primary_metric_floor", 5.398304166059712)
+# The oracle POS partition's OWN normalized load entropy on the DEV corpus. Recorded
+# beside the rows so a reader of `lang_calibration_*.json` compares each point's
+# `expert_load_entropy_normalized` against the corpus these points were run on.
+POS_PARTITION_OWN_LOAD_ENTROPY = _manifest_const(
+    "shuffled_control_marginal_entropy_real")
 
 
 def write_config(dest, routing_balance, halting, lr, dropout, weight_decay):
@@ -194,7 +226,8 @@ def main(argv=None):
                    "seq_len": SEQ_LEN, "batch_size": BATCH, "seed": args.seed,
                    "dev_bigram_floor": DEV_FLOOR,
                    "target_ratio_from_T4_2": TARGET_RATIO,
-                   "pos_partition_own_load_entropy": 0.8884,
+                   "pos_partition_own_load_entropy": POS_PARTITION_OWN_LOAD_ENTROPY,
+                   "pos_partition_own_load_entropy_corpus": CORPUS,
                    "caveat": ("CALIBRATION on the dev corpus. wikitext-2 shares its val "
                               "split byte-for-byte with wikitext-103 (T-L2.0), so these "
                               "runs may PICK a weight and may never be quoted as a result."),

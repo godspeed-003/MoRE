@@ -382,6 +382,12 @@ def train(cfg: dict, run_epochs: int | None = None, ctx: "RunContext | None" = N
                 break
             _ds = getattr(_ds, "dataset", None)
         _floor = getattr(_ds, "primary_metric_floor", None)
+        # T-LX.6: the oracle POS partition's own normalized load entropy, read from
+        # THIS corpus rather than from a constant. Every reported load-entropy figure
+        # is compared against it, and the two corpora disagree (dev 0.8884, canonical
+        # 0.8942) closely enough that a hard-coded value flips the sign of the
+        # comparison for a run measuring ~0.89.
+        _pos_entropy = getattr(_ds, "pos_partition_load_entropy", None)
         # T-L6.1: the frozen corpus-difficulty vectors, resolved ONCE here rather
         # than per validation pass. They come from the dataset, so a run cannot
         # correlate depth against a frequency table built for another corpus.
@@ -1412,6 +1418,12 @@ def train(cfg: dict, run_epochs: int | None = None, ctx: "RunContext | None" = N
                 # rather than 0.0 when the floor was not supplied.
                 if _floor is not None:
                     log_dict["val/nats_below_bigram_floor"] = _floor - val_loss
+                # The comparison target for every load-entropy figure this run
+                # reports, published BY the run so it can never be quoted from the
+                # wrong corpus. Absent rather than substituted when the corpus
+                # manifest has no shuffled-control stage.
+                if _pos_entropy is not None:
+                    log_dict["val/routing_pos_partition_load_entropy"] = _pos_entropy
             if val_loss < best_val_loss:
                 best_val_loss = val_loss
                 torch.save(model.state_dict(), ctx.path("checkpoint.pt"))

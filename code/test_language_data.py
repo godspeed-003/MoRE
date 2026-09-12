@@ -26,6 +26,7 @@ invocation of a test file, but silently not checking it would be worse.
 """
 
 import json
+import math
 import os
 import subprocess
 import sys
@@ -401,6 +402,24 @@ for corpus, man in present:
           f"{ds.dataset_version} / {ds.train_split_version} / floor "
           f"{ds.primary_metric_floor:.4f}")
 
+    # -- T-LX.6: the partition-entropy comparison target travels WITH the corpus ---
+    # The defect this closes: `0.8884` -- the wikitext-2 value -- was written into five
+    # documents as "the oracle POS partition's own load entropy" and quoted beside
+    # canonical wikitext-103 numbers, whose value is 0.8942. Six thousandths, and it is
+    # a THRESHOLD WITH A DIRECTION: a run at 0.890 is below the partition on canonical
+    # (matching the balance the data has, which is the reading T-L7.1 used to justify
+    # routing_balance_weight = 0.001) and above it on dev (buying uniformity the data
+    # does not have). Opposite conclusions from one measurement.
+    #
+    # Asserted on identity with the manifest, not on a literal, for the obvious reason:
+    # a test carrying its own copy of the constant is the same defect one layer down.
+    _pe = ds.pos_partition_load_entropy
+    check(f"TL2.3n {tag} pos_partition_load_entropy IS this corpus's manifest value",
+          _pe == man.get("shuffled_control_marginal_entropy_real")
+          and isinstance(_pe, float) and 0.5 < _pe < 1.0,
+          f"{_pe!r} from shuffled_control_marginal_entropy_real -- the comparison "
+          f"target is read from the corpus, never from a constant in prose")
+
 # -- shuffling belongs to the DataLoader, and is reproducible ----------------
 # The Verify clause: two epochs at the same seed give the same permutation, and
 # different seeds give different ones. Checked on the emitted block CONTENT rather
@@ -445,6 +464,60 @@ if present:
               [tuple(x.shape) for x in _b]
               == [(8, _ds.seq_len)] * 4 + [(8,)] * 3,
               " ".join(str(tuple(x.shape)) for x in _b))
+
+# -- T-LX.6: the two corpora DISAGREE, which is what makes the constant a defect ---
+# Without this check TL2.3n is satisfied by any implementation, including one that
+# returns a single shared value: the whole reason to read per corpus is that the
+# corpora differ. So the disagreement itself is asserted, and asserted in the
+# direction the docs got wrong (dev < canonical).
+#
+# The largest/smallest family token ratio is recomputed here from the recorded
+# marginals with the SAME expression `build_shuffled_control.py` now uses, which is
+# how the fix to that file is verified without rebuilding a frozen 103 M-token
+# artifact: the manifest key `shuffled_control_real_token_imbalance_ratio` lands on
+# the next control build, and until then this is the proof the formula is right.
+_ENT = "shuffled_control_marginal_entropy_real"
+_ent = {c: m.get(_ENT) for c, m in present}
+
+
+def _family_token_shares(m):
+    """Train per-family token shares over the six MAPPED families, from the manifest.
+
+    Over the mapped families only, because the -1 unmapped bucket is not an expert and
+    including it would make a 6-way normalized entropy out of 7 categories.
+    """
+    L = m["family_labels"]
+    bf = m["family_counts_tokens"]["train"]["by_family"]
+    tot = sum(bf[l] for l in L)
+    return [bf[l] / tot for l in L]
+
+
+def _norm_family_entropy(m):
+    p = [x for x in _family_token_shares(m) if x > 0]
+    return -sum(x * math.log(x) for x in p) / math.log(len(m["family_labels"]))
+
+
+if len(_ent) >= 2 and all(v is not None for v in _ent.values()):
+    _rat = {c: (lambda s: max(s) / min(s))(_family_token_shares(m))
+            for c, m in present}
+
+    check("TL2.3o the POS partition's own load entropy DIFFERS between corpora, so a "
+          "shared constant is wrong for one of them",
+          len(set(_ent.values())) == len(_ent),
+          "  ".join(f"{c} H={_ent[c]:.6f} ratio={_rat[c]:.2f}x" for c, _ in present)
+          + "  -- a run at 0.890 reads above the partition on one and below on the "
+            "other, which inverts what the balance term is said to be doing")
+
+    check("TL2.3p the normalized entropy re-derives from the corpus's own family "
+          "token marginals",
+          all(abs(_norm_family_entropy(m) - _ent[c]) < 1e-9 for c, m in present),
+          "  ".join(f"{c} {_norm_family_entropy(m):.9f}" for c, m in present)
+          + " -- so the manifest value is the partition's entropy and not an "
+            "unrelated recorded number")
+elif present:
+    skip("TL2.3o/p cross-corpus partition-entropy disagreement",
+         f"needs both corpora with a shuffled-control stage; have "
+         f"{sorted(c for c, v in _ent.items() if v is not None)}")
 
 # ===========================================================================
 print()
