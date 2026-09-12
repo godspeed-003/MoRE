@@ -2763,3 +2763,77 @@ where compute forces it, and say so in the caption rather than presenting a
     0.8884 inside an explicitly dev-corpus calibration record; the spec is frozen and is
     not edited for a documentation defect. `HANDOFF.md`, `TASKS_LANGUAGE.md` and the
     `metrics.py` caption now name both corpora and point at the per-run key.
+
+
+- [x] **T-LX.7 The `±` is the sample std, and no arm's aggregate is computed by
+  hand.** The first finished canonical arm (MoE, seeds 42–46, wikitext-103, reported in
+  the untracked `moe_batch1_results.md`) was summarised by hand, and **all six of its
+  `±` figures used the population std** (`statistics.pstdev` — also `numpy.std`'s
+  default and a spreadsheet's `STDEVP`) while `code/seed_stats.py::mean_std` and every
+  table in the arithmetic study use the **sample** std (`statistics.stdev`, n−1).
+  **Verify:** the suite asserts `mean_std` is n−1, that the two conventions differ by
+  exactly `sqrt((n-1)/n)` at n=5, that n=1 yields `std=None` not `0.0`, and that the
+  **exporter's own published aggregate** reproduces `statistics.stdev` over its own
+  raw per-seed vector.
+  **Evidence (2026-09-12, CPU interpreter): `test_language_export.py` 77 passed / 0
+  failed / 0 skipped** (was 73; TLX.7a/b/c/d are this task). Gate L0 **TOTAL 356 356 0
+  0, ALL GATES PASS**.
+  - **The measured error.** Recomputed from the report's own per-seed table with
+    `seed_stats.mean_std`, every mean reproduced exactly and every std was low by the
+    factor `sqrt(4/5) = 0.894427` — a **10.6 % understatement of seed variance**:
+
+    | quantity | mean | reported ± (n) | correct ± (n−1) |
+    |---|---|---|---|
+    | `val/task_loss` | 3.9483 | 0.0216 | **0.024194** |
+    | `val/routing_load_entropy_norm` | 0.6003 | 0.1186 | **0.132599** |
+    | Hungarian acc (%) | 36.16 | 2.93 | **3.272308** |
+    | AMI (real) | 0.1637 | 0.0427 | **0.047771** |
+    | AMI (shuffled control) | 0.0364 | 0.0096 | **0.010697** |
+    | mean pairwise cosine | 0.0304 | 0.0038 | **0.004269** |
+
+    Every per-seed derived quantity in the report was itself correct — `exp(val)`
+    reproduces each perplexity, `val/ln 2` each bits/token, `4.98494701553838 − val`
+    each margin. The defect is confined to dispersion.
+  - **WHY THIS IS NOT A ROUNDING CONCERN: the error is asymmetric in its
+    consequence.** An arm reported with the n denominator looks *more stable* than an
+    arm reported with n−1, so a table mixing the conventions can **invert the
+    seed-variance ranking** between MoE, MoR and MoRE — and "low seed variance" is one
+    of the three conditions Outcome A is defined on (`CLAUDE.md` §8). It also breaks
+    comparability with the arithmetic study this one extends, whose tables are all n−1.
+    The verdicts themselves are unaffected: `perm_test` is an exact randomization test
+    over the raw vectors and never forms a variance estimate at all
+    (`seed_stats.py:74` notes `se_of_difference` is "for reporting only").
+  - **No run is invalidated and no number in `runs/` is wrong.** The arm's
+    `metrics.json` files hold per-seed scalars; the aggregation happened afterwards, by
+    hand, outside the tooling. Re-running `export_results.py --task language` over the
+    same directories yields the corrected `±` with no retraining.
+  - **The structural half of the fix is a refusal to accept hand-aggregation.**
+    `HANDOFF.md` §"Recording results" gains two subsections: *"Do not compute the ±
+    yourself (T-LX.7)"*, which names the denominator, quantifies the 10.6 %, gives the
+    corrected table above, and says to quote `results_aggregate.csv`; and *"A hand-written
+    summary is not the record"*, because the same batch also arrived **without its five
+    `runs/langB_MoE_seed4*__<hash>/` directories** — `git ls-files runs/ | grep langB_MoE`
+    is empty. Absent those, `export_results.py` cannot admit the arm, the proxy guard
+    cannot check `config_hash` or `dataset_version`, and `CLAUDE.md` §5 forbids
+    hand-copying the numbers into a table regardless of how carefully they were
+    transcribed. A prose report is narration *over* the record, never a substitute.
+  - **TLX.7d is the check that actually binds.** TLX.7a–c pin the library, but a
+    library can be correct while the published table is not; TLX.7d re-derives the
+    exporter's own emitted `std` from the raw vector it emitted alongside it, so the
+    `±` in `results_tables.md` cannot silently become a population std.
+  - **The same report also quotes `0.884` as the POS partition entropy** — the
+    wikitext-2 dev constant, beside canonical wikitext-103 runs whose value is
+    `0.894156`. That is the first real-world instance of the T-LX.6 defect, and it
+    confirms the structural fix was the right one: once those directories exist, the run
+    publishes `val/routing_pos_partition_load_entropy` from its own corpus and the
+    number cannot be quoted from the wrong one.
+  - **What the arm actually measured, pending its directories.** Val task loss
+    **3.9483 ± 0.0242** nats/token against the canonical backoff-bigram floor
+    4.98494701553838 — a **+1.0366** nat margin, every seed clearing it. Routing beats
+    its own permutation control on **all five seeds** (AMI margin **+0.1273 ± 0.0400**,
+    range +0.0740 to +0.1862). Normalized load entropy is **0.6003 ± 0.1326** with a
+    per-seed range **0.3709–0.7049**, i.e. **0.2939 below** the canonical partition's own
+    0.894156, and the worst-balanced seed (43, 0.3709) is simultaneously the worst on
+    val loss (3.9829) and on AMI (0.1066) — a signal that `routing_balance_weight =
+    0.001` may be under-regularized for MoE on the full corpus. Recorded here as an
+    observation about an arm that is **not yet admissible**, not as a result.

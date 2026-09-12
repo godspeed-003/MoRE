@@ -283,6 +283,52 @@ exact randomization test, never from a k×std threshold. The exporter refuses to
 dataset versions or config hashes, refuses a run stamped `task = arithmetic`, and
 emits `N/A` rather than fabricating.
 
+### Do not compute the ± yourself (T-LX.7)
+
+`code/seed_stats.py::mean_std` uses the **sample** standard deviation,
+`statistics.stdev`, i.e. the n−1 (Bessel-corrected) denominator. Every seed table in
+the arithmetic study was produced that way, so the language tables must match or the
+two studies cannot be read side by side.
+
+At n = 5 the population std (`statistics.pstdev`, the n denominator — and what
+NumPy's `np.std` gives you by default, and what a spreadsheet's `STDEVP` gives you)
+is smaller by exactly `sqrt(4/5) = 0.8944`, a **10.6 % understatement of seed
+variance**. This is not a rounding difference and it is not symmetric in its
+consequences: an arm whose ± was computed with the n denominator looks *more stable*
+than an arm that used n−1, so a mixed-convention table can invert the seed-variance
+ranking between MoE, MoR and MoRE — which is one of the three things Outcome A is
+defined on (`CLAUDE.md` §8, "low seed variance").
+
+This happened for real. The first MoE batch of five canonical seeds was summarised
+by hand with population std, and every one of its six ± figures was ~10.6 % too
+tight:
+
+| quantity | mean | reported ± (n) | correct ± (n−1) |
+|---|---|---|---|
+| `val/task_loss` | 3.9483 | 0.0216 | **0.0242** |
+| `val/routing_load_entropy_norm` | 0.6003 | 0.1186 | **0.1326** |
+| Hungarian acc (%) | 36.16 | 2.93 | **3.27** |
+| AMI (real) | 0.1637 | 0.0427 | **0.0478** |
+| AMI (shuffled control) | 0.0364 | 0.0096 | **0.0107** |
+| mean pairwise cosine | 0.0304 | 0.0038 | **0.0043** |
+
+The means were all correct; only the dispersion was wrong. Run
+`export_results.py --task language` and quote its `results_aggregate.csv` instead of
+computing anything by hand.
+
+### A hand-written summary is not the record
+
+A prose report of a finished arm is welcome — it is how a human reads the batch — but
+it is **narration over** the record, never a substitute for it. The paper cites
+`runs/<experiment_id>/metrics.json`; the exporter cannot admit a run whose directory
+is not on disk, cannot verify its `config_hash` or `dataset_version`, and
+`CLAUDE.md` §5 forbids hand-copying numbers into a results table outright.
+
+So: push the five `runs/langB_<ARCH>_seed4*__<hash>/` directories in the same commit
+as any summary you write about them. A summary that arrives without its directories
+cannot enter a table no matter how carefully it was transcribed, and re-deriving it
+later means re-running the arm.
+
 Three things it will refuse the whole export for, so they are worth avoiding rather
 than debugging at hour 39:
 

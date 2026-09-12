@@ -335,6 +335,62 @@ else:
 
 
 # ===========================================================================
+print("\n=== TLX.7 the +- is the SAMPLE std, and nobody computes it by hand "
+      + "=" * 11)
+# ===========================================================================
+
+# Why this is a suite check and not a comment. The first finished canonical arm
+# (MoE, 5 seeds) was summarised by hand and every one of its six +- figures used
+# the POPULATION std -- `statistics.pstdev`, which is also `np.std`'s default and
+# a spreadsheet's STDEVP. At n = 5 that is smaller by exactly sqrt(4/5) = 0.8944,
+# a 10.6% understatement of seed variance. The means were all correct.
+#
+# It is not a rounding difference, because the error is not symmetric in its
+# consequence: an arm reported with the n denominator looks MORE STABLE than an
+# arm reported with n-1, so a mixed-convention table can invert the seed-variance
+# ranking between MoE / MoR / MoRE -- and "low seed variance" is one of the three
+# conditions Outcome A is defined on (CLAUDE.md 8). The arithmetic study's tables
+# are all n-1, so a population-std language table is also not comparable to the
+# study it is supposed to extend.
+import statistics as _st                                             # noqa: E402
+import seed_stats as _ss                                             # noqa: E402
+
+_sample = [3.9629, 3.9829, 3.9400, 3.9311, 3.9245]                   # the real arm
+_ms = _ss.mean_std(_sample)
+check("TLX.7a seed_stats.mean_std uses the SAMPLE (n-1) std, not the population "
+      "(n) std", _ms is not None
+      and math.isclose(_ms["std"], _st.stdev(_sample), rel_tol=0, abs_tol=1e-15)
+      and not math.isclose(_ms["std"], _st.pstdev(_sample), rel_tol=1e-6),
+      f"mean_std={_ms['std']!r}  stdev={_st.stdev(_sample)!r}  "
+      f"pstdev={_st.pstdev(_sample)!r}")
+
+check("TLX.7b the two conventions differ by sqrt((n-1)/n) at n=5, i.e. the wrong "
+      "one understates spread by 10.6% -- large enough to reorder arms",
+      math.isclose(_st.pstdev(_sample) / _st.stdev(_sample),
+                   math.sqrt(4 / 5), rel_tol=1e-12),
+      f"ratio={_st.pstdev(_sample) / _st.stdev(_sample):.6f} "
+      f"vs sqrt(4/5)={math.sqrt(4 / 5):.6f}")
+
+check("TLX.7c mean_std returns std=None at n=1 rather than 0.0 (one seed has no "
+      "spread; 0.0 would read as perfect agreement)",
+      _ss.mean_std([3.9629]) == {"mean": 3.9629, "std": None, "n": 1},
+      repr(_ss.mean_std([3.9629])))
+
+if TMP is None:
+    skip("TLX.7d exporter aggregate uses mean_std", "no fixtures")
+else:
+    _a = agg["moe"]["metrics"][ex.PRIMARY]
+    _raw = [v for v in _a["raw"] if isinstance(v, (int, float))]
+    check("TLX.7d the exporter's own aggregate std reproduces statistics.stdev on "
+          "its own raw values -- so the published +- cannot silently be a "
+          "population std",
+          len(_raw) >= 2 and _a["std"] is not None
+          and math.isclose(_a["std"], _st.stdev(_raw), rel_tol=0, abs_tol=1e-12),
+          f"agg std={_a['std']!r} vs stdev(raw)={_st.stdev(_raw)!r} "
+          f"(n={len(_raw)})")
+
+
+# ===========================================================================
 print("\n=== derived columns: cross-entropy is not variance explained " + "=" * 17)
 # ===========================================================================
 

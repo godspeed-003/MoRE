@@ -6323,6 +6323,98 @@ number ever has to be quoted without a run in hand, take it from
 `canonical_spec_language.json` still records 0.8884 inside an explicitly dev-corpus
 calibration block; that is correct and the spec is frozen -- do not "fix" it.
 
+## T-LX.7 - the first finished arm was aggregated by hand, with the wrong denominator
+
+**Defect.** `moe_batch1_results.md` (untracked, hand-written) summarised the first
+completed canonical language arm - MoE, seeds 42-46, wikitext-103, 5 x ~1.1 h on the
+RTX 4060 - and every one of its six `+-` figures was a **population** standard
+deviation (`statistics.pstdev`; equivalently `numpy.std` with its default `ddof=0`, or
+a spreadsheet's `STDEVP`). The repository's aggregator, `code/seed_stats.py:56`
+`mean_std`, uses the **sample** std `statistics.stdev` (n-1), as does every seed table
+in the arithmetic study.
+
+Recomputed from the report's own per-seed table, every **mean** reproduced exactly and
+every **std** was low by the factor `sqrt(4/5) = 0.894427`:
+
+| quantity | mean | reported (n) | correct (n-1) |
+|---|---|---|---|
+| `val/task_loss` | 3.9483 | 0.0216 | 0.024194 |
+| `val/routing_load_entropy_norm` | 0.6003 | 0.1186 | 0.132599 |
+| Hungarian acc (%) | 36.16 | 2.93 | 3.272308 |
+| AMI (real) | 0.1637 | 0.0427 | 0.047771 |
+| AMI (shuffled control) | 0.0364 | 0.0096 | 0.010697 |
+| mean pairwise cosine | 0.0304 | 0.0038 | 0.004269 |
+
+The per-seed numbers were themselves clean: `exp(val)` reproduces every claimed
+perplexity, `val / ln 2` every bits/token figure, and `4.98494701553838 - val` every
+margin. The defect is confined to dispersion.
+
+**Why a 10.6% difference is not a rounding concern.** The error is asymmetric in its
+consequence. An arm whose `+-` used the n denominator looks *more stable* than an arm
+that used n-1, so a table mixing the conventions can **invert the seed-variance
+ranking** between MoE, MoR and MoRE - and "low seed variance" is one of the three
+conditions Outcome A is defined on (`CLAUDE.md` 8). It also silently breaks
+comparability with the arithmetic study this one extends. The pairwise *verdicts* are
+untouched: `perm_test` is an exact randomization test over the raw per-seed vectors and
+forms no variance estimate at all (`seed_stats.py:74` already records that
+`se_of_difference` is "for reporting only").
+
+**No run is invalidated.** `metrics.json` holds per-seed scalars; the aggregation
+happened afterwards, by hand, outside the tooling. Re-running
+`export_results.py --task language` over the same directories produces the corrected
+`+-` with no retraining.
+
+**Second defect in the same artifact: the record was not pushed.**
+`git ls-files runs/ | grep langB_MoE` is empty - the five
+`runs/langB_MoE_seed4*__<hash>/` directories do not exist in the repository. Without
+them `export_results.py` cannot admit the arm, the proxy guard cannot verify
+`config_hash` or `dataset_version`, and `CLAUDE.md` 5 ("Never hand-copy numbers into a
+results table") forbids the markdown's numbers entering any table however carefully
+transcribed. A prose report is narration *over* the machine record, never a substitute
+for it.
+
+**Third, and it validates T-LX.6.** The same report quotes `0.884` as "the oracle POS
+partition's theoretical entropy" beside canonical wikitext-103 runs, whose value is
+`0.894156`; `0.8884` is the wikitext-2 dev figure. This is the first real-world
+instance of the defect T-LX.6 closed hours earlier, and it is the case the structural
+fix was designed for: once the directories exist, each run publishes
+`val/routing_pos_partition_load_entropy` from its own corpus's manifest and the
+constant cannot be quoted from the wrong corpus.
+
+**Fix - a library check plus a published-output check.** Four assertions added to
+`code/test_language_export.py` (new section, after the N/A-boundary block):
+
+- `TLX.7a` - `seed_stats.mean_std` equals `statistics.stdev` and is *not* close to
+  `statistics.pstdev`, on the real arm's five val-loss values.
+- `TLX.7b` - the two conventions differ by exactly `sqrt((n-1)/n)` at n = 5, pinning
+  the 10.6% magnitude so the rationale cannot drift from the arithmetic.
+- `TLX.7c` - `mean_std` returns `std=None` at n = 1 rather than `0.0` (one seed has no
+  spread; `0.0` would read as perfect agreement - the sentinel-as-measurement trap of
+  `CLAUDE.md` 4).
+- `TLX.7d` - **the one that binds**: the exporter's own emitted aggregate `std` is
+  re-derived from the raw per-seed vector it emits alongside it. A library can be
+  correct while the published table is not; this closes that gap, so the `+-` in
+  `results_tables.md` cannot silently become a population std.
+
+`code/test_language_export.py` now reports **77 passed, 0 failed, 0 skipped** (was 73).
+
+**Documentation.** `HANDOFF.md`, in the "Recording results so the paper can cite them"
+section, gains two subsections aimed at the operator driving the matrix on the other
+machine: *"Do not compute the +- yourself (T-LX.7)"* - names the denominator, the
+`sqrt(4/5)` factor, the corrected table above, and directs the reader to
+`results_aggregate.csv`; and *"A hand-written summary is not the record"* - states the
+push obligation for the run directories in the same commit as any summary.
+
+**Verification.** `test_language_export.py` 77/0/0 on
+`C:\Users\vedan\anaconda3\python.exe`. Gate L0 `TOTAL 356 356 0 0`, `ALL GATES PASS`.
+
+**Where to look.** The denominator lives in exactly one place -
+`code/seed_stats.py:56` `mean_std`, docstring "Mean and SAMPLE (n-1) std". If a
+language or arithmetic table's dispersion ever looks too tight, check that the number
+came from `export_results.py` and not from a hand computation or a NumPy default; the
+`TLX.7*` block in `code/test_language_export.py` is the regression fence, and
+`HANDOFF.md` carries the operator-facing statement of the same rule.
+
 <!-- APPEND-MARKER-CL -->
 
 
