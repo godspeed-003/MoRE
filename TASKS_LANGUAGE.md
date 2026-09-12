@@ -2272,21 +2272,47 @@ does not exist here (T-L0.0).
   invisible to the hash and must be caught by reading the field. The old wrong text
   is quoted inside the correction.
 
-- [ ] **T-L7.2 GATE L6 / GATE L7 — parameter budget and floor.**
+- [x] **T-L7.2 GATE L6 / GATE L7 — parameter budget and floor.**
   **Verify (L6):** the MoR/MoRE parameter difference is < 5% on both the total and
   the non-embedding count, and the three arms' counts are published as a table.
   **Verify (L7):** a single short language run beats `primary_metric_floor` from
   T-L2.5. If it does not, the architecture matrix is not yet worth running and the
   gate-failure protocol applies — that is the whole point of having a floor.
-  **STATUS: GATE L6 PASSED. GATE L7 IN FLIGHT — the box stays unticked until its own
-  number lands.** L7 cannot be discharged by an assertion: a floor is beaten by a
-  training run or not at all. The run is MoRE, 1 epoch, seed 42, on the **canonical**
-  corpus (`langB_gate_l7`, deliberately non-canonical group because `epochs 3` is a
-  frozen field and "short" means non-canonical by definition), measured against
+  **STATUS: GATE L6 PASSED. GATE L7 PASSED — the number landed.** L7 cannot be
+  discharged by an assertion: a floor is beaten by a training run or not at all. The
+  run is MoRE, 1 epoch, seed 42, on the **canonical** corpus (`langB_gate_l7`,
+  deliberately non-canonical group because `epochs 3` is a frozen field and "short"
+  means non-canonical by definition), measured against
   `primary_metric_floor = 4.98494701553838`. **Do not substitute the dev-corpus
   figure 5.398304166059712 for it** — T-L2.0 established that wikitext-2 shares its
   val split byte-for-byte with wikitext-103, so a dev number would be the same split
   scored against the wrong floor.
+  **Evidence (L7), `runs/langB_MoRE_seed42__1304961e__r4/metrics.json`:
+  `val/task_loss` = 3.7843224898062116 against the floor 4.98494701553838 — the floor
+  is beaten by 1.2006245257321688 nats/token** (perplexity 44.006, 5.4596 bits/token).
+  The recorded `val/nats_below_bigram_floor` reproduces `floor − val/task_loss` to
+  `<1e-12`, which is the same identity the exporter re-derives and refuses on. Run
+  provenance: `experiment_group = langB_gate_l7`, `architecture = more`, `seed = 42`,
+  `dataset_version = lang-wikitext-103-bpe8192-len256-800d6154`,
+  `code_git_commit = 82e521d`, resolved `epochs = 1`. Its `total_params` /
+  `non_embedding_params` are 5,584,908 / 3,422,220, matching the L6 table below
+  exactly — so the model that beat the floor is the model whose budget was gated,
+  not a differently-shaped one.
+  - **This is one epoch and one seed, and is therefore a GATE, not a result.** It
+    licenses spending 39 GPU-hours on the matrix; it may not be quoted as MoRE's
+    language performance, compared against MoE's 3-epoch number, or put in any table.
+    Its group is non-canonical precisely so the proxy guard refuses it.
+  - **An earlier attempt at this same run was interrupted.**
+    `runs/langB_MoRE_seed42__1304961e/` holds `config.json` + `resolved_config.json` +
+    `stdout.log` and **no `metrics.json`** — the signature of a killed run. It is kept,
+    not deleted (`CLAUDE.md` §6), and it is exactly the case
+    `run_language_matrix.py --all` treats as incomplete and re-runs: a directory with
+    no finished metrics is an interrupted run, and a checkpoint at an unknown epoch is
+    the kind of artifact that ends up in a table by accident.
+  - **First run to publish `val/routing_pos_partition_load_entropy`** — it records
+    0.8941557591319386, this corpus's own partition entropy, read from the manifest
+    rather than from any document. That is the T-LX.6 fix working end to end on a real
+    run: the constant now travels with the measurement.
   **Evidence (L6):** `code/test_language_gate_l6_l7.py` — **28 passed, 0 failed, 0
   skipped**; table also written to `code/lang_param_budget.json` so no number is
   hand-copied. Counts are built through the **same** kwargs mapping the trainer uses
@@ -2595,10 +2621,55 @@ where compute forces it, and say so in the caption rather than presenting a
   two points. **Verify:** the section names both dataset versions and both config
   hashes and makes no claim that requires the two to be commensurable.
 
-- [ ] **T-L10.3 Update README and ARCHITECTURE for two tasks.** README gains a
+- [x] **T-L10.3 Update README and ARCHITECTURE for two tasks.** README gains a
   language quickstart; ARCHITECTURE gains the `task` axis, the attention sublayer,
   and the language data contract. **Verify:** a reader following README alone can
   build the dataset and launch one language run.
+  **Evidence (2026-09-12):** the README's five build commands all parse and exit 0 as
+  written; `run_language_matrix.py --preflight` reports **preflight clean** (CUDA
+  matmul, corpus 526,320 train blocks, POS lookup, spec frozen, all three arms
+  accepted as `canonical_lang_b`, W&B settled, disk headroom); `--smoke` was executed
+  end to end. **Every one of the 39 numbers written into the two documents was
+  re-read programmatically from `data/lang/{wikitext-103,wikitext-2}/dataset_meta.json`
+  rather than transcribed** — split and token counts, all three floors, both partition
+  entropies, the imbalance ratio, all six family type counts and all six token shares.
+  - **README §3b "The language corpus"** — splits (526,320 / 1,098 / 1,256 blocks ×
+    256; 134,737,951 train tokens) and the point that they are the **corpus author's
+    own**, so there is no split seed to get wrong; BPE-8192 trained on train text
+    alone; `eot_id = 0` packing with 31 / 247 / 47 dropped tail tokens;
+    `dataset_version` derived from the split-array SHAs alone. The three floors as a
+    table, with the dev corpus's 5.398304 named as **0.41 nats away — larger than any
+    architecture gap this study can resolve**. The six families with type counts and
+    token shares, and the caveat that governs every routing number on this task: the
+    partition is a **prior, not ground truth** (3,508 contested types, 1.23% UNMAPPED
+    against a 2% budget), hence `val/routing_agreement_with_pos` rather than
+    "accuracy", hence 0.894156 rather than 1.0 as the load-entropy reference, hence
+    the shuffled control and the induced topics as falsifiers.
+  - **README §6 "Running the language task"** — the five build commands, `--preflight`,
+    `--smoke`, a single run, and `export_results.py --task language`. Two traps are
+    stated inline **because both produce a plausible wrong answer rather than an
+    error**: omitting `--task language` from the exporter yields the *arithmetic*
+    matrix under a heading that looks like your result, and calling `train.py` directly
+    without `--config config_language.json` takes the language data path with
+    arithmetic-shaped hyperparameters. Also states that the `±` is a sample (n−1) std
+    and must come from the exporter (T-LX.7).
+  - **README §5** gains rows for `canonical_spec_language.json`, `data/lang/<corpus>/`,
+    `results/language/` and `SETUP.md`/`HANDOFF.md`; **§7** gains four language-only
+    metric rules.
+  - **ARCHITECTURE §4a "The `task` axis, and the language data contract"** — the axis
+    is orthogonal to `architecture` and selects dataset and heads, never a model;
+    **absence of a `task` key MEANS arithmetic**, which is what preserves all 15
+    published arithmetic `config_hash` values. The language 7-tuple is the *same*
+    7-tuple, so the engine needs no `if task ==`; slot 6 is **`NaN` on purpose**
+    because a `0.0` would be a silently valid number the MSE path would consume, and
+    `step_mask` is all True because dropping the trailing partial block makes
+    attention's fully-masked-row NaN path unreachable and the ACT denominators exact.
+    The attention sublayer is documented as **one module constructed once and reused at
+    every depth** (a per-depth module would make depth a stack of depth-specific
+    networks), with halted tokens **attendable but frozen** — both halves necessary —
+    and `is_causal=True` deliberately unused because PyTorch may silently ignore the
+    hint, and an ignored causality hint is a non-causal LM that still reports a
+    plausible loss.
 
 - [ ] **T-L10.4 Final go/no-go.** State which of Outcome A/B/C the language study
   supports, on the evidence, with the resolution floor and the seed variance in

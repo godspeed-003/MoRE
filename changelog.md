@@ -6415,6 +6415,135 @@ came from `export_results.py` and not from a hand computation or a NumPy default
 `TLX.7*` block in `code/test_language_export.py` is the regression fence, and
 `HANDOFF.md` carries the operator-facing statement of the same rule.
 
+## T-L7.2 - GATE L7 passed: MoRE beats the bigram floor on the canonical corpus
+
+**What the gate asks and why an assertion cannot answer it.** A floor is beaten by a
+training run or not at all. Gate L7's question is whether the language task is learnable
+by this architecture at all before 39 GPU-hours are spent on the matrix; if the answer
+were no, `plan.md` 20's stop-and-fix protocol applies instead.
+
+**The number.** `runs/langB_MoRE_seed42__1304961e__r4/metrics.json`:
+
+| quantity | value |
+|---|---|
+| `val/task_loss` | 3.7843224898062116 nats/token |
+| `primary_metric_floor` (backoff bigram, wikitext-103) | 4.98494701553838 |
+| `val/nats_below_bigram_floor` | **+1.2006245257321688** |
+| perplexity | 44.006 |
+| bits/token | 5.4596 |
+
+The recorded margin reproduces `floor - val/task_loss` to `<1e-12`, which is the same
+identity `export_results.py` re-derives and refuses the whole export on.
+
+Provenance: `experiment_group = langB_gate_l7`, `architecture = more`, `seed = 42`,
+`task = language`, `dataset_version = lang-wikitext-103-bpe8192-len256-800d6154`,
+`code_git_commit = 82e521d`, resolved `epochs = 1`. `total_params` /
+`non_embedding_params` are 5,584,908 / 3,422,220 - identical to the Gate L6 table - so
+the model that beat the floor is the model whose parameter budget was gated, not a
+differently-shaped one. That check matters because a gate run built from a different
+kwargs path could pass L7 while the trainer instantiates something else.
+
+**This is a GATE, not a result, and the group name enforces it.** One epoch, one seed.
+`langB_gate_l7` is deliberately non-canonical because `epochs = 3` is a frozen spec
+field and "short" means non-canonical by definition, so the proxy guard refuses this run
+for any canonical claim. It may not be quoted as MoRE's language performance and may not
+be compared against MoE's 3-epoch number.
+
+**The interrupted twin is kept.** `runs/langB_MoRE_seed42__1304961e/` holds
+`config.json` + `resolved_config.json` + `stdout.log` and **no `metrics.json`** - the
+signature of a killed run, archived rather than deleted (`CLAUDE.md` 6). It is exactly
+the case `run_language_matrix.py:289` treats as incomplete and re-runs: a directory with
+a checkpoint but no finished metrics is an interrupted run, and a checkpoint at an
+unknown epoch is the kind of artifact that reaches a table by accident. The `__r4`
+suffix is `run_context.py` refusing to overwrite a directory that already exists.
+
+**First run to publish `val/routing_pos_partition_load_entropy`** - 0.8941557591319386,
+this corpus's own partition entropy, read from its manifest rather than from any
+document. That is the T-LX.6 fix working end to end on a real run: the constant now
+travels with the measurement instead of being quoted beside it.
+
+Committed artifacts are `config.json`, `resolved_config.json`, `metrics.json`,
+`results.tsv`; `checkpoint.pt` and `stdout.log` are git-ignored by design.
+
+**Where to look.** `code/test_language_gate_l6_l7.py` (28/28) holds the L6 half - the
+parameter budget - and pins both anchors as assertions so a shape change must be a
+deliberate re-derivation. The L7 half lives in the run directory named above and
+nowhere else.
+
+## T-L10.3 - README and ARCHITECTURE describe two tasks
+
+`README.md` and `ARCHITECTURE.md` documented only the arithmetic task;
+`ARCHITECTURE.md` contained the string "language" zero times. A reader following either
+could not build the corpus or launch a language run, which is what this task's Verify
+line asks for.
+
+**README gains four things.**
+
+- **3b "The language corpus - `wikitext-103`"**: split table (526,320 / 1,098 / 1,256
+  blocks of 256; 134,737,951 train tokens), the author-provided-splits point, BPE-8192
+  trained on train text alone, the `eot_id = 0` packing with its 31 / 247 / 47 dropped
+  tail tokens, and `dataset_version` deriving from the split-array SHAs alone. The three
+  floors as a table (uniform 9.010913, unigram 7.198227, backoff bigram 4.984947) with
+  the statement that the dev corpus's 5.398304 differs by 0.41 nats - larger than any
+  architecture gap this study can resolve. The six POS families with type counts and
+  train token shares, and the caveat that carries the most weight for reading any
+  routing number: **the partition is a prior, not ground truth** (3,508 contested types,
+  1.23% UNMAPPED against a 2% budget), hence `val/routing_agreement_with_pos` and not
+  "accuracy", hence 0.894156 rather than 1.0 as the load-entropy reference, hence the
+  shuffled control and the induced topic partition as falsifiers.
+- **5 layout rows** for `canonical_spec_language.json`, `data/lang/<corpus>/`,
+  `results/language/`, and `SETUP.md` / `HANDOFF.md`.
+- **6 "Running the language task"**: the five build commands, `--preflight`, `--smoke`,
+  `--arch/--seed`, and `export_results.py --task language`, each as its own runnable
+  block. Two traps are stated inline because both produce a plausible wrong answer
+  rather than an error: omitting `--task language` from the exporter gives the
+  **arithmetic** matrix under a heading that looks like your result, and invoking
+  `train.py` directly without `--config config_language.json` takes the language data
+  path with arithmetic-shaped hyperparameters.
+- **7 "Four more that apply only to the language task"**: nats against the bigram floor,
+  no routing "accuracy" on English, load entropy read against the partition's own value,
+  and `depth/allocation_error_*` as structurally `N/A`.
+
+**ARCHITECTURE gains 4a, "The `task` axis, and the language data contract."** The
+substantive content is the three things a reader has to know before touching the code:
+
+1. **`task` is orthogonal to `architecture`** - it selects dataset and heads, never a
+   model. All three arms run both tasks through the same `engine.py`, the same routing
+   path, the same halting machinery. **Absence of a `task` key MEANS arithmetic**, which
+   is what preserves all 15 published arithmetic `config_hash` values; writing
+   `"task": "arithmetic"` into the arithmetic config to "tidy" it would re-hash every
+   published run.
+2. **The language 7-tuple is the same 7-tuple** (`lang_data.py:246`), so the engine
+   needs no `if task ==` in its loop. Slot-by-slot table, with the two load-bearing
+   entries called out: slot 6 is **`NaN` on purpose** because a `0.0` would be a
+   silently valid number the arithmetic MSE path would consume, and `step_mask` is all
+   True because dropping the trailing partial block at pack time makes attention's
+   fully-masked-row NaN path unreachable and the ACT denominators exact rather than
+   mask-conditional. `step_experts` carries the POS family but is never an input -
+   `CLAUDE.md` 3 is unchanged on language.
+3. **The attention sublayer** (`model.py:605-637`): required because causal LM without
+   token mixing is degenerate, constructed **once and reused at every depth** because a
+   per-depth module would make depth a stack of depth-specific networks, and positioned
+   as step 0 of the depth loop. Halted tokens **stay attendable and stay frozen** - both
+   halves necessary, since losing attendability would couple one token's prediction to
+   another token's halting decision, and losing the freeze would mean halting is not
+   halting. `is_causal=True` is deliberately not used: PyTorch treats it as a hint that
+   may be silently ignored, and an ignored causality hint is a non-causal LM that still
+   trains and still reports a plausible loss.
+
+**Verification.** All 39 numbers written into the two documents were re-read from
+`data/lang/{wikitext-103,wikitext-2}/dataset_meta.json` programmatically rather than
+transcribed - split counts, token counts, the three floors, both partition entropies,
+the imbalance ratio, all six family type counts and all six token shares. The five
+README build commands were executed and parse (exit 0); `--preflight` was executed and
+reports **preflight clean** on this machine; `--smoke` was executed end to end.
+
+**Where to look.** If a README instruction stops working, the command it names is the
+thing that changed - `data/lang/build_*.py` for the corpus stages,
+`code/run_language_matrix.py` for preflight/smoke/matrix, `code/export_results.py` for
+the table. The numbers in 3b are not maintained by hand: they are all present in the
+corpus manifest, and the manifest is the thing to re-read.
+
 <!-- APPEND-MARKER-CL -->
 
 

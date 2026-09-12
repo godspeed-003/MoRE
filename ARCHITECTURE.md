@@ -294,6 +294,120 @@ of steps per program, **not** the expert count, and must not be "fixed" to 6.
 
 ---
 
+## 4a. The `task` axis, and the language data contract
+
+`task` is **orthogonal to `architecture`**. It selects the dataset, the input head and
+the output head; it does not select a model. All three architectures run both tasks
+from the same `engine.py`, the same routing path, the same halting machinery and the
+same balance objective. There is no `language/` package for the same reason there is no
+`moe/` one.
+
+| | `task = arithmetic` (default) | `task = language` |
+|---|---|---|
+| dataset class | `more.data.MoREDataset` | `more.lang_data.MoRELanguageDataset` |
+| input head | `nn.Linear(step_feat_dim, d_model)` + op embedding | `nn.Embedding(vocab_size, d_model)` + learned positions |
+| output head | scalar regression | `nn.Linear(d_model, vocab_size)`, weight-tied |
+| primary metric | MSE against 0.080914 | cross-entropy in **nats/token** against 4.984947 |
+| attention | absent | **one shared causal sublayer** |
+| spec / group | `canonical_spec.json` / `canonical_phase_b` | `canonical_spec_language.json` / `canonical_lang_b` |
+
+**Absence of a `task` key MEANS `arithmetic`.** No `task` field is injected on the
+arithmetic path, which is what preserves all 15 published arithmetic `config_hash`
+values — and therefore every canonical arithmetic run's identity — across the entire
+language migration. Do not "tidy" this by writing `"task": "arithmetic"` into the
+arithmetic config: it would re-hash every published run.
+
+### The language 7-tuple is the SAME 7-tuple
+
+`MoRELanguageDataset.__getitem__` returns the arithmetic contract's shape, so the
+engine needs no `if task ==` in its training loop:
+
+| slot | arithmetic | language |
+|---|---|---|
+| 0 `x` | `[7, 12]` float32 features | `[256]` int64 **token ids** |
+| 1 `step_mask` | real-vs-pad | **all True**, always |
+| 2 `step_experts` | oracle expert per step | POS family per token, `-1` where unmapped |
+| 3 `step_ops` | operation code | `-1` — English has no operation identity |
+| 4 `family` | program family 0–5, `-1` MIXED | `-1` — a *block* has no single family |
+| 5 `depth` | number of real steps | `seq_len`, i.e. structurally constant |
+| 6 `target` | normalised final answer | **`NaN`, deliberately poisoned** |
+
+Two of those are load-bearing and are worth stating plainly:
+
+- **Slot 6 is `NaN` on purpose.** Language has no regression target; the next-token
+  labels are `x` shifted by one and are formed inside the engine. A `0.0` there would
+  be a silently valid number that the arithmetic MSE path would happily consume, so the
+  slot is poisoned instead — any code that still reads it produces `NaN` immediately
+  rather than a plausible wrong loss.
+- **`step_mask` is all True because the trailing partial block is dropped at pack
+  time.** That is not tidiness. With no padded positions there is no
+  `key_padding_mask`, so attention's fully-masked-row `NaN` path is unreachable and the
+  ACT denominators are exact rather than mask-conditional.
+
+`step_experts` carries the POS family, but note what it is *not*: it is never an input.
+`CLAUDE.md` §3's prohibition is unchanged on language — the family is a diagnostic
+label, read only by the metric layer, and the model sees token ids alone.
+
+### The attention sublayer (`model.attention`, language-only)
+
+Arithmetic programs are 7 independent steps and need no token mixing; **causal language
+modelling without attention is degenerate** — position 40 could never see the word at
+position 4, so the model would be an n-gram with extra parameters. So `task = language`
+enables one `nn.MultiheadAttention` sublayer, and where it sits is the constraint that
+matters:
+
+```
+for depth in 1..max_depth:
+    0. shared causal self-attention over the FULL sequence
+    1. gather active tokens
+    2. MoE dispatch → expert FFN
+    3. halt head, write-back under the active mask
+```
+
+It is **constructed once and reused at every depth** — the same tensors at depth 1 and
+depth 7 — because a per-depth attention module would turn depth into a stack of
+depth-specific networks and break `updated_rules.md` §2.2's weight-sharing rule
+outright.
+
+**Halted tokens stay attendable and stay frozen.** Attention runs over all `S`
+positions using each position's current state, so a halted position remains a valid key
+and value; but nothing is *written* at a halted position, because the same `torch.where`
+mask that guards the MoE write-back guards this one. Both halves are necessary: if
+halted positions stopped being attendable, one token's prediction would depend on
+another token's halting decision, which would make the depth metrics uninterpretable;
+if they were written, halting would not be halting.
+
+`is_causal=True` is **deliberately not used**. In PyTorch's API it is a *hint* that may
+be silently ignored, and an ignored causality hint is a non-causal language model that
+still trains and still reports a plausible loss — the worst possible failure mode. An
+explicit `attn_mask` is built and cached per sequence length instead.
+
+Attention runs over all positions while only active ones are updated, so the wasted
+query fraction is measured and reported rather than assumed negligible
+(`attn_query_slots` / `attn_query_wasted`).
+
+### What the language corpus contributes
+
+`data/lang/<corpus>/dataset_meta.json` is the manifest, and `dataset_version` derives
+from the **SHA-256 of the split arrays alone** — not from the whole manifest. That is
+why a manifest stage (family lookup, floors, shuffled control, topics) can be rebuilt
+without changing any run's identity, and it is asserted rather than assumed.
+
+The POS partition is a **prior, not ground truth**: it comes from a tagger with a
+surface fallback, 3,508 types are contested across occurrences, and 1.2% of training
+tokens are `UNMAPPED`. Hence `val/routing_agreement_with_pos`, never "accuracy", and
+hence the shuffled control — alignment is a claim only if it beats its own permutation
+floor. The partition's own normalized load entropy (0.894156 on wikitext-103, 0.888442
+on wikitext-2) is the reference for load balance instead of 1.0, and because it differs
+between corpora, each run publishes its own via
+`val/routing_pos_partition_load_entropy` rather than any module hard-coding it.
+
+`depth/allocation_error_*` exports as `N/A` on language and that is structural: English
+has no per-token ground-truth depth, so there is no curriculum to be scored against and
+a `0.0` would read as a perfect score against a table that does not exist.
+
+---
+
 ## 5. Routing: the canonical path and the one permitted ablation
 
 Set by `model.routing_mode`, validated by `config.enforce_routing_mode()`:

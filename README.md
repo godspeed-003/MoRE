@@ -22,6 +22,31 @@ component gives alone.
 > This is [CLAUDE.md](CLAUDE.md) §8 **Outcome C**, and it is the result, not a
 > setback. Full evidence and limitations: **[results/results.md](results/results.md)**.
 
+### Two tasks, and this page is mostly about the first one
+
+The repository now runs the same engine on two tasks, selected by one field:
+
+| `task` | data | target | status |
+| :--- | :--- | :--- | :--- |
+| `arithmetic` (default) | synthetic `more6-v1`, 70,000 programs | one regressed scalar, **mean squared error** | complete — the Outcome C above |
+| `language` | WikiText-103, BPE-8192, packed to 256 tokens | next token, **per-token cross-entropy in nats** | protocol frozen; canonical matrix pending |
+
+**The headline finding above is the arithmetic result and says nothing about
+language.** The two primary metrics are an MSE and a cross-entropy; they may never
+appear in one table ([CLAUDE.md](CLAUDE.md) §6) and the exporter refuses to combine
+them. Whether an Outcome C on a 70,000-program synthetic regression predicts anything
+about a 135 M-token language model is exactly the open question, and the reason the
+language study exists rather than being inferred.
+
+Absence of a `task` key **means arithmetic**. That is not laziness: it is what keeps
+all 15 published arithmetic `config_hash` values, and therefore every canonical run's
+identity, unchanged by the language work.
+
+The language quickstart is §6; the corpus is §3b. If you are here to *run* the
+language matrix, read [SETUP.md](SETUP.md) then [HANDOFF.md](HANDOFF.md) instead —
+they are written for that job and this file is not.
+
+
 ---
 
 ## 1. Results in short
@@ -248,6 +273,89 @@ phenomenon under study.
 
 ---
 
+## 3b. The language corpus — `wikitext-103`
+
+The second task is next-token prediction on English. Nothing about the engine changes;
+`task = language` swaps the dataset, the input head and the output head, and the
+primary metric becomes **per-token cross-entropy in nats**. Built once by
+[data/lang/build_language_dataset.py](data/lang/build_language_dataset.py) and frozen
+on disk as `uint16` `.npy` arrays, memory-mapped at load — **not** re-tokenized per run.
+
+| | blocks of 256 | tokens |
+| :--- | ---: | ---: |
+| train | 526,320 | 134,737,951 |
+| validation | 1,098 | 281,335 |
+| test | 1,256 | 321,583 |
+
+Splits are **the corpus author's own**, not ours — WikiText-103 ships train/valid/test,
+so there is no split seed to get wrong and no possibility of a leak we introduced. A
+BPE tokenizer of **vocabulary 8,192** is trained on the training text alone; documents
+are separated by `eot_id = 0` and the stream is packed into fixed 256-token blocks,
+discarding a tail of 31 / 247 / 47 tokens. Every canonical language run declares
+`dataset_version = lang-wikitext-103-bpe8192-len256-800d6154`, which is derived **from
+the SHA-256 of the split arrays alone** — so a manifest stage can be rebuilt without
+changing any run's identity. A second, much smaller corpus (`wikitext-2`) exists for
+development and smoke runs and carries its own `dataset_version`, which is what makes
+it structurally incapable of contaminating the canonical matrix.
+
+**Read every language loss against the bigram floor, never against zero — and never
+against the arithmetic floor.** Three trivial predictors were fitted on train and
+evaluated on validation:
+
+| floor | val nats/token | what it knows |
+| :--- | ---: | :--- |
+| uniform over the vocabulary | 9.010913 | nothing |
+| unigram (add-1) | 7.198227 | token frequency |
+| **backoff bigram** (abs. discounting D=0.75) | **4.984947** | the previous token |
+
+`primary_metric_floor = 4.984947` is the one that counts, and each run records its own
+margin over it; the exporter re-derives that margin and refuses the export if it does
+not reproduce. The dev corpus's floor is 5.398304 — a 0.41 nat gap, **larger than any
+architecture difference this study can resolve**, which is precisely why a dev-corpus
+number may never sit in a canonical table.
+
+**Six POS families, and they are a prior rather than ground truth** — this is the most
+important caveat on this page for reading any language routing number.
+[code/more/lang_families.py](code/more/lang_families.py) is the single manifest; the
+per-token mapping is built by a majority vote of an NLTK perceptron tagger over
+training occurrences, with a surface fallback for numerals and punctuation:
+
+| family | types | train token share |
+| :--- | ---: | ---: |
+| `L1_FUNCTION` | 243 | 28.2% |
+| `L2_NOUN` | 3,495 | 30.0% |
+| `L3_VERB` | 839 | 5.8% |
+| `L4_MODIFIER` | 658 | 6.6% |
+| `L5_PUNCT_SYM` | 38 | 8.8% |
+| `L6_NUM_SUBWORD` | 2,743 | 20.7% |
+
+A BPE piece has no part of speech — only whole words do — so 3,508 types are
+*contested* across occurrences and 1.23% of training tokens stay `UNMAPPED` (budget:
+2%). The partition is therefore a **hypothesis about what a router might find**, not a
+label set the router is scored against. Consequently the metric is named
+`val/routing_agreement_with_pos` and **never "routing accuracy"**, and the honest
+reference point is not 1.0: the partition's own normalized load entropy is
+**0.894156** on this corpus, and its largest/smallest family token ratio is 5.17×.
+Both are corpus-specific, so each run publishes its own corpus's value as
+`val/routing_pos_partition_load_entropy` rather than any document quoting a constant.
+
+Two controls exist so that "routing aligns with grammar" can be falsified rather than
+merely asserted. A **shuffled control** (`token_family_shuffled.npy`, 10 draws)
+reassigns families at random while matching the real token proportions, giving an
+empirical floor for AMI and Hungarian accuracy — alignment counts only if it beats its
+own permutation control. And an **induced 6-topic document clustering** provides a
+semantic partition independent of syntax. Both are explicitly *not* ground truth, and
+the manifest says so in its own `topic_note`.
+
+Two further per-token tables ship with the corpus and are **ablation-only, never
+canonical**: a 10-way frequency-decile label (for the supervised-curriculum ablation)
+and the topic assignment. Canonical language runs **invent no depth target** — English
+has no per-token ground-truth depth, which is why `depth/allocation_error_*` exports as
+`N/A` rather than `0.0` on this task. A `0.0` there would read as perfect allocation
+against a curriculum that does not exist.
+
+---
+
 ## 4. Experiments conducted
 
 | experiment | arms | seeds | epochs | status | artifact |
@@ -314,8 +422,12 @@ and spending it would change every canonical run's identity.
 | [CLAUDE.md](CLAUDE.md) | operating rules: terminology, hard architectural constraints, metric rules, outcome honesty |
 | `code/more/` | the implementation (`config`, `families`, `data`, `model`, `metrics`, `engine`, `run_context`) |
 | `code/canonical_spec.json` | the single frozen definition of "canonical"; the guard refuses any run that deviates |
+| `code/canonical_spec_language.json` | the same guard for `task = language` — separate file, separate group `canonical_lang_b` |
 | `data/` | `more6-v1` as three frozen files plus `dataset_meta.json` (split hashes, counts, leakage audit) and the generator |
+| `data/lang/<corpus>/` | the language corpora as frozen `.npy` arrays plus their own `dataset_meta.json`; `wikitext-103` is canonical, `wikitext-2` is dev-only |
+| [SETUP.md](SETUP.md) / [HANDOFF.md](HANDOFF.md) | clone-to-first-run setup, and the operating instructions for whoever drives the language matrix |
 | `results/` | `results.md` (the narrative) plus machine-generated `results.csv` / `.json` / `results_tables.md`, `depth_null_model.json`, `bench_capacity.log` |
+| `results/language/` | the same artifacts for the language task, written only by `export_results.py --task language` |
 | `runs/<experiment_id>/` | per-run outputs only — config, resolved config, metrics, TSV, held-out depth sidecar; checkpoints and stdout are untracked |
 | `automated/` | exploratory sweep drivers and ablation results; these may never launch canonical runs |
 | `archive/` | invalidated history, retained as evidence and never deleted |
@@ -390,6 +502,105 @@ python eval_val_depth.py --glob 'phaseB_*'
 python ../automated/phase10_ablations.py --report-only
 ```
 
+### Running the language task
+
+Everything above is the arithmetic task, which is the default. The language task needs
+its corpus built once, and then uses the same `train.py` with `--task language`.
+
+**Step 1 — build the corpus.** Needs network access the first time (it pulls
+`Salesforce/wikitext` at a pinned revision), then never again. The canonical build is
+~135 M tokens and takes a while; the dev corpus is minutes.
+
+```bash
+C:/Users/vedan/anaconda3/python.exe data/lang/build_language_dataset.py --corpus wikitext-103
+```
+
+Four manifest stages follow, in this order, each appending to the same
+`dataset_meta.json`. They are separate scripts because each is separately
+re-derivable, and because `dataset_version` depends on the split arrays alone — so
+re-running any of these does **not** change any run's identity:
+
+```bash
+C:/Users/vedan/anaconda3/python.exe data/lang/build_family_lookup.py --corpus wikitext-103
+```
+
+```bash
+C:/Users/vedan/anaconda3/python.exe data/lang/build_baseline_floors.py --corpus wikitext-103
+```
+
+```bash
+C:/Users/vedan/anaconda3/python.exe data/lang/build_shuffled_control.py --corpus wikitext-103
+```
+
+```bash
+C:/Users/vedan/anaconda3/python.exe data/lang/build_block_topics.py --corpus wikitext-103
+```
+
+**Step 2 — check the machine before spending a GPU-hour.** This refuses rather than
+warns: it runs a real CUDA matmul, verifies the corpus and the POS lookup, confirms the
+frozen config is accepted by the proxy guard on all three arms, settles W&B and checks
+disk headroom. Fifteen seconds.
+
+```bash
+D:/res/git/MoRE/.venv_cuda/Scripts/python.exe code/run_language_matrix.py --preflight
+```
+
+**Step 3 — one short run to prove the pipeline end to end.** Runs on the dev corpus,
+so it *cannot* contaminate the canonical matrix — `wikitext-2` carries its own
+`dataset_version` and the exporter refuses to mix versions.
+
+```bash
+D:/res/git/MoRE/.venv_cuda/Scripts/python.exe code/run_language_matrix.py --smoke
+```
+
+It takes about eight minutes and it is a **plumbing check, not a quality check**: one
+epoch over a 2 M-token corpus lands near 6.2 nats against that corpus's 5.40 floor, so
+the smoke run is *expected not to beat its floor*. Success is that it completes and
+writes a run directory. The gate that actually tests learnability is Gate L7, on the
+canonical corpus, where one MoRE epoch reaches 3.784 against the 4.985 floor.
+
+**Step 4 — one canonical run**, or `--all` for the full 15-run matrix
+(MoE → MoR → MoRE × seeds 42–46). `--all` is interruption-safe: re-running it skips
+anything already finished, and treats a directory with a checkpoint but no
+`metrics.json` as interrupted rather than complete.
+
+```bash
+D:/res/git/MoRE/.venv_cuda/Scripts/python.exe code/run_language_matrix.py --arch more --seed 42
+```
+
+Equivalently, directly — and note `--config`, because `--task language` against the
+default `config.json` would take the language data path with arithmetic-shaped
+hyperparameters:
+
+```bash
+python train.py --config config_language.json --task language --architecture more --seed 42
+```
+
+The language protocol is frozen (3 epochs, batch 48, seq_len 256, lr 1e-3) and is not a
+tuning surface — `HANDOFF.md` §"Why nothing here is tunable" gives the reason for each
+field.
+
+**Step 5 — export.** `--task language` is what selects the language spec, the
+`canonical_lang_b` group and the nats-based derived columns. **Without it you get the
+arithmetic matrix**, which is 15 rows of mean squared error under a heading that looks
+like your result.
+
+```bash
+D:/res/git/MoRE/.venv_cuda/Scripts/python.exe code/export_results.py --task language
+```
+
+Never compute a mean ± std by hand. The `±` is a **sample** (n−1) standard deviation
+throughout; a population std understates seed variance by 10.6% at n = 5, and that is
+enough to reorder the arms on the seed-variance criterion. Quote
+`results/language/results_aggregate.csv`.
+
+The language suites are **not** part of the 356-check correctness gate — that number is
+the published arithmetic result and must not move. Run them separately:
+
+```bash
+C:/Users/vedan/anaconda3/python.exe code/test_language_data.py
+```
+
 ---
 
 ## 7. Reading the metrics without being misled
@@ -414,6 +625,32 @@ These are project rules, not style preferences. Full list in [CLAUDE.md](CLAUDE.
 - The correct phrasing for the depth claim is *learns to allocate recursion depth in
   accordance with the predefined operation-complexity curriculum* — and this work
   measured that it **did not**. Never "discovers intrinsic mathematical complexity".
+
+### Four more that apply only to the language task
+
+- **The primary metric is `val/task_loss` in nats per token**, read against the
+  backoff-bigram floor 4.984947, never against zero and never against the arithmetic
+  floor. Perplexity and bits/token are `exp(nats)` and `nats / ln 2` — presentations of
+  the same number, not independent evidence.
+- **There is no routing "accuracy" on English.** The POS partition is a prior built by
+  a tagger, not a label set, so the metric is `val/routing_agreement_with_pos` and the
+  question it answers is whether the router beats **its own shuffled control** — which
+  is reported alongside it. Agreement above a permutation floor is the claim; a raw
+  percentage on its own is not.
+- **Load entropy is read against the partition's own value, not against 1.0.** English
+  token families are genuinely imbalanced (5.17× between the largest and smallest
+  family on this corpus), so a perfectly uniform router would be *wrong* about the
+  data. Each run publishes `val/routing_pos_partition_load_entropy` from its own
+  corpus's manifest, because that constant differs between corpora and a document
+  quoting one number will eventually quote it beside the other corpus's runs.
+- **`depth/allocation_error_*` is `N/A` structurally on language.** There is no
+  per-token ground-truth depth for English; a `0.0` would read as perfect allocation
+  against a curriculum that does not exist. Depth is still *described* (mean, per-family
+  mean, early-exit and forced-exit rates) — it simply has nothing to be scored against.
+
+Arithmetic and language results **may never appear in one table**. One is a mean
+squared error and the other a cross-entropy; the exporter writes them to separate
+directories and refuses to mix dataset versions.
 
 ---
 
