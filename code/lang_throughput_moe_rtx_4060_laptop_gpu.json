@@ -1,0 +1,219 @@
+{
+  "device": "NVIDIA GeForce RTX 4060 Laptop GPU",
+  "total_vram_gib": 7.99560546875,
+  "torch": "2.6.0+cu126",
+  "arch": "moe",
+  "shape": {
+    "d_model": 256,
+    "n_heads": 4,
+    "num_blocks": 1,
+    "vocab_size": 8192,
+    "max_depth": 1,
+    "ffn_mult": 4
+  },
+  "timed_steps": 5,
+  "synthetic_ids": true,
+  "tokens_per_sec_is_upper_bound": true,
+  "rows": [
+    {
+      "arch": "moe",
+      "seq_len": 128,
+      "batch_size": 8,
+      "tokens_per_batch": 1024,
+      "tokens_per_sec": 22019.94267140515,
+      "peak_mib": 234.87744140625,
+      "oom": false,
+      "note": ""
+    },
+    {
+      "arch": "moe",
+      "seq_len": 128,
+      "batch_size": 16,
+      "tokens_per_batch": 2048,
+      "tokens_per_sec": 41286.59347577628,
+      "peak_mib": 389.4404296875,
+      "oom": false,
+      "note": ""
+    },
+    {
+      "arch": "moe",
+      "seq_len": 128,
+      "batch_size": 32,
+      "tokens_per_batch": 4096,
+      "tokens_per_sec": 66665.77693155647,
+      "peak_mib": 695.76806640625,
+      "oom": false,
+      "note": ""
+    },
+    {
+      "arch": "moe",
+      "seq_len": 128,
+      "batch_size": 64,
+      "tokens_per_batch": 8192,
+      "tokens_per_sec": 104406.11122451254,
+      "peak_mib": 1301.8447265625,
+      "oom": false,
+      "note": ""
+    },
+    {
+      "arch": "moe",
+      "seq_len": 128,
+      "batch_size": 128,
+      "tokens_per_batch": 16384,
+      "tokens_per_sec": 133536.70295145252,
+      "peak_mib": 2516.712890625,
+      "oom": false,
+      "note": ""
+    },
+    {
+      "arch": "moe",
+      "seq_len": 256,
+      "batch_size": 8,
+      "tokens_per_batch": 2048,
+      "tokens_per_sec": 40122.23175328875,
+      "peak_mib": 389.02294921875,
+      "oom": false,
+      "note": ""
+    },
+    {
+      "arch": "moe",
+      "seq_len": 256,
+      "batch_size": 16,
+      "tokens_per_batch": 4096,
+      "tokens_per_sec": 66868.66575762111,
+      "peak_mib": 695.89453125,
+      "oom": false,
+      "note": ""
+    },
+    {
+      "arch": "moe",
+      "seq_len": 256,
+      "batch_size": 32,
+      "tokens_per_batch": 8192,
+      "tokens_per_sec": 106303.5735245993,
+      "peak_mib": 1309.4775390625,
+      "oom": false,
+      "note": ""
+    },
+    {
+      "arch": "moe",
+      "seq_len": 256,
+      "batch_size": 64,
+      "tokens_per_batch": 16384,
+      "tokens_per_sec": 127880.95082524559,
+      "peak_mib": 2522.19482421875,
+      "oom": false,
+      "note": ""
+    },
+    {
+      "arch": "moe",
+      "seq_len": 256,
+      "batch_size": 128,
+      "tokens_per_batch": 32768,
+      "tokens_per_sec": 138023.14363862056,
+      "peak_mib": 4954.9541015625,
+      "oom": false,
+      "note": ""
+    },
+    {
+      "arch": "moe",
+      "seq_len": 512,
+      "batch_size": 8,
+      "tokens_per_batch": 4096,
+      "tokens_per_sec": 68866.1233257043,
+      "peak_mib": 696.482421875,
+      "oom": false,
+      "note": ""
+    },
+    {
+      "arch": "moe",
+      "seq_len": 512,
+      "batch_size": 16,
+      "tokens_per_batch": 8192,
+      "tokens_per_sec": 102065.14975889128,
+      "peak_mib": 1311.36962890625,
+      "oom": false,
+      "note": ""
+    },
+    {
+      "arch": "moe",
+      "seq_len": 512,
+      "batch_size": 32,
+      "tokens_per_batch": 16384,
+      "tokens_per_sec": 124141.77074795592,
+      "peak_mib": 2531.62451171875,
+      "oom": false,
+      "note": ""
+    },
+    {
+      "arch": "moe",
+      "seq_len": 512,
+      "batch_size": 64,
+      "tokens_per_batch": 32768,
+      "tokens_per_sec": 133419.72824953363,
+      "peak_mib": 4964.328125,
+      "oom": false,
+      "note": ""
+    },
+    {
+      "arch": "moe",
+      "seq_len": 512,
+      "batch_size": 128,
+      "tokens_per_batch": 65536,
+      "tokens_per_sec": 19624.248581096443,
+      "peak_mib": 9832.984375,
+      "oom": false,
+      "note": ""
+    },
+    {
+      "arch": "moe",
+      "seq_len": 1024,
+      "batch_size": 8,
+      "tokens_per_batch": 8192,
+      "tokens_per_sec": 90796.46186908253,
+      "peak_mib": 1315.1591796875,
+      "oom": false,
+      "note": ""
+    },
+    {
+      "arch": "moe",
+      "seq_len": 1024,
+      "batch_size": 16,
+      "tokens_per_batch": 16384,
+      "tokens_per_sec": 114771.84542640505,
+      "peak_mib": 2534.4990234375,
+      "oom": false,
+      "note": ""
+    },
+    {
+      "arch": "moe",
+      "seq_len": 1024,
+      "batch_size": 32,
+      "tokens_per_batch": 32768,
+      "tokens_per_sec": 123425.3177404303,
+      "peak_mib": 4974.51611328125,
+      "oom": false,
+      "note": ""
+    },
+    {
+      "arch": "moe",
+      "seq_len": 1024,
+      "batch_size": 64,
+      "tokens_per_batch": 65536,
+      "tokens_per_sec": 19538.67581238708,
+      "peak_mib": 9846.03515625,
+      "oom": false,
+      "note": ""
+    },
+    {
+      "arch": "moe",
+      "seq_len": 1024,
+      "batch_size": 128,
+      "tokens_per_batch": 131072,
+      "tokens_per_sec": null,
+      "peak_mib": null,
+      "oom": true,
+      "note": "CUDA out of memory. Tried to allocate 4.00 GiB. GPU 0 has a total capacity of 8.00 GiB of which 0 bytes is fre"
+    }
+  ]
+}

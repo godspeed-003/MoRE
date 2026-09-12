@@ -1,0 +1,51 @@
+# MoRE -- pinned runtime dependencies  (anon.md RP-1)
+#
+# PROVENANCE OF THESE PINS. They are not invented and they are not "latest".
+# Every version below is the version actually present in the interpreter that
+# produced the runs in `runs/` and the artifacts in `results/`, cross-checked
+# against the environment manifest W&B captured at run time
+# (`archive/pre_finalization/wandb_runs_micropoc/run-*/files/requirements.txt`,
+# seven independent captures, all agreeing on the four packages listed here).
+#
+# Python 3.10.20. The interpreter version matters for one reason beyond the
+# usual: `config_hash` is computed over a `json.dumps(..., sort_keys=True)`
+# rendering of the config, so a Python release that changed float repr would
+# change every recorded hash. 3.10 does not, but pin it anyway.
+#
+# torch 2.5.1 here is the CUDA 12.1 build. The published index does not carry
+# that build under a plain `pip install torch==2.5.1` on every platform, so the
+# extra index is stated as a comment rather than a `--index-url` line: putting it
+# in the file would silently force the CUDA wheel on a CPU-only reviewer machine
+# and fail the install, and the repository runs correctly on CPU (every
+# entrypoint selects the device with `torch.cuda.is_available()`).
+#
+#   GPU (what we used):
+#     pip install torch==2.5.1 --index-url https://download.pytorch.org/whl/cu121
+#   CPU (fine for the correctness suite and every offline evaluation):
+#     pip install torch==2.5.1
+
+torch==2.5.1
+numpy==2.2.6
+matplotlib==3.10.9
+
+# W&B is OPTIONAL. Since anon.md RP-2 the import is lazy: it is resolved inside
+# `train()` only when `logging.use_wandb` is true, so `--help`, the correctness
+# suite, the exporter and every offline evaluation script run with wandb absent.
+# It is pinned here because reproducing a *logged* run needs the same client.
+# Install it, then either `--wandb_mode offline` (writes `wandb/` locally, no
+# account) or `--wandb_mode disabled`.
+wandb==0.28.0
+
+# NOT dependencies, recorded so nobody adds them back "because the code must
+# need them":
+#   scipy       -- not installed and not imported. The Hungarian matching in
+#                  `code/more/metrics.py` is a self-contained implementation
+#                  precisely so the routing metrics have no scipy dependency.
+#   pandas, scikit-learn, seaborn, tqdm -- never imported anywhere outside
+#                  `archive/`.
+#   requests    -- imported by exactly two retired exploratory files
+#                  (`code/verify_pipeline.py`'s optional local-LLM probe, which
+#                  now defaults to skipped, and
+#                  `automated/autoresearch_runner.py`, retired). Neither is on
+#                  any reproduction path. Install `requests` only if you
+#                  deliberately re-enable the probe.

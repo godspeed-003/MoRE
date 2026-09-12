@@ -1,0 +1,74 @@
+# .gitattributes -- line-ending pins for the files whose BYTES are evidence.
+#
+# T-L7.7. This repository's integrity story is SHA-256: `data/dataset_meta.json`
+# and `data/lang/<corpus>/dataset_meta.json` record a digest for every split, and
+# `code/test_language_data.py` / the correctness suite grade the files against
+# those digests. A digest is over bytes, and on Windows `core.autocrlf=true` (the
+# installer default -- it IS set on the machine this file was written on) rewrites
+# line endings between the blob and the working copy. So for any text file whose
+# digest is recorded, the EOL form is part of the evidence, and leaving it to a
+# per-machine git setting means the published digests verify on some clones and
+# fail on others.
+#
+# Both rules below were chosen so that NO BLOB CHANGES. They restate, as a
+# repository-level fact, the form each recorded digest was actually computed over.
+# Neither re-hashes anything and neither rewrites a tracked file's content
+# (CLAUDE.md 6 / DN-2: the arithmetic dataset is published evidence and its
+# recorded numbers may not move).
+
+# --- Arithmetic dataset: digest recorded over the CRLF form ------------------
+# MEASURED at T-L7.7, on the three files the arithmetic study publishes:
+#
+#   file                 blob EOL   sha256 in data/dataset_meta.json is of
+#   data/train.jsonl     LF         CRLF  (d9ecb9a6...; the LF form is 656507ef...)
+#   data/val.jsonl       LF         CRLF  (189dd7a8...; the LF form is b5c479c8...)
+#   data/test.jsonl      LF         CRLF  (2a88633f...; the LF form is 61b851df...)
+#
+# They were generated and hashed on Windows with CRLF, then stored LF-normalized
+# by autocrlf. Consequence before this file existed: a clone on Linux or macOS, or
+# on Windows with `core.autocrlf=false|input`, materializes LF working copies and
+# ALL THREE published digests fail. That failure is indistinguishable from a
+# tampered dataset -- the worst possible way for a reproduction attempt to start,
+# and it would have hit the first reviewer who cloned the artifact on Linux.
+#
+# `text eol=crlf` forces the working copy to CRLF on every platform, which is the
+# form the recorded digest describes, while check-in still normalizes to LF -- and
+# the blob is ALREADY LF, so this introduces no diff. Verified: `git status` stays
+# clean and all three digests verify after adding this line.
+#
+# Do NOT "fix" this by re-hashing to the LF form. Those three digests are cited in
+# the paper and in `runs/phaseB_*` provenance; changing them invalidates the
+# published record to save one line here.
+data/train.jsonl text eol=crlf
+data/val.jsonl   text eol=crlf
+data/test.jsonl  text eol=crlf
+
+# --- Language tokenizers: digest recorded over the LF form -------------------
+# The opposite pin, for the opposite reason. `tokenizer_sha256` in each language
+# manifest is of the LF form (wikitext-2 2a714747..., wikitext-103 6a1f1477...),
+# blob and working copy are both LF today -- but with autocrlf=true and no rule
+# here, git says so out loud on every diff:
+#
+#   warning: in the working copy of 'data/lang/wikitext-103/tokenizer.json',
+#            LF will be replaced by CRLF the next time Git touches it
+#
+# That is a live threat, not a cosmetic warning. `.gitignore` tracks tokenizer.json
+# precisely because BPE merge order depends on the `tokenizers` version's
+# tie-breaking, so a tokenizer that is not byte-identical makes every recorded
+# language loss incomparable -- and a CRLF rewrite would do exactly that while
+# `git diff` reported the file as unchanged.
+#
+# `-text` marks it binary: git never converts EOL in either direction, so the
+# bytes on disk are the bytes in the blob on every platform and every autocrlf
+# setting. Chosen over `text eol=lf` deliberately -- for a file whose bytes are
+# load-bearing, the correct statement is "never touch this", not "convert it the
+# way I happen to want today".
+data/lang/**/tokenizer.json -text
+
+# --- Everything else -------------------------------------------------------
+# Left to git's defaults ON PURPOSE. In particular this file says nothing about
+# `runs/**/*.json`: `config_hash` is computed by `run_context.canonical_json` over
+# the PARSED object, not the file bytes, so it is EOL-immune -- and a blanket rule
+# over `*.json` would be a redaction-shaped edit across 262 run records for no
+# integrity gain (DN-1). Add a pin here only when a specific file's recorded
+# digest is over its bytes, and record the measured EOL form when you do.

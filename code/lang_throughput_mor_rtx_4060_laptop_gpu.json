@@ -1,0 +1,189 @@
+{
+  "device": "NVIDIA GeForce RTX 4060 Laptop GPU",
+  "total_vram_gib": 7.99560546875,
+  "torch": "2.6.0+cu126",
+  "arch": "mor",
+  "shape": {
+    "d_model": 256,
+    "n_heads": 4,
+    "num_blocks": 1,
+    "vocab_size": 8192,
+    "max_depth": 7,
+    "ffn_mult": 24
+  },
+  "timed_steps": 5,
+  "synthetic_ids": true,
+  "tokens_per_sec_is_upper_bound": true,
+  "rows": [
+    {
+      "arch": "mor",
+      "seq_len": 128,
+      "batch_size": 8,
+      "tokens_per_batch": 1024,
+      "tokens_per_sec": 10091.618889967398,
+      "peak_mib": 687.634765625,
+      "oom": false,
+      "note": ""
+    },
+    {
+      "arch": "mor",
+      "seq_len": 128,
+      "batch_size": 16,
+      "tokens_per_batch": 2048,
+      "tokens_per_sec": 17786.204609219407,
+      "peak_mib": 1295.9306640625,
+      "oom": false,
+      "note": ""
+    },
+    {
+      "arch": "mor",
+      "seq_len": 128,
+      "batch_size": 32,
+      "tokens_per_batch": 4096,
+      "tokens_per_sec": 25314.521808937912,
+      "peak_mib": 2510.0205078125,
+      "oom": false,
+      "note": ""
+    },
+    {
+      "arch": "mor",
+      "seq_len": 128,
+      "batch_size": 64,
+      "tokens_per_batch": 8192,
+      "tokens_per_sec": 38387.10433225904,
+      "peak_mib": 4640.40234375,
+      "oom": false,
+      "note": ""
+    },
+    {
+      "arch": "mor",
+      "seq_len": 128,
+      "batch_size": 128,
+      "tokens_per_batch": 16384,
+      "tokens_per_sec": 46840.44555801841,
+      "peak_mib": 7034.53955078125,
+      "oom": false,
+      "note": ""
+    },
+    {
+      "arch": "mor",
+      "seq_len": 256,
+      "batch_size": 8,
+      "tokens_per_batch": 2048,
+      "tokens_per_sec": 18942.28430309689,
+      "peak_mib": 1297.791015625,
+      "oom": false,
+      "note": ""
+    },
+    {
+      "arch": "mor",
+      "seq_len": 256,
+      "batch_size": 16,
+      "tokens_per_batch": 4096,
+      "tokens_per_sec": 28753.734790528608,
+      "peak_mib": 1822.6298828125,
+      "oom": false,
+      "note": ""
+    },
+    {
+      "arch": "mor",
+      "seq_len": 256,
+      "batch_size": 32,
+      "tokens_per_batch": 8192,
+      "tokens_per_sec": 51420.43942323331,
+      "peak_mib": 3555.66845703125,
+      "oom": false,
+      "note": ""
+    },
+    {
+      "arch": "mor",
+      "seq_len": 256,
+      "batch_size": 64,
+      "tokens_per_batch": 16384,
+      "tokens_per_sec": 55322.718106959604,
+      "peak_mib": 7325.78857421875,
+      "oom": false,
+      "note": ""
+    },
+    {
+      "arch": "mor",
+      "seq_len": 256,
+      "batch_size": 128,
+      "tokens_per_batch": 32768,
+      "tokens_per_sec": null,
+      "peak_mib": null,
+      "oom": true,
+      "note": "CUDA out of memory. Tried to allocate 1024.00 MiB. GPU 0 has a total capacity of 8.00 GiB of which 0 bytes is "
+    },
+    {
+      "arch": "mor",
+      "seq_len": 512,
+      "batch_size": 8,
+      "tokens_per_batch": 4096,
+      "tokens_per_sec": 25120.81727034673,
+      "peak_mib": 2517.8232421875,
+      "oom": false,
+      "note": ""
+    },
+    {
+      "arch": "mor",
+      "seq_len": 512,
+      "batch_size": 16,
+      "tokens_per_batch": 8192,
+      "tokens_per_sec": 41576.850788649885,
+      "peak_mib": 3384.10791015625,
+      "oom": false,
+      "note": ""
+    },
+    {
+      "arch": "mor",
+      "seq_len": 512,
+      "batch_size": 32,
+      "tokens_per_batch": 16384,
+      "tokens_per_sec": 45470.54128388217,
+      "peak_mib": 6766.806640625,
+      "oom": false,
+      "note": ""
+    },
+    {
+      "arch": "mor",
+      "seq_len": 512,
+      "batch_size": 64,
+      "tokens_per_batch": 32768,
+      "tokens_per_sec": null,
+      "peak_mib": null,
+      "oom": true,
+      "note": "CUDA out of memory. Tried to allocate 1022.00 MiB. GPU 0 has a total capacity of 8.00 GiB of which 0 bytes is "
+    },
+    {
+      "arch": "mor",
+      "seq_len": 1024,
+      "batch_size": 8,
+      "tokens_per_batch": 8192,
+      "tokens_per_sec": 41365.89038869135,
+      "peak_mib": 3606.1650390625,
+      "oom": false,
+      "note": ""
+    },
+    {
+      "arch": "mor",
+      "seq_len": 1024,
+      "batch_size": 16,
+      "tokens_per_batch": 16384,
+      "tokens_per_sec": 48574.75893667324,
+      "peak_mib": 6996.57373046875,
+      "oom": false,
+      "note": ""
+    },
+    {
+      "arch": "mor",
+      "seq_len": 1024,
+      "batch_size": 32,
+      "tokens_per_batch": 32768,
+      "tokens_per_sec": null,
+      "peak_mib": null,
+      "oom": true,
+      "note": "CUDA out of memory. Tried to allocate 1024.00 MiB. GPU 0 has a total capacity of 8.00 GiB of which 0 bytes is "
+    }
+  ]
+}
