@@ -22,6 +22,14 @@ runs/**/checkpoint.pt
 runs/**/*.pt
 runs/**/stdout.log
 
+# T-LX.8: stray logs at the REPO ROOT, from `python ... > foo.log` invocations.
+# CLAUDE.md 5 is per-run output directories only; a root-level log is by
+# construction not attached to a run, so it can never be provenance and must
+# never be mistaken for it. Ignored rather than forbidden because redirecting a
+# long job's output is legitimate -- what is not legitimate is committing it.
+# Anything worth keeping belongs in runs/<experiment_id>/stdout.log.
+/*.log
+
 # --- Model checkpoints outside the archive ----------------------------------
 # The two checkpoints under archive/pre_finalization/ are tracked as evidence of
 # the pre-audit state and are unaffected by this rule.

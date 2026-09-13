@@ -831,6 +831,95 @@ check("TL1.3p the arithmetic guard still refuses router noise (G4.37's case)",
 
 
 # ===========================================================================
+# T-LX.8 -- `perf/throughput_tokens_sec` counted ITEMS, not tokens.
+#
+# THE DEFECT. engine.py accumulated `total_tokens += bs`, and `bs` is the BATCH
+# dimension. On arithmetic one item IS one record, so the key was right by
+# accident and README 392 quotes it as records/s. On LANGUAGE one item is a
+# packed block of `data.seq_len` tokens, so the published rate was low by
+# exactly 256x.
+#
+# WHY IT IS NOT A COSMETIC LABEL BUG, and why the check below is on a RUN
+# DIRECTORY rather than on the source text. The wrong number left the repo and
+# was consumed: the language runs reported 53-65 "tok/s", a downstream cost
+# model read those as real tokens/s, and the remaining 10-run matrix was costed
+# at 15 DAYS of GPU time -- against ~35-50 h at the measured rate of 53 x 256 =
+# 13.6 k tok/s. A capacity decision (rent an H100 / cut the corpus to 68 M
+# tokens / shrink the model below 1 M parameters) was about to be taken on a
+# unit error, and each of those would have re-frozen an enforced field and
+# invalidated the five finished MoE runs. A source-level assertion would have
+# been satisfied by a comment; only a run's own emitted metrics prove the fix
+# reached the artifact a reader costs a matrix from.
+#
+# THE INVARIANT. Every run that carries both keys must satisfy
+#     perf/throughput_tokens_sec == perf/throughput_items_sec * tokens_per_item
+# with tokens_per_item = data.seq_len on language and 1 on arithmetic. Runs
+# written before the fix carry only the old key and are skipped -- their
+# recorded value equals today's `perf/throughput_items_sec`, which is why the
+# items key is published alongside rather than replacing it.
+
+_TLX8_MIN_TOK_S = 1000.0     # a language run below this is a unit error, not a
+                             # slow GPU: the slowest arm measured is ~16.5 k.
+
+_tlx8_rows, _tlx8_bad, _tlx8_lang = [], [], 0
+for _rc in sorted(glob.glob(os.path.join(REPO, "runs", "*", "metrics.json"))):
+    _rd = os.path.dirname(_rc)
+    try:
+        _m = json.load(open(_rc, encoding="utf-8"))
+        _cfg = json.load(open(os.path.join(_rd, "resolved_config.json"),
+                              encoding="utf-8"))
+    except Exception:
+        continue
+    _tok, _itm = (_m.get("perf/throughput_tokens_sec"),
+                  _m.get("perf/throughput_items_sec"))
+    if not isinstance(_tok, (int, float)) or not isinstance(_itm, (int, float)):
+        continue                                   # pre-fix run: only one key
+    _t = _cfg.get("task") or resolve_task(_cfg)
+    _tpi = (int(_cfg.get("data", {}).get("seq_len", 0))
+            if _t == TASK_LANGUAGE else 1)
+    _tlx8_rows.append((os.path.basename(_rd), _t, _tok, _itm, _tpi))
+    if _t == TASK_LANGUAGE:
+        _tlx8_lang += 1
+    if _tpi <= 0 or abs(_tok - _itm * _tpi) > 1e-6 * max(1.0, abs(_tok)):
+        _tlx8_bad.append(f"{os.path.basename(_rd)}: {_tok}/{_itm} != {_tpi}")
+
+check("TLX.8a every run emitting both throughput keys satisfies "
+      "tokens_sec == items_sec * tokens_per_item (seq_len on language, 1 on "
+      "arithmetic)",
+      not _tlx8_bad,
+      f"{len(_tlx8_rows)} run(s) carry both keys"
+      if not _tlx8_bad else "; ".join(_tlx8_bad[:3]))
+
+check("TLX.8b at least one LANGUAGE run carries both keys, so TLX.8a is not "
+      "vacuously true -- deleting the fix must break a real artifact",
+      _tlx8_lang >= 1,
+      f"{_tlx8_lang} language run(s) post-fix")
+
+_tlx8_slow = [r for r in _tlx8_rows
+              if r[1] == TASK_LANGUAGE and r[2] < _TLX8_MIN_TOK_S]
+check("TLX.8c no language run reports a token rate below 1 k tok/s -- the "
+      "signature of the items/tokens confusion that produced the 15-day "
+      "cost estimate",
+      not _tlx8_slow,
+      "slowest language run "
+      + (f"{min(r[2] for r in _tlx8_rows if r[1] == TASK_LANGUAGE):,.0f} tok/s"
+         if _tlx8_lang else "N/A")
+      if not _tlx8_slow else f"{_tlx8_slow[0][0]} at {_tlx8_slow[0][2]:.1f}")
+
+_tlx8_ar = [r for r in _tlx8_rows if r[1] != TASK_LANGUAGE]
+check("TLX.8d an ARITHMETIC run's two keys are equal -- an item is a record "
+      "there, so the historical records/s reading of the old key is preserved "
+      "byte-for-byte",
+      all(abs(r[2] - r[3]) <= 1e-9 * max(1.0, abs(r[2])) for r in _tlx8_ar),
+      f"{len(_tlx8_ar)} arithmetic run(s) with both keys")
+
+check("TLX.8e language seq_len is 256, so the factor the pre-fix language logs "
+      "were low by is exactly 256",
+      LANGUAGE_SEQ_LEN_DEFAULT == 256,
+      f"LANGUAGE_SEQ_LEN_DEFAULT={LANGUAGE_SEQ_LEN_DEFAULT}")
+
+
+# ===========================================================================
 print(f"\n{len(PASS)} passed, {len(FAIL)} failed")
 if FAIL:
     print("FAILED:")

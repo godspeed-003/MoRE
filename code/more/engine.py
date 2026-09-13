@@ -586,6 +586,10 @@ def train(cfg: dict, run_epochs: int | None = None, ctx: "RunContext | None" = N
         epoch_probe_ce   = 0.0
         epoch_start      = time.perf_counter()
         total_tokens     = 0
+        # T-LX.8: tokens per batch ITEM. 1 on arithmetic (an item IS a record, so
+        # the accumulator keeps its published records/s meaning byte-for-byte);
+        # `data.seq_len` on language, where an item is a packed block.
+        _tokens_per_item = (int(dc["seq_len"]) if _task == TASK_LANGUAGE else 1)
         depth_hist       = torch.zeros(mc["max_depth"])
 
         # --- Shannon entropy tracking (activated) -----------------------
@@ -817,13 +821,28 @@ def train(cfg: dict, run_epochs: int | None = None, ctx: "RunContext | None" = N
                 epoch_depth_err_n   += 1
             epoch_step_route += step_routing_loss.item()
             epoch_probe_ce   += probe_family_ce.item()
-            total_tokens     += bs
+            # T-LX.8. `bs` is the BATCH dimension, i.e. the number of ITEMS, and
+            # an item is not a token on both tasks. On arithmetic one item is one
+            # record, so items/s is the right quantity and `records/s` is how
+            # README 392 quotes it. On LANGUAGE one item is a packed block of
+            # `data.seq_len` tokens, so counting items under the name
+            # `perf/throughput_tokens_sec` understates the token rate by exactly
+            # 256x. That misnomer is not a harmless label: the language runs
+            # reported 53-65 "tok/s", a downstream cost model read them as real
+            # tokens/s, and the remaining matrix was costed at 15 DAYS when the
+            # measured rate (53 x 256 = 13.6 k tok/s) puts it near 35 h. Multiply
+            # here rather than at the log site so `total_tokens` means tokens.
+            total_tokens     += bs * _tokens_per_item
             if depth_exits is not None:
                 depth_hist += depth_exits.detach().cpu().sum(dim=0)
 
         scheduler.step()
         elapsed    = time.perf_counter() - epoch_start
         throughput = total_tokens / max(elapsed, 1e-6)
+        # T-LX.8: the items/s number the old key really carried. Published
+        # alongside so a language run's two rates are both readable and a reader
+        # can reconstruct any pre-T-LX.8 language log (old value = this one).
+        items_per_sec = throughput / _tokens_per_item
         n_batches  = max(len(train_loader), 1)
 
         # ---- Validation + paper metrics --------------------------------
@@ -1273,6 +1292,9 @@ def train(cfg: dict, run_epochs: int | None = None, ctx: "RunContext | None" = N
                 avg_depth.item() if avg_depth is not None else float("nan")
             ),
             "perf/throughput_tokens_sec":   throughput,
+            # T-LX.8. On arithmetic this equals the key above (an item is a
+            # record); on language it is the BLOCKS/s figure, 1/seq_len of it.
+            "perf/throughput_items_sec":    items_per_sec,
             "epoch": epoch,
         }
 

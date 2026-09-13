@@ -6544,6 +6544,84 @@ thing that changed - `data/lang/build_*.py` for the corpus stages,
 the table. The numbers in 3b are not maintained by hand: they are all present in the
 corpus manifest, and the manifest is the thing to re-read.
 
+## T-LX.8 - `perf/throughput_tokens_sec` counted batch items, and a 15-day estimate
+
+**The defect.** `code/more/engine.py`'s epoch loop accumulated `total_tokens += bs`.
+`bs` is the **batch dimension** - the number of *items* - and an item is not a token on
+either task. On arithmetic one item is one record, so the key was correct by accident
+and README:392 reads it as records/s. On **language** one item is a packed block of
+`data.seq_len = 256` tokens, so every language run in the repo published a token rate
+low by exactly **256x**.
+
+**Why it mattered far more than a label.** Gate L7's MoRE run reported `64.66` under a
+key named *tokens*/sec. A cost model on the other machine
+(`cloud_gpu_costing_and_onboarding.md`) read the 53-65 range as real token rates and
+costed the remaining 10-run canonical matrix at **15 days** of GPU time. The true rate
+is `64.66 x 256 = 16,553 tok/s`, which puts the same matrix near **35-50 h**. Three
+remedies were proposed off that number, and **every one of them would have re-frozen an
+`enforced_field` and invalidated the five finished MoE runs**: cut the corpus to 68 M
+tokens (`epochs` 3 -> 1 in disguise - 68 M is half an epoch, and the spec froze 3
+epochs precisely because average depth was still moving between epochs 2 and 3), shrink
+`d_model` 256 -> 128 (a 0.86 M-parameter model, plus re-deriving `ffn_mult` and
+re-tuning `lr`), or rent an H100 at ~$2.7/hr. A mislabeled unit nearly rewrote the
+frozen spec.
+
+**Method.** Multiply at the accumulator, not at the log site:
+`_tokens_per_item = int(dc["seq_len"]) if _task == TASK_LANGUAGE else 1`, then
+`total_tokens += bs * _tokens_per_item`. Scaling at the log site would leave the
+variable's *name* lying about its contents for the next reader, which is the exact
+failure being fixed. `total_tokens` is also the denominator of the items rate, so it has
+to mean tokens at the point of accumulation.
+
+**`perf/throughput_items_sec` is published alongside rather than the old key being
+silently corrected.** Every pre-T-LX.8 language log - in `runs/`, in Ayan's
+`moe_batch1_results.md`, in `cloud_gpu_costing_and_onboarding.md` - carries the items
+number under the tokens name. Publishing both makes those logs *reconstructible* (their
+value = today's `perf/throughput_items_sec`) instead of merely wrong, and preserves
+README:392's arithmetic records/s reading byte-for-byte, because on arithmetic the two
+keys are equal by construction.
+
+**No `config_hash` moves.** `perf/*` are emitted metrics, not config fields. The proxy
+guard reads `enforced_fields`; none moved. The five MoE runs stay admissible, and the
+Gate L7 run's scientific content (`train/avg_recursion_steps = 6.9388` of 7,
+`val/forced_exit_rate = 0.9628`) is untouched - only the wall-clock projection built on
+top of it was wrong.
+
+**Verified by.** `C:/Users/vedan/anaconda3/python.exe code/test_language_task_axis.py`
+-> **79 passed / 0 failed** (was 74). TLX.8a-e read the *emitted* `metrics.json` of
+every run directory carrying both keys and assert
+`tokens_sec == items_sec x tokens_per_item` (`seq_len` on language, 1 on arithmetic);
+that at least one **language** run carries both, so the check cannot pass vacuously;
+that no language run reports below 1 k tok/s - the signature of the confusion itself;
+and that an arithmetic run's two keys are equal. Gate L0
+(`code/run_correctness_suite.py`, CPU interpreter) **TOTAL 356 356 0 0, ALL GATES PASS**.
+
+The checks read run artifacts rather than source text on purpose. A source-level
+assertion is satisfiable by editing a comment, and the number that did the damage was
+one a reader lifted out of an artifact. The end-to-end proof is a pair of runs:
+`runs/langB_MoRE_seed44__d915d7de__r3/` (post-fix) emits
+`perf/throughput_tokens_sec = 25887.734` and `perf/throughput_items_sec = 101.124`,
+ratio **256.0 exactly**; its pre-fix twin `__r2` emits `104.812` under the tokens key
+and no items key at all.
+
+**What the corrected number exposes.** The open question stops being *where to rent* and
+becomes whether MoRE is measuring adaptive computation at all: it runs at depth
+**6.9388 of 7** with **96.3 %** forced exit on canonical wikitext-103.
+`halting_weight = 0.001` was calibrated on wikitext-2, 50x smaller, where depth landed
+at 2.63. Recalibrating is uniquely cheap in spec terms - `halting_weight` lives in
+`architecture_variants.{mor,more}` and the guard consults only the arm's own block, so
+MoE's `0.0` block and its five runs survive - but any sweep is a **separately labelled
+ablation** and must pre-register "depth interior to the budget" as its selection rule.
+Selecting on val loss would be tuning toward a conclusion (`CLAUDE.md` 6).
+
+**Where to look.** Throughput accounting: `code/more/engine.py`, the epoch loop's
+`total_tokens` / `_tokens_per_item` / `items_per_sec` triple and the two `perf/*` keys in
+the metrics dict. If a language run ever reports a two-digit "tok/s" again, that
+accumulator has been reverted. If a *new* task is added, `_tokens_per_item` is the line
+that needs a case - the default is 1, which is silently wrong for anything packed.
+
+---
+
 <!-- APPEND-MARKER-CL -->
 
 

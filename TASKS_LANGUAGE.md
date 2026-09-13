@@ -2908,3 +2908,62 @@ where compute forces it, and say so in the caption rather than presenting a
     val loss (3.9829) and on AMI (0.1066) — a signal that `routing_balance_weight =
     0.001` may be under-regularized for MoE on the full corpus. Recorded here as an
     observation about an arm that is **not yet admissible**, not as a result.
+
+- [x] **T-LX.8 `perf/throughput_tokens_sec` counted batch ITEMS, not tokens, and a
+  15-day capacity estimate was built on the 256× error.** `engine.py`'s epoch loop
+  accumulated `total_tokens += bs`, where `bs` is the **batch dimension**. On
+  arithmetic an item *is* a record, so the key was right by accident and README:392
+  reads it as records/s. On **language** an item is a packed block of
+  `data.seq_len = 256` tokens, so every language run published a token rate low by
+  exactly 256×. **Verify:** `test_language_task_axis.py` asserts, over the emitted
+  `metrics.json` of every run carrying both keys, that
+  `perf/throughput_tokens_sec == perf/throughput_items_sec × tokens_per_item`
+  (`seq_len` on language, 1 on arithmetic); that at least one **language** run carries
+  both, so the check cannot pass vacuously; that no language run reports below
+  1 k tok/s; and that an arithmetic run's two keys are equal.
+  **Evidence (2026-09-13, CPU interpreter): `test_language_task_axis.py` 79 passed / 0
+  failed** (was 74; TLX.8a–e are this task). Gate L0 **TOTAL 356 356 0 0, ALL GATES
+  PASS**.
+  - **The end-to-end proof is a run, not an assertion.** `runs/langB_MoRE_seed44__d915d7de__r3/`
+    (post-fix smoke) emits `perf/throughput_tokens_sec = 25887.73423518508` and
+    `perf/throughput_items_sec = 101.12396185619171` — ratio **256.0 exactly**. Its
+    pre-fix twin `__r2` emits `104.81153234709336` under the tokens key and **no items
+    key at all**. That pair is why the check reads run directories instead of source
+    text: a source-level assertion is satisfiable by editing a comment, and the number
+    that caused the damage was one a reader lifted out of an artifact.
+  - **WHY THIS IS THE MOST EXPENSIVE UNIT BUG IN THE PROJECT SO FAR.** Gate L7's MoRE
+    run reported `64.66` under a key named *tokens*/sec. A downstream cost model on the
+    other machine (`cloud_gpu_costing_and_onboarding.md`, authored off these logs) read
+    those 53–65 figures as real token rates and costed the remaining 10-run canonical
+    matrix at **15 days** of GPU time. The true rate is `64.66 × 256 = 16,553 tok/s`,
+    putting the same matrix near **35–50 h**. Three remedies were on the table because
+    of that number, and **each one would have re-frozen an `enforced_field` and
+    invalidated the five finished MoE runs**: cut the corpus to 68 M tokens (= 0.5
+    epoch, so `epochs` 3 → 1); shrink `d_model` 256 → 128 (a 0.86 M-param model);
+    rent an H100 at ~$2.7/hr. A mislabeled unit nearly rewrote the frozen spec.
+  - **Why multiply at the accumulator and not at the log site.** `total_tokens` is read
+    twice — once for `perf/throughput_tokens_sec` and once as the denominator of
+    `items_per_sec`. Scaling at the log site leaves the variable's *name* lying about
+    its contents for the next reader, which is the exact failure being fixed.
+  - **Why `perf/throughput_items_sec` is published rather than the old key being
+    silently corrected.** Every pre-T-LX.8 language log in the repo and in
+    `moe_batch1_results.md` carries the items number under the tokens name. Publishing
+    both makes those logs *reconstructible* (old value = today's items key) instead of
+    merely wrong, and preserves README:392's arithmetic records/s reading byte-for-byte,
+    since on arithmetic the two keys are equal by construction.
+  - **This does not touch any `config_hash`.** `perf/*` are emitted metrics, not config
+    fields; the proxy guard reads `enforced_fields`, and no enforced field moved. The
+    five MoE runs remain admissible, and the Gate L7 run's *scientific* content —
+    `train/avg_recursion_steps = 6.9388` of 7, `val/forced_exit_rate = 0.9628` — is
+    unaffected. Only the wall-clock projection built on top of it was wrong.
+  - **The finding the corrected number exposes is a scientific one, not a logistical
+    one.** At 16.5 k tok/s the matrix is affordable on hardware the project already
+    owns, so the open question is no longer *where to rent* but whether MoRE running at
+    depth 6.94/7 with 96.3 % forced exit is measuring adaptive computation at all.
+    `halting_weight = 0.001` was calibrated on wikitext-2 (50× smaller) where depth
+    landed at 2.63. Recalibrating it is uniquely cheap in spec terms because
+    `halting_weight` lives in `architecture_variants.{mor,more}` and the guard consults
+    only the arm's own block — MoE's block is `0.0` by definition, so its five runs
+    survive. Any such sweep is a **separately labelled ablation** and must pre-register
+    "depth interior to the budget" as its selection rule; selecting on val loss would be
+    tuning toward a conclusion (`CLAUDE.md` §6).
