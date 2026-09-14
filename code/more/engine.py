@@ -641,7 +641,9 @@ def train(cfg: dict, run_epochs: int | None = None, ctx: "RunContext | None" = N
                     for e in range(mc["num_experts"]):
                         epoch_expert_counts[e] += (idx_tensor == e).float().sum()
                 # Feed raw tensors to compute_expert_load_entropy at epoch end
-                epoch_all_expert_idx.extend(batch_expert_idx)
+                epoch_all_expert_idx.extend(
+                    idx_tensor.detach().cpu() for idx_tensor in batch_expert_idx
+                )
 
             # --- Losses -------------------------------------------------
             # 1. Primary task loss.
