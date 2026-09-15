@@ -31,23 +31,22 @@ from .model import MoREModel
 # 3. Metric utilities
 # ---------------------------------------------------------------------------
 
-def compute_expert_load_entropy(
-    depth_exits: torch.Tensor,
-    all_expert_idx: list,
+def expert_load_entropy_from_counts(
+    counts: torch.Tensor,
     num_experts: int,
 ) -> torch.Tensor:
     """
-    Normalized Shannon entropy of expert utilisation, H / log(E) in [0, 1].
+    Normalized Shannon entropy H / log(E) of an ALREADY-ACCUMULATED load vector.
+
+    `counts[e]` is the number of hard-argmax token assignments to expert `e`.
+    This is the whole input the statistic needs -- the per-token indices that
+    produced those counts are not required and must not be retained to get here
+    (T-LX.9; see `compute_expert_load_entropy` below).
 
     This is a LOAD-BALANCE DIAGNOSTIC ONLY. High entropy means routing is
     uniform, i.e. no expert is starved; it is NOT evidence of specialization
     and must never be tuned toward (CLAUDE.md 2, 4). Returns None when E < 2.
-    Uses hard argmax assignments, not soft probabilities.
     """
-    counts = torch.zeros(num_experts, device=depth_exits.device)
-    for idx_tensor in all_expert_idx:
-        for e in range(num_experts):
-            counts[e] += (idx_tensor == e).sum().float()
     total   = counts.sum().clamp(min=1.0)
     probs   = counts / total
     entropy = -(probs * torch.log(probs + 1e-8)).sum()
@@ -61,6 +60,32 @@ def compute_expert_load_entropy(
     if num_experts < 2:
         return None
     return entropy / math.log(num_experts)
+
+
+def compute_expert_load_entropy(
+    depth_exits: torch.Tensor,
+    all_expert_idx: list,
+    num_experts: int,
+) -> torch.Tensor:
+    """
+    Normalized expert-load entropy from RAW per-depth argmax index tensors.
+
+    Kept because it is the form the correctness suite exercises (G4.16) and the
+    form a caller with indices already in hand wants. It counts, then defers to
+    `expert_load_entropy_from_counts`, so there is exactly one definition of the
+    statistic and the two entry points cannot drift apart.
+
+    T-LX.9: the TRAINING LOOP must NOT use this entry point. Reaching it
+    requires holding every per-depth index tensor of the epoch, which on the
+    language task is ~7.4 GiB of live tensors by the last batch. `engine.py`
+    already accumulates the identical `counts` vector incrementally and calls
+    `expert_load_entropy_from_counts` instead.
+    """
+    counts = torch.zeros(num_experts, device=depth_exits.device)
+    for idx_tensor in all_expert_idx:
+        for e in range(num_experts):
+            counts[e] += (idx_tensor == e).sum().float()
+    return expert_load_entropy_from_counts(counts, num_experts)
 
 
 def compute_pairwise_cosine_sim(model: MoREModel):

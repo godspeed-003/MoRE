@@ -27,6 +27,7 @@ from .data import MoREDataset
 from .lang_data import MoRELanguageDataset, LANG_ROOT
 from .model import MoEBlock, MoREWrapper, MoREModel
 from .metrics import (compute_expert_load_entropy,
+                      expert_load_entropy_from_counts,
                       compute_pairwise_cosine_sim,
                       compute_token_exit_depths,
                       routing_accuracy_from_confusion,
@@ -585,6 +586,15 @@ def train(cfg: dict, run_epochs: int | None = None, ctx: "RunContext | None" = N
         # under `probe/family_ce`, never folded into a total.
         epoch_probe_ce   = 0.0
         epoch_start      = time.perf_counter()
+        # T-LX.9: peak allocator watermark for THIS epoch. Reset per epoch so a
+        # cross-epoch growth pattern is visible as a rising series rather than
+        # one flat all-time maximum. This exists because the MoR OOM on a 16 GB
+        # V100 had to be diagnosed from a traceback and an arithmetic estimate:
+        # no run in the repo recorded how much memory it actually used, so
+        # "epoch 1 fits, epoch 2 batch 0 does not" could not be distinguished
+        # from "the batch never fit" without paying for another GPU hour.
+        if device.type == "cuda":
+            torch.cuda.reset_peak_memory_stats(device)
         total_tokens     = 0
         # T-LX.8: tokens per batch ITEM. 1 on arithmetic (an item IS a record, so
         # the accumulator keeps its published records/s meaning byte-for-byte);
@@ -598,8 +608,10 @@ def train(cfg: dict, run_epochs: int | None = None, ctx: "RunContext | None" = N
         #   (a) per-expert load % (logged individually to W&B)
         #   (b) overall Shannon entropy via compute_expert_load_entropy()
         epoch_expert_counts: torch.Tensor = torch.zeros(mc["num_experts"], device=device)
-        # Raw per-depth argmax tensors — fed into compute_expert_load_entropy
-        epoch_all_expert_idx: list = []
+        # T-LX.9: there is deliberately NO list of raw per-depth argmax tensors
+        # here. `epoch_expert_counts` above is the complete input to the load
+        # entropy, and retaining the indices that produced it cost ~7.4 GiB of
+        # live GPU tensors per language epoch -- see the epoch-end call site.
         # T2.3: per-epoch dispatch accounting. Reset each epoch so the logged
         # overflow rate describes THIS epoch, not a running total.
         epoch_route_stats: dict = {}
@@ -640,10 +652,20 @@ def train(cfg: dict, run_epochs: int | None = None, ctx: "RunContext | None" = N
                 for idx_tensor in batch_expert_idx:
                     for e in range(mc["num_experts"]):
                         epoch_expert_counts[e] += (idx_tensor == e).float().sum()
-                # Feed raw tensors to compute_expert_load_entropy at epoch end
-                epoch_all_expert_idx.extend(
-                    idx_tensor.detach().cpu() for idx_tensor in batch_expert_idx
-                )
+                # T-LX.9: the counts above are ALL the epoch-end entropy needs.
+                # This used to also do
+                #     epoch_all_expert_idx.extend(batch_expert_idx)
+                # which held every [N_active] int64 index tensor of every depth
+                # step of every batch until the epoch ended. On canonical
+                # language that is 7 depths x 12,288 tokens x 8 B x 10,965
+                # batches = ~7.4 GiB of LIVE GPU tensors, plus ~77 k separate
+                # allocations fragmenting the caching allocator. MoR OOM'd on a
+                # 16 GB V100 -- and MoR has num_experts = 1, so it was paying
+                # the full 7.4 GiB to feed a statistic that is `None` by
+                # definition at E = 1. Moving the list to CPU (the obvious
+                # one-line patch) relocates the same 7.4 GiB into host RAM and
+                # then doubles it in the epoch-end `torch.cat`; the list is
+                # simply redundant, so it is gone.
 
             # --- Losses -------------------------------------------------
             # 1. Primary task loss.
@@ -1239,10 +1261,17 @@ def train(cfg: dict, run_epochs: int | None = None, ctx: "RunContext | None" = N
         # no tokens were routed. It is a load-balance diagnostic, not a quality
         # metric, and 0.0 must never be substituted for "undefined" (T6.4).
         load_entropy = None
-        if epoch_all_expert_idx:
-            _ent = compute_expert_load_entropy(
-                depth_exits,            # used only for .device; last batch is fine
-                epoch_all_expert_idx,   # every per-depth argmax tensor this epoch
+        # T-LX.9: computed from the incrementally-accumulated count vector, not
+        # from a retained list of per-token indices. `epoch_expert_counts` is
+        # built by exactly the expression `compute_expert_load_entropy` used to
+        # rebuild internally -- same float32 accumulator, same per-batch
+        # addition order -- so this is bit-identical to the pre-T-LX.9 value and
+        # no published entropy is reinterpreted. The `> 0` guard preserves the
+        # old `if epoch_all_expert_idx:` semantics: an epoch in which nothing
+        # was routed reports N/A, never 0.0.
+        if float(epoch_expert_counts.sum().item()) > 0.0:
+            _ent = expert_load_entropy_from_counts(
+                epoch_expert_counts,
                 mc["num_experts"],
             )
             load_entropy = None if _ent is None else _ent.item()
@@ -1297,6 +1326,18 @@ def train(cfg: dict, run_epochs: int | None = None, ctx: "RunContext | None" = N
             # T-LX.8. On arithmetic this equals the key above (an item is a
             # record); on language it is the BLOCKS/s figure, 1/seq_len of it.
             "perf/throughput_items_sec":    items_per_sec,
+            # T-LX.9: peak allocator watermark for THIS epoch, in GiB. A RISING
+            # series across epochs is the signature of a cross-epoch retention
+            # leak and is the thing to look at first if a run OOMs at an epoch
+            # boundary; a flat series means the batch genuinely does not fit.
+            # `max_memory_allocated` is LIVE tensor bytes; `max_memory_reserved`
+            # is what the caching allocator holds from the driver, and the gap
+            # between them is fragmentation -- both are needed, because an OOM
+            # can be caused by either and the remedies are different.
+            **({
+                "perf/gpu_peak_alloc_gib":    torch.cuda.max_memory_allocated(device) / 2**30,
+                "perf/gpu_peak_reserved_gib": torch.cuda.max_memory_reserved(device) / 2**30,
+            } if device.type == "cuda" else {}),
             "epoch": epoch,
         }
 

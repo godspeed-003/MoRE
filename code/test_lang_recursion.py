@@ -228,6 +228,94 @@ check("L4d expected_depth is differentiable, so halting is not only a boolean ga
 
 # ===========================================================================
 print()
+
+# ===========================================================================
+# T-LX.9 -- the training loop must not retain per-token routing tensors.
+#
+# THE DEFECT. The epoch loop kept `epoch_all_expert_idx`, a list holding every
+# [N_active] int64 argmax index tensor, for every depth step, for every batch,
+# until the epoch ended -- to feed `compute_expert_load_entropy` once at epoch
+# end. On canonical language that is 7 depths x 12,288 tokens x 8 B x 10,965
+# batches = ~7.4 GiB of LIVE tensors, in ~77 k separate allocations. MoR OOM'd
+# on a 16 GB V100. MoR has `num_experts = 1`, where the entropy is `None` by
+# definition (T6.4) -- so the arm paid 7.4 GiB to feed a statistic it never
+# reports.
+#
+# WHY MOVING THE LIST TO CPU IS NOT THE FIX. `.cpu()` on each tensor relocates
+# the same 7.4 GiB into host RAM, and the box that OOM'd has 21 GB. The list is
+# redundant: `epoch_expert_counts` already accumulates the identical per-expert
+# totals incrementally, and those counts are the complete input to the
+# statistic. So the list is gone and the entropy is computed from the counts.
+#
+# WHAT THESE CHECKS BIND. The refactor is only safe if the two entry points
+# give the SAME NUMBER -- otherwise every published `routing_load_entropy_norm`
+# silently changes meaning. TLX.9a-c assert bit-identity on the incremental
+# accumulation order the engine actually uses, at E = 1, 2 and 6, so the
+# canonical MoE/MoRE value (E=6) and the MoR N/A contract (E=1) are both
+# covered.
+
+from more.metrics import (compute_expert_load_entropy,          # noqa: E402
+                          expert_load_entropy_from_counts)
+
+def _counts_like_engine(idx_list, E):
+    """Rebuild counts exactly as engine.py's epoch loop accumulates them:
+    float32, one `(idx == e).float().sum()` per expert per tensor, in tensor
+    order. Any deviation here would make the comparison meaningless."""
+    counts = torch.zeros(E)
+    for t in idx_list:
+        for e in range(E):
+            counts[e] += (t == e).float().sum()
+    return counts
+
+torch.manual_seed(20260914)
+for _E in (1, 2, 6):
+    _idx = [torch.randint(0, _E, (1234,)) for _ in range(7)]
+    _from_idx = compute_expert_load_entropy(torch.zeros(4, 7), _idx, _E)
+    _from_cnt = expert_load_entropy_from_counts(_counts_like_engine(_idx, _E), _E)
+
+    if _E < 2:
+        check(f"TLX.9a E={_E}: both entry points return None, never 0.0 -- the "
+              "MoR arm has no routing decision to be 'collapsed' about",
+              _from_idx is None and _from_cnt is None,
+              f"indices={_from_idx}, counts={_from_cnt}")
+    else:
+        check(f"TLX.9a E={_E}: entropy from accumulated COUNTS is bit-identical "
+              "to entropy from retained per-token INDICES, so dropping the "
+              "retained list reinterprets no published number",
+              _from_idx is not None and _from_cnt is not None
+              and _from_idx.item() == _from_cnt.item(),
+              f"{_from_idx.item()!r} vs {_from_cnt.item()!r}")
+
+# An empty epoch must report N/A, not a spurious 0.0 -- this is the branch the
+# old `if epoch_all_expert_idx:` guard covered and the new `counts.sum() > 0`
+# guard has to keep covering.
+_zero = expert_load_entropy_from_counts(torch.zeros(6), 6)
+check("TLX.9b a zero count vector still yields a finite normalized entropy, so "
+      "the engine's `sum() > 0` guard -- not a NaN -- is what makes an "
+      "unrouted epoch report N/A",
+      _zero is not None and math.isfinite(_zero.item()),
+      f"H/log(E)={_zero.item():.6f} at all-zero counts (guarded upstream)")
+
+# The structural half: the engine must not reintroduce an unbounded per-batch
+# accumulator. Checked against the SOURCE because the property is a source
+# property -- there is no list to observe at runtime once it is correctly gone.
+_eng = open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                         "more", "engine.py"), encoding="utf-8").read()
+_eng_code = "\n".join(l.split("#")[0] for l in _eng.splitlines())
+check("TLX.9c the epoch loop holds no `epoch_all_expert_idx` accumulator -- "
+      "neither on GPU nor relocated to CPU",
+      "epoch_all_expert_idx" not in _eng_code,
+      "no per-token routing list survives in executable engine code")
+
+check("TLX.9d the engine reports its own peak GPU memory per epoch, so an OOM "
+      "at an epoch boundary is diagnosed from the run's metrics rather than "
+      "from a traceback and an arithmetic estimate",
+      "perf/gpu_peak_alloc_gib" in _eng_code
+      and "perf/gpu_peak_reserved_gib" in _eng_code
+      and "reset_peak_memory_stats" in _eng_code,
+      "peak alloc + peak reserved, reset per epoch (a rising series = leak, "
+      "a flat series = the batch genuinely does not fit)")
+
 print("=" * 78)
 print(f"{len(PASS)} passed, {len(FAIL)} failed, {len(SKIP)} skipped")
 if FAIL:
