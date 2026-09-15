@@ -6620,6 +6620,91 @@ the metrics dict. If a language run ever reports a two-digit "tok/s" again, that
 accumulator has been reverted. If a *new* task is added, `_tokens_per_item` is the line
 that needs a case - the default is 1, which is silently wrong for anything packed.
 
+## T-LX.9 - the epoch loop retained every routing index tensor, and MoR paid 7.4 GiB
+
+**The defect.** `code/more/engine.py`'s epoch loop kept `epoch_all_expert_idx`: a list of
+every `[N_active]` int64 argmax tensor, for every depth step, of every batch, kept alive
+until the epoch ended, solely to feed `compute_expert_load_entropy` once at epoch end. On
+canonical wikitext-103 that is `7 depths x 12,288 tokens x 8 B x 10,965 batches = ~7.4
+GiB` of **live** GPU tensors, in roughly 77,000 separate allocations. MoR OOM'd on a
+rented 16 GB V100 at the first backward pass of epoch 2.
+
+**The sharpest part: MoR was paying that for a number it never reports.** MoR has
+`num_experts = 1`, and T6.4 makes the normalized entropy `None` by definition at `E = 1`.
+The arm held 7.4 GiB across a whole epoch to compute `N/A`.
+
+**Why `.cpu()` on the retained tensors is not the fix.** The one-line patch
+`epoch_all_expert_idx.extend(t.detach().cpu() for t in batch_expert_idx)` moves the same
+7.4 GiB into host RAM on a 21 GB box, keeps ~77 k Python objects alive, and adds a
+CPU-side `(idx == e)` scan per expert per tensor at epoch end. It relieves the GPU
+symptom and keeps the redundancy. **The list has no reader the counts cannot serve**:
+`epoch_expert_counts`, at the epoch head, already accumulates
+`(idx_tensor == e).float().sum()` over exactly the same tensors, and that count vector is
+the *complete* input to `H / log(E)`. The list was deleted, not relocated. (This patch
+had already been applied to the working tree; it is removed by this change.)
+
+**The refactor is numerically inert, which is what makes it safe to land mid-study.**
+`more/metrics.expert_load_entropy_from_counts(counts, num_experts)` now holds the single
+definition of the statistic. `compute_expert_load_entropy(depth_exits, all_expert_idx,
+num_experts)` is kept because Gate L0's G4.16 (`test_phase5_dimensions.py:405`) exercises
+that signature; it now counts and delegates. Same float32 accumulator, same per-batch
+addition order, so every published `val/routing_load_entropy_norm` keeps its meaning and
+no prior run is reinterpreted. `perf/*` and metric keys are not config fields, so no
+`config_hash` moves and the five finished MoE runs stay admissible.
+
+**The empty-epoch branch is preserved explicitly.** The old guard was
+`if epoch_all_expert_idx:` - falsy when nothing had been routed. With the list gone the
+guard is `epoch_expert_counts.sum() > 0`. Without it an unrouted epoch would publish
+`-0.0` where the statistic is undefined, which is the sentinel-as-measurement failure
+`CLAUDE.md` 4 forbids.
+
+**New: `perf/gpu_peak_alloc_gib` and `perf/gpu_peak_reserved_gib`, reset per epoch.** The
+OOM had to be diagnosed from a traceback and an arithmetic estimate because no run in this
+repo recorded how much memory it used, so "epoch 1 fits and epoch 2 batch 0 does not"
+could not be told apart from "the batch never fit" without buying another GPU hour. The
+two keys answer different questions and both are needed: `allocated` is live tensor bytes,
+and a series that **rises across epochs** is retention; `reserved` is what the caching
+allocator holds from the driver, and the gap between them is fragmentation. Either can
+cause an OOM and the remedies differ.
+
+**What was ruled out, so the next OOM is not re-diagnosed from scratch.**
+`torch.save(model.state_dict(), ...)` saves and discards, retaining nothing. `depth_hist`
+is a CPU tensor. `epoch_halt_stats`, `epoch_route_stats` and `depth_allocation_error`
+carry Python floats (`float(...)` / `.item()` at the model boundary), not graph-bearing
+tensors. The validation accumulators (`_lang_depth_ed/_ids/_loss`, `_lang_route`,
+`_lang_ids_full`) are already `.cpu()` and the val split is 1,098 blocks, so they are
+megabytes. **`wandb.watch(model, log="gradients", log_freq=50)` is deliberately left in
+place**: it is part of the logging pipeline, removing it changes what a canonical run
+records, and a per-epoch growth pattern does not implicate it. If the instrumented run
+shows `perf/gpu_peak_alloc_gib` still rising with this fix in, `wandb.watch` is the next
+thing to test - as a labelled variant, never as a silent edit.
+
+**Batch size was not touched.** `batch_size = 48` is a shared `enforced_field` frozen for
+the 8 GB card (T-L7.0/T-L7.1). Lowering it to fit memory would invalidate the five MoE
+runs and silently change the optimization problem. When a run does not fit, the defect
+gets fixed, not the protocol.
+
+**Verify.** `test_lang_recursion.py` asserts that the entropy computed from the
+incrementally accumulated count vector is **bit-identical** to the entropy computed from
+the retained index tensors, at `E = 1` (both `None`), 2 and 6, using the engine's own
+float32 accumulation order; that no `epoch_all_expert_idx` accumulator survives in
+executable engine code; and that the engine emits per-epoch peak GPU memory and resets the
+peak at each epoch head.
+
+**Evidence.** `test_lang_recursion.py` **17 passed / 0 failed / 0 skipped** (was 11;
+TLX.9a-d are this task), bit-identity at `E = 2` `0.9997463226318359` and `E = 6`
+`0.9999266266822815` on both paths. Gate L0 **TOTAL 356 356 0 0, ALL GATES PASS**.
+
+**Where to look.** If a MoR or MoRE run OOMs again, read `perf/gpu_peak_alloc_gib` first:
+flat across epochs means the leak is not retention and the next suspect is
+`wandb.watch`, rising means something else is holding graph-bearing tensors past its
+scope. Routing-statistic consumers: `code/more/metrics.py`, the two entropy entry points.
+Epoch-boundary memory instrumentation: `code/more/engine.py`, the
+`reset_peak_memory_stats` call at the epoch head and the two `perf/gpu_peak_*` keys in the
+metrics dict.
+
+---
+
 ---
 
 <!-- APPEND-MARKER-CL -->
