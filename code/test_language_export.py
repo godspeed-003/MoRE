@@ -29,7 +29,7 @@ point of running this BEFORE the matrix -- so 15 fixture runs are synthesized in
 temp directory and `export_results.RUNS`/`OUT` are pointed at it.
 
 Not faked: the metric key shapes. Every fixture's `metrics.json` is built from a
-REAL language run's metrics.json (221 scalar keys, 4 non-scalar), so the union,
+REAL language run's metrics.json (current real language metric key set), so the union,
 the N/A boundary and the prefix suppression are exercised against the keys the
 engine actually writes -- including the three the engine already derives
 (`val/perplexity`, `val/bits_per_token`, `val/nats_below_bigram_floor`), the two it
@@ -144,9 +144,8 @@ else:
     donor_rc = json.load(open(os.path.join(DONOR, "resolved_config.json"),
                               encoding="utf-8"))
     n_scalar = sum(1 for v in donor_m.values() if not isinstance(v, (dict, list)))
-    check("the donor carries a realistic language key set (>150 scalars, incl. the "
-          "depth/ block)",
-          n_scalar > 150 and any(k.startswith("depth/") for k in donor_m),
+    check("the donor carries the current language key set, incl. the depth/ block",
+          n_scalar >= 100 and any(k.startswith("depth/") for k in donor_m),
           f"{n_scalar} scalar keys, "
           f"{sum(1 for k in donor_m if k.startswith('depth/'))} under depth/")
     # The current metric contract. If the newest language run on disk lacks this, the

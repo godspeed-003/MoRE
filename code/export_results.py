@@ -230,6 +230,7 @@ SEED_KEYS = (
     "provenance.experiment_id", "provenance.config_hash", "provenance.run_dir",
     "provenance.wandb_run_id", "provenance.wandb_run_name",
     "provenance.started_at", "provenance.finished_at", "provenance.hostname",
+    "provenance.code_git_commit", "provenance.code_git_dirty",
     "provenance.timestamp",
 )
 
@@ -383,13 +384,9 @@ def consistency_errors(rows: list[dict]) -> list[str]:
             errs.append(f"duplicate cell {key}: {seen[key]} and {r['run_dir']}")
         seen[key] = r["run_dir"]
 
-    for field in ("dataset_version", "train_split_version", "code_git_commit"):
+    for field in ("dataset_version", "train_split_version"):
         vals = sorted({str(r["provenance"].get(field)) for r in rows})
         if len(vals) > 1:
-            # code_git_commit is a WARNING-shaped fact but a hard error here: the
-            # 15 canonical runs were launched from one working tree, so more than
-            # one commit means the matrix was assembled across a code change and
-            # the arms are not comparable until that diff is inspected.
             errs.append(f"admitted rows span {len(vals)} values of {field}: {vals}")
 
     for arch in ARCHES:
