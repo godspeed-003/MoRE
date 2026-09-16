@@ -3033,3 +3033,63 @@ where compute forces it, and say so in the caption rather than presenting a
     for the 8 GB card (T-L7.0/T-L7.1); lowering it to fit memory would invalidate the
     five MoE runs and silently change the optimization problem. When a run does not fit,
     the defect gets fixed, not the protocol.
+
+- [x] **T-LX.10 The published language results package carried a mixed-unit throughput
+  row and a single-commit provenance claim the exporter's own data contradicted.** The
+  15 canonical cells themselves audited clean (all present, all four artifacts each, all
+  conforming to `canonical_spec_language.json`); the two defects were in the package
+  built around them, and both were of the class CLAUDE.md §5 exists to prevent — a
+  number that means one thing being presented as though it meant another. **Verify:**
+  `test_language_export.py` 77 passed / 0 failed / 0 skipped; Gate L0 **TOTAL 356 356 0
+  0, ALL GATES PASS**; the regenerated `results/language/results_tables.md` shows a
+  complete `perf/throughput_items_sec` row across all three arms, `N/A` in the tokens
+  row for MoE only, and four commits enumerated with the cells behind each. **Evidence
+  (2026-09-16, CPU interpreter).**
+  - **Defect 1: `perf/throughput_tokens_sec` aggregated pre- and post-T-LX.8 runs in one
+    column.** All five canonical MoE runs were trained at `29fe5892`, before T-LX.8; they
+    publish a tokens key and no items key. Pre-T-LX.8 the engine divided batch ITEMS by
+    elapsed seconds, and on the language task an item is a `seq_len = 256` token block,
+    so their `718.8116 +- 7.2022` is items/s. It was published beside MoR's
+    `44485.5120` and MoRE's `43145.8525` tokens/s in a single row, reading as MoE being
+    ~62x slower than MoR when the truth is ~4x faster (718.81 x 256 ~ 183,976 tok/s).
+    **This is the T-LX.8 defect — the one that produced the 15-day cost estimate —
+    resurfacing inside the results package**, which is why the fix belongs in the
+    exporter and not in a note.
+  - **The version test needs no commit archaeology.** T-LX.8 began publishing
+    `perf/throughput_items_sec` alongside the corrected tokens key *precisely so that a
+    pre-fix log stays reconstructible*. So on the language task, a run carrying a tokens
+    value and no items value is pre-T-LX.8 by construction.
+    `normalize_throughput_units()` in `code/export_results.py` applies that test at
+    admission, inside `admit()`'s row builder, so **no downstream consumer can mix the
+    units**: `results.csv`, `results_aggregate.csv`, `results.json`, the Markdown and the
+    pairwise tests all read the repaired dict.
+  - **The value is relabelled, never rescaled.** Multiplying by `seq_len` would recover
+    the tokens figure exactly — it is the identical arithmetic the fixed engine performs,
+    and `seq_len` is a frozen `enforced_field` — but the product appears in no run's
+    `metrics.json`, and a reader who greps the artifact would find `718.8116` under a key
+    the table renders as `183,976`. CLAUDE.md §5 requires `N/A` over synthesis. The
+    relabelling costs nothing analytically because MoR and MoRE publish items/s too, so
+    the items row is complete and unit-consistent across all three arms and is the row a
+    throughput comparison should be read from; a Markdown footnote in section 3 says so,
+    and is emitted **only when the relabelling actually fired**, so a fully post-fix
+    matrix is not annotated with a defect it does not have.
+  - **Defect 2: the Markdown header attributed all 15 runs to `rows[0]`'s commit.** It
+    read `- git commit of the admitted runs: \`29fe5892...\` (dirty=True)`, and the
+    console printed `consistency: ... one commit, ...`. The matrix spans four:
+    `29fe5892` (MoE x5), `079de08a` (MoR s42), `f464c966` (MoR s43-46), `ba60b0b8`
+    (MoRE x5). **Neither claim was ever checked** — `consistency_errors()` verifies
+    duplicate cells, one `dataset_version`, one `train_split_version`, seed-blind config
+    equality within each arm, and floor-margin consistency, and has never examined
+    `code_git_commit`.
+  - **Removing commit from the seed-blind check was correct; the reporting simply never
+    followed.** A 15-run matrix trained over several days across two machines cannot
+    share one revision and still be a matrix — what holds the arms comparable is
+    `canonical_spec_language.json` plus the seed-blind config equality check, not a code
+    hash. The header now enumerates every distinct commit with its arm/seed cells, and
+    the console line states only what `consistency_errors()` actually enforces, then
+    reports the commit count separately as provenance rather than as a passed check. **A
+    success message that asserts a property no check enforces is worse than no message**,
+    because it is the line a reader trusts when deciding not to look.
+  - **Scope discipline.** No GPU run, no rebuilt dataset, no re-run cell, no reverted
+    fix: the 15 canonical artifacts are byte-unchanged and the defects were entirely in
+    the reporting layer downstream of them.

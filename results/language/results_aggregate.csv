@@ -293,10 +293,10 @@ perf/gpu_peak_alloc_gib,more,N/A,N/A,0,5,0
 perf/gpu_peak_reserved_gib,moe,N/A,N/A,0,5,0
 perf/gpu_peak_reserved_gib,mor,7.794921875,0.2705025242,5,0,0
 perf/gpu_peak_reserved_gib,more,N/A,N/A,0,5,0
-perf/throughput_items_sec,moe,N/A,N/A,0,5,0
+perf/throughput_items_sec,moe,718.8116254,7.202206656,5,0,0
 perf/throughput_items_sec,mor,173.7715314,6.337032829,5,0,0
 perf/throughput_items_sec,more,168.5384863,2.499153497,5,0,0
-perf/throughput_tokens_sec,moe,718.8116254,7.202206656,5,0,0
+perf/throughput_tokens_sec,moe,N/A,N/A,0,5,0
 perf/throughput_tokens_sec,mor,44485.51203,1622.280404,5,0,0
 perf/throughput_tokens_sec,more,43145.8525,639.7832953,5,0,0
 probe/family_ce,moe,1.908674533,0.07270714026,5,0,0

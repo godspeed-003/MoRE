@@ -255,6 +255,50 @@ def load_json(path: Path):
         return {"__error__": f"{type(exc).__name__}: {exc}"}
 
 
+TP_TOKENS = "perf/throughput_tokens_sec"
+TP_ITEMS = "perf/throughput_items_sec"
+
+
+def normalize_throughput_units(metrics: dict, run_task: str) -> dict:
+    """T-LX.8 unit repair, applied at admission so no table can mix units.
+
+    Before T-LX.8 the engine divided the batch-ITEM count by elapsed seconds and
+    published the quotient as `perf/throughput_tokens_sec`. On the arithmetic task
+    an item IS one token-equivalent record, so that key was correct there. On the
+    language task an item is a `seq_len`-token block, so every pre-fix language run
+    under-reports throughput by exactly `seq_len` (256x on the canonical corpus).
+    T-LX.8 fixed the tokens key and began publishing `perf/throughput_items_sec`
+    alongside it, precisely so a pre-fix log stays reconstructible.
+
+    That gives a version test that needs no commit archaeology: on the language task
+    a run that publishes a tokens value but NO items value predates T-LX.8, so the
+    value it labelled `tokens_sec` is really items/s. Here the number is moved into
+    the items slot it belongs in and the tokens slot is emptied.
+
+    The value is RELABELLED, never rescaled. Multiplying by `seq_len` would recover
+    the tokens figure exactly -- it is the same arithmetic the fixed engine performs
+    -- but it would put a number in the table that appears nowhere in the run's
+    metrics.json, and CLAUDE.md 5 requires the exporter to emit N/A rather than
+    synthesize. The items row stays complete and unit-consistent across all three
+    arms, which is the comparison a reader actually wants; the tokens row carries
+    N/A for the pre-fix arm and the Markdown footnotes why.
+
+    The defect this guards against is not hypothetical. The five canonical MoE runs
+    are all pre-fix, and the first export published MoE 718.81 tokens/s beside MoR
+    44485.51 tokens/s in one column -- reading as a 62x deficit where the truth is a
+    4x surplus. That mislabelling is the same one that produced the 15-day cost
+    estimate in T-LX.8.
+    """
+    if run_task != "language":
+        return metrics
+    tok, itm = metrics.get(TP_TOKENS), metrics.get(TP_ITEMS)
+    if isinstance(tok, (int, float)) and itm is None:
+        metrics = dict(metrics)
+        metrics[TP_ITEMS] = tok
+        metrics[TP_TOKENS] = None
+    return metrics
+
+
 def admit(d: Path) -> tuple[dict | None, str | None]:
     """Rule 1. Returns (row, None) for an admitted run or (None, reason) otherwise.
 
@@ -337,7 +381,9 @@ def admit(d: Path) -> tuple[dict | None, str | None]:
         | {"architecture": arch, "task": run_task},
         "seed_blind_config": {k: v for k, v in flatten(rc).items()
                               if k not in SEED_KEYS},
-        "metrics": {k: v for k, v in mt.items() if not isinstance(v, (dict, list))}
+        "metrics": normalize_throughput_units(
+            {k: v for k, v in mt.items() if not isinstance(v, (dict, list))},
+            run_task)
         # total_params lives in provenance, not metrics.json, but it is the one
         # provenance field that belongs in a results table: the MoE/MoRE parameter
         # identity and MoR's 0.120% deficit are what make the pairwise comparisons
@@ -702,9 +748,36 @@ def write_md(rows, refusals, agg, keys, pw, abl) -> Path:
     A(f"- admitted runs: " + ", ".join(
         f"{ARCH_LABEL[a]} {agg[a]['n_seeds']}/{len(FROZEN_SEEDS)} "
         f"(seeds {agg[a]['seeds']})" for a in ARCHES))
-    A(f"- git commit of the admitted runs: "
-      f"`{rows[0]['provenance'].get('code_git_commit')}` "
-      f"(dirty={rows[0]['provenance'].get('code_git_dirty')})")
+    # The commit line. This used to read `rows[0]['provenance']` and announce that
+    # one commit as "the git commit of the admitted runs", which is true only when
+    # the matrix happens to be single-commit. A 15-run matrix trained over several
+    # days is not: the language matrix spans four. Taking rows[0] published a
+    # provenance claim that the exporter's own data contradicted -- the exact class
+    # of defect the "never hand-copy a number" rule exists to prevent, arrived at
+    # automatically. Commit was deliberately removed from the seed-blind equality
+    # check (a multi-day matrix cannot share one commit and still be a matrix); this
+    # is the reporting side of that same decision. Every distinct commit is listed,
+    # with the arm and seed count behind it, so a reader can see exactly which cells
+    # were produced by which code state.
+    by_commit: dict[tuple, list[str]] = {}
+    for r in rows:
+        key = (r["provenance"].get("code_git_commit"),
+               r["provenance"].get("code_git_dirty"))
+        by_commit.setdefault(key, []).append(
+            f"{ARCH_LABEL[r['architecture']]} s{r['seed']}")
+    if len(by_commit) == 1:
+        (cm, dty), _ = next(iter(by_commit.items()))
+        A(f"- git commit of the admitted runs: `{cm}` (dirty={dty}) -- all "
+          f"{len(rows)} cells")
+    else:
+        A(f"- git commits of the admitted runs: **{len(by_commit)} distinct "
+          f"commits** across {len(rows)} cells. A canonical matrix is frozen by "
+          f"`canonical_spec_language.json`, not by a single code revision; the "
+          f"seed-blind config equality check below is what holds the arms "
+          f"comparable. Listed newest-directory-first:")
+        for (cm, dty), cells in by_commit.items():
+            A(f"  - `{cm}` (dirty={dty}) -- {len(cells)} cell(s): "
+              f"{', '.join(sorted(cells))}")
     A(f"- refused directories: {len(refusals)} (listed at the end; a refusal is the "
       f"admission filter working)")
     A("")
@@ -913,6 +986,34 @@ def _write_md_tail(L: list, rows, refusals, agg, keys, abl) -> Path:
                 cells.append(s)
             A(f"| `{k}` | " + " | ".join(cells) + " |")
         A("")
+    # T-LX.8 relabelling footnote. `normalize_throughput_units()` moves a pre-fix
+    # language run's mislabelled tokens/s figure into the items/s slot at admission,
+    # which leaves the tokens row N/A for exactly those arms. Without this note that
+    # N/A reads as "throughput was not measured", which is false -- it was measured,
+    # under the other unit, and it is one multiplication away. The note is emitted
+    # only when the relabelling actually fired, so a fully post-fix matrix is not
+    # annotated with a defect it does not have.
+    if TASK == "language":
+        relabelled = [ARCH_LABEL[a] for a in ARCHES
+                      if not agg[a]["metrics"].get(TP_TOKENS, {"n": 0})["n"]
+                      and agg[a]["metrics"].get(TP_ITEMS, {"n": 0})["n"]]
+        if relabelled:
+            A(f"**Throughput units.** `{TP_TOKENS}` is `N/A` for "
+              f"{', '.join(relabelled)} because those runs predate the T-LX.8 fix, "
+              f"which is detectable without commit archaeology: before T-LX.8 the "
+              f"engine divided batch ITEMS by elapsed seconds and labelled the "
+              f"quotient tokens/s, and it published no items/s key at all. On this "
+              f"task an item is one `seq_len`-token block, so the figure those runs "
+              f"recorded is items/s and it is reported above in the `{TP_ITEMS}` "
+              f"row, where it is directly comparable to every other arm. It is "
+              f"relabelled, never rescaled: multiplying by `seq_len` recovers the "
+              f"tokens figure exactly, but that product appears in no run's "
+              f"`metrics.json`, and this exporter reports `N/A` rather than "
+              f"synthesize a cell. **Compare throughput on the `{TP_ITEMS}` row.** "
+              f"Reading the tokens row alone would show these arms as missing, and "
+              f"an earlier export that mixed the two units in one row showed them "
+              f"as ~62x slower than the truth.")
+            A("")
     if dead:
         A("### Keys omitted from the tables above, and why")
         A("")
@@ -1106,8 +1207,17 @@ def main() -> int:
         for e in errs:
             print(f"  - {e}")
         return 2
-    print("consistency: one dataset_version, one split version, one commit, "
-          "no duplicate cells, seed-blind configs identical within each arm")
+    # This line must name exactly what `consistency_errors()` checked and nothing
+    # more. It used to claim "one commit", which that function has never verified
+    # and which the language matrix does not satisfy -- a success message asserting
+    # a property no check enforces is worse than no message, because it is the line
+    # a reader trusts when they decide not to look.
+    n_commits = len({r["provenance"].get("code_git_commit") for r in rows})
+    print("consistency: one dataset_version, one split version, no duplicate cells, "
+          "seed-blind configs identical within each arm")
+    print(f"  code_git_commit is NOT a consistency key: {n_commits} distinct "
+          f"commit(s) across {len(rows)} admitted cells, each listed in the "
+          f"Markdown header")
 
     incomplete = [a for a in ARCHES
                   if len([r for r in rows if r['architecture'] == a]) != len(FROZEN_SEEDS)]

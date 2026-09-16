@@ -10,8 +10,12 @@ numbers out of a run directory into this file -- regenerate it.
 - baseline floor on val: `4.984947` nats/token -- the backoff BIGRAM (T-L2.5), = 7.1918 bits, perplexity 146.2. A run that does not beat it has learned nothing a two-column count table could not. The derived columns below are monotone transforms of the nats; no verdict is taken on them.
 - **this is a per-token cross-entropy and the arithmetic tables are a mean squared error. They may never appear in one table (CLAUDE.md 6).**
 - admitted runs: MoE 5/5 (seeds [42, 43, 44, 45, 46]), MoR 5/5 (seeds [42, 43, 44, 45, 46]), MoRE 5/5 (seeds [42, 43, 44, 45, 46])
-- git commit of the admitted runs: `29fe5892fb3b09fc9be4c23c5c628d71c322bdb7` (dirty=True)
-- refused directories: 181 (listed at the end; a refusal is the admission filter working)
+- git commits of the admitted runs: **4 distinct commits** across 15 cells. A canonical matrix is frozen by `canonical_spec_language.json`, not by a single code revision; the seed-blind config equality check below is what holds the arms comparable. Listed newest-directory-first:
+  - `29fe5892fb3b09fc9be4c23c5c628d71c322bdb7` (dirty=True) -- 5 cell(s): MoE s42, MoE s43, MoE s44, MoE s45, MoE s46
+  - `079de08a2dc17d754173f1f62f1cf0af412a16a4` (dirty=True) -- 1 cell(s): MoR s42
+  - `f464c966b5f3921daa7e386d3470e11f1af89cb4` (dirty=True) -- 4 cell(s): MoR s43, MoR s44, MoR s45, MoR s46
+  - `ba60b0b817e09dfd102a63ccce3f3d8866ebd761` (dirty=True) -- 5 cell(s): MoRE s42, MoRE s43, MoRE s44, MoRE s45, MoRE s46
+- refused directories: 272 (listed at the end; a refusal is the admission filter working)
 
 ## 1. Headline
 
@@ -197,8 +201,8 @@ vector) are not table cells and are not shown here; they are carried in
 |---|---|---|---|
 | `perf/gpu_peak_alloc_gib` | N/A | 7.3346 +- 0.2905 | N/A |
 | `perf/gpu_peak_reserved_gib` | N/A | 7.7949 +- 0.2705 | N/A |
-| `perf/throughput_items_sec` | N/A | 173.7715 +- 6.3370 | 168.5385 +- 2.4992 |
-| `perf/throughput_tokens_sec` | 718.8116 +- 7.2022 | 44485.5120 +- 1622.2804 | 43145.8525 +- 639.7833 |
+| `perf/throughput_items_sec` | 718.8116 +- 7.2022 | 173.7715 +- 6.3370 | 168.5385 +- 2.4992 |
+| `perf/throughput_tokens_sec` | N/A | 44485.5120 +- 1622.2804 | 43145.8525 +- 639.7833 |
 
 ### `probe`
 
@@ -321,6 +325,8 @@ vector) are not table cells and are not shown here; they are carried in
 | `val/routing_recall_matched/E6_SORT_STAT` | 0.4113 +- 0.2796 | N/A | 0.2282 +- 0.0278 |
 | `val/task_loss` | 3.9529 +- 0.0396 | 3.5202 +- 0.0406 | 3.5031 +- 0.0133 |
 
+**Throughput units.** `perf/throughput_tokens_sec` is `N/A` for MoE because those runs predate the T-LX.8 fix, which is detectable without commit archaeology: before T-LX.8 the engine divided batch ITEMS by elapsed seconds and labelled the quotient tokens/s, and it published no items/s key at all. On this task an item is one `seq_len`-token block, so the figure those runs recorded is items/s and it is reported above in the `perf/throughput_items_sec` row, where it is directly comparable to every other arm. It is relabelled, never rescaled: multiplying by `seq_len` recovers the tokens figure exactly, but that product appears in no run's `metrics.json`, and this exporter reports `N/A` rather than synthesize a cell. **Compare throughput on the `perf/throughput_items_sec` row.** Reading the tokens row alone would show these arms as missing, and an earlier export that mixed the two units in one row showed them as ~62x slower than the truth.
+
 ### Keys omitted from the tables above, and why
 
 | key | reason | recorded value |
@@ -389,6 +395,9 @@ skipped these would be indistinguishable from one that found nothing wrong.
 | `famcls_nofam_seed43__ca305b98` | experiment_group='exploratory' != 'canonical_lang_b' |
 | `famcls_nofam_seed44__1d8e55dd` | experiment_group='exploratory' != 'canonical_lang_b' |
 | `gate1_dataset_check__seedNA__fa24821c` | experiment_group='exploratory' != 'canonical_lang_b' |
+| `langB_MoR_seed43__c1873a66` | experiment_group='lang_smoke2' != 'canonical_lang_b' |
+| `langB_MoR_seed44__78580ac8` | no metrics.json (run did not finish) |
+| `langB_MoR_seed44__78580ac8__r2` | experiment_group='langB_smoke' != 'canonical_lang_b' |
 | `langB_MoRE_seed42__1304961e` | no metrics.json (run did not finish) |
 | `langB_MoRE_seed42__1304961e__r4` | experiment_group='langB_gate_l7' != 'canonical_lang_b' |
 | `langB_MoRE_seed42__91c9bba1` | experiment_group='lang_smoke' != 'canonical_lang_b' |
@@ -428,14 +437,6 @@ skipped these would be indistinguishable from one that found nothing wrong.
 | `langB_MoRE_seed45__90b9896f` | no metrics.json (run did not finish) |
 | `langB_MoRE_seed45__d6025531` | experiment_group='lang_rho_fix' != 'canonical_lang_b' |
 | `langB_MoRE_seed46__d9882139` | no metrics.json (run did not finish) |
-| `langB_MoR_seed42__547e435b` | no metrics.json (run did not finish) |
-| `langB_MoR_seed42__547e435b__r2` | no metrics.json (run did not finish) |
-| `langB_MoR_seed43__84a6b29d` | no metrics.json (run did not finish) |
-| `langB_MoR_seed43__84a6b29d__r2` | no metrics.json (run did not finish) |
-| `langB_MoR_seed43__84a6b29d__r3` | no metrics.json (run did not finish) |
-| `langB_MoR_seed43__c1873a66` | experiment_group='lang_smoke2' != 'canonical_lang_b' |
-| `langB_MoR_seed44__78580ac8` | no metrics.json (run did not finish) |
-| `langB_MoR_seed44__78580ac8__r2` | experiment_group='langB_smoke' != 'canonical_lang_b' |
 | `nacheck_moe__seedNA__27d97bf3` | experiment_group='exploratory' != 'canonical_lang_b' |
 | `nacheck_mor__seedNA__a2494065` | experiment_group='exploratory' != 'canonical_lang_b' |
 | `nacheck_more__seedNA__9f1a6c31` | experiment_group='exploratory' != 'canonical_lang_b' |
@@ -526,12 +527,108 @@ skipped these would be indistinguishable from one that found nothing wrong.
 | `t67_provenance_check_seed44__59000a77__r7` | experiment_group='exploratory' != 'canonical_lang_b' |
 | `t67_provenance_check_seed44__59000a77__r8` | experiment_group='exploratory' != 'canonical_lang_b' |
 | `t67_provenance_check_seed44__59000a77__r9` | experiment_group='exploratory' != 'canonical_lang_b' |
+| `t67_provenance_check_seed44__6b711a59` | experiment_group='exploratory' != 'canonical_lang_b' |
+| `t67_provenance_check_seed44__6b711a59__r10` | experiment_group='exploratory' != 'canonical_lang_b' |
+| `t67_provenance_check_seed44__6b711a59__r11` | experiment_group='exploratory' != 'canonical_lang_b' |
+| `t67_provenance_check_seed44__6b711a59__r12` | experiment_group='exploratory' != 'canonical_lang_b' |
+| `t67_provenance_check_seed44__6b711a59__r13` | experiment_group='exploratory' != 'canonical_lang_b' |
+| `t67_provenance_check_seed44__6b711a59__r14` | experiment_group='exploratory' != 'canonical_lang_b' |
+| `t67_provenance_check_seed44__6b711a59__r15` | experiment_group='exploratory' != 'canonical_lang_b' |
+| `t67_provenance_check_seed44__6b711a59__r16` | experiment_group='exploratory' != 'canonical_lang_b' |
+| `t67_provenance_check_seed44__6b711a59__r17` | experiment_group='exploratory' != 'canonical_lang_b' |
+| `t67_provenance_check_seed44__6b711a59__r18` | experiment_group='exploratory' != 'canonical_lang_b' |
+| `t67_provenance_check_seed44__6b711a59__r19` | experiment_group='exploratory' != 'canonical_lang_b' |
+| `t67_provenance_check_seed44__6b711a59__r2` | experiment_group='exploratory' != 'canonical_lang_b' |
+| `t67_provenance_check_seed44__6b711a59__r20` | experiment_group='exploratory' != 'canonical_lang_b' |
+| `t67_provenance_check_seed44__6b711a59__r21` | experiment_group='exploratory' != 'canonical_lang_b' |
+| `t67_provenance_check_seed44__6b711a59__r22` | experiment_group='exploratory' != 'canonical_lang_b' |
+| `t67_provenance_check_seed44__6b711a59__r23` | experiment_group='exploratory' != 'canonical_lang_b' |
+| `t67_provenance_check_seed44__6b711a59__r24` | experiment_group='exploratory' != 'canonical_lang_b' |
+| `t67_provenance_check_seed44__6b711a59__r25` | experiment_group='exploratory' != 'canonical_lang_b' |
+| `t67_provenance_check_seed44__6b711a59__r26` | experiment_group='exploratory' != 'canonical_lang_b' |
+| `t67_provenance_check_seed44__6b711a59__r27` | experiment_group='exploratory' != 'canonical_lang_b' |
+| `t67_provenance_check_seed44__6b711a59__r28` | experiment_group='exploratory' != 'canonical_lang_b' |
+| `t67_provenance_check_seed44__6b711a59__r29` | experiment_group='exploratory' != 'canonical_lang_b' |
+| `t67_provenance_check_seed44__6b711a59__r3` | experiment_group='exploratory' != 'canonical_lang_b' |
+| `t67_provenance_check_seed44__6b711a59__r30` | experiment_group='exploratory' != 'canonical_lang_b' |
+| `t67_provenance_check_seed44__6b711a59__r31` | experiment_group='exploratory' != 'canonical_lang_b' |
+| `t67_provenance_check_seed44__6b711a59__r32` | experiment_group='exploratory' != 'canonical_lang_b' |
+| `t67_provenance_check_seed44__6b711a59__r33` | experiment_group='exploratory' != 'canonical_lang_b' |
+| `t67_provenance_check_seed44__6b711a59__r34` | experiment_group='exploratory' != 'canonical_lang_b' |
+| `t67_provenance_check_seed44__6b711a59__r35` | experiment_group='exploratory' != 'canonical_lang_b' |
+| `t67_provenance_check_seed44__6b711a59__r36` | experiment_group='exploratory' != 'canonical_lang_b' |
+| `t67_provenance_check_seed44__6b711a59__r37` | experiment_group='exploratory' != 'canonical_lang_b' |
+| `t67_provenance_check_seed44__6b711a59__r38` | experiment_group='exploratory' != 'canonical_lang_b' |
+| `t67_provenance_check_seed44__6b711a59__r39` | experiment_group='exploratory' != 'canonical_lang_b' |
+| `t67_provenance_check_seed44__6b711a59__r4` | experiment_group='exploratory' != 'canonical_lang_b' |
+| `t67_provenance_check_seed44__6b711a59__r40` | experiment_group='exploratory' != 'canonical_lang_b' |
+| `t67_provenance_check_seed44__6b711a59__r41` | experiment_group='exploratory' != 'canonical_lang_b' |
+| `t67_provenance_check_seed44__6b711a59__r42` | experiment_group='exploratory' != 'canonical_lang_b' |
+| `t67_provenance_check_seed44__6b711a59__r43` | experiment_group='exploratory' != 'canonical_lang_b' |
+| `t67_provenance_check_seed44__6b711a59__r44` | experiment_group='exploratory' != 'canonical_lang_b' |
+| `t67_provenance_check_seed44__6b711a59__r45` | experiment_group='exploratory' != 'canonical_lang_b' |
+| `t67_provenance_check_seed44__6b711a59__r46` | experiment_group='exploratory' != 'canonical_lang_b' |
+| `t67_provenance_check_seed44__6b711a59__r47` | experiment_group='exploratory' != 'canonical_lang_b' |
+| `t67_provenance_check_seed44__6b711a59__r48` | experiment_group='exploratory' != 'canonical_lang_b' |
+| `t67_provenance_check_seed44__6b711a59__r49` | experiment_group='exploratory' != 'canonical_lang_b' |
+| `t67_provenance_check_seed44__6b711a59__r5` | experiment_group='exploratory' != 'canonical_lang_b' |
+| `t67_provenance_check_seed44__6b711a59__r6` | experiment_group='exploratory' != 'canonical_lang_b' |
+| `t67_provenance_check_seed44__6b711a59__r7` | experiment_group='exploratory' != 'canonical_lang_b' |
+| `t67_provenance_check_seed44__6b711a59__r8` | experiment_group='exploratory' != 'canonical_lang_b' |
+| `t67_provenance_check_seed44__6b711a59__r9` | no metrics.json (run did not finish) |
 | `t67_provenance_check_seed44__c1c47354` | no metrics.json (run did not finish) |
 | `t67_provenance_check_seed44__c1c47354__r2` | experiment_group='exploratory' != 'canonical_lang_b' |
 | `t67_provenance_check_seed44__c1c47354__r3` | experiment_group='exploratory' != 'canonical_lang_b' |
 | `t67_provenance_check_seed44__c1c47354__r4` | experiment_group='exploratory' != 'canonical_lang_b' |
 | `t67_provenance_check_seed44__c1c47354__r5` | experiment_group='exploratory' != 'canonical_lang_b' |
 | `t67_provenance_check_seed44__c3571d3a` | experiment_group='exploratory' != 'canonical_lang_b' |
+| `t67d_provenance_check_mor_seed44__fa9339bc` | experiment_group='exploratory' != 'canonical_lang_b' |
+| `t67d_provenance_check_mor_seed44__fa9339bc__r10` | experiment_group='exploratory' != 'canonical_lang_b' |
+| `t67d_provenance_check_mor_seed44__fa9339bc__r11` | experiment_group='exploratory' != 'canonical_lang_b' |
+| `t67d_provenance_check_mor_seed44__fa9339bc__r12` | experiment_group='exploratory' != 'canonical_lang_b' |
+| `t67d_provenance_check_mor_seed44__fa9339bc__r13` | experiment_group='exploratory' != 'canonical_lang_b' |
+| `t67d_provenance_check_mor_seed44__fa9339bc__r14` | experiment_group='exploratory' != 'canonical_lang_b' |
+| `t67d_provenance_check_mor_seed44__fa9339bc__r15` | experiment_group='exploratory' != 'canonical_lang_b' |
+| `t67d_provenance_check_mor_seed44__fa9339bc__r16` | experiment_group='exploratory' != 'canonical_lang_b' |
+| `t67d_provenance_check_mor_seed44__fa9339bc__r17` | experiment_group='exploratory' != 'canonical_lang_b' |
+| `t67d_provenance_check_mor_seed44__fa9339bc__r18` | experiment_group='exploratory' != 'canonical_lang_b' |
+| `t67d_provenance_check_mor_seed44__fa9339bc__r19` | experiment_group='exploratory' != 'canonical_lang_b' |
+| `t67d_provenance_check_mor_seed44__fa9339bc__r2` | experiment_group='exploratory' != 'canonical_lang_b' |
+| `t67d_provenance_check_mor_seed44__fa9339bc__r20` | experiment_group='exploratory' != 'canonical_lang_b' |
+| `t67d_provenance_check_mor_seed44__fa9339bc__r21` | experiment_group='exploratory' != 'canonical_lang_b' |
+| `t67d_provenance_check_mor_seed44__fa9339bc__r22` | experiment_group='exploratory' != 'canonical_lang_b' |
+| `t67d_provenance_check_mor_seed44__fa9339bc__r23` | experiment_group='exploratory' != 'canonical_lang_b' |
+| `t67d_provenance_check_mor_seed44__fa9339bc__r24` | experiment_group='exploratory' != 'canonical_lang_b' |
+| `t67d_provenance_check_mor_seed44__fa9339bc__r25` | experiment_group='exploratory' != 'canonical_lang_b' |
+| `t67d_provenance_check_mor_seed44__fa9339bc__r26` | experiment_group='exploratory' != 'canonical_lang_b' |
+| `t67d_provenance_check_mor_seed44__fa9339bc__r27` | experiment_group='exploratory' != 'canonical_lang_b' |
+| `t67d_provenance_check_mor_seed44__fa9339bc__r28` | experiment_group='exploratory' != 'canonical_lang_b' |
+| `t67d_provenance_check_mor_seed44__fa9339bc__r29` | experiment_group='exploratory' != 'canonical_lang_b' |
+| `t67d_provenance_check_mor_seed44__fa9339bc__r3` | experiment_group='exploratory' != 'canonical_lang_b' |
+| `t67d_provenance_check_mor_seed44__fa9339bc__r30` | experiment_group='exploratory' != 'canonical_lang_b' |
+| `t67d_provenance_check_mor_seed44__fa9339bc__r31` | experiment_group='exploratory' != 'canonical_lang_b' |
+| `t67d_provenance_check_mor_seed44__fa9339bc__r32` | experiment_group='exploratory' != 'canonical_lang_b' |
+| `t67d_provenance_check_mor_seed44__fa9339bc__r33` | experiment_group='exploratory' != 'canonical_lang_b' |
+| `t67d_provenance_check_mor_seed44__fa9339bc__r34` | experiment_group='exploratory' != 'canonical_lang_b' |
+| `t67d_provenance_check_mor_seed44__fa9339bc__r35` | experiment_group='exploratory' != 'canonical_lang_b' |
+| `t67d_provenance_check_mor_seed44__fa9339bc__r36` | experiment_group='exploratory' != 'canonical_lang_b' |
+| `t67d_provenance_check_mor_seed44__fa9339bc__r37` | experiment_group='exploratory' != 'canonical_lang_b' |
+| `t67d_provenance_check_mor_seed44__fa9339bc__r38` | experiment_group='exploratory' != 'canonical_lang_b' |
+| `t67d_provenance_check_mor_seed44__fa9339bc__r39` | experiment_group='exploratory' != 'canonical_lang_b' |
+| `t67d_provenance_check_mor_seed44__fa9339bc__r4` | experiment_group='exploratory' != 'canonical_lang_b' |
+| `t67d_provenance_check_mor_seed44__fa9339bc__r40` | experiment_group='exploratory' != 'canonical_lang_b' |
+| `t67d_provenance_check_mor_seed44__fa9339bc__r41` | experiment_group='exploratory' != 'canonical_lang_b' |
+| `t67d_provenance_check_mor_seed44__fa9339bc__r42` | experiment_group='exploratory' != 'canonical_lang_b' |
+| `t67d_provenance_check_mor_seed44__fa9339bc__r43` | experiment_group='exploratory' != 'canonical_lang_b' |
+| `t67d_provenance_check_mor_seed44__fa9339bc__r44` | experiment_group='exploratory' != 'canonical_lang_b' |
+| `t67d_provenance_check_mor_seed44__fa9339bc__r45` | experiment_group='exploratory' != 'canonical_lang_b' |
+| `t67d_provenance_check_mor_seed44__fa9339bc__r46` | experiment_group='exploratory' != 'canonical_lang_b' |
+| `t67d_provenance_check_mor_seed44__fa9339bc__r47` | experiment_group='exploratory' != 'canonical_lang_b' |
+| `t67d_provenance_check_mor_seed44__fa9339bc__r5` | experiment_group='exploratory' != 'canonical_lang_b' |
+| `t67d_provenance_check_mor_seed44__fa9339bc__r6` | experiment_group='exploratory' != 'canonical_lang_b' |
+| `t67d_provenance_check_mor_seed44__fa9339bc__r7` | experiment_group='exploratory' != 'canonical_lang_b' |
+| `t67d_provenance_check_mor_seed44__fa9339bc__r8` | experiment_group='exploratory' != 'canonical_lang_b' |
+| `t67d_provenance_check_mor_seed44__fa9339bc__r9` | experiment_group='exploratory' != 'canonical_lang_b' |
 | `t68_matched_check_seed42__2d8b6203` | experiment_group='exploratory' != 'canonical_lang_b' |
 | `t81_moe__seedNA__b5532075` | experiment_group='t81_smoke' != 'canonical_lang_b' |
 | `t81_mor__seedNA__30831ff6` | experiment_group='t81_smoke' != 'canonical_lang_b' |
@@ -552,3 +649,4 @@ skipped these would be indistinguishable from one that found nothing wrong.
 | `t_l03_mor_timing_seed44__fa9339bc` | experiment_group='exploratory' != 'canonical_lang_b' |
 | `t_l03_mor_timing_seed44__fa9339bc__r2` | no metrics.json (run did not finish) |
 | `t_l03_mor_timing_seed44__fa9339bc__r3` | experiment_group='exploratory' != 'canonical_lang_b' |
+
