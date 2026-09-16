@@ -89,7 +89,7 @@
     "normalized": 0.27238032486571845
   },
   "decile_generator": "data/lang/build_depth_deciles.py",
-  "decile_generator_commit": "11c36d223862ba185f9b579cb2a93b14829b5c31",
+  "decile_generator_commit": "29fe5892fb3b09fc9be4c23c5c628d71c322bdb7",
   "decile_is_canonical": false,
   "decile_purpose": "ablation F (supervised_curriculum) only. plan_language.md \u00a75: canonical language runs invent no depth target, so loss_weights.halting_supervision stays 0.0 and halting stays pure ACT. The decile->depth mapping is a DESIGN CHOICE and lives in code/more/lang_families.py:decile_target_depth, not in this artifact.",
   "decile_table": [
@@ -271,10 +271,10 @@
   "floors_eval_tokens": 281088,
   "floors_fitted_on": "train",
   "floors_generator": "data/lang/build_baseline_floors.py",
-  "floors_generator_commit": "5aae2e3fd3245c0fae3fde96f13cd786a7897c41",
+  "floors_generator_commit": "29fe5892fb3b09fc9be4c23c5c628d71c322bdb7",
   "floors_ordered_uniform_ge_unigram_ge_bigram": true,
   "floors_units": "nats per token",
-  "generator_commit": "9470ff273d126565e5c18a3661c5c7eae2e4a6af",
+  "generator_commit": "29fe5892fb3b09fc9be4c23c5c628d71c322bdb7",
   "generator_script": "data/lang/build_language_dataset.py",
   "hf_config": "wikitext-103-raw-v1",
   "hf_dataset": "Salesforce/wikitext",
@@ -489,7 +489,7 @@
     }
   ],
   "shuffled_control_generator": "data/lang/build_shuffled_control.py",
-  "shuffled_control_generator_commit": "82e521d4a311512de6cda0745b6eff455f6da0d4",
+  "shuffled_control_generator_commit": "29fe5892fb3b09fc9be4c23c5c628d71c322bdb7",
   "shuffled_control_marginal_entropy_draws": [
     0.8951314103695812,
     0.8941335379282797,
@@ -694,7 +694,7 @@
   "train_documents": 29445,
   "train_text_bytes": 539295549,
   "uniform_ce": 9.010913347279288,
-  "unigram_ce": 7.19822725507796,
+  "unigram_ce": 7.198227255077959,
   "unigram_smoothing": "add-1 (Laplace)",
   "unigram_unseen_types": 80,
   "unk_literal_occurrences": {
