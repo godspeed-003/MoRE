@@ -3093,3 +3093,209 @@ where compute forces it, and say so in the caption rather than presenting a
   - **Scope discipline.** No GPU run, no rebuilt dataset, no re-run cell, no reverted
     fix: the 15 canonical artifacts are byte-unchanged and the defects were entirely in
     the reporting layer downstream of them.
+
+## T-LX.11 - the MoRE depth loop re-routes every step, and that is why adaptive depth is absent
+
+**Status: FINDING, diagnosed and quantified. No change to the model yet. The 15
+canonical cells are byte-unchanged and remain canonical.**
+
+- **The spec.** `CLAUDE.md` 1: "MoRE - a token is routed to a specialized expert, and
+  **that expert's** weights are recursively reused for an adaptive number of steps."
+  One routing decision per token; recursion happens *inside* the chosen expert.
+- **The code.** `code/more/model.py:605` opens `for depth in range(1, self.max_depth + 1)`
+  and `:646` calls `self.moe_block(active_inputs)` **inside** that loop, so
+  `:240 expert_idx = torch.argmax(router_probs, dim=-1)` re-decides at every recursion
+  step. `:672-674` captures `first_route_flat` at `depth == 1` **for reporting only** -
+  nothing consumes it to constrain later steps. Grepping `code/` for
+  `route_once|fixed_rout|freeze_rout|persist_rout|route_at_depth` returns no matches: no
+  fixed-routing option exists anywhere.
+- **The compounding half.** `:723-728` selects the halt head by the *same* `expert_idx`:
+
+  ```python
+  halt_logits = torch.zeros(N_active, device=x.device)
+  for e, halt_head in enumerate(self.expert_halt_heads):
+      emask = (expert_idx == e)
+      if emask.any():
+          halt_logits = halt_logits.clone()
+          halt_logits[emask] = halt_head(updated[emask]).squeeze(-1)
+  ```
+
+  So a token's halting policy is re-drawn every step too. A halt head can only learn
+  "how much more compute does *this* trajectory need" if it sees the same trajectory
+  across steps, and it does not.
+- **Provenance of the design.** This is not a regression introduced in the language
+  phase. It was a deliberate arithmetic-phase choice: in the arithmetic corpus a record's
+  operations ran in sequence (add, then multiply), so switching expert per step modelled
+  the data correctly. Carrying it into language unchanged was the unexamined step.
+
+### Blast radius: 5 of 15 canonical cells
+
+| arm | `num_experts` | `max_depth` | real routing decisions | affected |
+|---|---|---|---|---|
+| MoE | 6 | 1 | 1 (router fires once; no second step to re-route at) | no |
+| MoR | 1 | 7 | 0 (argmax over a single logit is always expert 0) | no |
+| MoRE | 6 | 7 | 7 | **yes** |
+
+The MoE and MoR arms are unaffected *by construction*, not by luck. Their numbers stand
+regardless of how this is resolved.
+
+### Part 1 measurement - route stability (PROXY, read the provenance warning)
+
+`code/diag_route_stability.py`, written for this task. It wraps `MoEBlock.forward` to
+capture `out[2]` (`expert_idx`) per depth call rather than editing the model, so it is
+read-only with respect to the canonical code path. Two passes: `adaptive` (the model as
+trained - the active set shrinks as tokens halt, so per-depth vectors stop being
+row-aligned with depth 1 and the comparison truncates at the first width mismatch) and
+`fixed` (`fixed_depth=True` **at inference only** - no weight or shape change, it merely
+stops tokens halting, so all N tokens are present at all 7 depths and agreement is
+exactly aligned). Both are reported so neither artifact can hide the answer.
+
+**PROVENANCE WARNING, read before quoting any Part 1 number.** `checkpoint.pt` is
+**MISSING for all 15 canonical cells**: `*.pt` is gitignored (`.gitignore:47`) and the
+rented V100 was terminated, so only `metrics.json` was ever committed. The runs
+themselves are valid and canonical - what is unavailable is their *weights*, which blocks
+any post-hoc inspection of a trained canonical model's internals. Every Part 1 number
+therefore comes from a **proxy** under `CLAUDE.md` 6 and may never enter a headline table
+or be substituted for a canonical cell. What keeps it valid: route stability is a
+property of the forward graph, which is bit-identical across the proxy and the canonical
+runs (same code path, `num_experts=6`, `max_depth=7`, `routing_mode=top1_sparse`,
+`router_noise=none`).
+
+Closest available proxy - `runs/langB_MoRE_seed42__1304961e__r4`, canonical corpus
+`lang-wikitext-103-bpe8192-len256-800d6154`, canonical `batch_size`/`lr`/`ffn_mult`,
+`epochs=1` where canonical is 3 (that single field is what makes it a proxy):
+
+| depth | `P(expert_d == expert_d1)` |
+|---|---|
+| 1 | 1.0000 |
+| 2 | 0.6176 |
+| 3 | 0.5155 |
+| 4 | 0.4591 |
+| 5 | 0.4271 |
+| 6 | 0.3935 |
+| 7 | **0.3509** |
+
+Per-step switch rate **0.2768**. Chance for E=6 is 0.1667; the spec's value is 1.0000.
+**65% of tokens finish their recursion in a different expert than they started in, and
+38% leave on the very first step.** So the built architecture is not "an expert recursing
+on its own weights" - it is seven independently-routed MoE applications that share
+weights.
+
+### Part 2 measurement - the consequence, on the CANONICAL matrix
+
+Part 2 needs no checkpoints: every value is already in the 15 canonical `metrics.json`
+files, so **this half is canonical evidence and may be quoted as such.** MoR (E=1: the
+router is a no-op and one halt head governs every token at every step) against MoRE
+(E=6: both expert and halt head re-drawn per step). MoE is excluded because
+`max_depth = 1` leaves it no depth to allocate. Exact two-sided permutation test, n=5 vs
+n=5, 252 permutations, floor p = 2/252 = 0.0079.
+
+| quantity | MoR (n=5) | MoRE (n=5) | perm p |
+|---|---|---|---|
+| `depth/spearman_vs_model_loss` | **+0.2953 +- 0.0553** | **-0.0154 +- 0.0186** | 0.0079 |
+| `depth/spearman_vs_logfreq` | +0.2108 +- 0.0635 | -0.0068 +- 0.0061 | 0.0079 |
+| `depth/embed_norm_logfreq_partial_norm` | +0.1722 +- 0.0608 | -0.0156 +- 0.0117 | 0.0079 |
+| `depth/by_document/between_share` | +0.0104 +- 0.0099 | +0.0003 +- 0.0002 | 0.0079 |
+| `val/forced_exit_rate` | +0.7931 +- 0.2031 | +0.9840 +- 0.0029 | 0.0079 |
+| `depth/mean` | +6.6167 +- 0.4393 | +6.9651 +- 0.0119 | 0.0079 |
+| `val/task_loss` | +3.5202 +- 0.0406 | +3.5031 +- 0.0133 | 0.4048 |
+
+Ranges are fully disjoint on every depth-quality row (MoR min +0.2275 vs MoRE max
++0.0013 on the model-loss correlation), which is why p sits at the floor.
+
+**MoR allocates recursion depth in proportion to how hard it finds a token. MoRE does
+not - its correlation is statistically indistinguishable from zero and of the wrong
+sign.** Adding routing to recursion did not merely fail to help; it removed the adaptive
+behaviour that recursion alone had. The task loss is unchanged (p=0.40), so this is
+invisible in the headline quality row and shows up only in the depth diagnostics.
+
+### What this pair does NOT establish
+
+MoR and MoRE differ in **three** things at once: expert count (1 vs 6), halt-head count
+(1 vs 6), and `ffn_mult` (24 vs 4, set that way to match total params at 5.58M). Part 2
+therefore establishes *that* adaptive depth is present in one arm and absent in the
+other; it cannot attribute the loss to re-routing specifically. Part 1 is what points at
+re-routing, and Part 1 is a proxy.
+
+**The attributing experiment** is a MoRE variant that freezes the depth-1 assignment for
+the remainder of that token's recursion, holding `num_experts`, halt-head count and
+`ffn_mult` fixed and moving *only* the re-routing. Per `CLAUDE.md` 6 it must be added as
+an explicitly labelled variant with the original MoRE arm preserved, never as a
+correction to it.
+
+**Pre-registered predictions for that variant** (recorded before it is run, so it can
+fail):
+
+1. `val/forced_exit_rate` falls materially below 0.984.
+2. `depth/spearman_vs_model_loss` becomes positive and clears its permutation null band.
+3. `val/routing_ami` rises toward or past MoE's 0.1615 +- 0.0231 (currently MoRE 0.1410
+   +- 0.0160 - *below* MoE despite MoRE having 7x more routing opportunities, which is
+   itself hard to explain any other way).
+4. `val/task_loss` is **not** predicted to improve. If depth allocation is repaired and
+   loss is unchanged, that is Outcome B, and it is reported as Outcome B.
+
+### Adjacent findings from the same audit
+
+- **A second design lever, independent of re-routing.** Six halt heads is a choice, not a
+  requirement of `CLAUDE.md` 1. Even with routing frozen, each per-expert halt head sees
+  ~1/6 of the tokens, so the halting policy trains on 6x less data than a single shared
+  halt head would. Worth an arm of its own.
+- **The router's input distribution is not stationary across depth.** One
+  `nn.Linear(d_model, E)` (`:167`) is applied to the depth-1 state *and* to post-LN
+  recursed states at depths 2..7. Those are different distributions with no
+  depth-conditioning, which is a second, independent reason the argmax is unstable.
+- **`ffn_mult` is 4 / 24 / 4 for MoE / MoR / MoRE.** Total params are matched at 5.58M,
+  but **active FFN params per token per step differ ~6x**: MoR's single block has hidden
+  6144 and is always active, while MoE/MoRE dispatch top-1 into one of six hidden-1024
+  experts. With near-equal mean depth (6.62 vs 6.97), MoRE reaches statistically
+  identical loss to MoR at ~5.7x less active FFN compute. That is a real efficiency
+  result the current tables do not extract. Wall-clock does not show it (MoRE 168.5 vs
+  MoR 173.8 items/s), which is itself worth reporting.
+- **The 2x2 has a missing control.** depth in {1,7} x E in {1,6}: MoE fills (1,6), MoR
+  fills (7,1), MoRE fills (7,6), and **(1,1) is absent**. So "MoR beats MoE" conflates
+  adaptive recursion with 7x more sequential block applications *and* 7x more attention
+  passes - it is parameter-matched but **not compute-matched** (MoE is ~4.1x faster in
+  items/s). `fixed_depth` already exists in the model, so the depth-matched
+  "recursion without halting" control is a config change, not new code.
+- **`halting` loss weight is 0.001** for both MoR and MoRE against `task` 1.0. Both arms
+  sit near the depth ceiling (6.62/7 and 6.97/7), so the ponder pressure may simply be
+  too weak for halting to bind at all.
+- **Memory: the MoR arm does not fit an 8 GB card with margin.** Canonical MoR
+  `perf/gpu_peak_alloc_gib` runs 6.849-7.522 and `perf/gpu_peak_reserved_gib` runs
+  7.439-**8.064**; two seeds exceed 8.0 GiB reserved. Ayan's RTX 4060 8 GB drives a
+  Windows display, so re-running the MoR arm there at the frozen `batch_size=48` will be
+  at or over the line. T-LX.9 removed a ~7.4 GiB leak but did not create headroom at this
+  batch size. MoRE cells predate T-LX.9 and carry no `gpu_peak_*` keys at all, so MoRE's
+  peak is unknown.
+- **Provenance gap: the GPU model is not recorded.** `provenance` carries `device` only,
+  whose value is the string `cuda` for all 15 cells. There is no `gpu_name`, so the
+  hardware identity of a canonical run is not recoverable from the repo - it is known to
+  be one rented V100 session only from session history. `CLAUDE.md` 5 asks for full
+  provenance; add `gpu_name` before the next matrix so "same GPU across all arms" is a
+  checkable claim rather than a remembered one.
+
+### Verified correct, explicitly not defects
+
+ACT is canonical Graves 2016 with step weights summing to exactly 1 and a live gradient
+path to the halt heads through the convex combination (`:704-760`); halted states are
+frozen, never recomputed, and stay attendable, with `attn_query_wasted` measured
+(`:626-637`); balance loss is divided by realised `bal_calls` so its magnitude is
+depth-invariant (`:799-811`); `fixed_depth` correctly gives the halt heads no gradient
+because that configuration has no halting to train (`:734-741`); `tie_lm_head`,
+`num_blocks=1`, `routing_mode=top1_sparse`, `router_noise=none`, `d_model=256`,
+`n_heads=4`, `dropout=0.1`, `epochs=3`, `batch_size=48`, `lr=0.001`, `grad_clip=1.0`,
+`weight_decay=1e-4` are identical across all three arms.
+
+### Verify
+
+```
+python code/diag_route_stability.py            # CUDA interpreter; Part 1 + Part 2
+python code/run_correctness_suite.py           # Gate L0: TOTAL 356 356 0 0
+```
+
+### Where to look
+
+`code/more/model.py:605` (depth loop), `:646` (router call inside it), `:672-674`
+(`first_route_flat`, reporting only), `:723-728` (halt head selected by `expert_idx`),
+`:734` (`fixed_depth` branch). Diagnostic: `code/diag_route_stability.py`. Output:
+`results/language/diagnostics/route_stability.json`.
