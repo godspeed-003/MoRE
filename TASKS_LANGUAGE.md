@@ -3676,3 +3676,80 @@ python code/run_language_matrix.py --smoke        # then read the new run's reso
 reasoning for keeping these fields out of `updated_rules.md` §9:
 `_required_fields`' docstring in `code/test_phase6_provenance.py`. Full change record:
 `changelog.md` T-LX.13.
+
+---
+
+- [x] **T-LX.16 — evaluate on the held-out test split without retraining.**
+  Reviewer 652J concern 4 (validation reported as though it were test) is the only
+  objection that can invalidate a published number. Established that
+  `data/test.jsonl` (5,250 records) was **never touched**, on two independent
+  grounds: `engine.py` has no test loader at all in the arithmetic path (it reads
+  only `train_path`/`jsonl_path` at `engine.py:179` and `val_path` at
+  `engine.py:201`; `SPLITS` with `"test"` exists only at `lang_data.py:68`), and
+  whole-line SHA-1 gives train∩test = 0, val∩test = 0, train∩val = 0 across
+  59,500 / 5,250 / 5,250 records. So the fix is one forward pass, not ~5.6 h of
+  retraining — and retraining would produce a *different* model than the paper
+  reports. Added `code/eval_test_split.py`, which mirrors the engine's validation
+  reduction exactly (`engine.py:999-1002`) so `test/task_loss` is comparable to
+  the published `val/task_loss`, with five hard guards (train/val path identity,
+  re-verified record disjointness, test-file SHA-256 in the sidecar, routing
+  accuracy vs confusion diagonal to 1e-9 per CLAUDE.md §4, and `"N/A"` never
+  `0.0`). Writes only a `test_split_metrics.json` sidecar, so no canonical
+  artifact changes and no `config_hash` moves.
+
+  **Blocked, but not on compute.** The 15 canonical `phaseB_*` cells have no
+  `checkpoint.pt` in this worktree — `.gitignore:21` and `:47` exclude them, so
+  they were never committed, and they live on Ayan's machine. **Fetch them; do
+  not retrain.** The script's `FileNotFoundError` says so in its message.
+
+  **Real defect caught by running it rather than by a pre-written test:** first
+  execution failed on `step_proj.0.weight` shape `[256,12]` vs `[256,8]`, because
+  `step_feat_dim` is a *model* field (`engine.py:137`) and the initial code read
+  it from `data` with a default of 8. Now reads `model` first and **raises** when
+  absent in both. The same inert wrong default remains in `diag_halt_gradient.py`
+  and `flops_accounting.py`, where it cannot bite because the language model has
+  no `step_proj` — verified against the language checkpoint's keys, so the
+  T-LX.14 and T-LX.15 results stand.
+
+  ### Verify
+
+  ```
+  python code/run_correctness_suite.py                                    # TOTAL 356 356 0 0
+  python code/eval_test_split.py runs/t67_provenance_check_seed44__6b711a59 --device cpu
+  python code/eval_test_split.py --group canonical_phase_b --device cpu    # 15 skipped, no ckpt
+  ```
+
+  Executed: test 0.069772 vs published val 0.073807, delta +0.004035, disjointness
+  0/0, on an **exploratory** (not canonical) checkpoint — proves the harness, not
+  the matrix.
+
+  ### Where to look
+
+  `code/eval_test_split.py` — `verify_disjoint` and the path-identity check in
+  `evaluate` are the leak guards; `_ROUTING_TOL` is the CLAUDE.md §4 cross-check.
+  Full record: `changelog.md` T-LX.16. Agenda: `PAPER_REVISION.md` §2.3.
+
+- [x] **T-LX.17 — reframe the reviewer output as a revision agenda, not a rebuttal.**
+  There is no author-response phase: the rejection is final and the paper goes to
+  another venue, so the reviews are an expert defect list. Rewrote
+  `PAPER_REVISION.md` accordingly — priority is now "how much it improves the
+  paper" rather than "how loudly a reviewer raised it", and every fix must stand
+  as ordinary good practice in the paper's own text, since the next reviewer will
+  not have seen these reviews. Recorded the **7-seed rationale**, which the naive
+  reading gets wrong: no reviewer asked for seeds; the binding constraint is
+  test-family size. At 5 seeds the permutation floor is 0.00794 while Bonferroni
+  at 7 tests is 0.00714, so past six tests *nothing* can be significant at any
+  effect size — and the revision's own controls (the fixed-depth sweep alone is up
+  to 7 comparisons) would therefore destroy the significance of the results the
+  paper already has. 7 seeds moves the floor to 0.00058 (~85 tests of headroom).
+  Also recorded that 7 seeds will **not** rescue MoRE vs MoR (p = 0.405, a genuine
+  null), so the extension cannot be mistaken for a fishing expedition. Cost
+  measured, not guessed: ~22 min per arithmetic run, so 2 extra seeds × 3 arms
+  ≈ 2.2 h locally with no rental. Seeds 42–46 remain frozen in
+  `canonical_spec.json`; extending to 42–48 is a spec amendment that must be
+  recorded **before** the runs execute.
+
+  ### Where to look
+
+  `PAPER_REVISION.md` §2.5 (seed argument, resolution correction), §6 (GPU split),
+  §7 (venue). Full record: `changelog.md` T-LX.17.

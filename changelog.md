@@ -7254,5 +7254,166 @@ reported until the cause is found.
 
 ---
 
+## T-LX.16 — the held-out test split is clean and usable; evaluate on it without retraining
+
+**Why.** NeurIPS-workshop reviewer 652J, concern 4: headline results are reported on
+**validation** despite a declared **test** split, and the paper does not say whether the same
+held-out data both selected and evaluated the constant `c = 2`. This is the only objection in
+either review that can invalidate a published number rather than merely under-describe it, so
+it was triaged first.
+
+**Finding 1 — the test split was never touched, on two independent grounds.** `data/test.jsonl`
+holds 5,250 records.
+
+1. *No code path could have read it.* `engine.py` opens `dc["train_path"]`/`dc["jsonl_path"]`
+   (`engine.py:179`) and `dc["val_path"]` (`engine.py:201`), and nothing else. The arithmetic
+   path has no test loader at all: `SPLITS = ("train", "val", "test")` occurs only at
+   `lang_data.py:68`. No run could have touched it even accidentally.
+2. *Byte-level disjointness.* Whole-line SHA-1 over all three files gives train 59,500 /
+   val 5,250 / test 5,250 records, every record unique within its split, and
+   **train∩test = 0, val∩test = 0, train∩val = 0**.
+
+So the repair is a forward pass, not a training run. That is a large cost difference: ~5.6 h
+of retraining versus minutes of inference, and more importantly a retrained model is a
+*different* model than the one the paper reports (CLAUDE.md §6: preserve the original run).
+
+**Finding 2 — the canonical checkpoints are not in this worktree.** All 15 `phaseB_*` cells
+have `resolved_config.json`, `metrics.json` and `results.tsv` but **no `checkpoint.pt`**:
+`.gitignore:21` excludes `runs/**/checkpoint.pt` and `.gitignore:47` excludes `*.pt`, so they
+were never committed. They were produced on Ayan's machine (CLAUDE.md §9) and should still be
+there. `eval_test_split.py` raises a `FileNotFoundError` whose message says exactly this and
+says to fetch rather than retrain, because the obvious wrong move when 15 checkpoints are
+missing is to regenerate them.
+
+**What was added.** `code/eval_test_split.py`. Rebuilds the model from the run's own
+`resolved_config.json`, loads the checkpoint, and scores the test split with the *identical*
+reduction the engine uses for validation — arithmetic `F.mse_loss(reg.squeeze(-1), tgt)`
+sample-weighted exactly as `engine.py:999-1002`, language next-token CE as
+`engine.py:994-997` — so `test/task_loss` is directly comparable to the published
+`val/task_loss` rather than a differently-reduced near-miss. Also reports test-split routing
+accuracy, confusion-diagonal fraction, mean depth and exit histogram, because the
+specialization and depth claims have to survive the split change too. Supports
+`--group canonical_phase_b` to sweep a whole matrix.
+
+Five guards, all hard failures, none silent:
+
+1. the resolved test path must differ from **both** the train and val paths the run used — a
+   config pointing them at one file would manufacture a training number wearing a test label;
+2. record-level disjointness is **re-verified on every invocation**, not trusted from a prior
+   session (~2 s, against the cost of publishing a leaked number);
+3. the test file's SHA-256 goes into the sidecar, so a later run proves it scored the same
+   bytes;
+4. routing accuracy and the confusion diagonal must agree to `1e-9` — the CLAUDE.md §4
+   invariant — and disagreement **raises** rather than reporting the more flattering of the
+   two;
+5. absent quantities are `"N/A"`, never `0.0`.
+
+Output is a `test_split_metrics.json` sidecar only. The script never writes `metrics.json`,
+`results.tsv` or the checkpoint, so no canonical artifact changes and no `config_hash` moves.
+
+**A real defect this caught, which a pre-written test would not have.** The first execution
+failed with `size mismatch for step_proj.0.weight: copying a param with shape [256, 12] ...
+the shape in current model is [256, 8]`. Cause: `step_feat_dim` is a **model** field —
+`engine.py:137` reads `mc["step_feat_dim"]` — and every config in `runs/` carries
+`model.step_feat_dim = 12` with **no** `data.step_feat_dim`. The initial
+`dc.get("step_feat_dim", 8)` therefore silently built the input projection four columns too
+narrow. Fixed by reading `mc` first and **raising** when the field is absent in both, rather
+than defaulting: a wrong input width either fails the load or, worse, loads a model that
+never trained.
+
+*This same wrong default is present in `code/diag_halt_gradient.py` and
+`code/flops_accounting.py`.* It never surfaced there because both are language-only and the
+language model has **no `step_proj` at all** — verified by listing the language checkpoint's
+keys, which contain no `step_proj` entry, since language consumes token embeddings rather
+than step features. **The T-LX.14 gradient-attribution result and the T-LX.15 FLOPs table are
+therefore unaffected.** Left as-is rather than "fixed", because changing a parameter those
+files never construct would be a no-op edit to working code; recorded here so the next reader
+of either file knows the default is inert there and load-bearing in `eval_test_split.py`.
+
+**Validated by execution**, on the one arithmetic checkpoint that exists in this worktree —
+`runs/t67_provenance_check_seed44__6b711a59`, an exploratory smoke run, **not** canonical:
+
+| quantity | value |
+|---|---|
+| test records / train∩test / val∩test | 5,250 / 0 / 0 |
+| `test/task_loss` | 0.069772 |
+| published `val/task_loss` | 0.073807 |
+| `val_minus_test` | **+0.004035** (test slightly *better*) |
+| `test/routing_accuracy` | 0.0990 |
+| `test/depth_mean` | 2.899 |
+
+The `--group canonical_phase_b` sweep was also run and correctly reported all 15 cells skipped
+for missing checkpoints. One exploratory cell proves the harness runs; it is **not** evidence
+about the canonical matrix, and the sidecar records `experiment_group` so it cannot later be
+mistaken for one.
+
+**Where to look.** `code/eval_test_split.py`. The leak guards are `verify_disjoint` and the
+train/val path-identity check in `evaluate`; the routing cross-check is the `_ROUTING_TOL`
+comparison. The `step_feat_dim` resolution and the reason it raises instead of defaulting are
+commented at the top of `evaluate`. Revision agenda this serves: `PAPER_REVISION.md` §2.3.
+
+---
+
+## T-LX.17 — reframe the reviewer output as a revision agenda, not a rebuttal
+
+**Why.** The first draft of `PAPER_REVISION.md` was written as a point-by-point author
+response. That is the wrong artifact: the rejection is final, there is no author-response
+phase, and the paper goes to a different venue. Reviews are being used as an expert defect
+list.
+
+**Consequences that changed the document, not just its tone.**
+
+1. **Nothing may assume the next reviewer has seen these reviews.** Every fix has to stand as
+   ordinary good practice in the paper's own text — ACT equations in methods, the FLOPs table
+   in results, the corrected permutation resolution in the statistics section — rather than as
+   an argument addressed to someone.
+2. **Priority order changed** from "how loudly a reviewer raised it" to "how much it improves
+   the paper": items changing a number or a claim (§1.2, §2.3, §2.5) are mandatory, missing
+   experiments (§2.1, §2.2) are high value because the paper itself raises those questions and
+   leaves them open, presentation (§3, §4) is last.
+3. **Two objections are refuted by measurement** and the paper must state the measured fact
+   rather than adopt the reviewer's premise — silently conceding a point that measurement
+   contradicts would put a false statement in the next draft.
+
+**Also recorded: the 7-seed rationale, because the naive reading is wrong.** No reviewer asked
+for more seeds; 652J only corrected the *stated* resolution. Seven seeds is a consequence, and
+not for a better p-value — the binding constraint is the **size of the test family**:
+
+| | 5 seeds/arm | 7 seeds/arm |
+|---|---|---|
+| partitions `C(2n,n)` | 252 | 3,432 |
+| min attainable two-sided p | 0.00794 | 0.00058 |
+| Bonferroni α at 6 tests | 0.00833 | 0.00833 |
+| margin | **0.0004** | 0.0078 |
+| max tests before the floor exceeds α | **6** | ~85 |
+
+At 5 seeds the floor is 0.00794 while Bonferroni at 7 tests is 0.00714: past six tests **no
+result can be significant at any effect size**, because the smallest p the design can emit
+exceeds the threshold it must clear. The paper sits at 6 tests with a 0.0004 margin. The
+revision *adds* tests — the fixed-depth sweep alone is up to 7 comparisons — so **running the
+controls the paper needs would, at 5 seeds, destroy the significance of the results it already
+has.** That is the entire argument for 7.
+
+Recorded equally explicitly: 7 seeds will **not** rescue MoRE vs MoR (diff 0.0172, pooled sd
+~0.03, p = 0.405). That is a genuine null; more seeds tighten the interval around ~zero rather
+than moving it. Writing this down so a later reader cannot mistake the seed extension for a
+fishing expedition.
+
+**Cost, measured not guessed.** The canonical arithmetic cells ran at 2,216 items/s over
+59,500 records × 50 epochs ≈ **22 min per run**, so 2 extra seeds × 3 arms ≈ **2.2 h** — local
+hardware, no rental. Language is the expensive side and the extension folds into the
+MoRE-per-token re-run that is already mandatory.
+
+**Integrity precondition, unchanged.** Seeds 42–46 are frozen in `canonical_spec.json` and
+`canonical_spec_language.json` (CLAUDE.md §5). Extending to 42–48 is a spec amendment that
+must be recorded **before** the runs execute. Amending after seeing results is seed-shopping
+regardless of intent; amending because the planned controls require the resolution is
+legitimate, and that reason is the one written down here.
+
+**Where to look.** `PAPER_REVISION.md` — §2.5 for the seed argument and the resolution
+correction, §6 for the GPU/no-GPU split, §7 for the venue consequences.
+
+---
+
 <!-- APPEND-MARKER-CL -->
 
