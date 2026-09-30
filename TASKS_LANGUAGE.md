@@ -3150,6 +3150,57 @@ where compute forces it, and say so in the caption rather than presenting a
     change and their torch build is **not** recoverable from the repo. If the re-run MoRE
     arm lands on a different torch than they did, that belongs in threats-to-validity.
 
+- [x] **T-LX.14 The halt heads are trained 285x harder by the task loss than by the
+  ponder cost — so the absent adaptive depth is not a missing gradient, it is a task
+  loss that wants maximum depth.** Reviewer 652J (NeurIPS workshop, concern 1) could not
+  find the ACT output aggregation in the paper and inferred the halt head sees only a
+  discrete state, predicting "a near-constant policy". The aggregation exists
+  (`model.py:995`, `accumulator += updated * step_weight`, weights summing to exactly 1),
+  and their `c_t + p_t` "double count" is paper notation, not a defect — `c_t` is
+  strictly-prior mass, so the test is standard Graves 2016. But the *prediction* is
+  correct, which is why the question is dominance, not existence.
+  **Measured** on the converged 30-epoch checkpoint `runs/langB_MoRE_seed44__68d032ba`:
+  task-loss gradient at `expert_halt_heads` **7.786e-02**, ponder **2.734e-04**,
+  ratio **285x task-dominated**; `routing_balance` and `step_routing` exact structural
+  zeros (no graph path), labelled as measurements rather than sentinels per CLAUDE.md §4.
+  Depth and val loss move *together* over training — depth 1.96 → 6.82 while val
+  5.68 → 4.63 — so the task loss is pulling depth up, not failing to hold it down.
+  Per-family depth spread is only 6.80–6.94 across six families and
+  `depth/by_document/between_share` is 0.0008: there is nothing for the policy to be
+  adaptive about at this scale. **This is the mechanism-bearing form of Outcome C**, and
+  it predicts the V100 MoRE re-run will land near the cap — that rental buys
+  architectural correctness, not a depth result.
+  **Verify — by running, not only by test:** Gate L0 **TOTAL 356 356 0 0 / ALL GATES
+  PASS**, and the diagnostic run against a real trained checkpoint, artifact
+  `halt_gradient_attribution.json` in that run directory.
+  **Full write-up: `changelog.md` T-LX.14.**
+
+- [x] **T-LX.15 "Compute-matched" had never been measured — the repository contained no
+  FLOPs accounting at all.** Only two comments marked the hole (`engine.py:1458`,
+  `metrics.py:1647`). Reviewer 652J concern 3 made it a condition of acceptance:
+  *"MoRE versus MoR needs an iso-FLOP or iso-latency control."*
+  `code/flops_accounting.py` measures a real forward with `FlopCounterMode` from each
+  arm's own `resolved_config.json` — so attention, positional table and the 8192-way LM
+  head are counted, which every hand derivation had dropped — sweeps depth with
+  `fixed_depth`, and **verifies** the `base + (d-1)*per_step` fit against a third measured
+  point rather than assuming linearity (>0.1% residual raises).
+  At each arm's own measured `depth/mean`: MoE **10.751** GFLOPs, MoR **97.506**,
+  MoRE **23.565** → MoR/MoRE **4.14x**, MoR/MoE **9.07x**, MoRE/MoE **2.19x**.
+  MoE's marginal-step cell is `N/A`, not 0.
+  **The trap:** that 4.14x buys nothing in wall-clock — MoR 173.8 vs MoRE 168.5 items/s,
+  a 3% deficit for MoRE on the same card, because top-1 dispatch spends the saving on
+  gather/scatter. FLOPs and latency point in opposite directions; every claim must name
+  which axis it rests on.
+  **Consequence for the reviewer's demand:** iso-parameter holds by construction and
+  iso-latency *already holds* (MoR vs MoRE within 3%), so the published matrix contains
+  the control that was asked for and the failure was in the reporting. iso-FLOP is not
+  matched and cannot be, jointly with iso-parameter, in this family: matching MoR's active
+  width means `ffn_mult 24 → 4`, which drops its FFN parameters to a sixth. An iso-FLOP
+  MoR is a *second* control, not a replacement.
+  **Supersedes** the ~3.7x / ~25x multipliers quoted in session chat before this module
+  existed; those were FFN-only and are wrong.
+  **Full write-up: `changelog.md` T-LX.15.**
+
 ## T-LX.11 - the MoRE depth loop re-routes every step, and that is why adaptive depth is absent
 
 **Status: FINDING, diagnosed and quantified. No change to the model yet. The 15

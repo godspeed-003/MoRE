@@ -1,0 +1,25 @@
+{
+  "run": "langB_MoRE_seed44__68d032ba",
+  "corpus": "wikitext-2",
+  "batches": 4,
+  "batch_size": 48,
+  "device": "cpu",
+  "routing_persistence": "per_token",
+  "ponder_weight": 0.001,
+  "halt_head_tensors": 12,
+  "halt_head_params": 1542,
+  "avg_depth_mean": 6.483113646507263,
+  "grad_norm": {
+    "task": 0.07786218543298176,
+    "ponder": 0.0002734471909437692,
+    "routing_balance": 0.0,
+    "step_routing": 0.0
+  },
+  "grad_norm_std": {
+    "task": 0.009306374155481502,
+    "ponder": 1.3150692949290318e-05,
+    "routing_balance": 0.0,
+    "step_routing": 0.0
+  },
+  "task_over_ponder_ratio": 284.7430436723451
+}

@@ -1,0 +1,63 @@
+{
+  "_README": "TEMPORARY -- T-LX.14 control. Declares the per_step ablation explicitly so the dev-corpus MoRE run matches the 5 published cells. Delete after use; never commit.",
+  "task": "language",
+  "model": {
+    "d_model": 256,
+    "n_heads": 4,
+    "attention": true,
+    "tie_lm_head": true,
+    "num_blocks": 1,
+    "max_depth": 7,
+    "dropout": 0.1,
+    "routing_mode": "top1_sparse",
+    "router_noise": "none",
+    "halting_supervision": false,
+    "routing_persistence": "per_step",
+    "num_experts": 6,
+    "router_noise_init": 0.1,
+    "router_noise_anneal_steps": 1000,
+    "max_steps": 7,
+    "step_feat_dim": 12,
+    "adaptive_halting": true,
+    "ffn_mult": 4
+  },
+  "training": {
+    "lr": 0.001,
+    "weight_decay": 0.0001,
+    "batch_size": 48,
+    "epochs": 3,
+    "grad_clip": 1.0,
+    "val_split": 0.1,
+    "subset_fraction": 1.0,
+    "subset_seed": 42
+  },
+  "loss_weights": {
+    "task": 1.0,
+    "routing_balance": 0.001,
+    "step_routing": 0.0,
+    "halting": 0.001,
+    "halting_supervision": 0.0,
+    "family_cls": 0.0
+  },
+  "data": {
+    "corpus": "wikitext-2",
+    "seq_len": 256,
+    "vocab_size": 8192,
+    "subset_fraction": 1.0,
+    "train_path": "D:\\res\\git\\MoRE\\.claude\\worktrees\\english-language-dataset-migration-92946e\\data\\train.jsonl",
+    "val_path": "D:\\res\\git\\MoRE\\.claude\\worktrees\\english-language-dataset-migration-92946e\\data\\val.jsonl",
+    "test_path": "D:\\res\\git\\MoRE\\.claude\\worktrees\\english-language-dataset-migration-92946e\\data\\test.jsonl",
+    "jsonl_path": "D:\\res\\git\\MoRE\\.claude\\worktrees\\english-language-dataset-migration-92946e\\data\\train.jsonl",
+    "subset_seed": 42,
+    "max_val": 1000000.0,
+    "pad_value": 0.0,
+    "dataset_version": "lang-wikitext-2-bpe8192-len256-9f870794",
+    "train_split_version": "wikitext-author-splits-v1"
+  },
+  "logging": {
+    "wandb_project": "micro-MoRE-language",
+    "log_interval": 1,
+    "run_name": "langB_MoRE"
+  },
+  "architecture": "more"
+}

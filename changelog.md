@@ -7126,5 +7126,133 @@ explains why the fields are there and not in `updated_rules.md` 9.
 
 ---
 
+## T-LX.14 - The halt heads are trained by the task loss, 285x harder than by the ponder cost, and depth still pins at the cap
+
+**What was believed.** Two independent readers reached the same conclusion from
+opposite directions. NeurIPS-workshop reviewer 652J (concern 1) read the paper's ACT
+section, found no definition of the output aggregation, and inferred: *"If the task loss
+sees only a discrete halted state, the halt head learns mainly to stop early, and a
+near-constant policy is expected."* Internally, the near-cap depth of the five published
+MoRE cells (`val/forced_exit_rate` 0.980-0.987) was being read as a symptom of T-LX.11's
+per-step re-routing, and therefore as something T-LX.12 would fix.
+
+**Both readings are wrong, and the measurement says so.** The convex-combination
+aggregation the reviewer could not find is at `code/more/model.py:995` - section
+`5. Accumulate the ACT-weighted output`, `accumulator[active] += updated * step_weight`
+with per-token weights summing to exactly 1 - so the task loss sees a weighted mixture of
+every step's state and a real gradient path to the halt heads exists. The reviewer's
+`c_t + p_t > 1 - eps` "double count" is likewise a notation ambiguity in the paper, not a
+defect: `c_t` is the mass accumulated strictly BEFORE step t, so the test is the standard
+Graves 2016 form. And T-LX.12 does not change depth at all: the 30-epoch per-token dev
+run climbs 1.96 -> 6.82 mean depth and force-exits 88.9% of tokens at step 7, which is
+where the per-step cells already were.
+
+**The actual mechanism, measured.** `diag_halt_gradient.py` backpropagates each objective
+term separately into `blocks[*].expert_halt_heads.*` on the converged 30-epoch checkpoint
+(`runs/langB_MoRE_seed44__68d032ba`, 12 tensors / 1,542 params, 4 val batches, eval mode
+so dropout is off):
+
+| objective term | \|\|grad\|\| at halt heads |
+|---|---|
+| `task` (LM cross-entropy) | **7.786e-02** +- 9.3e-03 |
+| `ponder` (weight 0.001) | **2.734e-04** +- 1.3e-05 |
+| `routing_balance` | exact structural 0 |
+| `step_routing` | exact structural 0 |
+
+**task / ponder = 285x.** The halting policy is overwhelmingly trained by the task loss,
+not suppressed by the ponder cost - so "depth rises because nothing pushes it down" is
+refuted too. Depth rises because *the task loss pulls it up*: across the 30-epoch trend
+mean depth and val loss move together (depth 1.96 -> 6.82 while val 5.68 -> 4.63, best
+4.6265 at epoch ~12). At this scale on language there is no token for which early exit is
+task-optimal, so the halting policy has nothing to be adaptive about. Corroborating
+spread: `depth/mean_by_family` ranges only 6.80 (L6_NUM_SUBWORD) to 6.94 (L5_PUNCT_SYM)
+across six families, and `depth/by_document/between_share` is 0.0008.
+
+The two exact zeros are **measurements, not sentinels** (CLAUDE.md 4). The balance and
+step-routing terms are functions of `router_logits` alone; no edge of the autograd graph
+runs from them to a halt head, so their derivative is structurally zero rather than
+numerically small. The script labels them that way in both stdout and the sidecar so a
+future reader cannot mistake either for the dead halt gradient `updated_rules.md` 2.2
+forbids.
+
+**Why this is the honest form of Outcome C.** "MoRE shows no adaptive depth" with a
+measured cause - a task gradient that is present, dominant, and monotonically pro-depth -
+is a substantially stronger statement than the same sentence with no mechanism, and it
+survives the reviewer's objection rather than conceding it. It also predicts the V100
+re-run's depth result in advance: MoRE-per-token will land near the cap, and the rental
+buys architectural correctness, not a depth finding.
+
+**Verified by running.** Gate L0 `TOTAL 356 356 0 0` / `ALL GATES PASS`, and the
+diagnostic itself executed against a real trained checkpoint rather than a fixture -
+`runs/langB_MoRE_seed44__68d032ba/halt_gradient_attribution.json` is the artifact.
+
+**Where to look.** `code/diag_halt_gradient.py`. The aggregation it vindicates is
+`code/more/model.py:995`; the loss assembly it mirrors term-for-term, including the
+weights actually applied, is `code/more/engine.py:830-838`. The script refuses to report
+`0.0` when the parameter name match comes back empty (`halt_params`, which raises) -
+because an empty match and a genuinely absent gradient would otherwise print identically.
+
+---
+
+## T-LX.15 - FLOPs accounting, because "compute-matched" had never been measured anywhere in the repository
+
+**What was missing.** The three language arms are parameter-matched by construction
+(MoE 6x4, MoR 1x24, MoRE 6x4 FFN units - 24 each) and that was being allowed to stand in
+for compute-matching. It does not: MoR runs one 24x-wide FFN with every unit active, MoRE
+activates one of six 4x experts, and both then multiply by mean recursion depth. Before
+this task the repository contained **no FLOPs accounting at all** - only two comments
+marking the hole (`engine.py:1458`, `metrics.py:1647`), both warning that the
+depth-allocation-error metric must not be called "compute efficiency" because no FLOPs are
+in it. Reviewer 652J independently made it a condition: *"MoRE versus MoR needs an
+iso-FLOP or iso-latency control."*
+
+**Measured, not derived.** `flops_accounting.py` runs `FlopCounterMode` over a real
+forward built from each arm's own `resolved_config.json`, so attention, the positional
+table and the 8192-way LM head are all counted - the parts every hand derivation had
+dropped. Depth is swept with `fixed_depth=True`, and the two-point fit
+`FLOPs(d) = base + (d-1) * per_step` is **verified against a third measured point**, not
+assumed; a residual above 0.1% raises rather than reports, because a non-linearity in
+depth would mean the recursion is not doing what the architecture claims. Each arm is then
+evaluated at its own measured `depth/mean`, never at `max_depth`.
+
+| arm | E | ffn | d_mean | GFLOPs @1 | GF/extra step | GFLOPs @ d_mean | items/s |
+|---|---|---|---|---|---|---|---|
+| MoE | 6 | 4 | 1.000 | 10.751 | N/A | 10.751 | 718.8 |
+| MoR | 1 | 24 | 6.899 | 21.483 | 12.887 | **97.506** | 173.8 |
+| MoRE | 6 | 4 | 6.947 | 10.751 | 2.155 | **23.565** | 168.5 |
+
+MoR / MoRE = **4.14x**, MoR / MoE = **9.07x**, MoRE / MoE = **2.19x**. MoE's marginal
+step is `N/A`, not 0: at `max_depth = 1` there is no extra step to price, and a 0 in that
+column would read as "free recursion".
+
+**The trap this closes, stated so it cannot be reopened.** A 4.14x FLOP advantage buys
+**nothing** in wall-clock: MoR 173.8 vs MoRE 168.5 items/s is a 3% deficit for MoRE on the
+same card. The top-1 dispatch spends the entire theoretical saving on gather/scatter and
+never reaches a fused sparse kernel. So FLOPs and latency point in OPPOSITE directions
+here, and any claim must name which one it rests on. The module prints that sentence
+under every table for exactly this reason.
+
+**Three axes, and two of them are already matched.** iso-parameter: all three arms, by
+construction. iso-latency: MoR and MoRE within 3% on one card - which means the published
+matrix *already contains* the iso-latency control the reviewer asked for, and the omission
+was in the reporting, not in the experiments. iso-FLOP: not matched, and now quantified
+instead of hand-waved. Note that in this architecture family iso-parameter and iso-FLOP
+are **mutually exclusive** - matching MoR's active width to MoRE's means `ffn_mult 24 -> 4`
+at `num_experts = 1`, which drops its FFN parameters to a sixth. An iso-FLOP MoR is
+therefore a second control, never a replacement for the parameter-matched one.
+
+**Superseded numbers.** Multipliers of ~3.7x (MoR/MoRE) and ~25x (MoR/MoE) were quoted in
+session chat before this module existed. They were FFN-only hand derivations and are
+**wrong**; 4.14x and 9.07x are the measured values and are the only ones that may appear
+in the paper. An FFN-only derivation overstates the gap because the shared attention,
+embedding and LM-head cost is a large constant that dilutes it.
+
+**Where to look.** `code/flops_accounting.py`, artifact at
+`results/flops_language.json`. The linearity guard is `profile_arm`'s `resid` check; if it
+ever fires, the two-point composition is invalid and no composed FLOPs number may be
+reported until the cause is found.
+
+---
+
 <!-- APPEND-MARKER-CL -->
 
