@@ -38,6 +38,51 @@ DENSE_ABLATION_ROUTING_MODE = "dense_blend"
 ROUTING_MODES = (CANONICAL_ROUTING_MODE, DENSE_ABLATION_ROUTING_MODE)
 
 # ---------------------------------------------------------------------------
+# Routing persistence across recursion depth (T-LX.12; diagnosed as T-LX.11)
+# ---------------------------------------------------------------------------
+#
+# This axis answers: WHEN does the router fire?
+#
+# "per_token" -- ONCE per token per forward pass. The expert chosen at a token's
+#   first depth, and the gate probability that selected it, are cached and reused
+#   at every subsequent recursion step. This is MoRE as specified (CLAUDE.md 1:
+#   "a token is routed to a specialized expert, and THAT EXPERT's weights are
+#   recursively reused for an adaptive number of steps"). Because the halt heads
+#   are per-expert and indexed by the same decision, persisting the expert also
+#   persists the halting policy, so a halt head finally observes one token's
+#   whole trajectory.
+#
+# "per_step" -- LEGACY. The router fires again inside the depth loop, so the
+#   expert AND the halt head are re-drawn at every recursion step. Measured on
+#   the canonical-corpus proxy (code/diag_route_stability.py): agreement with the
+#   depth-1 expert decays 1.000 / 0.618 / 0.516 / 0.459 / 0.427 / 0.394 / 0.351
+#   at a per-step switch rate of 0.277 against a chance level of 1/6 = 0.167. So
+#   65% of tokens finish recursion in a different expert than they started in:
+#   the realised architecture is seven independently-routed MoE applications that
+#   happen to share weights, not one expert recursing.
+#
+#   Its consequence on the canonical matrix, MoR vs per-step MoRE, n=5 vs n=5,
+#   exact permutation test (floor p = 2/252 = 0.0079):
+#       depth/spearman_vs_model_loss  +0.2953 +- 0.0553  vs  -0.0154 +- 0.0186
+#   i.e. per-step MoRE's depth allocation is statistically zero and of the wrong
+#   sign, while task loss is indistinguishable (p = 0.40) -- the defect is
+#   invisible in the quality row and shows up only in the depth diagnostics.
+#
+# WHY "per_step" IS THE DEFAULT AND WHY THE CONFIG KEY IS ABSENT BY DEFAULT.
+# `run_context.config_hash` hashes the whole config minus `provenance` and
+# `logging`, so writing this key into every config would move the config_hash of
+# all 15 published arithmetic runs -- the exact harm the absent-key pattern in
+# `config.load_config_defaults` exists to avoid (see the `task` key there). A
+# legacy default plus an absent key means: arithmetic and the ten published
+# language MoE/MoR cells stay byte-reproducible, the five published per-step MoRE
+# cells keep meaning exactly what they did, and only a config that explicitly
+# asks for "per_token" gets the new behaviour and a new hash.
+ROUTING_PERSISTENCE_PER_TOKEN = "per_token"
+ROUTING_PERSISTENCE_LEGACY = "per_step"
+ROUTING_PERSISTENCE_MODES = (ROUTING_PERSISTENCE_PER_TOKEN,
+                             ROUTING_PERSISTENCE_LEGACY)
+
+# ---------------------------------------------------------------------------
 # Router exploration noise (T5.4, plan.md 7.4 / updated_rules.md 1.1 ablation D)
 # ---------------------------------------------------------------------------
 #
@@ -207,37 +252,84 @@ class MoEBlock(nn.Module):
                            max(1, self.router_noise_anneal_steps))
         return float(self.router_noise_init * max(0.0, remaining))
 
-    def forward(self, x: torch.Tensor):
+    def forward(self, x: torch.Tensor, route=None):
         """
         Args:
-            x : [N, d_model]  (flattened active tokens)
+            x     : [N, d_model]  (flattened active tokens)
+            route : None, or the tuple `(expert_idx, gate)` from an EARLIER call
+                    of this same block on the same tokens. When supplied the
+                    router does NOT fire: dispatch uses the given `expert_idx`
+                    and the given `gate` scales the output. This is what makes a
+                    token's expert PERSIST across recursion depth (T-LX.12 /
+                    CLAUDE.md 1: "a token is routed to a specialized expert, and
+                    THAT EXPERT's weights are recursively reused"). One routing
+                    decision per token per forward means exactly one balance
+                    term per forward, so `balance_loss` and `router_logits`
+                    return None on these non-routing calls and the caller must
+                    skip them rather than accumulate a zero (a zero would be
+                    averaged in by `/= bal_calls` and silently shrink the
+                    auxiliary by a factor of max_depth).
         Returns:
             out         : [N, d_model]  expert-processed tokens
             balance_loss: scalar — entropy balancing auxiliary loss for THIS ONE
-                          call. The caller is responsible for averaging over
-                          (block, depth) calls; do not sum it (plan.md 6.1).
-            expert_idx  : [N] long tensor of chosen expert per token
-            router_logits: [N, E] pre-softmax logits (after noise)
-            route_stats : dict of measured dispatch diagnostics (T2.3), plus the
-                          separately-reported `entropy_term` and
-                          `switch_aux_term` (T4.2).
+                          call, or None when `route` was supplied. The caller is
+                          responsible for averaging over the calls that actually
+                          routed; do not sum it (plan.md 6.1).
+            expert_idx  : [N] long tensor of the expert each token was dispatched
+                          to — the router's argmax on a routing call, the
+                          persisted index on a non-routing call. Either way it is
+                          the index that CONTROLLED dispatch (T2.2).
+            router_logits: [N, E] pre-softmax logits (after noise), or None when
+                          `route` was supplied.
+            route_stats : dict of measured dispatch diagnostics (T2.3). Contains
+                          the separately-reported `entropy_term` and
+                          `switch_aux_term` (T4.2) only on a routing call — their
+                          ABSENCE is how the caller tells the two kinds of call
+                          apart, rather than a 0.0 sentinel (CLAUDE.md 4).
+            gate        : [N] the selected gate probability actually applied, so
+                          the caller can persist it to later depths. None in the
+                          dense ablation, which has no single selected gate.
         """
-        router_logits = self.router(x)                          # [N, E]
-        if self.training and self.router_noise != "none":
-            # ABLATION D ONLY (T5.4). Canonical routing is deterministic given
-            # the weights: the argmax below is taken on the raw logits, so a
-            # canonical run's routing decisions are reproducible from the
-            # checkpoint. Under either noisy variant they are not, which is why
-            # the variant has to be named in the run label and provenance.
-            if self.router_noise == "trainable":
-                scale = self.router_noise_scale.abs()           # gradient flows
-            else:                                               # fixed_annealed
-                self._router_noise_step += 1
-                scale = self.current_router_noise_scale()
-            noise         = torch.randn_like(router_logits) * scale
-            router_logits = router_logits + noise
-        router_probs = F.softmax(router_logits, dim=-1)         # [N, E]
-        expert_idx   = torch.argmax(router_probs, dim=-1)       # [N]
+        if route is None:
+            router_logits = self.router(x)                      # [N, E]
+            if self.training and self.router_noise != "none":
+                # ABLATION D ONLY (T5.4). Canonical routing is deterministic
+                # given the weights: the argmax below is taken on the raw
+                # logits, so a canonical run's routing decisions are
+                # reproducible from the checkpoint. Under either noisy variant
+                # they are not, which is why the variant has to be named in the
+                # run label and provenance.
+                if self.router_noise == "trainable":
+                    scale = self.router_noise_scale.abs()       # gradient flows
+                else:                                           # fixed_annealed
+                    self._router_noise_step += 1
+                    scale = self.current_router_noise_scale()
+                noise         = torch.randn_like(router_logits) * scale
+                router_logits = router_logits + noise
+            router_probs = F.softmax(router_logits, dim=-1)     # [N, E]
+            expert_idx   = torch.argmax(router_probs, dim=-1)   # [N]
+            gate         = None                                 # set per mode below
+        else:
+            # Persisted route. The dense ablation blends ALL experts by their
+            # probabilities and has no single selected expert to persist, so the
+            # two options are incoherent together; refuse rather than silently
+            # pick one (CLAUDE.md: an unmapped configuration must raise).
+            if self.routing_mode != CANONICAL_ROUTING_MODE:
+                raise ValueError(
+                    "routing_persistence='per_token' requires routing_mode="
+                    f"'{CANONICAL_ROUTING_MODE}'; got '{self.routing_mode}'. The "
+                    "dense routing ablation evaluates every expert on every "
+                    "token, so there is no selected expert to persist."
+                )
+            expert_idx, gate = route
+            if expert_idx.shape[0] != x.shape[0]:
+                raise ValueError(
+                    f"persisted route has {expert_idx.shape[0]} rows but this "
+                    f"call has {x.shape[0]} tokens -- the caller must slice the "
+                    "route to the current active set before passing it."
+                )
+            router_logits = None
+            router_probs  = None
 
         # ---- Dispatch -------------------------------------------------------
         # `expert_idx` is THE dispatch decision and is also the tensor returned
@@ -257,8 +349,12 @@ class MoEBlock(nn.Module):
             # The gradient path into the router is the gate multiply: d out/d
             # gate is the expert output, and gate = softmax(logits)[argmax], so
             # the router is trained by the task loss and not only by the
-            # auxiliary/oracle terms.
-            gate = router_probs.gather(-1, expert_idx.unsqueeze(-1)).squeeze(-1)  # [N]
+            # auxiliary/oracle terms. Under persistence that ONE gate value is
+            # reused at every depth, so the router still receives task gradient
+            # from all max_depth steps -- through a single decision rather than
+            # through max_depth independent ones.
+            if gate is None:
+                gate = router_probs.gather(-1, expert_idx.unsqueeze(-1)).squeeze(-1)  # [N]
             out  = torch.zeros_like(x)
             for e in range(self.num_experts):
                 sel = (expert_idx == e).nonzero(as_tuple=True)[0]
@@ -277,12 +373,19 @@ class MoEBlock(nn.Module):
             expert_outputs = torch.stack([expert(x) for expert in self.experts], dim=1)
             out = (router_probs.unsqueeze(-1) * expert_outputs).sum(dim=1)
 
+        # --- Load, from the index that actually controlled dispatch -----------
+        # Needed by the diagnostics in BOTH kinds of call, so it is computed
+        # before the balance terms (which need router_probs and therefore exist
+        # only on a routing call).
+        load = torch.zeros(self.num_experts, device=x.device)
+        for e in range(self.num_experts):
+            load[e] = (expert_idx == e).float().sum()
+        load = load / load.sum().clamp(min=1.0)                          # [E]
+
         # --- Two-term balance loss -------------------------------------------
         # Term 1 – Soft entropy: gradient always present via softmax, but blind
         #   to hard routing collapse because softmax is never exactly one-hot.
-        avg_probs    = router_probs.mean(dim=0)                          # [E]
-        entropy_term = -torch.sum(avg_probs * torch.log(avg_probs + 1e-8))
-
+        #
         # Term 2 – Switch-Transformer auxiliary loss:
         #   f_e  = fraction of tokens dispatched to expert e (hard argmax,
         #          detached so no gradient through the discrete choice).
@@ -292,13 +395,20 @@ class MoEBlock(nn.Module):
         #          loss (minimised), not subtracted.  We subtract balance_loss in
         #          total_loss, so we store: balance_loss = entropy_term - switch_aux
         #          → -entropy_term (maximise entropy) + switch_aux (minimise collapse).
-        load = torch.zeros(self.num_experts, device=x.device)
-        for e in range(self.num_experts):
-            load[e] = (expert_idx == e).float().sum()
-        load       = load / load.sum().clamp(min=1.0)                    # [E]
-        switch_aux = self.num_experts * (load.detach() * avg_probs).sum()
-
-        balance_loss = -entropy_term + switch_aux
+        #
+        # On a persisted-route call there is no router output to balance: the
+        # decision being balanced was already made and already scored on the
+        # routing call. Returning None (not 0.0) forces the caller to exclude
+        # this call from its average instead of diluting it.
+        if router_probs is None:
+            balance_loss = None
+            entropy_term = None
+            switch_aux   = None
+        else:
+            avg_probs    = router_probs.mean(dim=0)                      # [E]
+            entropy_term = -torch.sum(avg_probs * torch.log(avg_probs + 1e-8))
+            switch_aux   = self.num_experts * (load.detach() * avg_probs).sum()
+            balance_loss = -entropy_term + switch_aux
 
         # --- Dispatch diagnostics (T2.3) -------------------------------------
         # Capacity policy is NO CAPACITY LIMIT (see CAPACITY_POLICY below), so
@@ -319,19 +429,29 @@ class MoEBlock(nn.Module):
             "overflow":          0.0,
             "max_load_fraction": float(load.max().item()) if N > 0 else 0.0,
             "experts_called":    float((load > 0).sum().item()),
+            # How many ROUTING decisions this call made. 1 on a router call, 0 on
+            # a persisted-route call. Under per-token persistence the totals read
+            # router_calls = 1 while dispatch_steps = max_depth, which is the
+            # whole architectural claim in two numbers: one decision, many
+            # reuses. Under the legacy per-step path the two are equal.
+            "router_calls":      0.0 if router_probs is None else 1.0,
+        }
+        if router_probs is not None:
             # T4.2 / CLAUDE.md 4: the two halves of the balance objective must be
             # REPORTED separately. They move in opposite directions (entropy up is
             # good, switch-aux up is bad), so the single `balance_loss` number can
             # sit flat while both components drift. Detached -- these are
-            # diagnostics; the gradient path is `balance_loss` itself.
-            "entropy_term":      float(entropy_term.detach().item()),
-            "switch_aux_term":   float(switch_aux.detach().item()),
-        }
+            # diagnostics; the gradient path is `balance_loss` itself. Absent, not
+            # zero, when no routing happened.
+            route_stats["entropy_term"]    = float(entropy_term.detach().item())
+            route_stats["switch_aux_term"] = float(switch_aux.detach().item())
 
         # Return router_logits (pre-softmax, after noise) so callers can
         # apply oracle CE directly on the router — much shorter gradient path
-        # than going through step_cls_head after pooling.
-        return out, balance_loss, expert_idx, router_logits, route_stats
+        # than going through step_cls_head after pooling. `gate` is returned so a
+        # caller implementing per-token persistence can hand the SAME gate back
+        # in on later depths instead of re-deriving one.
+        return out, balance_loss, expert_idx, router_logits, route_stats, gate
 
 
 class MoREWrapper(nn.Module):
@@ -371,6 +491,22 @@ class MoREWrapper(nn.Module):
         max_depth   : maximum recursion depth (default 7)
         num_experts : number of expert networks (default: the canonical six)
         dropout     : dropout in experts
+        routing_persistence :
+            "per_token" -- the router fires ONCE per token per forward. The
+              chosen expert and its gate probability are cached at the first
+              depth a token is processed at and reused for every subsequent
+              depth, so recursion happens inside the chosen expert. This is
+              MoRE as specified (CLAUDE.md 1).
+            "per_step" -- LEGACY. The router fires again at every recursion
+              step, so a token's expert (and, because the halt heads are
+              per-expert, its halting policy) is re-drawn each step. Measured
+              on the canonical-corpus proxy: only 35.1% of tokens still hold
+              their depth-1 expert at depth 7. Retained solely so the five
+              published per-step MoRE cells stay reproducible (CLAUDE.md 6:
+              archive, never delete) and so the pair is a controlled
+              experiment. Default for backward bit-compatibility -- see
+              `config.resolve_routing_persistence` for why the config key is
+              ABSENT rather than defaulted.
     """
 
     def __init__(
@@ -387,12 +523,29 @@ class MoREWrapper(nn.Module):
         ffn_mult: int = 4,
         attention: bool = False,
         n_heads: int = 4,
+        routing_persistence: str = ROUTING_PERSISTENCE_LEGACY,
     ):
         super().__init__()
         self.max_depth   = max_depth
         self.num_experts = num_experts
         self.d_model     = d_model
         self.fixed_depth = fixed_depth
+
+        if routing_persistence not in ROUTING_PERSISTENCE_MODES:
+            raise ValueError(
+                f"routing_persistence must be one of {ROUTING_PERSISTENCE_MODES}, "
+                f"got {routing_persistence!r}"
+            )
+        if (routing_persistence == ROUTING_PERSISTENCE_PER_TOKEN
+                and routing_mode != CANONICAL_ROUTING_MODE):
+            # Caught here as well as in MoEBlock.forward so a misconfiguration
+            # fails at construction time rather than in the middle of epoch 1.
+            raise ValueError(
+                f"routing_persistence='{ROUTING_PERSISTENCE_PER_TOKEN}' is "
+                f"incompatible with routing_mode='{routing_mode}': the dense "
+                "ablation has no selected expert to persist."
+            )
+        self.routing_persistence = routing_persistence
 
         # ACT halting threshold = 1 - eps (Graves 2016 / Universal Transformer).
         # A token halts once its cumulative halt mass would cross this, which
@@ -580,7 +733,13 @@ class MoREWrapper(nn.Module):
         depth_exits     = torch.zeros(N, self.max_depth, device=x.device)
         all_expert_idx  = []          # list of [N_active] per depth step
         tokens_per_step = []          # diagnostic: active count per step
+        # T-LX.12: under "per_token" this is the LIVE route -- it is written at
+        # depth 1 and read back at every later depth to keep each token inside
+        # its chosen expert. Under legacy "per_step" it is written and only
+        # reported, which is exactly the dead assignment T-LX.11 identified.
         first_route_flat = torch.full((N,), -1, dtype=torch.long, device=x.device)
+        persist_route    = (self.routing_persistence == ROUTING_PERSISTENCE_PER_TOKEN)
+        route_gate_flat  = None       # [N] float, populated at depth 1 if persisting
 
         # T2.3 dispatch accounting, accumulated over the depth loop.
         route_stat_totals = {
@@ -588,8 +747,12 @@ class MoREWrapper(nn.Module):
             "expert_evaluations": 0.0,
             "max_load_fraction": 0.0, "experts_called": 0.0,
             "dispatch_steps": 0.0,
-            # T4.2: summed here, divided by `dispatch_steps` at the end so the
-            # reported term is a mean over the same calls the loss averages over.
+            # T-LX.12: routing DECISIONS, as distinct from expert applications.
+            # Equal to dispatch_steps under "per_step"; 1 under "per_token".
+            "router_calls": 0.0,
+            # T4.2: summed here, divided by the number of calls that actually
+            # routed at the end, so the reported term is a mean over the same
+            # calls the loss averages over.
             "entropy_term": 0.0, "switch_aux_term": 0.0,
         }
 
@@ -643,8 +806,27 @@ class MoREWrapper(nn.Module):
             active_positions = active_mask.nonzero(as_tuple=True)[0]   # [N_active]
 
             # ---- 2. MoE forward ----------------------------------------
-            (moe_out, b_loss, expert_idx,
-             router_logits, step_route_stats) = self.moe_block(active_inputs)
+            # UNDER PER-TOKEN PERSISTENCE the router fires only once per token
+            # per forward. It fires at depth 1 because `active_mask` is
+            # initialised from `step_mask` and thereafter only ever cleared --
+            # tokens leave the active set, none joins it -- so every token that
+            # is ever routed is routed at depth 1, and the active set at depth d
+            # is a subset of the one at depth 1. At depths 2..max_depth the SAME
+            # expert index and the SAME gate probability are handed back in, so
+            # recursion runs inside the expert the token was routed to, which is
+            # what CLAUDE.md 1 specifies. The depth-1 assignment is therefore now
+            # CONSUMED, not merely recorded for reporting (T-LX.11's finding was
+            # that it was dead).
+            #
+            # UNDER "per_step" (legacy) `route` stays None at every depth and
+            # this is bit-identical to the pre-T-LX.12 code path.
+            if persist_route and depth > 1:
+                route = (first_route_flat[active_positions],
+                         route_gate_flat[active_positions])
+            else:
+                route = None
+            (moe_out, b_loss, expert_idx, router_logits,
+             step_route_stats, step_gate) = self.moe_block(active_inputs, route=route)
             all_expert_idx.append(expert_idx)
 
             # T2.3: accumulate dispatch counts across depth steps. Summed, not
@@ -665,13 +847,32 @@ class MoREWrapper(nn.Module):
                 route_stat_totals["experts_called"],
                 step_route_stats["experts_called"],
             )
+            # `dispatch_steps` counts EXPERT applications (one per depth, always).
+            # `router_calls` counts ROUTING DECISIONS (max_depth under "per_step",
+            # 1 under "per_token"). Keeping them separate is what makes the
+            # persistence mode readable straight off the logs, and it is why the
+            # balance terms below are divided by `router_calls` and not by
+            # `dispatch_steps`.
             route_stat_totals["dispatch_steps"] += 1.0
-            route_stat_totals["entropy_term"]    += step_route_stats["entropy_term"]
-            route_stat_totals["switch_aux_term"] += step_route_stats["switch_aux_term"]
+            route_stat_totals["router_calls"]   += step_route_stats["router_calls"]
+            if "entropy_term" in step_route_stats:
+                route_stat_totals["entropy_term"]    += step_route_stats["entropy_term"]
+                route_stat_totals["switch_aux_term"] += step_route_stats["switch_aux_term"]
 
             if depth == 1:
                 first_route_flat = first_route_flat.clone()
                 first_route_flat[active_positions] = expert_idx
+                if persist_route:
+                    # The gate is persisted alongside the index deliberately. If
+                    # only the index persisted and the gate were re-derived from
+                    # a fresh softmax each depth, the router could drive the
+                    # persisted expert's gate toward 0 and turn the block into a
+                    # near-no-op -- re-routing through the back door, with the
+                    # index held fixed for the metrics. One decision means one
+                    # index AND one scalar.
+                    route_gate_flat = torch.zeros(
+                        N, device=x.device, dtype=step_gate.dtype)
+                    route_gate_flat[active_positions] = step_gate
 
             # ---- 3. Residual + LayerNorm --------------------------------
             updated = self.layer_norm(active_inputs + moe_out)
@@ -684,15 +885,25 @@ class MoREWrapper(nn.Module):
             # calls after the loop. It is accumulated rather than averaged
             # in-place because the number of depth steps is not known until the
             # loop ends -- ACT may break early when every token has halted.
-            total_bal_loss = total_bal_loss + b_loss
-            bal_calls      = bal_calls + 1
+            #
+            # `b_loss is None` on a persisted-route step: there was no routing
+            # decision to balance, so the step is EXCLUDED from both the sum and
+            # the divisor. Adding a 0.0 instead would divide one real balance
+            # term by max_depth and silently weaken the auxiliary by 7x.
+            if b_loss is not None:
+                total_bal_loss = total_bal_loss + b_loss
+                bal_calls      = bal_calls + 1
 
             # ---- Oracle routing CE — direct on router logits -----------
             # This is the SHORT gradient path: router_logits → oracle CE.
             # The router learns immediately which expert each op type belongs to,
             # without waiting for gradients to travel back through the full
             # MoREWrapper depth loop via step_cls_head.
-            if flat_experts is not None:
+            #
+            # `router_logits is None` on a persisted-route step -- there are no
+            # logits to supervise, because the decision they would supervise was
+            # already made and already supervised at depth 1.
+            if flat_experts is not None and router_logits is not None:
                 active_oracle = flat_experts[active_positions]    # [N_active]
                 valid_oracle  = (active_oracle >= 0) & (active_oracle < self.num_experts)
                 if valid_oracle.any():
@@ -720,6 +931,13 @@ class MoREWrapper(nn.Module):
             # you change how much of each step's state reaches the output. The
             # boolean `> threshold` decides dispatch only, which updated_rules.md
             # 2.2 permits, while the objective keeps a differentiable path.
+            # The halt head is selected by `expert_idx`, which under "per_token"
+            # is the PERSISTED index -- so a token keeps the same halt head for
+            # its whole trajectory and that head finally observes a coherent
+            # sequence of states to halt on. Under legacy "per_step" the head was
+            # re-drawn with the expert at every step, which is the compounding
+            # half of T-LX.11: no halt head ever saw one token's full trajectory,
+            # and 98.4% of tokens force-exited at max depth.
             halt_logits = torch.zeros(N_active, device=x.device)
             for e, halt_head in enumerate(self.expert_halt_heads):
                 emask = (expert_idx == e)
@@ -806,9 +1024,19 @@ class MoREWrapper(nn.Module):
         # Dividing by the realised call count -- not by max_depth -- is what makes
         # it depth-invariant under ACT, where the loop can break early.
         if bal_calls > 0:
+            # `bal_calls` counts the calls that actually ROUTED, which under
+            # "per_token" is 1 and under "per_step" is the number of depth steps.
+            # The entropy/switch sums above are accumulated on exactly those same
+            # calls, so this stays a mean over a matched set in both modes.
             total_bal_loss = total_bal_loss / float(bal_calls)
             route_stat_totals["entropy_term"]    /= float(bal_calls)
             route_stat_totals["switch_aux_term"] /= float(bal_calls)
+        else:
+            # No routing call happened at all (E == 1 still routes, so in practice
+            # this means the depth loop never ran). Drop the two terms rather than
+            # report a 0.0 that was never measured (CLAUDE.md 4).
+            route_stat_totals.pop("entropy_term", None)
+            route_stat_totals.pop("switch_aux_term", None)
 
         # T-L4.3: the attention query waste, as a MEASURED fraction. Emitted only
         # when attention actually ran -- on the arithmetic path there is no
@@ -950,6 +1178,7 @@ class MoREModel(nn.Module):
         max_seq_len: int | None = None,
         task: str = TASK_ARITHMETIC,
         vocab_size: int | None = None,
+        routing_persistence: str = ROUTING_PERSISTENCE_LEGACY,
     ):
 
         super().__init__()
@@ -958,6 +1187,7 @@ class MoREModel(nn.Module):
         self.routing_mode = routing_mode
         self.router_noise = router_noise
         self.ffn_mult     = ffn_mult
+        self.routing_persistence = routing_persistence
 
         # Per-step projection: each step row [step_feat_dim] → [d_model].
         # PyTorch applies Linear to the last dim, so [B, S, F] → [B, S, d_model].
@@ -997,7 +1227,8 @@ class MoREModel(nn.Module):
                         router_noise_anneal_steps=router_noise_anneal_steps,
                         ffn_mult=ffn_mult,
                         attention=attention,
-                        n_heads=n_heads)
+                        n_heads=n_heads,
+                        routing_persistence=routing_persistence)
             for _ in range(num_blocks)
         ])
 
@@ -1245,8 +1476,15 @@ class MoREModel(nn.Module):
             "expert_evaluations": 0.0,
             "max_load_fraction": 0.0, "experts_called": 0.0,
             "dispatch_steps": 0.0,
-            "entropy_term": 0.0, "switch_aux_term": 0.0,
+            # T-LX.12: routing decisions, summed over blocks like dispatch_steps.
+            "router_calls": 0.0,
         }
+        # T4.2 / T-LX.12: the balance terms are accumulated in a SEPARATE counter
+        # from the block loop, because a block that never routed omits them
+        # entirely rather than contributing a 0.0 (CLAUDE.md 4). Averaging over
+        # the blocks that reported keeps the reported term matched to the loss.
+        _bal_term_sum = {"entropy_term": 0.0, "switch_aux_term": 0.0}
+        _bal_term_blocks = 0
 
         for block_idx, block in enumerate(self.blocks):
             (
@@ -1279,12 +1517,15 @@ class MoREModel(nn.Module):
             # T2.3: dispatch counts sum over blocks (each block dispatches
             # independently); capacity pressure is the worst block.
             for k in ("tokens", "dispatched", "overflow", "dispatch_steps",
-                      "expert_evaluations"):
+                      "expert_evaluations", "router_calls"):
                 route_stats_total[k] += block_route_stats[k]
-            # T4.2: already per-call means inside the block; averaged over blocks
-            # below so the reported term matches the normalized loss.
-            for k in ("entropy_term", "switch_aux_term"):
-                route_stats_total[k] += block_route_stats[k]
+            # T4.2: already per-call means inside the block; averaged over the
+            # blocks that reported them below so the reported term matches the
+            # normalized loss.
+            if "entropy_term" in block_route_stats:
+                _bal_term_sum["entropy_term"]    += block_route_stats["entropy_term"]
+                _bal_term_sum["switch_aux_term"] += block_route_stats["switch_aux_term"]
+                _bal_term_blocks += 1
             for k in ("max_load_fraction", "experts_called"):
                 route_stats_total[k] = max(route_stats_total[k],
                                            block_route_stats[k])
@@ -1312,8 +1553,11 @@ class MoREModel(nn.Module):
         # equal-per-block weighting is the deliberate choice where they do not,
         # matching how the ponder cost is aggregated.
         total_bal_loss    = total_bal_loss / _nb
-        route_stats_total["entropy_term"]    /= _nb
-        route_stats_total["switch_aux_term"] /= _nb
+        if _bal_term_blocks > 0:
+            route_stats_total["entropy_term"] = (
+                _bal_term_sum["entropy_term"] / float(_bal_term_blocks))
+            route_stats_total["switch_aux_term"] = (
+                _bal_term_sum["switch_aux_term"] / float(_bal_term_blocks))
         # T-L4.3: one fraction over the summed slots, so a block that ran seven
         # depth steps contributes seven steps' worth of waste rather than one
         # block's worth.

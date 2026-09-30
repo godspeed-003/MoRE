@@ -65,6 +65,7 @@ from more.lang_data import MoRELanguageDataset                   # noqa: E402
 from more.config import (CANONICAL_ROUTER_NOISE,                 # noqa: E402
                          ROUTER_NOISE_INIT_SCALE_DEFAULT,
                          ROUTER_NOISE_ANNEAL_STEPS_DEFAULT,
+                         ROUTING_PERSISTENCE_LEGACY,
                          NUM_EXPERTS_CANONICAL, TASK_LANGUAGE)
 from torch.utils.data import DataLoader                          # noqa: E402
 
@@ -118,6 +119,14 @@ def build(mc, dc, force_fixed_depth):
         attention=bool(mc.get("attention", False)), n_heads=int(mc.get("n_heads", 4)),
         max_seq_len=int(dc["seq_len"]), task=TASK_LANGUAGE,
         vocab_size=int(dc["vocab_size"]),
+        # T-LX.12. Read off the run's OWN config with the legacy default, so this
+        # script measures the architecture that run actually had. Hard-coding either
+        # value would make the diagnostic answer a different question than the one
+        # its docstring asks -- per_token would report a flat 1.0000 for every
+        # checkpoint including the pre-fix ones, and per_step would keep reporting a
+        # decay curve for runs that no longer re-route.
+        routing_persistence=mc.get("routing_persistence",
+                                   ROUTING_PERSISTENCE_LEGACY),
     ).to(device)
 
 
@@ -128,8 +137,14 @@ _CAPTURE: list = []
 _orig_forward = MoEBlock.forward
 
 
-def _capturing_forward(self, x):
-    out = _orig_forward(self, x)
+def _capturing_forward(self, x, route=None):
+    # T-LX.12 added the `route` parameter to MoEBlock.forward -- it is how the depth
+    # loop hands back the persisted (expert_idx, gate) pair at depths >= 2. The
+    # wrapper must FORWARD it, not swallow it: a signature of (self, x) raises
+    # TypeError on a per_token model, and a signature that accepted it and dropped it
+    # would silently make every model look like the legacy per-step one, i.e. this
+    # diagnostic would report the very defect it is measuring even after the fix.
+    out = _orig_forward(self, x, route=route)
     _CAPTURE.append(out[2].detach().to("cpu"))      # expert_idx, [N_active]
     return out
 

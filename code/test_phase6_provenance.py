@@ -224,6 +224,18 @@ def _required_fields(rc: dict) -> dict:
     which leaves any E=1 or max_depth=1 specific provenance gap invisible -- the
     same blind spot class as T8.3, where a head sized by num_experts passed at
     E=6 and hit a CUDA device-side assert at E=1.
+
+    T-LX.13 adds the six HARDWARE fields at the end. They are not in
+    updated_rules.md 9 -- that list predates this project running on four
+    different cards -- but they belong to the same contract: a seed matrix whose
+    cells came from different silicon cannot report per-epoch time, throughput or
+    peak memory as one number, and `device` alone ("cuda") cannot tell you. They
+    are added to THIS dict rather than as new `check(...)` calls on purpose: the
+    dict feeds one existing completeness check, so the frozen Gate L0 total of
+    356 does not move for a provenance field. On a CPU-only interpreter they
+    resolve to the string "N/A", which is a measurement of "no GPU" and not a
+    sentinel (CLAUDE.md 4) -- and, being non-None, they satisfy the check the way
+    a real card does.
     """
     prov = rc.get("provenance", {})
     mc, tc, lw = (rc.get("model", {}), rc.get("training", {}),
@@ -255,6 +267,13 @@ def _required_fields(rc: dict) -> dict:
         "halt_target_mode":    prov.get("halt_target_mode"),
         "resolved_epochs":     prov.get("resolved_epochs"),
         "resolved_subset_fraction": prov.get("resolved_subset_fraction"),
+        # T-LX.13 hardware identity -- see the docstring.
+        "device":              prov.get("device"),
+        "gpu_name":            prov.get("gpu_name"),
+        "gpu_total_mem_gib":   prov.get("gpu_total_mem_gib"),
+        "gpu_capability":      prov.get("gpu_capability"),
+        "torch_version":       prov.get("torch_version"),
+        "torch_cuda_version":  prov.get("torch_cuda_version"),
     }
 
 

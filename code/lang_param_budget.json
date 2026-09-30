@@ -1,6 +1,6 @@
 {
   "_note": "GATE L6 evidence for T-L7.2. Counts built through the engine.py:263 kwargs mapping from the frozen config_language.json, so they are the counts a canonical run prints. Non-embedding excludes tok_embed/pos_embed/lm_head; lm_head is TIED to tok_embed so named_parameters yields the shared tensor once.",
-  "spec_version": "L7.1-language-frozen",
+  "spec_version": "L7.2-TLX.12-route-persistence",
   "dataset_version": "lang-wikitext-103-bpe8192-len256-800d6154",
   "tolerance": 0.05,
   "arms": {

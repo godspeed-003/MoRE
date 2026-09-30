@@ -118,7 +118,29 @@
     "of the weights."
   ],
 
-  "spec_version": "L7.1-language-frozen",
+  "spec_version": "L7.2-TLX.12-route-persistence",
+  "spec_version_history": [
+    "L7.1-language-frozen -- the original freeze (T-L7.1): every enforced field and",
+    "every architecture_variants block non-null, protocol.val_interval set. The 15",
+    "canonical cells in runs/langB_* were produced under this version.",
+    "",
+    "L7.2-TLX.12-route-persistence -- amends architecture_variants.more with",
+    "routing_persistence = \"per_token\" (T-LX.12). NO protocol field moved: epochs,",
+    "batch_size, lr, seq_len, vocab_size, the loss weights and ffn_mult are all",
+    "byte-identical to L7.1, so the MoE and MoR arms' definition of canonical is",
+    "UNCHANGED and their 10 cells remain canonical without qualification.",
+    "",
+    "WHY THE VERSION MOVES ANYWAY: canonical MoRE is now a different architecture --",
+    "one routing decision per token instead of one per recursion step -- so the 5",
+    "MoRE cells produced under L7.1 and any MoRE cell produced under L7.2 measure",
+    "two different models and must never be averaged into one row. They are",
+    "separated mechanically as well as by this string: the L7.1 cells carry no",
+    "`model.routing_persistence` key while the L7.2 cells carry `per_token`, which",
+    "is a real difference in the field-by-field config comparison export_results.py",
+    "runs within each architecture, and it is also a different config_hash. The 5",
+    "L7.1 MoRE cells are preserved unedited as the labelled per-step ablation",
+    "(CLAUDE.md 6); do not rewrite their resolved_config.json to add the key."
+  ],
   "canonical_group": "canonical_lang_b",
   "canonical_variant": "language",
   "task": "language",
@@ -204,7 +226,14 @@
       "step-tokens). Language has no per-item step count, so the recursion budget",
       "has no dataset to inherit from and is a real choice with a real cost: it",
       "multiplies compute per token. moe.max_depth stays 1 because MoE is defined",
-      "by having no recursion at all."
+      "by having no recursion at all.",
+      "",
+      "routing_persistence appears in the `more` block ONLY, and its absence from",
+      "moe and mor is not an omission -- the axis is inert there (max_depth 1 leaves",
+      "MoE no second step at which to re-route; num_experts 1 makes MoR's argmax",
+      "constantly expert 0). Listing it for them would pin a field whose value",
+      "cannot affect their forward pass and would move their config hashes for",
+      "nothing. See architecture_variants_frozen_by.routing_persistence."
     ],
     "moe": {
       "num_experts": 6,
@@ -237,6 +266,7 @@
       "step_routing_weight": 0.0,
       "halting_weight": 0.001,
       "halting_supervision_weight": 0.0,
+      "routing_persistence": "per_token",
       "top1_routing": true
     }
   },
@@ -249,7 +279,8 @@
     "routing_balance_weight": "FROZEN BY T-L7.1 AT 0.001 for moe/more; mor 0.0 is DEFINITIONAL (one expert, nothing to balance). MEASURED ON LANGUAGE, and the measurement REJECTS the re-scaling _NULLS_NOTE predicted would be necessary -- read that note's prediction and then this: it is the same number as arithmetic, arrived at independently, and the near-identity is the finding rather than laziness. One-axis grid at halting 0.001, 3 epochs, dev corpus, val/task_loss then routing AMI: 0.001 -> 5.2406, AMI 0.2907 (its own per-run control floor 0.0621) | 0.05 -> 5.2991, 0.3070 | 0.21 -> 5.3097, 0.2688 | 1.0 -> 5.3458, 0.1807. 0.21 is the value that reproduces T4.2's 0.017x-of-task-loss RATIO, and it is worse than 0.001 on val loss by 0.069 nats AND worse on AMI. So the quantity that transfers across tasks is the ABSOLUTE gradient magnitude of the auxiliary term, not its ratio to a task loss whose scale changed by two orders of magnitude. SECONDARY COHERENCE CHECK, and the reason to trust the low value rather than merely record it: 0.001 sits at normalised load entropy 0.8571, just BELOW the oracle POS partition's own entropy of 0.8884, while every higher weight overshoots to 0.99+ -- i.e. the weight that best matches the balance the data itself has is also the weight that predicts best, and the higher weights are buying uniformity the data does not have. Note the sign of the trade-off for the paper: entropy and AMI move in OPPOSITE directions here, which is exactly why CLAUDE.md 2 forbids tuning toward maximal entropy. Grid in code/lang_calibration_weights.json.",
     "step_routing_weight": "DEFINITIONAL 0.0, and on language it is FORCED rather than chosen. A non-zero value trains the router against an oracle expert index; language has no per-token oracle expert, because there is no operation family to read off a token. The oracle-routing ablation that exists on arithmetic (T10.E) has no language counterpart, so 0.0 is the only defined value in all three blocks.",
     "halting_weight": "FROZEN BY T-L7.1 AT 0.001 for mor/more; moe 0.0 is DEFINITIONAL (at max_depth 1 every token forced-exits at step 1, so a ponder cost would be a constant). MEASURED, and this is the axis where the inherited ratio rule fails hardest -- the entry that used to sit here predicted the arithmetic 0.001 would leave the ponder cost 'invisible against a loss that large' and would 'silently turn adaptive depth into always-max depth'. THE OPPOSITE IS WHAT HAPPENS. One-axis grid at balance 0.001, 3 epochs, dev corpus, val/task_loss | avg depth | AMI: 0.001 -> 5.2406 | 2.63 | 0.2907 (control 0.0621) | 0.03 -> 5.2547 | 2.30 | 0.0050 | 0.107 -> 5.3345 | 1.49 | 0.0025 | 0.5 -> 5.3305 | 1.07 | 0.0205. At 0.001 depth is 2.63 of a 7 budget -- adaptive, not saturated -- and routing structure is 4.7x its own control floor. 0.107 is the ratio-matched value and it is a DOUBLE FAILURE: depth collapses to 1.49, i.e. most tokens exit after one step and MoRE degenerates toward MoE, and AMI falls 0.2907 -> 0.0025, statistically indistinguishable from the shuffled control. The ratio rule does not merely mis-tune this term, it switches off both behaviours the study exists to measure, and it would have produced a clean-looking Outcome C that was an artifact of the loss weight. THE COUPLING IS THE SCIENTIFICALLY INTERESTING PART and belongs in the paper: raising the HALTING weight destroys ROUTING structure, which is not obvious a priori -- with fewer recursion steps the router has fewer opportunities to specialise, so depth and expert differentiation are not independent knobs in MoRE the way they are in MoR and MoE separately. Grid in code/lang_calibration_weights.json.",
-    "halting_supervision_weight": "DEFINITIONAL 0.0 everywhere, and FORCED on language for the same reason as step_routing_weight: a supervised halting target needs a per-item oracle depth, and there is no per-token complexity label in a packed LM sequence. The supervised_curriculum ablation does not exist on this task."
+    "halting_supervision_weight": "DEFINITIONAL 0.0 everywhere, and FORCED on language for the same reason as step_routing_weight: a supervised halting target needs a per-item oracle depth, and there is no per-token complexity label in a packed LM sequence. The supervised_curriculum ablation does not exist on this task.",
+    "routing_persistence": "FROZEN BY T-LX.12 AT \"per_token\" FOR more ONLY; absent from the moe and mor blocks because the axis is INERT for them -- MoE has max_depth 1 so there is no second step at which to re-route, and MoR has num_experts 1 so the argmax over a single logit is constantly expert 0. DEFINITIONAL, not tuned: CLAUDE.md 1 states that in MoRE 'a token is routed to a specialized expert, and THAT EXPERT'S weights are recursively reused for an adaptive number of steps', which is one routing decision per token per forward. T-LX.11 measured that the code did the opposite -- the router fired inside the depth loop, so agreement with the depth-1 expert decayed 1.0000 / 0.6176 / 0.5155 / 0.4591 / 0.4271 / 0.3935 / 0.3509 at a per-step switch rate of 0.2768 against chance 0.1667, i.e. 65% of tokens finished recursion in a different expert than they started in, and because the halt head is selected by the same index the halting policy was re-drawn with it. The consequence on the canonical matrix, exact two-sided permutation test n=5 vs n=5 (floor p=0.0079): depth/spearman_vs_model_loss +0.2953 +- 0.0553 for MoR against -0.0154 +- 0.0186 for MoRE, p=0.0079, ranges fully disjoint, while val/task_loss was indistinguishable (3.5202 vs 3.5031, p=0.4048) -- so adding routing to recursion REMOVED the adaptive depth allocation recursion alone had, invisibly to the headline quality row. WHY THE KEY MOVES THE HASH AND WHY THAT IS CORRECT: per-token persistence is a different architecture, so it must hash differently. The 5 language MoRE cells at config_hash values produced before this field existed carry no key, which config.py:stamp_routing_persistence and model.py both read as the legacy \"per_step\", i.e. exactly what they ran. They are preserved unedited as the labelled per-step ablation (CLAUDE.md 6) and their resolved_config.json must never be rewritten to add this key. ARITHMETIC IS NOT FIXED BY THIS ENTRY: canonical_spec.json does not list the field, so arithmetic MoRE still resolves to per_step. Its per-STEP-TOKEN routing is legitimate (7 step-tokens are 7 genuinely different operations) but re-routing along the RECURSION axis is the same defect, and repairing it requires re-running the published arithmetic matrix -- a named, deferred task, not a silent config change."
   },
 
   "run_name_template": "langB_{architecture}_seed{seed}",

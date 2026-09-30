@@ -76,12 +76,32 @@ class CallRecorder:
 
     def __init__(self):
         self.values = []
+        self.silent = 0
         self._orig = MoEBlock.forward
         rec = self
 
-        def patched(blk, x):
-            out = rec._orig(blk, x)
-            rec.values.append(float(out[1].detach().item()))
+        # `route` must be accepted AND FORWARDED. T-LX.12 added it to
+        # MoEBlock.forward: it carries the persisted (expert_idx, gate) pair at
+        # depths >= 2 under `routing_persistence="per_token"`. A wrapper with the
+        # old `(blk, x)` signature raises TypeError the moment a per_token model is
+        # recorded, and one that accepted it and dropped it would silently turn
+        # every model into the legacy per-step one -- so the recorder would
+        # "verify" the aggregation of an architecture the caller did not build.
+        def patched(blk, x, route=None):
+            out = rec._orig(blk, x, route=route)
+            # A persisted-route call reports NO balance term (None, not 0.0) --
+            # one routing decision is one balance term, which is what keeps
+            # `/= bal_calls` from dividing a single term by max_depth. Those calls
+            # are counted separately rather than recorded as zeros: appending a 0.0
+            # here would drag `mean_calls` below the aggregate and fail T4.1a for a
+            # correct model. Every wrapper in this file is built at the LEGACY
+            # default, so `silent` stays 0 throughout and the mean-vs-sum
+            # assertions below are unaffected; `test_route_persistence.py` is where
+            # the per_token accounting itself is checked.
+            if out[1] is None:
+                rec.silent += 1
+            else:
+                rec.values.append(float(out[1].detach().item()))
             return out
 
         MoEBlock.forward = patched

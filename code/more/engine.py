@@ -51,7 +51,8 @@ from .seeding import (apply_seeding, make_generator, seed_worker,
 from .model import (CAPACITY_POLICY, CANONICAL_ROUTING_MODE,
                     CANONICAL_ROUTER_NOISE,
                     ROUTER_NOISE_INIT_SCALE_DEFAULT,
-                    ROUTER_NOISE_ANNEAL_STEPS_DEFAULT)
+                    ROUTER_NOISE_ANNEAL_STEPS_DEFAULT,
+                    ROUTING_PERSISTENCE_LEGACY)
 from .metrics import halting_supervision_loss, depth_allocation_error
 from .families import op_target_depth_table
 from .config import (resolve_halting_mode, CANONICAL_FAMILY_CLS_WEIGHT,
@@ -270,6 +271,14 @@ def train(cfg: dict, run_epochs: int | None = None, ctx: "RunContext | None" = N
         dropout=mc["dropout"],
         fixed_depth=mc.get("fixed_depth", False),
         routing_mode=mc.get("routing_mode", CANONICAL_ROUTING_MODE),
+        # T-LX.12: WHEN the router fires. `mc.get` with the LEGACY default, not a
+        # `setdefault` written back into the config: a config that does not name
+        # this axis keeps its config_hash, which is what protects the 15 published
+        # arithmetic runs and the 10 published language MoE/MoR cells. A run that
+        # wants per-token persistence must say so in its config, and its hash
+        # moves -- correctly, because it is a different architecture.
+        routing_persistence=mc.get("routing_persistence",
+                                   ROUTING_PERSISTENCE_LEGACY),
         # T5.4: canonical is "none". A noisy run must say so in its config, which
         # then reaches resolved_config.json, W&B and the run directory name.
         router_noise=mc.get("router_noise", CANONICAL_ROUTER_NOISE),
@@ -430,7 +439,31 @@ def train(cfg: dict, run_epochs: int | None = None, ctx: "RunContext | None" = N
           + (f", supervision_weight={lw['halting_supervision']}"
              if halting_supervision_enabled else ""))
 
+    # T-LX.13. `device` on its own records the string "cuda", which cannot answer
+    # the question a seed matrix depends on: did all 15 cells run on the SAME
+    # card? This project has already spread language work across an H100, a
+    # 6 GB 3050 and an 8 GB 4060, and `perf/tokens_per_sec` plus the peak-memory
+    # numbers are only comparable within one card -- a per-machine confound
+    # otherwise hides inside the seed variance the study reports (CLAUDE.md 9).
+    # The card's identity therefore belongs in the run directory, not in a rental
+    # receipt. Safe to add to published runs: `provenance` is stripped before
+    # `config_hash` is computed (run_context.py), so these keys move no hash.
+    _hw_provenance = {
+        "device": str(device),
+        "gpu_name": (torch.cuda.get_device_name(device)
+                     if device.type == "cuda" else "N/A"),
+        "gpu_total_mem_gib": (
+            round(torch.cuda.get_device_properties(device).total_memory / 2**30, 3)
+            if device.type == "cuda" else "N/A"),
+        "gpu_capability": (
+            "%d.%d" % torch.cuda.get_device_capability(device)
+            if device.type == "cuda" else "N/A"),
+        "torch_version": torch.__version__,
+        "torch_cuda_version": torch.version.cuda or "N/A",
+    }
+
     wandb_config = {**mc, **tc, **lw, **dc}
+    wandb_config.update(_hw_provenance)
     wandb_config.update({
         "experiment_id":            ctx.experiment_id,
         "experiment_group":         ctx.experiment_group,
@@ -522,12 +555,12 @@ def train(cfg: dict, run_epochs: int | None = None, ctx: "RunContext | None" = N
     wandb.watch(model, log="gradients", log_freq=50)
 
     # Keep resolved_config.json in sync with the numbers the loop is using.
-    ctx.resolved_cfg.setdefault("provenance", {}).update({
+    ctx.resolved_cfg.setdefault("provenance", {}).update(_hw_provenance)
+    ctx.resolved_cfg["provenance"].update({
         "resolved_epochs":          epochs,
         "resolved_subset_fraction": subset_fraction,
         "resolved_batch_size":      batch_sz,
         "wandb_run_id":             getattr(wandb.run, "id", None),
-        "device":                   str(device),
         "halting_mode":                halting_mode,
         "halting_supervision_enabled": halting_supervision_enabled,
         "halting_supervision_weight":  float(lw["halting_supervision"]),
@@ -1372,6 +1405,20 @@ def train(cfg: dict, run_epochs: int | None = None, ctx: "RunContext | None" = N
             log_dict["dispatch/routing_mode"]       = mc.get(
                 "routing_mode", CANONICAL_ROUTING_MODE
             )
+            # T-LX.12: WHEN the router fired, and the two counts that prove it.
+            # `dispatch/router_calls_per_dispatch` is 1.0 when the router fired at
+            # every recursion step (legacy "per_step") and 1/realised_depth when it
+            # fired once per token ("per_token"). It is the single number that
+            # distinguishes the two architectures in a log or a table -- the same
+            # role `evals_per_token` plays for sparse vs dense.
+            log_dict["dispatch/routing_persistence"] = mc.get(
+                "routing_persistence", ROUTING_PERSISTENCE_LEGACY
+            )
+            _rc = epoch_route_stats.get("router_calls")
+            _ds = epoch_route_stats.get("dispatch_steps", 0.0)
+            if _rc is not None and _ds > 0:
+                log_dict["dispatch/router_calls"] = _rc
+                log_dict["dispatch/router_calls_per_dispatch"] = _rc / _ds
             # T5.4: which noise variant ran, and the scale actually applied this
             # epoch. Canonical logs "none" / 0.0; the annealed ablation logs a
             # decaying number, which is the only way to tell from the logs

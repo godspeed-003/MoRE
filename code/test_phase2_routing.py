@@ -57,7 +57,11 @@ block = MoEBlock(num_experts=E, d_model=D, dropout=0.0,
                  routing_mode=CANONICAL_ROUTING_MODE).eval()
 x = torch.randn(N, D)
 seen, handles = instrument(block)
-out, bal, expert_idx, logits, stats = block(x)
+# T-LX.12 added a 6th return value (the selected gate probability) so the depth
+# loop can persist a token's whole routing decision, gate included. Unpacked
+# explicitly rather than with `*rest`: if the arity moves again, this line should
+# raise here instead of quietly binding the wrong tensor to `stats`.
+out, bal, expert_idx, logits, stats, _gate = block(x)
 for h in handles:
     h.remove()
 
@@ -97,7 +101,7 @@ torch.manual_seed(1)
 g_block = MoEBlock(num_experts=E, d_model=D, dropout=0.0,
                    routing_mode=CANONICAL_ROUTING_MODE).eval()
 x1 = torch.randn(1, D)
-out1, _, idx1, _, _ = g_block(x1)
+out1, _, idx1, _, _, _ = g_block(x1)
 out1.sum().backward()
 chosen = int(idx1.item())
 grad_norms = {}
@@ -129,9 +133,15 @@ torch.manual_seed(2)
 s_block = MoEBlock(num_experts=E, d_model=D, dropout=0.0,
                    routing_mode=CANONICAL_ROUTING_MODE).eval()
 xs = torch.randn(8, D)
-out_s, _, idx_s, logits_s, _ = s_block(xs)
+out_s, _, idx_s, logits_s, _, gate_ret = s_block(xs)
 probs_s = torch.softmax(logits_s, dim=-1)
 gate_s = probs_s.gather(-1, idx_s.unsqueeze(-1)).squeeze(-1)
+# The gate the block RETURNS must be the same number this check re-derives from
+# the logits -- it is the value T-LX.12's depth loop caches and replays at depths
+# >= 2, so if it diverged from the multiply the persisted route would be a
+# different computation from the depth-1 one while every metric still read 1.000.
+assert torch.allclose(gate_ret, gate_s, atol=1e-6), (
+    "MoEBlock returned a gate that is not the selected softmax probability")
 raw = torch.stack([s_block.experts[int(idx_s[i])](xs[i:i + 1]).squeeze(0)
                    for i in range(xs.shape[0])])
 expected = raw * gate_s.unsqueeze(-1)

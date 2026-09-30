@@ -15,6 +15,8 @@ from .model import (CANONICAL_ROUTING_MODE, DENSE_ABLATION_ROUTING_MODE,
                     ROUTING_MODES, CANONICAL_ROUTER_NOISE, ROUTER_NOISE_MODES,
                     ROUTER_NOISE_INIT_SCALE_DEFAULT,
                     ROUTER_NOISE_ANNEAL_STEPS_DEFAULT,
+                    ROUTING_PERSISTENCE_MODES, ROUTING_PERSISTENCE_LEGACY,
+                    ROUTING_PERSISTENCE_PER_TOKEN,
                     TASK_ARITHMETIC, TASK_LANGUAGE)
 from .families import NUM_EXPERTS_CANONICAL
 
@@ -498,6 +500,114 @@ CANONICAL_FFN_MULT = {"moe": 4, "mor": 24, "more": 4}
 # seq_len decision and this one are independent and may be made in either order.
 CANONICAL_FFN_MULT_LANGUAGE = {"moe": 4, "mor": 24, "more": 4}
 
+# T-LX.12. Canonical route persistence, keyed by (task, architecture). ONE routing
+# decision per token per forward is what CLAUDE.md §1 defines MoRE to be -- "a token
+# is routed to a specialized expert, and THAT EXPERT'S weights are recursively
+# reused" -- and T-LX.11 measured that the built model did the opposite: expert
+# agreement with depth 1 decayed to 0.3509 by depth 7 at a per-step switch rate of
+# 0.2768 (chance 0.1667), and the canonical MoRE arm's depth-vs-difficulty
+# correlation came out at -0.0154 ± 0.0186 against MoR's +0.2953 ± 0.0553.
+#
+# WHY THIS TABLE IS SPARSE, AND WHY THAT IS THE DESIGN. Anything not listed is
+# ROUTING_PERSISTENCE_LEGACY, which is also what model.py assumes when the key is
+# ABSENT from `cfg["model"]`. `config_hash` is a SHA-256 over the resolved config
+# with only `provenance` and `logging` stripped (run_context.py:117), so writing
+# this key into every config would move the hash of all 15 published arithmetic
+# runs and all 15 canonical language cells. It is the same trap `resolve_task`
+# already documents for the `task` key, and the same resolution: absence is the
+# legacy value, and only the arm whose behaviour actually changes carries the key.
+#
+# So exactly one entry moves: language MoRE. That is correct rather than convenient
+# -- per-token persistence IS a different architecture, so it SHOULD hash
+# differently, and the 5 existing language MoRE cells lack the key, which resolves
+# to per_step, which is exactly what they did. They are preserved unedited as the
+# labelled per-step ablation (CLAUDE.md §6). Never rewrite their resolved_config.json
+# to add this key: that would relabel a completed run as something it was not.
+#
+# The axis is INERT for MoE (max_depth 1 -- there is no second step at which to
+# re-route) and for MoR (num_experts 1 -- the argmax over a single logit is
+# constantly expert 0), which is also why T-LX.11's blast radius is 5 of 15 cells
+# by construction. They are left at legacy so their configs stay byte-reproducible.
+#
+# ARITHMETIC IS DELIBERATELY NOT FIXED HERE. Arithmetic carries the same defect
+# along the recursion axis -- its per-STEP-TOKEN routing is legitimate (7 step
+# tokens are 7 genuinely different operations) but re-routing along the RECURSION
+# axis is the identical bug. Repairing it means re-running the published arithmetic
+# matrix, which is a named, deferred task and not a silent config change.
+CANONICAL_ROUTING_PERSISTENCE = {
+    (TASK_LANGUAGE, "more"): ROUTING_PERSISTENCE_PER_TOKEN,
+}
+
+
+def canonical_routing_persistence(task: str, arch: str) -> str:
+    """The canonical `model.routing_persistence` for one (task, architecture).
+
+    ONE implementation, three callers -- `resolve_variant` (to decide whether a tag
+    is owed), `stamp_routing_persistence` (to write the value) and the test suite. A
+    second copy of the table is how the stamp and the label come to disagree, which
+    is the T5.4 trap this repository has already paid for once.
+    """
+    return CANONICAL_ROUTING_PERSISTENCE.get(
+        (str(task).lower(), str(arch).lower()), ROUTING_PERSISTENCE_LEGACY)
+
+
+def stamp_routing_persistence(cfg: dict) -> dict:
+    """Write `model.routing_persistence`, in place, for the arms whose canonical
+    value is not the legacy one. T-LX.12.
+
+    CALLED FROM TWO PLACES, and both are required because the two entry points
+    settle `task` and `architecture` in opposite orders:
+
+      config file declares task   load_config_defaults -> _apply_language_block
+                                  fires with NO architecture yet, so this returns
+                                  without stamping; `apply_architecture` runs next
+                                  and stamps.
+      `--task language` on CLI    apply_architecture fires with the task still
+                                  absent (so this returns without stamping), then
+                                  apply_task -> _apply_language_block stamps with
+                                  the architecture already final.
+
+    Hence the early return on an unsettled architecture is a normal control path,
+    not a defensive guard: whichever call runs second is the one that stamps. The
+    function is idempotent, so both firing is free.
+
+    `setdefault`, NOT assignment. A config file that declares `per_step` on a
+    language MoRE run is asking for the labelled per-step ablation -- the
+    architecture the 5 published MoRE cells actually ran -- and must get it, with
+    `resolve_variant` emitting `route_per_step` and the Gate 0 spec guard refusing
+    its canonical claim. Overwriting a declared value would run something other than
+    what the config asked for, silently.
+
+    NOTHING IS WRITTEN when the canonical value is the legacy one, which is every
+    arithmetic run and the language MoE and MoR arms. That absence is load-bearing:
+    `config_hash` covers the whole resolved config bar `provenance`/`logging`
+    (run_context.py:117), so writing even a correct default into those configs would
+    move the hash of all 15 published arithmetic runs and the 10 canonical language
+    MoE/MoR cells. model.py treats an absent key as `per_step`, so absence and the
+    legacy value mean the same thing to the model and different things to the hash.
+    """
+    mc = cfg.setdefault("model", {})
+
+    declared = mc.get("routing_persistence")
+    if declared is not None and str(declared).lower() not in ROUTING_PERSISTENCE_MODES:
+        raise ValueError(
+            f"model.routing_persistence must be one of {ROUTING_PERSISTENCE_MODES}, "
+            f"got {declared!r}. {ROUTING_PERSISTENCE_PER_TOKEN!r} routes each token "
+            "once and reuses that expert for the whole recursion (CLAUDE.md §1); "
+            f"{ROUTING_PERSISTENCE_LEGACY!r} re-runs the router at every recursion "
+            "step, which is what T-LX.11 measured and is retained only as a labelled "
+            "ablation."
+        )
+
+    arch = str(cfg.get("architecture") or "").lower()
+    if arch not in ARCHITECTURES:
+        return cfg
+
+    want = canonical_routing_persistence(resolve_task(cfg), arch)
+    if want != ROUTING_PERSISTENCE_LEGACY:
+        mc.setdefault("routing_persistence", want)
+    return cfg
+
 
 def resolve_variant(cfg: dict) -> str:
     """
@@ -613,6 +723,25 @@ def resolve_variant(cfg: dict) -> str:
         got_fm = int(mc.get("ffn_mult", 4))
         if want_fm is not None and got_fm != want_fm:
             tags.append(f"ffn_mult_{got_fm}")
+
+    # T-LX.12. Route persistence, judged against the run's OWN (task, architecture)
+    # canonical value for the same reason ffn_mult is: the canonical value differs by
+    # arm, so one shared number would mislabel two of the three arms. Canonical is
+    # `per_token` for language MoRE and `per_step` everywhere else, so this is
+    # ADDITIVE -- no existing run acquires a tag, and the 15 arithmetic runs plus the
+    # 10 language MoE/MoR cells keep the variant strings already printed in their
+    # tables.
+    #
+    # The 5 published language MoRE cells are the one asymmetry worth knowing about:
+    # they were resolved before this axis existed, so the `variant` string ON DISK
+    # says "language" where a rerun of the same config today would say
+    # "language+route_per_step". Their behaviour is recorded by their `config_hash`
+    # (which lacks the key) plus the T-LX.11/T-LX.12 entries, and per CLAUDE.md §6
+    # the artifacts are not edited after the fact to carry a label they never had.
+    _want_rp = canonical_routing_persistence(task, arch)
+    _got_rp = str(mc.get("routing_persistence", ROUTING_PERSISTENCE_LEGACY)).lower()
+    if _got_rp != _want_rp:
+        tags.append(f"route_{_got_rp}")
 
     # T-L1.1. The task leads, then the sorted deviations. So:
     #   arithmetic, no deviations -> "canonical"      (unchanged, all 15 runs)
@@ -776,6 +905,13 @@ def apply_architecture(cfg: dict, architecture: str) -> dict:
     # --run_name override has not been applied yet -- so gating on the label
     # here refuses even a correctly labelled dense ablation. The gate runs in
     # cli.py AFTER resolve_overrides, against the label the run will really use.
+    #
+    # T-LX.12: route persistence IS stamped here, unlike the routing-mode gate,
+    # because it depends only on (task, architecture) and not on the run label. On
+    # the config-file path this is the call that stamps -- `_apply_language_block`
+    # has already run without an architecture to key on. On the CLI path it is a
+    # no-op (the task is still absent) and `apply_task` stamps instead.
+    stamp_routing_persistence(cfg)
     return cfg
 
 
@@ -893,10 +1029,17 @@ def _apply_language_block(cfg: dict, declared_family_cls=None) -> dict:
         if log.get("run_name") in (None, stamped_arith):
             log["run_name"] = canonical_run_name(arch, None, TASK_LANGUAGE)
 
-    # LAST, because it reads dc["corpus"] and the line above is where that is
-    # settled for a config-file run. cli.py calls it a SECOND time after the
-    # `--corpus` override lands -- see the function's own docstring for why once is
-    # not enough.
+    # T-LX.12. Stamped here as well as in `apply_architecture` because the two entry
+    # points settle `architecture` and `task` in opposite orders -- see
+    # `stamp_routing_persistence`. On the `--task language` CLI path THIS is the call
+    # that lands the value; it is idempotent, so the config-file path paying for it
+    # twice costs nothing.
+    stamp_routing_persistence(cfg)
+
+    # LAST, because it reads dc["corpus"], which the `dc.setdefault("corpus", ...)`
+    # near the top of this function is what settles for a config-file run. cli.py
+    # calls it a SECOND time after the `--corpus` override lands -- see the
+    # function's own docstring for why once is not enough.
     stamp_language_dataset_versions(cfg)
     return cfg
 

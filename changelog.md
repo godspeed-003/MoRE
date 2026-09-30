@@ -6881,4 +6881,250 @@ is `TASKS_LANGUAGE.md` T-LX.11.
 
 ---
 
+## T-LX.12 - MoRE routes once per token and recurses that expert; `routing_persistence` freezes it for the canonical language arm
+
+**What changed.** `MoREWrapper.forward` now caches the depth-1 routing decision and
+reuses it for the rest of a token's recursion, so MoRE is the architecture `CLAUDE.md` 1
+defines: *a token is routed to a specialized expert, and that expert's weights are
+recursively reused for an adaptive number of steps*. The legacy per-step behaviour that
+T-LX.11 diagnosed is kept, selectable, and labelled - it is now the ablation, not the
+canonical path.
+
+**The axis.** `model.routing_persistence`, values `per_token` (new canonical for language
+MoRE) and `per_step` (the legacy default, `ROUTING_PERSISTENCE_LEGACY`). Declared in
+`code/more/model.py:80-83`.
+
+**Mechanism, and why the obvious version of it is wrong.** `MoEBlock.forward` gained a
+`route=(expert_idx, gate)` parameter (`code/more/model.py:255`). When it is supplied the
+router is not called at all: the block dispatches on the given index, multiplies by the
+given gate, and returns `balance_loss = None`, `router_logits = None`, and a `route_stats`
+dict with `router_calls = 0.0` and **no** `entropy_term` / `switch_aux_term` keys.
+
+BOTH the index and the gate are cached. Persisting only the index is defeatable: the
+router would still be called each depth to re-derive the gate probability, and it could
+drive the persisted expert's gate toward 0 at depths >= 2, multiplying the expert output by
+~0 and turning the block into a near-no-op - re-routing through the back door while
+`expert_idx` reports a fixed index and every persistence metric reads 1.000. The cached
+gate is NOT detached: task gradient still reaches the router through it, which is what
+keeps the router from being supervised by the balance loss alone (measured below).
+
+**One routing decision is one balance term.** `bal_calls` counts the calls that actually
+routed, so under `per_token` the wrapper's `total_bal_loss` is that single term, undivided.
+The tempting alternative - have a persisted-route call return `0.0` instead of `None` -
+divides one real balance term by `max_depth` and silently weakens the auxiliary 7x, which
+is `CLAUDE.md` 4's depth-coupling defect mirrored. `MoREModel` aggregates via
+`_bal_term_sum` / `_bal_term_blocks` so a non-reporting block contributes nothing rather
+than a zero.
+
+**`router_calls` vs `dispatch_steps`.** Two distinct counters, both in `route_stats` and
+both logged (`dispatch/router_calls`, `dispatch/router_calls_per_dispatch`,
+`dispatch/routing_persistence`). `dispatch_steps` counts expert applications, one per depth
+always; `router_calls` counts routing decisions - `max_depth` under `per_step`, 1 under
+`per_token`. Collapsing them would make the fix unverifiable from an artifact.
+
+**Measured on a seeded 64-dim toy model, `fixed_depth=True` so all seven depths run over a
+full active set** (`code/test_route_persistence.py`; random weights, so these numbers
+describe the *architecture*, never a trained model):
+
+| | dispatch_steps | router_calls | P(expert@d == expert@d1), d=1..7 | balance | router grad L1 |
+|---|---|---|---|---|---|
+| `per_step` (legacy) | 7 | 7 | 1.000 .911 .911 .880 .818 .849 .781 | -0.4452 (mean of 7) | 45.15 |
+| `per_token` (fixed) | 7 | **1** | 1.000 1.000 1.000 1.000 1.000 1.000 1.000 | -0.4442 (1 term) | 56.06 |
+
+**The halt head follows the persisted expert**, which is the compounding half of T-LX.11.
+Probe: zero every halt head's weight, set expert 0's bias to +20 ("halt now") and every
+other to -20 ("never halt"). Under `per_token` the exit depth is then fully determined by
+the depth-1 expert - 192/192 tokens exit at depth 1 if routed to expert 0 and at max depth
+otherwise, and `forced_exit_rate` matches `1 - P(expert 0)` to 1e-9. Under `per_step`, 6 of
+192 tokens halt on a head they were never routed to.
+
+**Config identity - what moved and what did not.** `config_hash` is a SHA-256 over the
+resolved config minus `provenance`/`logging` (`code/more/run_context.py:117`), so any key
+written into `model` moves the hash of every run that receives it. The key is therefore
+stamped ONLY for `(language, more)`, via a sparse table
+(`CANONICAL_ROUTING_PERSISTENCE` in `code/more/config.py`) plus `stamp_routing_persistence`,
+and is **absent** everywhere else. Same precedent as `load_config_defaults` deliberately
+not `setdefault`-ing `task` on the arithmetic path. Language MoE and MoR do not get it
+because the axis cannot affect them (`max_depth = 1` -> no second depth; `num_experts = 1`
+-> constant argmax), and arithmetic does not get it at all. Verified empirically, not
+argued: all 30 canonical cells on disk (15 `canonical_phase_b` + 15 `canonical_lang_b`)
+still hash to their stamped `config_hash` (`test_route_persistence.py` TLX12p).
+
+**Two stamp call sites, because the two entry points resolve in opposite orders.**
+`config_language.json` declares `task: "language"` and no `architecture`, so
+`load_config_defaults -> _apply_language_block` fires with no architecture known; the CLI
+path applies the architecture with the task still absent. Hence the stamp is called at the
+end of `apply_architecture` AND in `_apply_language_block`. A single call site in `cli.py`
+would miss `run_language_matrix.resolved()`, which replicates the CLI order.
+
+**The intended asymmetry - do not "fix" it later.** The 5 published L7.1 MoRE cells store
+`variant = "language"`; resolving that architecture today yields
+`variant = "language+route_per_step"`, because the canonical value for that arm has moved.
+That is what marks them as the labelled per-step ablation (`CLAUDE.md` 6). Their
+`resolved_config.json` is never rewritten, and a per-step MoRE can no longer claim
+`canonical_lang_b` - the proxy guard refuses it and names `routing_persistence`.
+
+**Spec.** `code/canonical_spec_language.json`: `architecture_variants.more.routing_persistence
+= "per_token"`, a justification entry in `architecture_variants_frozen_by`, and
+`spec_version` `L7.1-language-frozen` -> **`L7.2-TLX.12-route-persistence`** with a new
+`spec_version_history` block. No protocol field moved - epochs, batch_size, lr, seq_len,
+vocab_size, the loss weights and `ffn_mult` are byte-identical - so the MoE and MoR arms'
+definition of canonical is unchanged and their 10 cells remain canonical without
+qualification. Canonical MoRE, however, is now a different architecture: the 5 L7.1 MoRE
+cells and any L7.2 MoRE cell must never be averaged into one row. Parameter count is
+unchanged (MoRE 5,584,908, Gate L6 anchor) - persistence adds no parameters.
+
+**The trap this landed on, and it will be hit again.** Adding a 6th return value and a
+`route=` parameter to `MoEBlock.forward` breaks two distinct classes of caller, and Gate L0
+caught them on two separate runs rather than one.
+
+*Wrappers.* Three places monkeypatch `MoEBlock.forward` to record per-call values. A wrapper
+with the old `(self, x)` signature raises `TypeError` the moment a `per_token` model runs,
+and - worse - a wrapper that accepts `route` and drops it silently turns every model into
+the legacy per-step one, so the recorder would "verify" an architecture the caller did not
+build. `test_phase4_balance.py` hit the first form and took Gate L0 from 356 to a hard
+`GATE FAILURE` with 0 tests run. All three now forward `route` and skip (rather than
+zero-fill) non-reporting calls: `code/test_phase4_balance.py:82` (`CallRecorder`),
+`code/diag_route_stability.py:140`, `code/test_route_persistence.py:197`.
+`test_route_persistence.py` TLX12k5 asserts the keyword by name so the diagnostic stays
+runnable.
+
+*Direct callers.* `code/test_phase2_routing.py` unpacked the block's return in three places
+as a 5-tuple (`:60`, `:100`, `:132`) and raised
+`ValueError: too many values to unpack (expected 5)` at the first one - taking gate 1 to
+`EMPTY`, `TOTAL 337 337 0 0`, and a second `GATE FAILURE`, this time with a traceback that
+names an unrelated-looking test. The three sites are now explicit 6-tuple unpacks, **not**
+`*rest`: a future arity change must raise at the unpack instead of quietly binding the
+wrong tensor to `stats`. A repo-wide audit (`grep -l "MoEBlock("` then every >=4-element
+unpack in those four files) confirms `model.py`, `test_phase4_balance.py` and
+`test_phase5_dimensions.py` hold no other positional dependency - the last reads `out[2]`
+by index. T2.1d additionally now `assert`s that the gate the block *returns* equals the
+selected softmax probability the check re-derives from the logits; deliberately a bare
+`assert` and not a `check(...)` call, because a 20th check would move the frozen 356
+baseline for a contract already covered by name in the language suite.
+
+**Landed.** `code/more/model.py` (the axis, `MoEBlock.forward(route=)`, the depth-loop
+cache, `bal_calls` accounting), `code/more/engine.py` (kwarg passthrough + three
+`dispatch/*` metrics), `code/more/config.py` (sparse canonical table,
+`canonical_routing_persistence`, `stamp_routing_persistence`, the additive
+`route_{value}` variant tag, two call sites), `code/more/run_context.py` (Gate 0 reads the
+field), `code/canonical_spec_language.json`, `code/diag_route_stability.py`,
+`code/test_phase4_balance.py`, `code/test_language_spec_freeze.py` (new `spec_version`
+plus the missing `architecture_variants` <-> `architecture_variants_frozen_by` 1:1 check),
+`code/test_phase2_routing.py` (three stale 5-tuple unpacks; the returned-gate assert),
+`code/test_route_persistence.py` (new, 37 checks), `SETUP.md` (suite list and counts).
+
+**Not touched.** No GPU matrix run, no rebuilt dataset, no re-run canonical cell, no
+edited artifact. `results/results.json` and `results/results_tables.md` were regenerated
+by accident while probing the exporter's CLI and were restored - note that
+`export_results.py` has no `--help`: any invocation without `--check` performs a real
+export and rewrites those files.
+
+**Every control is asserted too.** Each `per_token` invariant is paired with the legacy
+run on the same weights and input, where the defect must still be present. A persistence
+test that only checks `per_token` passes vacuously if the loop stops re-routing for an
+unrelated reason (a shape bug collapsing the active set, an argmax over a constant). If a
+control ever starts passing, the result above it has stopped being evidence.
+
+**Verify.**
+
+```
+python code/test_route_persistence.py          # 37 passed, 0 failed, 0 skipped
+python code/test_phase4_balance.py            # 27 passed, 0 failed
+python code/test_language_spec_freeze.py      # 64 passed, 0 failed, 0 skipped
+python code/run_language_matrix.py --preflight # all three arms accepted, spec L7.2
+python code/run_correctness_suite.py           # Gate L0: TOTAL 356 356 0 0
+```
+
+**Where to look.** The cache and its reuse: `code/more/model.py` depth loop, the
+`persist_route and depth > 1` branch and the `depth == 1` capture below it. The
+no-router-call path: `MoEBlock.forward`'s `route is None` / else split. The normalization:
+the `bal_calls` block at the end of `MoREWrapper.forward`. Who gets the key:
+`CANONICAL_ROUTING_PERSISTENCE` in `code/more/config.py`. Why a key absent from MoE/MoR is
+correct rather than an oversight: the same file's comment above that table, and this
+entry's config-identity paragraph. Full task record, including the four pre-registered
+predictions for the fix run, `TASKS_LANGUAGE.md` T-LX.12.
+
+---
+
+---
+
+## T-LX.13 - a run records which card it ran on, because this project has used four
+
+**Symptom.** Every canonical language cell on disk records `"device": "cuda"` and nothing
+else about the hardware. So the question a seed matrix depends on -
+*did all fifteen cells run on the same GPU?* - is **not answerable from the artifacts**.
+It has to be reconstructed from a rental receipt and a conversation, and for the 10 kept
+MoE/MoR cells the torch build is not recoverable at all.
+
+That is not a bookkeeping complaint. `perf/throughput_items_sec`, per-epoch hours and
+`perf/gpu_peak_*_gib` are only comparable within one card, and this project has now run
+language work on a V100, an H100, a 6 GB 3050 and an 8 GB 4060. `CLAUDE.md` 9 excludes the
+college-lab 4060 from the canonical matrix for exactly this reason - a per-machine confound
+hiding inside the seed variance the study reports - and then the run record kept no field
+that would let anyone check the rule was followed.
+
+**Fix.** `code/more/engine.py`: a single `_hw_provenance` dict built once, before
+`wandb.init`, and merged into **both** sinks - the W&B config and
+`resolved_config.json`'s `provenance` block:
+
+```
+device               str(device)                                  "cuda" / "cpu"
+gpu_name             torch.cuda.get_device_name(device)            "Tesla V100-SXM2-16GB"
+gpu_total_mem_gib    device_properties(device).total_memory/2**30   15.773
+gpu_capability       "%d.%d" % get_device_capability(device)        "7.0"
+torch_version        torch.__version__                             "2.6.0+cu126"
+torch_cuda_version   torch.version.cuda                            "12.6"
+```
+
+One dict, two sinks: `device` was previously written to `resolved_config.json` only and was
+absent from the W&B config entirely, so the two records of the same run disagreed about
+which fields existed. A future hardware field cannot now land in one and miss the other.
+
+**Why this is safe to add to a repository full of published runs.** `config_hash` is a
+SHA-256 over the resolved config with `provenance` and `logging` **stripped**
+(`run_context.py:117`). These keys live in `provenance`, so they move no hash and no
+published cell's identity changes - unlike `model.routing_persistence` in T-LX.12, which
+had to be stamped for exactly one arm for precisely that reason. Verified: the 30 canonical
+cells still hash to their stamped values after this change.
+
+**On a CPU interpreter the four GPU fields resolve to the string `"N/A"`,** not to `0`,
+`""`, or `None`. `CLAUDE.md` 4 forbids reporting a sentinel as a measurement; "this run had
+no GPU" is a fact about the run and `"N/A"` is its correct spelling. It also keeps the
+completeness check below meaningful on the gate machine instead of skipped there.
+
+**Test.** `code/test_phase6_provenance.py`: the six fields are appended to
+`_required_fields()`, which already feeds one "every field is present and not None" check
+run twice (T6.7c on `more`, T6.7d on `mor` at E=1). Deliberately **not** six new
+`check(...)` calls: the Gate L0 total is frozen at 356 and a provenance field is not worth
+moving a frozen baseline for. Because `_required_fields` also feeds the seed-invariance
+comparison at `:399`, the fields are additionally asserted stable across seeds for free -
+two cells of one matrix that disagree on `gpu_name` now surface there.
+
+**What this does NOT do.** It does not retrofit the 15 existing canonical cells. Their
+`gpu_name` is absent and will stay absent; `RUNBOOK_V100.md` records that the V100 is being
+re-rented so the MoRE re-run matches the 10 kept cells' silicon, and that their torch
+version is unrecoverable and belongs in the paper's threats to validity. Do not backfill
+the field by hand into a finished run - a hand-written provenance value is indistinguishable
+from a measured one, which is the whole failure mode this task exists to close.
+
+**Verified by running, not by reading.** Gate L0 `TOTAL 356 356 0 0` / `ALL GATES PASS`
+(the suite launches two real 1-epoch arithmetic trainings, so the new code executed on both
+the `more` and the `mor` path), plus a real GPU run -
+`run_language_matrix.py --smoke` on the 3050, landing in
+`runs/langB_MoRE_seed44__16aaf2cb__r2/` - whose `resolved_config.json` carries
+`gpu_name = "NVIDIA GeForce RTX 3050 6GB Laptop GPU"`, `gpu_capability = "8.6"`,
+`gpu_total_mem_gib = 6.0`, `torch_version = "2.6.0+cu126"`,
+`torch_cuda_version = "12.6"`. All six fields, read back out of the artifact after the
+run rather than asserted from the source - that directory is the thing to diff against
+if a future run reports `"N/A"` on a machine that has a card.
+
+**Where to look.** `code/more/engine.py`, the `_hw_provenance` dict immediately above
+`wandb_config` and the `ctx.resolved_cfg["provenance"].update(_hw_provenance)` beside it.
+The contract: `_required_fields` in `code/test_phase6_provenance.py`, whose docstring
+explains why the fields are there and not in `updated_rules.md` 9.
+
+---
+
 <!-- APPEND-MARKER-CL -->
+

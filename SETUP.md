@@ -176,7 +176,20 @@ Takes ~4 minutes and launches two real 1-epoch arithmetic training runs.
 python code/test_lang_causality.py && python code/test_lang_heads.py && python code/test_lang_recursion.py && python code/test_language_families.py && python code/test_language_task_axis.py
 ```
 
-Expected: `22`, `25`, `11`, `89`, `74` passed, `0 failed` throughout.
+Expected: `22`, `47`, `17`, `114`, `79` passed, `0 failed` throughout (one skip each in
+`test_lang_heads` and `test_language_families`, both corpus-availability skips).
+
+Then the route-persistence suite, which is the one that checks MoRE is MoRE:
+
+```bash
+python code/test_route_persistence.py
+```
+
+Expected `37 passed, 0 failed, 0 skipped`. It runs the same randomly-initialised model
+twice, once per persistence mode, and asserts the token keeps its depth-1 expert at all
+seven depths under `per_token` while the legacy `per_step` control still re-routes. If
+a *control* check fails, the `per_token` result next to it has stopped being evidence —
+read the file's docstring before touching anything. No GPU, no training, ~10 s.
 
 Then the two Phase L-7 suites, which check the frozen protocol rather than the code:
 
@@ -184,9 +197,12 @@ Then the two Phase L-7 suites, which check the frozen protocol rather than the c
 python code/test_language_spec_freeze.py && python code/test_language_gate_l6_l7.py
 ```
 
-Expected: `59 passed, 0 failed, 0 skipped` and `28 passed, 0 failed, 0 skipped`. The
+Expected: `64 passed, 0 failed, 0 skipped` and `28 passed, 0 failed, 0 skipped`. The
 second one prints the three arms' parameter-count table — **MoRE must be 5,584,908**.
 If it is not, the arms are not budget-matched and nothing downstream means anything.
+The first one pins `spec_version` to the exact string `L7.2-TLX.12-route-persistence`;
+if it fails there, someone amended `canonical_spec_language.json` without recording the
+amendment, which is the one thing that file exists to prevent.
 
 Finally the reporting path, which is worth running **before** the matrix rather than
 after it:

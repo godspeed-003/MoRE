@@ -61,7 +61,8 @@ from more.config import (load_config, load_config_defaults, apply_architecture,
                          TASK_LANGUAGE, ARCHITECTURES)
 from more.lang_data import corpus_versions, TRAIN_SPLIT_VERSION, LANG_ROOT
 from more.run_context import (assert_not_silent_proxy, ProxyGuardError,
-                              load_canonical_spec, config_hash, _effective)
+                              load_canonical_spec, config_hash, _effective,
+                              _ARCH_VARIANT_DESCRIPTIVE_ONLY)
 
 try:
     sys.stdout.reconfigure(encoding="utf-8")
@@ -141,9 +142,67 @@ check("TL7.1d every enforced field carries a frozen_by entry",
 _thin = sorted(k for k, v in SPEC["frozen_by"].items() if len(str(v)) < 40)
 check("TL7.1e ... and none of them is a placeholder",
       not _thin, f"suspiciously short = {_thin}" if _thin else "all substantive")
+# T-LX.12 amended the spec: `architecture_variants.more.routing_persistence` was
+# added and frozen to `per_token`, so canonical MoRE routes a token once and recurses
+# that expert (CLAUDE.md 1) instead of re-drawing the expert at every depth. The
+# version string moved L7.1-language-frozen -> L7.2-TLX.12-route-persistence.
+#
+# THIS ASSERTION IS PINNED TO THE EXACT STRING ON PURPOSE. A test reading
+# `startswith("L7.")` would let the next amendment through silently, and the point of
+# the string is that a matrix run's `spec_version` in provenance says which
+# GENERATION of the protocol produced it. The five published L7.1 MoRE cells are a
+# different architecture from an L7.2 MoRE cell and must never be averaged into one
+# row; that separation is only legible if the version is forced to move and forced to
+# be re-declared here. Update this literal and `spec_version_history` together.
 check("TL7.1f spec_version records the freeze",
-      SPEC["spec_version"] == "L7.1-language-frozen",
+      SPEC["spec_version"] == "L7.2-TLX.12-route-persistence",
       f"spec_version = {SPEC['spec_version']!r}")
+# ... and the amendment must actually be narrated, not just numbered. The history is
+# a prose block (a list of lines, the same shape `_README` and `architecture_variants
+# ._note` use in this file) rather than one record per version: the useful content is
+# what did and did not move BETWEEN versions, which does not decompose per version.
+# So the check is that the current version string appears in it and the block is
+# substantive -- a bumped version with no narration is the thing being prevented.
+_hist = SPEC.get("spec_version_history")
+_hist_text = "\n".join(_hist) if isinstance(_hist, list) else str(_hist or "")
+check("TL7.1f2 spec_version_history narrates the current version",
+      SPEC["spec_version"] in _hist_text and len(_hist_text) >= 400,
+      f"{len(_hist_text)} chars, current version "
+      f"{'named' if SPEC['spec_version'] in _hist_text else 'NOT NAMED'}")
+# Every version that has ever existed has to stay in the block. Rewriting history to
+# mention only the current version destroys exactly the information a reader needs
+# when they find a run whose provenance names an older spec_version.
+check("TL7.1f3 ... and has not dropped the L7.1 freeze it superseded",
+      "L7.1-language-frozen" in _hist_text,
+      "L7.1 still recorded" if "L7.1-language-frozen" in _hist_text
+      else "the superseded version was erased")
+
+# TL7.1d covers `enforced_fields` <-> `frozen_by`. There was NO analogous check for
+# the per-architecture block, and that gap is what let `routing_persistence` be added
+# as a bare value: a field the guard enforces per-arm with no recorded reason is the
+# same defect TL7.1d exists to prevent, one section over. Justifications are keyed by
+# FIELD NAME, not by `arch.field`, because a field frozen for one arm is frozen for
+# the same reason wherever it appears -- the entry itself states the per-arm values.
+_av_fields = sorted({
+    k for a, b in SPEC["architecture_variants"].items()
+    if not a.startswith("_") and isinstance(b, dict)
+    for k in b if not k.startswith("_")
+    and k not in _ARCH_VARIANT_DESCRIPTIVE_ONLY})
+_av_why = SPEC.get("architecture_variants_frozen_by", {})
+_av_missing = [k for k in _av_fields if k not in _av_why]
+check("TL7.1d2 every ENFORCED architecture_variants field carries a justification",
+      not _av_missing, f"missing = {_av_missing}" if _av_missing else "1:1")
+_av_thin = sorted(k for k, v in _av_why.items() if len(str(v)) < 40)
+check("TL7.1d3 ... and none of those is a placeholder",
+      not _av_thin, f"suspiciously short = {_av_thin}" if _av_thin else "all substantive")
+# The reverse direction: a justification for a field no block declares is a leftover
+# from a removed axis, and reading it later as if it were live is how a dead
+# constraint gets re-enforced by hand. (`_ARCH_VARIANT_DESCRIPTIVE_ONLY` entries are
+# allowed to be documented without being enforced, so they are permitted here.)
+_av_orphan = sorted(set(_av_why) - set(_av_fields)
+                    - set(_ARCH_VARIANT_DESCRIPTIVE_ONLY))
+check("TL7.1d4 no justification describes a field no architecture declares",
+      not _av_orphan, f"orphaned = {_av_orphan}" if _av_orphan else "none")
 
 
 print("\n=== T-L7.1  the frozen config is ACCEPTED, on all three arms ===")

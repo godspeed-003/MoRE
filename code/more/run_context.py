@@ -46,7 +46,8 @@ import sys
 # "canonical is top1_sparse with no noise" living in the guard is exactly how a
 # guard comes to pass a run the model no longer implements (T5.4). No import
 # cycle: model.py does not import this module.
-from .model import CANONICAL_ROUTING_MODE, CANONICAL_ROUTER_NOISE
+from .model import (CANONICAL_ROUTING_MODE, CANONICAL_ROUTER_NOISE,
+                    ROUTING_PERSISTENCE_LEGACY)
 # T8.2: the guard must decide "which halting objective ran" and "is any ablation
 # active" using the SAME code that stamps provenance, not a second copy of the
 # rule. config.py imports model.py and families.py only, so there is no cycle.
@@ -329,6 +330,18 @@ def _effective(resolved: dict) -> dict:
         "step_routing_weight":        lw.get("step_routing"),
         "halting_weight":            lw.get("halting"),
         "halting_supervision_weight": lw.get("halting_supervision"),
+        # T-LX.12. Read with the LEGACY value as the default, not None, because the
+        # key's ABSENCE is a meaningful state rather than a gap: model.py treats an
+        # absent `routing_persistence` as `per_step`, and that absence is what keeps
+        # the 15 published arithmetic config hashes and the 10 canonical language
+        # MoE/MoR hashes from moving (config.py:stamp_routing_persistence). So the
+        # guard must compare the EFFECTIVE value the model will use. Reporting None
+        # here would make canonical_spec_language.json's
+        # `architecture_variants.more.routing_persistence = "per_token"` fail with
+        # "run has None" on a run that is in fact correctly stamped -- a real check
+        # failing for a fake reason.
+        "routing_persistence": mc.get("routing_persistence",
+                                      ROUTING_PERSISTENCE_LEGACY),
     }
 
 
