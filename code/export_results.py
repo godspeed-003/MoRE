@@ -140,6 +140,36 @@ TASK = _task_from_argv()
 SPEC_PATH = CODE / TASKS[TASK]["spec"]
 OUT = ROOT.joinpath(*TASKS[TASK]["out"])
 SPEC = json.loads(SPEC_PATH.read_text())
+
+# T-LX.18. The pre-registered confirmatory family size, used to Holm-correct the
+# primary-metric table. Read from code/confirmatory_tests.json, which is
+# committed BEFORE the results it governs exist, so the correction cannot be
+# reselected once the numbers land. Family A is the predictive-quality family
+# (primary metric); its declared size exceeds the three pairs this exporter
+# emits because it also declares the depth-matched fixed-depth control, whose
+# slot is consumed whether or not that arm was run.
+#
+# Absent file -> None, and `pairwise` falls back to the number of pairs it
+# actually emits (3). That fallback is a correction, not an absence of one; the
+# only way to get an uncorrected verdict out of this module is to read
+# `significant_alpha05` directly, which is why that key is documented as
+# UNCORRECTED at its definition.
+CONFIRMATORY_PATH = CODE / "confirmatory_tests.json"
+CONFIRMATORY_FAMILY_SIZE = None
+if CONFIRMATORY_PATH.is_file():
+    try:
+        _pre = json.loads(CONFIRMATORY_PATH.read_text(encoding="utf-8"))
+        CONFIRMATORY_FAMILY_SIZE = int(
+            _pre["families"]["A_predictive_quality"]["family_size"])
+    except (KeyError, ValueError, TypeError) as _e:
+        # Refuse to guess. A malformed pre-registration must not silently
+        # degrade into a weaker correction.
+        raise SystemExit(
+            f"{CONFIRMATORY_PATH.name} exists but families."
+            f"A_predictive_quality.family_size is unreadable ({_e}). Fix the "
+            "file or remove it; this exporter will not invent a family size."
+        ) from _e
+
 CANONICAL_GROUP = SPEC["canonical_group"]
 # The arithmetic spec has no `canonical_variant` key and its runs are stamped
 # `variant = canonical`; the language spec names `language`. Read it from the spec
@@ -597,14 +627,37 @@ def dead_rows(rows: list[dict], agg: dict, keys: list[str]) -> dict:
     return out
 
 
-def pairwise(agg: dict, key: str = PRIMARY) -> list[dict]:
-    """Rule 4. All three ordered pairs, each with its own resolution floor."""
+def pairwise(agg: dict, key: str = PRIMARY,
+             family_size: int | None = None) -> list[dict]:
+    """Rule 4. All three ordered pairs, each with its own resolution floor.
+
+    T-LX.18. The three pairs are read off ONE table, so a bare per-test
+    alpha = 0.05 is not a familywise verdict. Holm-Bonferroni is applied over
+    `family_size` comparisons, defaulting to the declared confirmatory family
+    for this task (`code/confirmatory_tests.json`) and falling back to the
+    number of pairs actually emitted. The declared size is used rather than the
+    computable count so that an arm which failed to run cannot make the
+    survivors easier to call significant -- see `seed_stats.holm`.
+
+    `significant_alpha05` is retained for consumers that already read it, but it
+    is UNCORRECTED and must not be rendered as the verdict; use `holm_reject`,
+    and `floor_above_threshold` to detect the undecidable case.
+    """
+    pairs = (("more", "moe"), ("more", "mor"), ("moe", "mor"))
+    tests = {}
+    for a, b in pairs:
+        tests[(a, b)] = _seed_stats.perm_test(agg[a]["metrics"][key]["raw"],
+                                              agg[b]["metrics"][key]["raw"])
+    m = family_size if family_size is not None else CONFIRMATORY_FAMILY_SIZE
+    m = max(int(m or 0), len(pairs))
+    corrected = _seed_stats.holm({f"{a}|{b}": t for (a, b), t in tests.items()},
+                                 alpha=0.05, family_size=m)
     res = []
-    for a, b in (("more", "moe"), ("more", "mor"), ("moe", "mor")):
-        t = _seed_stats.perm_test(agg[a]["metrics"][key]["raw"],
-                                  agg[b]["metrics"][key]["raw"])
+    for a, b in pairs:
+        t = corrected[f"{a}|{b}"]
         res.append({"pair": f"{ARCH_LABEL[a]} - {ARCH_LABEL[b]}", "metric": key,
                     "a": a, "b": b, "test": "exact two-sided randomization",
+                    "holm_family_size": m,
                     **({} if t is None else t),
                     "at_floor": bool(t and t["p_value"] <= t["min_p"] + 1e-12),
                     "significant_alpha05": bool(t and t["p_value"] < 0.05)})
@@ -810,24 +863,47 @@ def write_md(rows, refusals, agg, keys, pw, abl) -> Path:
     A("")
     A("## 2. Pairwise tests on the primary metric")
     A("")
-    A("| pair | gap | se(diff) | Cohen d | p (exact) | min_p | perms | verdict |")
+    A("| pair | gap | se(diff) | Cohen d | p (exact) | min_p | Holm thr | verdict |")
     A("|---|---|---|---|---|---|---|---|")
     for p in pw:
         if "p_value" not in p:
             A(f"| {p['pair']} | N/A | N/A | N/A | N/A | N/A | N/A | "
               f"fewer than 2 seeds in an arm |")
             continue
-        v = ("SIGNIFICANT" if p["significant_alpha05"] else "not significant")
+        thr = p.get("holm_threshold")
+        if p.get("floor_above_threshold"):
+            # The design cannot produce a significant result for this pair at
+            # any effect size. Printing "not significant" would blame the data
+            # for a limit of the seed count (CLAUDE.md 4: no sentinel reported
+            # as a measurement).
+            v = "N/A -- UNDECIDABLE (floor above Holm threshold)"
+        else:
+            v = ("SIGNIFICANT" if p.get("holm_reject")
+                 else "not significant")
         if p["at_floor"]:
             v += " (AT RESOLUTION FLOOR)"
         A(f"| {p['pair']} | {p['gap']:+.6f} | {p['se_diff']:.6f} "
-          f"| {p['cohens_d']:+.2f} | {p['p_value']:.4f} | {p['min_p']:.4f} "
-          f"| {p['n_perms']} | {v} |")
+          f"| {p['cohens_d']:+.2f} | {p['p_value']:.4f} | {p['min_p']:.5f} "
+          f"| {'N/A' if thr is None else f'{thr:.5f}'} | {v} |")
     A("")
     A("Exact two-sided randomization test (`code/seed_stats.py`); no k x std")
     A("threshold is used anywhere (superseded, T11.0b). `min_p` is the smallest")
-    A("p-value these arm sizes can produce: a p at the floor is the test's")
-    A("resolution limit and will not survive a multiple-comparison correction.")
+    A("p-value these arm sizes can produce -- **2**/C(n_a+n_b, n_a) for equal")
+    A("arms, because the two-sided statistic is invariant under swapping the")
+    A("groups and the complement of an equal-size subset is itself admissible,")
+    A("so extremes come in mirror pairs (corrected at T-LX.18; the old 1/C was")
+    A("2x too small and the AT-FLOOR flag could never fire). A p at the floor is")
+    A("the test's resolution limit: it is as extreme as the design admits, which")
+    A("is a weaker statement than significance.")
+    A("")
+    A(f"The verdict is **familywise**, Holm-Bonferroni at alpha = 0.05 over the")
+    A(f"{pw[0].get('holm_family_size', 'N/A')} comparisons declared in")
+    A("`code/confirmatory_tests.json`, which was committed before these results")
+    A("existed. Holm is a step-down procedure, so the thresholds differ by rank")
+    A("(alpha/m for the smallest p, alpha/(m-1) for the next, and so on); the")
+    A("`Holm thr` column is the one that pair actually faced. A pair whose floor")
+    A("exceeds its threshold is reported UNDECIDABLE rather than")
+    A("\"not significant\" -- no effect size could have passed it at this n.")
     A("")
     _write_md_depth(L, rows, agg)
     return _write_md_tail(L, rows, refusals, agg, keys, abl)
@@ -925,11 +1001,21 @@ def _write_md_depth(L: list, rows: list[dict], agg: dict) -> None:
         for p in pairwise(agg, key=k):
             if "p_value" not in p:
                 continue
-            v = "SIGNIFICANT" if p["significant_alpha05"] else "not significant"
+            # UNCORRECTED on purpose. These are exploratory depth diagnostics
+            # across several metrics x pairs, not the pre-registered family, and
+            # inventing a correction over an open-ended diagnostic set would be
+            # as misleading as omitting one. The confirmatory depth hypotheses
+            # are family B in code/confirmatory_tests.json and are tested there.
+            v = ("nominal" if p["significant_alpha05"] else "not significant")
             if p["at_floor"]:
                 v += " (AT FLOOR)"
             A(f"| `{k}` | {p['pair']} | {p['gap']:+.4f} | {p['cohens_d']:+.2f} "
-              f"| {p['p_value']:.4f} | {p['min_p']:.4f} | {v} |")
+              f"| {p['p_value']:.4f} | {p['min_p']:.5f} | {v} |")
+    A("")
+    A("These rows are **exploratory and uncorrected** -- \"nominal\" means")
+    A("p < 0.05 on that single test alone, not a familywise verdict. The")
+    A("pre-registered depth hypotheses are family B of")
+    A("`code/confirmatory_tests.json` and carry their own Holm correction.")
     A("")
     A("Pairs involving MoE are omitted rather than reported as N/A rows: MoE runs at")
     A("max_depth 1, so it allocates no depth and the quantity does not exist for it.")

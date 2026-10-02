@@ -676,7 +676,7 @@ model state. Every sidecar carries `measured_at: "best_val_checkpoint"`, and
 `results_tables.md` §2b restates it.
 
 **Held-out depth, canonical matrix** (n = 5/arm, offline, best-val checkpoint;
-exact two-sided randomization test, resolution floor p = 0.0040 at 5v5):
+exact two-sided randomization test, resolution floor p = 0.00794 at 5v5):
 
 | | MoE | MoR | MoRE |
 |---|---|---|---|
@@ -851,8 +851,15 @@ seed values and reports the exact two-sided p. Consequences you must respect:
   which shrank every spread and manufactured significance — the 2.10× figure in
   the T10.J pre-registration is a surviving artifact of it (corrected: 1.88×, and
   p = 0.125, i.e. not significant).
-- **There is a resolution floor.** The smallest attainable p is
-  `1 / C(n_a + n_b, n_a)` — **0.0040** at 5 vs 5, **0.0179** at 3 vs 5. A 3-seed
+- **There is a resolution floor, and it is not `1/C`.** Corrected at T-LX.18.
+  The test is two-sided, so for **equal** arms every extreme arrangement is
+  paired with its group-swapped mirror (same `|mean diff|`, and the complement
+  of an equal-size subset is itself admissible) and the smallest attainable p
+  is `2 / C(n_a + n_b, n_a)` — **0.00794** at 5 vs 5. For **unequal** arms the
+  complement has the wrong size, no mirror is forced, and it is
+  `1 / C(n_a + n_b, n_a)` — **0.0179** at 3 vs 5. The old table published
+  0.0040 at 5v5, which is 2x too small and made the AT-FLOOR guard unfirable;
+  `code/test_seed_stats.py` now re-derives every row by enumeration. A 3-seed
   arm therefore *cannot* clear a Bonferroni threshold of α = 0.0083 (six Phase 10
   arms) no matter how large the effect. Every driver prints the floor beside the p
   so this cannot be missed; if you need significance from a 3-seed arm, the fix is
@@ -1300,7 +1307,8 @@ confounds quality with curve noise). Mean ± **sample** std (n − 1), n = 5:
 | **MoR** | **0.062706 ± 0.000112** | **0.2250** | 3,197,710 | N/A | N/A | N/A |
 | MoRE | 0.063186 ± 0.000249 | 0.2191 | 3,201,555 | 0.526 ± 0.061 | 0.491 ± 0.074 | 0.605 ± 0.062 |
 
-Exact two-sided randomization test, floor p = 0.0040 at 5v5:
+Exact two-sided randomization test, floor p = 0.00794 at 5v5 (2/252; see
+T-LX.18 — the floor is 2/C for equal arms, 1/C otherwise):
 
 | pair | p | reading |
 |---|---:|---|

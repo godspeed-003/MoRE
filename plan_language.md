@@ -808,7 +808,8 @@ language instantiation of `updated_rules.md` §4's input-parity invariant, and
 trivially testable since the input is the token array itself (Gate L2).
 
 Seeds `42, 43, 44, 45, 46`; mean ± std; the exact randomization test in
-`code/seed_stats.py` with its 0.0040 resolution floor at 5v5; Bonferroni across
+`code/seed_stats.py` with its **0.00794** resolution floor at 5v5 (`2/C(10,5)`;
+corrected at T-LX.18 — the two-sided floor is 2/C for equal arms); Holm across
 however many ablations are actually run. Checkpoint selection is **final epoch**,
 per the T11.0b amendment, for the same reason as before: best-val is an order
 statistic whose downward bias scales with per-arm validation noise, and that noise

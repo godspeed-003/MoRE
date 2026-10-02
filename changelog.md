@@ -7417,3 +7417,130 @@ correction, §6 for the GPU/no-GPU split, §7 for the venue consequences.
 
 <!-- APPEND-MARKER-CL -->
 
+
+---
+
+## T-LX.18 — the two-sided resolution floor was 2x too small, and the AT-FLOOR guard was dead code
+
+**What.** `seed_stats.perm_test` reported `min_p = 1 / C(n_a+n_b, n_a)` for every
+design. For *equal* arm sizes that is the one-sided floor and the test is
+two-sided, so every equal-arm comparison in both papers carried a floor 2x
+smaller than the smallest p the design can actually produce. Fixed, with the
+pre-registered correction family that consumes it.
+
+**Why it is not a cosmetic decimal.** `format_row` and `export_results.pairwise`
+both flagged AT-FLOOR with `p_value <= min_p + 1e-12`. At 5v5 that asked
+`0.00794 <= 0.00397`, false by construction, so **the flag could never fire**.
+The two headline language comparisons sit exactly on the floor —
+
+| pair | gap | p | floor | was reported as |
+|---|---|---|---|---|
+| MoRE − MoE | −0.449869 | 0.00794 | 0.00794 | significant, no floor marker |
+| MoE − MoR  | +0.432711 | 0.00794 | 0.00794 | significant, no floor marker |
+| MoRE − MoR | −0.017158 | 0.40476 | 0.00794 | not significant (correct) |
+
+— so a result at the design's resolution limit was rendered as an ordinary
+significant result. That is the same defect class as reporting a sentinel as a
+measurement (CLAUDE.md §4): an absence of resolution rendered as resolution.
+`p = 0.00794` does not measure how small p is; it means *the observed split is
+the most extreme arrangement five seeds admit*. Both claims still clear Holm at
+the declared family of 4 (threshold 0.0125, margin 0.0046), so the conclusions
+stand and only the phrasing was wrong — but the phrasing is now enforced by
+code rather than by memory.
+
+**The derivation, because the fix is two-branched and looks wrong at a glance.**
+The statistic is `|mean(a) − mean(b)|`. When `n_a == n_b`, the complement of any
+group-a subset is *itself* a valid group-a subset, and swapping the groups
+negates the difference while preserving its absolute value — extremes come in
+mirror pairs, a count of 1 is unreachable, and the floor is `2/C`. When
+`n_a != n_b` the complement has the wrong size, is not an admissible regrouping,
+no mirror is forced, and the floor really is `1/C`.
+
+    n=5 vs 5  ->  2/252  = 0.00794      (was published as 0.0040)
+    n=7 vs 7  ->  2/3432 = 0.00058      (was published as 0.00029)
+    n=3 vs 5  ->  1/56   = 0.0179       (CORRECT as published)
+    n=3 vs 3  ->  2/20   = 0.1000       (was published as 0.0500)
+
+**A blanket `2.0 / total` was drafted first and would have been a second bug.**
+It inflates the floor for the n=3-vs-5 Phase 10 arms — precisely the arms whose
+verdicts depend on `min_p` — and would have marked them spuriously AT-FLOOR.
+Caught by brute-force enumeration rather than by re-reading the algebra, which
+is why `test_seed_stats.py:brute_force_min_p` re-implements the enumeration from
+scratch instead of importing it: a test that shares the formula under test
+cannot detect a wrong formula. The n=3-vs-3 row is also worse than the old
+comment admitted — it said 0.0500 "cannot clear alpha after correction", when in
+fact the floor is 0.1000 and such a design cannot reach alpha = 0.05 **at all**,
+uncorrected.
+
+**The suite was pinning the defect in place.** `test_language_export.py:449`
+asserted `min_p == 1/252` and failed when the library was fixed. Per CLAUDE.md
+§7 the correctness fix stands and the assertion was corrected, never the
+reverse; the old constant is marked do-not-restore at the call site.
+
+**Multiple comparisons.** Three pairs were read off one table against a bare
+`alpha = 0.05`, which is not a familywise verdict. Added `seed_stats.holm`
+(Holm–Bonferroni, step-down) and `code/confirmatory_tests.json`, which declares
+two families *before* the route-once MoRE cells were trained:
+
+* **A — predictive quality** on `val/task_loss`, 4 tests (MoRE-vs-MoE,
+  MoR-vs-MoE, MoRE-vs-MoR, MoRE-vs-depth-matched-fixed).
+* **B — adaptive depth** on `depth/spearman_vs_model_loss`, 2 tests
+  (route-once-vs-MoR, route-once-vs-per-step).
+
+Holm, not plain Bonferroni, because it controls the same familywise error rate
+and is uniformly more powerful, so the plain version is strictly worse with no
+compensating property — and the difference is load-bearing here: plain
+Bonferroni over 7 comparisons gives `0.05/7 = 0.00714`, **below** the 5v5 floor
+of 0.00794, a design in which no effect of any size could be called
+significant. `holm()` takes `m` from the *declared* family, not from the tests
+that happened to run, and raises if asked to correct for fewer comparisons than
+it is given — dropping an arm that failed must not make the survivors easier to
+call significant. A comparison whose floor exceeds its Holm threshold now prints
+`N/A — UNDECIDABLE`, never "not significant", because blaming the data for a
+limit of the seed count is the dishonest reading.
+
+The exporter's depth-diagnostic table is deliberately left **uncorrected and
+labelled exploratory** ("nominal", not "SIGNIFICANT"): it sweeps several metrics
+× pairs, and inventing a correction over an open-ended diagnostic set would be
+as misleading as omitting one. The confirmatory depth hypotheses are family B.
+
+**Honest limit of the pre-registration, recorded in the file itself.** MoE and
+MoR were already trained when it was written, so only the MoRE-involving tests
+are genuinely pre-result. `mor_vs_moe` is marked `pre_result: "known"` and the
+paper must say so. It is declared anyway because it is read off the same table
+and must be corrected for; omitting it to keep the family small is the worse
+error.
+
+**Failure tracing.**
+* A p-value that looks impossibly small, or an AT-FLOOR marker that never
+  appears → `code/seed_stats.py:perm_test`, the `mirrored` branch. Do not
+  collapse it to one case; `code/test_seed_stats.py` TLX18d/TLX18e fail in
+  opposite directions if you do.
+* A verdict that disagrees with the quoted threshold → `seed_stats.holm`; the
+  threshold is rank-dependent (`alpha/(m-rank)`), so the column to read is
+  `Holm thr`, not `alpha`.
+* "not significant" where the design was never decidable →
+  `floor_above_threshold` in `holm()` and the `UNDECIDABLE` branch in
+  `export_results._write_md_*`.
+* A results table correcting for the wrong number of tests →
+  `export_results.CONFIRMATORY_FAMILY_SIZE`, which reads
+  `code/confirmatory_tests.json` and exits rather than guess if the file is
+  malformed.
+* Floor numbers in prose disagreeing with code → `test_seed_stats.py` TLX18a
+  re-derives the whole docstring table by enumeration. Prose copies live in
+  `ARCHITECTURE.md`, both `canonical_spec*.json` protocol notes, and the
+  `train-launch` skill; all were corrected in this commit.
+
+**Verified by.**
+
+    C:/Users/vedan/anaconda3/python.exe code/test_seed_stats.py          # 38 passed
+    C:/Users/vedan/anaconda3/python.exe code/test_language_export.py     # 77 passed
+    C:/Users/vedan/anaconda3/python.exe code/test_language_spec_freeze.py # 64 passed
+    C:/Users/vedan/anaconda3/python.exe code/test_route_persistence.py   # 37 passed
+    C:/Users/vedan/anaconda3/python.exe code/run_correctness_suite.py    # TOTAL 356 356 0 0
+    C:/Users/vedan/anaconda3/python.exe code/export_results.py --task language
+
+The exporter was run against the real 15 admitted cells, not only the suites: it
+reproduced the three pairwise rows above with the corrected floor, and the 30
+canonical `config_hash` values are unmoved (TLX12p), confirming that correcting
+prose inside the frozen spec notes does not touch any run's identity.

@@ -65,7 +65,8 @@ import seed_stats as _seed_stats                     # noqa: E402
 # `routing_supervision` to seeds 45-46, because those two were the only arms with
 # a significant result and both sat EXACTLY at the 3-vs-5 resolution floor
 # (p = 0.0179 = 1/56), so neither could survive Bonferroni across six arms. Five
-# seeds drops the floor to 1/252 = 0.0040. Every other arm remains at n=3, so the
+# seeds drops the floor to 2/252 = 0.00794 (two-sided; 2/C for equal arms -- see
+# T-LX.18 and code/seed_stats.py). Every other arm remains at n=3, so the
 # seed set is now per-arm and is DISCOVERED FROM DISK rather than assumed -- see
 # `arm_seeds()`. CANDIDATE_SEEDS is the frozen set a run may draw from at all.
 CANDIDATE_SEEDS = (42, 43, 44, 45, 46)
@@ -559,8 +560,12 @@ def rule4(arm_vals: list, base_vals: list) -> dict:
     arm and the baseline are now compared at whatever matched seed set both
     actually have on disk, and nothing is borrowed.
 
-    READ THE FLOOR, NOT JUST THE p. `min_p = 1/C(n_a+n_b, n_a)` is 0.0179 at
-    3-vs-5 and 0.0040 at 5-vs-5. An arm whose p EQUALS its floor is as extreme as
+    READ THE FLOOR, NOT JUST THE p. `min_p` is 1/C(n_a+n_b, n_a) = 0.0179 at
+    3-vs-5 but 2/C = 0.00794 at 5-vs-5: the test is two-sided, and at EQUAL arm
+    sizes the complement of a group-a subset is itself admissible and carries the
+    same |mean difference|, so extremes come in mirror pairs and a count of 1 is
+    unreachable. These arms are 3-vs-5, so 1/C is the right floor for them and
+    T-LX.18 did not move their verdicts. An arm whose p EQUALS its floor is as extreme as
     its seed count can express; that is not the same claim as "significant", and
     it will not survive a Bonferroni correction across this phase's six arms
     (alpha = 0.05/6 = 0.0083). The verdict string says AT-FLOOR when that happens.

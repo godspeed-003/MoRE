@@ -491,7 +491,8 @@ regroupings, so the **smallest attainable p is 1/56 = 0.0179**.
 Both sit exactly at the design's resolution floor (1/56), so neither survives
 Bonferroni across six arms (α = 0.0083). **The n = 3 design cannot support a
 multiplicity-corrected claim at all.** Adding seeds 45 and 46 to these two arms
-(4 runs, ≈ 2.8 h) drops the floor to 1/252 = 0.004 and makes both findings
+(4 runs, ≈ 2.8 h) drops the floor to 2/252 = 0.00794 (two-sided; corrected at
+T-LX.18) and makes both findings
 multiplicity-robust. That is the highest-value remaining GPU spend in the project.
 
 ---

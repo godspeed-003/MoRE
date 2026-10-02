@@ -9,8 +9,8 @@ numbers out of a run directory into this file -- regenerate it.
 - primary metric: `val/task_loss` under checkpoint rule **final epoch (last-epoch val/task_loss)**
 - predict-the-train-mean floor on val: `0.080914` (R^2 below is derived from it, not stored)
 - admitted runs: MoE 5/5 (seeds [42, 43, 44, 45, 46]), MoR 5/5 (seeds [42, 43, 44, 45, 46]), MoRE 5/5 (seeds [42, 43, 44, 45, 46])
-- git commit of the admitted runs: `f7166b4fa4f5dcf34d0284fcaa5a686ad4d835f9` (dirty=True)
-- refused directories: 228 (listed at the end; a refusal is the admission filter working)
+- git commit of the admitted runs: `f7166b4fa4f5dcf34d0284fcaa5a686ad4d835f9` (dirty=True) -- all 15 cells
+- refused directories: 297 (listed at the end; a refusal is the admission filter working)
 
 ## 1. Headline
 
@@ -27,16 +27,30 @@ selection bias stays checkable; it is never the headline.
 
 ## 2. Pairwise tests on the primary metric
 
-| pair | gap | se(diff) | Cohen d | p (exact) | min_p | perms | verdict |
+| pair | gap | se(diff) | Cohen d | p (exact) | min_p | Holm thr | verdict |
 |---|---|---|---|---|---|---|---|
-| MoRE - MoE | -0.000074 | 0.000131 | -0.36 | 0.6587 | 0.0040 | 252 | not significant |
-| MoRE - MoR | +0.000481 | 0.000122 | +2.49 | 0.0159 | 0.0040 | 252 | SIGNIFICANT |
-| MoE - MoR | +0.000554 | 0.000085 | +4.13 | 0.0079 | 0.0040 | 252 | SIGNIFICANT |
+| MoRE - MoE | -0.000074 | 0.000131 | -0.36 | 0.6587 | 0.00794 | 0.02500 | not significant |
+| MoRE - MoR | +0.000481 | 0.000122 | +2.49 | 0.0159 | 0.00794 | 0.01667 | SIGNIFICANT |
+| MoE - MoR | +0.000554 | 0.000085 | +4.13 | 0.0079 | 0.00794 | 0.01250 | SIGNIFICANT (AT RESOLUTION FLOOR) |
 
 Exact two-sided randomization test (`code/seed_stats.py`); no k x std
 threshold is used anywhere (superseded, T11.0b). `min_p` is the smallest
-p-value these arm sizes can produce: a p at the floor is the test's
-resolution limit and will not survive a multiple-comparison correction.
+p-value these arm sizes can produce -- **2**/C(n_a+n_b, n_a) for equal
+arms, because the two-sided statistic is invariant under swapping the
+groups and the complement of an equal-size subset is itself admissible,
+so extremes come in mirror pairs (corrected at T-LX.18; the old 1/C was
+2x too small and the AT-FLOOR flag could never fire). A p at the floor is
+the test's resolution limit: it is as extreme as the design admits, which
+is a weaker statement than significance.
+
+The verdict is **familywise**, Holm-Bonferroni at alpha = 0.05 over the
+4 comparisons declared in
+`code/confirmatory_tests.json`, which was committed before these results
+existed. Holm is a step-down procedure, so the thresholds differ by rank
+(alpha/m for the smallest p, alpha/(m-1) for the next, and so on); the
+`Holm thr` column is the one that pair actually faced. A pair whose floor
+exceeds its threshold is reported UNDECIDABLE rather than
+"not significant" -- no effect size could have passed it at this n.
 
 ## 2b. Depth on the validation pass (offline, from checkpoint)
 
@@ -57,9 +71,14 @@ may not be captioned as coming from one model state.
 
 | metric | pair | gap | Cohen d | p (exact) | min_p | verdict |
 |---|---|---|---|---|---|---|
-| `val_offline/avg_recursion_steps` | MoRE - MoR | +0.2248 | +2.88 | 0.0079 | 0.0040 | SIGNIFICANT |
-| `val_offline/depth_allocation_error_abs` | MoRE - MoR | +0.0517 | +0.67 | 0.3571 | 0.0040 | not significant |
-| `val_offline/depth_allocation_error_rel` | MoRE - MoR | +0.0995 | +1.47 | 0.0159 | 0.0040 | SIGNIFICANT |
+| `val_offline/avg_recursion_steps` | MoRE - MoR | +0.2248 | +2.88 | 0.0079 | 0.00794 | nominal (AT FLOOR) |
+| `val_offline/depth_allocation_error_abs` | MoRE - MoR | +0.0517 | +0.67 | 0.3571 | 0.00794 | not significant |
+| `val_offline/depth_allocation_error_rel` | MoRE - MoR | +0.0995 | +1.47 | 0.0159 | 0.00794 | nominal |
+
+These rows are **exploratory and uncorrected** -- "nominal" means
+p < 0.05 on that single test alone, not a familywise verdict. The
+pre-registered depth hypotheses are family B of
+`code/confirmatory_tests.json` and carry their own Holm correction.
 
 Pairs involving MoE are omitted rather than reported as N/A rows: MoE runs at
 max_depth 1, so it allocates no depth and the quantity does not exist for it.
@@ -347,16 +366,37 @@ skipped these would be indistinguishable from one that found nothing wrong.
 | `famcls_nofam_seed43__ca305b98` | experiment_group='exploratory' != 'canonical_phase_b' |
 | `famcls_nofam_seed44__1d8e55dd` | experiment_group='exploratory' != 'canonical_phase_b' |
 | `gate1_dataset_check__seedNA__fa24821c` | experiment_group='exploratory' != 'canonical_phase_b' |
+| `langB_MoE_seed42__1958b9a5` | experiment_group='canonical_lang_b' != 'canonical_phase_b' |
+| `langB_MoE_seed43__b595f8f2` | experiment_group='canonical_lang_b' != 'canonical_phase_b' |
+| `langB_MoE_seed44__6a66e9bd` | experiment_group='canonical_lang_b' != 'canonical_phase_b' |
+| `langB_MoE_seed45__abe5e12e` | experiment_group='canonical_lang_b' != 'canonical_phase_b' |
+| `langB_MoE_seed46__d949c1d6` | experiment_group='canonical_lang_b' != 'canonical_phase_b' |
+| `langB_MoR_seed42__547e435b__r4` | experiment_group='canonical_lang_b' != 'canonical_phase_b' |
+| `langB_MoR_seed43__84a6b29d__r4` | experiment_group='canonical_lang_b' != 'canonical_phase_b' |
 | `langB_MoR_seed43__c1873a66` | experiment_group='lang_smoke2' != 'canonical_phase_b' |
+| `langB_MoR_seed44__14356af7` | experiment_group='langB_smoke' != 'canonical_phase_b' |
+| `langB_MoR_seed44__5ce4b087` | experiment_group='canonical_lang_b' != 'canonical_phase_b' |
+| `langB_MoR_seed44__78580ac8` | no metrics.json (run did not finish) |
+| `langB_MoR_seed44__78580ac8__r2` | experiment_group='langB_smoke' != 'canonical_phase_b' |
+| `langB_MoR_seed45__bef0bdd0` | experiment_group='canonical_lang_b' != 'canonical_phase_b' |
+| `langB_MoR_seed46__699aa4a1` | experiment_group='canonical_lang_b' != 'canonical_phase_b' |
 | `langB_MoRE_seed42__1304961e` | no metrics.json (run did not finish) |
+| `langB_MoRE_seed42__1304961e__r4` | experiment_group='langB_gate_l7' != 'canonical_phase_b' |
+| `langB_MoRE_seed42__5c34c9dd` | experiment_group='canonical_lang_b' != 'canonical_phase_b' |
 | `langB_MoRE_seed42__91c9bba1` | experiment_group='lang_smoke' != 'canonical_phase_b' |
+| `langB_MoRE_seed43__0a9737ff` | experiment_group='canonical_lang_b' != 'canonical_phase_b' |
 | `langB_MoRE_seed43__57e141ab` | no metrics.json (run did not finish) |
+| `langB_MoRE_seed44__16aaf2cb` | experiment_group='langB_smoke' != 'canonical_phase_b' |
+| `langB_MoRE_seed44__16aaf2cb__r2` | experiment_group='langB_smoke' != 'canonical_phase_b' |
 | `langB_MoRE_seed44__22474619` | experiment_group='lang_gpu_trend2' != 'canonical_phase_b' |
 | `langB_MoRE_seed44__2b8030a8` | experiment_group='lang_calib_b0p05_h0p001' != 'canonical_phase_b' |
+| `langB_MoRE_seed44__2ca6e831` | experiment_group='langB_smoke' != 'canonical_phase_b' |
 | `langB_MoRE_seed44__2ce26c0d` | experiment_group='lang_axes' != 'canonical_phase_b' |
 | `langB_MoRE_seed44__45a2bfbc` | experiment_group='lang_calib_b0p001_h0p5' != 'canonical_phase_b' |
 | `langB_MoRE_seed44__4fb3cbf2` | experiment_group='lang_calib_lr0p002_d0p1' != 'canonical_phase_b' |
 | `langB_MoRE_seed44__4fb3cbf2__r2` | experiment_group='lang_calib_lr0p002_d0p1' != 'canonical_phase_b' |
+| `langB_MoRE_seed44__68d032ba` | experiment_group='langB_depth_trend' != 'canonical_phase_b' |
+| `langB_MoRE_seed44__6aaf6e7e` | experiment_group='canonical_lang_b' != 'canonical_phase_b' |
 | `langB_MoRE_seed44__6d7a7820` | experiment_group='lang_calib_b0p21_h0p001' != 'canonical_phase_b' |
 | `langB_MoRE_seed44__7c2f1aa4` | experiment_group='lang_calib_b0p001_h0p107' != 'canonical_phase_b' |
 | `langB_MoRE_seed44__7c2f1aa4__r2` | experiment_group='lang_calib_b0p001_h0p107' != 'canonical_phase_b' |
@@ -369,6 +409,8 @@ skipped these would be indistinguishable from one that found nothing wrong.
 | `langB_MoRE_seed44__91f762a2__r4` | experiment_group='lang_calib_lr0p0005_d0p0' != 'canonical_phase_b' |
 | `langB_MoRE_seed44__d555126e` | experiment_group='lang_gpu_trend' != 'canonical_phase_b' |
 | `langB_MoRE_seed44__d915d7de` | experiment_group='langB_smoke' != 'canonical_phase_b' |
+| `langB_MoRE_seed44__d915d7de__r2` | experiment_group='langB_smoke' != 'canonical_phase_b' |
+| `langB_MoRE_seed44__d915d7de__r3` | experiment_group='langB_smoke' != 'canonical_phase_b' |
 | `langB_MoRE_seed44__df42339b` | experiment_group='lang_calib_b0p001_h0p001' != 'canonical_phase_b' |
 | `langB_MoRE_seed44__df42339b__r2` | experiment_group='lang_calib_b0p001_h0p001' != 'canonical_phase_b' |
 | `langB_MoRE_seed44__df42339b__r3` | experiment_group='lang_calib_b0p001_h0p001' != 'canonical_phase_b' |
@@ -382,7 +424,9 @@ skipped these would be indistinguishable from one that found nothing wrong.
 | `langB_MoRE_seed44__f205e549` | experiment_group='lang_calib_lr0p0005_d0p1' != 'canonical_phase_b' |
 | `langB_MoRE_seed44__f205e549__r2` | experiment_group='lang_calib_lr0p0005_d0p1' != 'canonical_phase_b' |
 | `langB_MoRE_seed45__90b9896f` | no metrics.json (run did not finish) |
+| `langB_MoRE_seed45__af8e24df` | experiment_group='canonical_lang_b' != 'canonical_phase_b' |
 | `langB_MoRE_seed45__d6025531` | experiment_group='lang_rho_fix' != 'canonical_phase_b' |
+| `langB_MoRE_seed46__48fe8e63` | experiment_group='canonical_lang_b' != 'canonical_phase_b' |
 | `langB_MoRE_seed46__d9882139` | no metrics.json (run did not finish) |
 | `nacheck_moe__seedNA__27d97bf3` | experiment_group='exploratory' != 'canonical_phase_b' |
 | `nacheck_mor__seedNA__a2494065` | experiment_group='exploratory' != 'canonical_phase_b' |
@@ -490,8 +534,30 @@ skipped these would be indistinguishable from one that found nothing wrong.
 | `t67_provenance_check_seed44__6b711a59__r35` | experiment_group='exploratory' != 'canonical_phase_b' |
 | `t67_provenance_check_seed44__6b711a59__r36` | experiment_group='exploratory' != 'canonical_phase_b' |
 | `t67_provenance_check_seed44__6b711a59__r37` | experiment_group='exploratory' != 'canonical_phase_b' |
+| `t67_provenance_check_seed44__6b711a59__r38` | experiment_group='exploratory' != 'canonical_phase_b' |
+| `t67_provenance_check_seed44__6b711a59__r39` | experiment_group='exploratory' != 'canonical_phase_b' |
 | `t67_provenance_check_seed44__6b711a59__r4` | experiment_group='exploratory' != 'canonical_phase_b' |
+| `t67_provenance_check_seed44__6b711a59__r40` | experiment_group='exploratory' != 'canonical_phase_b' |
+| `t67_provenance_check_seed44__6b711a59__r41` | experiment_group='exploratory' != 'canonical_phase_b' |
+| `t67_provenance_check_seed44__6b711a59__r42` | experiment_group='exploratory' != 'canonical_phase_b' |
+| `t67_provenance_check_seed44__6b711a59__r43` | experiment_group='exploratory' != 'canonical_phase_b' |
+| `t67_provenance_check_seed44__6b711a59__r44` | experiment_group='exploratory' != 'canonical_phase_b' |
+| `t67_provenance_check_seed44__6b711a59__r45` | experiment_group='exploratory' != 'canonical_phase_b' |
+| `t67_provenance_check_seed44__6b711a59__r46` | experiment_group='exploratory' != 'canonical_phase_b' |
+| `t67_provenance_check_seed44__6b711a59__r47` | experiment_group='exploratory' != 'canonical_phase_b' |
+| `t67_provenance_check_seed44__6b711a59__r48` | experiment_group='exploratory' != 'canonical_phase_b' |
+| `t67_provenance_check_seed44__6b711a59__r49` | experiment_group='exploratory' != 'canonical_phase_b' |
 | `t67_provenance_check_seed44__6b711a59__r5` | experiment_group='exploratory' != 'canonical_phase_b' |
+| `t67_provenance_check_seed44__6b711a59__r50` | experiment_group='exploratory' != 'canonical_phase_b' |
+| `t67_provenance_check_seed44__6b711a59__r51` | experiment_group='exploratory' != 'canonical_phase_b' |
+| `t67_provenance_check_seed44__6b711a59__r52` | experiment_group='exploratory' != 'canonical_phase_b' |
+| `t67_provenance_check_seed44__6b711a59__r53` | experiment_group='exploratory' != 'canonical_phase_b' |
+| `t67_provenance_check_seed44__6b711a59__r54` | experiment_group='exploratory' != 'canonical_phase_b' |
+| `t67_provenance_check_seed44__6b711a59__r55` | experiment_group='exploratory' != 'canonical_phase_b' |
+| `t67_provenance_check_seed44__6b711a59__r56` | experiment_group='exploratory' != 'canonical_phase_b' |
+| `t67_provenance_check_seed44__6b711a59__r57` | experiment_group='exploratory' != 'canonical_phase_b' |
+| `t67_provenance_check_seed44__6b711a59__r58` | experiment_group='exploratory' != 'canonical_phase_b' |
+| `t67_provenance_check_seed44__6b711a59__r59` | experiment_group='exploratory' != 'canonical_phase_b' |
 | `t67_provenance_check_seed44__6b711a59__r6` | experiment_group='exploratory' != 'canonical_phase_b' |
 | `t67_provenance_check_seed44__6b711a59__r7` | experiment_group='exploratory' != 'canonical_phase_b' |
 | `t67_provenance_check_seed44__6b711a59__r8` | experiment_group='exploratory' != 'canonical_phase_b' |
@@ -531,8 +597,30 @@ skipped these would be indistinguishable from one that found nothing wrong.
 | `t67d_provenance_check_mor_seed44__fa9339bc__r33` | experiment_group='exploratory' != 'canonical_phase_b' |
 | `t67d_provenance_check_mor_seed44__fa9339bc__r34` | experiment_group='exploratory' != 'canonical_phase_b' |
 | `t67d_provenance_check_mor_seed44__fa9339bc__r35` | experiment_group='exploratory' != 'canonical_phase_b' |
+| `t67d_provenance_check_mor_seed44__fa9339bc__r36` | experiment_group='exploratory' != 'canonical_phase_b' |
+| `t67d_provenance_check_mor_seed44__fa9339bc__r37` | experiment_group='exploratory' != 'canonical_phase_b' |
+| `t67d_provenance_check_mor_seed44__fa9339bc__r38` | experiment_group='exploratory' != 'canonical_phase_b' |
+| `t67d_provenance_check_mor_seed44__fa9339bc__r39` | experiment_group='exploratory' != 'canonical_phase_b' |
 | `t67d_provenance_check_mor_seed44__fa9339bc__r4` | experiment_group='exploratory' != 'canonical_phase_b' |
+| `t67d_provenance_check_mor_seed44__fa9339bc__r40` | experiment_group='exploratory' != 'canonical_phase_b' |
+| `t67d_provenance_check_mor_seed44__fa9339bc__r41` | experiment_group='exploratory' != 'canonical_phase_b' |
+| `t67d_provenance_check_mor_seed44__fa9339bc__r42` | experiment_group='exploratory' != 'canonical_phase_b' |
+| `t67d_provenance_check_mor_seed44__fa9339bc__r43` | experiment_group='exploratory' != 'canonical_phase_b' |
+| `t67d_provenance_check_mor_seed44__fa9339bc__r44` | experiment_group='exploratory' != 'canonical_phase_b' |
+| `t67d_provenance_check_mor_seed44__fa9339bc__r45` | experiment_group='exploratory' != 'canonical_phase_b' |
+| `t67d_provenance_check_mor_seed44__fa9339bc__r46` | experiment_group='exploratory' != 'canonical_phase_b' |
+| `t67d_provenance_check_mor_seed44__fa9339bc__r47` | experiment_group='exploratory' != 'canonical_phase_b' |
+| `t67d_provenance_check_mor_seed44__fa9339bc__r48` | experiment_group='exploratory' != 'canonical_phase_b' |
+| `t67d_provenance_check_mor_seed44__fa9339bc__r49` | experiment_group='exploratory' != 'canonical_phase_b' |
 | `t67d_provenance_check_mor_seed44__fa9339bc__r5` | experiment_group='exploratory' != 'canonical_phase_b' |
+| `t67d_provenance_check_mor_seed44__fa9339bc__r50` | experiment_group='exploratory' != 'canonical_phase_b' |
+| `t67d_provenance_check_mor_seed44__fa9339bc__r51` | experiment_group='exploratory' != 'canonical_phase_b' |
+| `t67d_provenance_check_mor_seed44__fa9339bc__r52` | experiment_group='exploratory' != 'canonical_phase_b' |
+| `t67d_provenance_check_mor_seed44__fa9339bc__r53` | experiment_group='exploratory' != 'canonical_phase_b' |
+| `t67d_provenance_check_mor_seed44__fa9339bc__r54` | experiment_group='exploratory' != 'canonical_phase_b' |
+| `t67d_provenance_check_mor_seed44__fa9339bc__r55` | experiment_group='exploratory' != 'canonical_phase_b' |
+| `t67d_provenance_check_mor_seed44__fa9339bc__r56` | experiment_group='exploratory' != 'canonical_phase_b' |
+| `t67d_provenance_check_mor_seed44__fa9339bc__r57` | experiment_group='exploratory' != 'canonical_phase_b' |
 | `t67d_provenance_check_mor_seed44__fa9339bc__r6` | experiment_group='exploratory' != 'canonical_phase_b' |
 | `t67d_provenance_check_mor_seed44__fa9339bc__r7` | experiment_group='exploratory' != 'canonical_phase_b' |
 | `t67d_provenance_check_mor_seed44__fa9339bc__r8` | experiment_group='exploratory' != 'canonical_phase_b' |

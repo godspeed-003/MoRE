@@ -93,5 +93,8 @@ so it flatters whichever arm is noisier.
   never proof of orthogonality.
 - "Depth allocation error", never "compute efficiency".
 - Seeds `42, 43, 44, 45, 46`, report **mean ± std**. One favourable seed is never
-  evidence. The randomization-test resolution floor at 5v5 is **0.0040** — a
-  smaller difference is not resolvable, whatever the point estimate looks like.
+  evidence. The two-sided randomization-test resolution floor at 5v5 is
+  **0.00794** (`2/C(10,5)`, not `1/C` — T-LX.18); a p *at* the floor means
+  "the most extreme split five seeds admit", not "strongly significant".
+  Correct several comparisons with Holm over the family declared in
+  `code/confirmatory_tests.json`; never read a bare alpha = 0.05 off a table.

@@ -1,0 +1,143 @@
+{
+  "_README": [
+    "PRE-REGISTERED CONFIRMATORY TEST FAMILIES for the language paper.",
+    "",
+    "WHY THIS FILE EXISTS. The analysis that decides a claim must be fixed before",
+    "the data that decides it exists, or the choice of test is a free parameter",
+    "fitted to the result. T-LX.18 commits this file BEFORE the five route-once",
+    "MoRE cells are trained, so the correction method, the family membership and",
+    "the primary metric cannot be reselected once the numbers land.",
+    "",
+    "HOW IT IS CONSUMED. code/seed_stats.holm() takes `family_size` from the",
+    "`family_size` field below -- NOT from the number of tests that happened to",
+    "be computable. A declared comparison that could not be run still consumes a",
+    "slot. Dropping a failed arm must never make the survivors easier to call",
+    "significant.",
+    "",
+    "HONEST DISCLOSURE, read this before citing the file as pre-registration.",
+    "This file is written at a point where the MoE and MoR arms are ALREADY",
+    "TRAINED and their numbers are known (MoE 3.9529 +/- 0.0396, MoR 3.5202 +/-",
+    "0.0406 on val/task_loss). Only the MoRE arm is being re-run. So:",
+    "  - Every test whose `pre_result` is \"unknown\" is genuinely pre-registered.",
+    "  - The single test marked \"known\" (mor_vs_moe) is NOT. It is declared here",
+    "    anyway because it is read off the same table and must be corrected for;",
+    "    omitting it to keep the family small would be the worse error. The paper",
+    "    must state that this one comparison was specified after its data existed.",
+    "Do not describe the whole file as pre-registered. Describe it as it is."
+  ],
+
+  "spec_version": "T-LX.18",
+  "frozen_by": "T-LX.18 -- committed before the five route-once MoRE cells were trained; see changelog.md",
+  "correction": "holm-bonferroni",
+  "alpha": 0.05,
+  "correction_note": [
+    "Holm-Bonferroni, not plain Bonferroni. Holm controls the same familywise",
+    "error rate and is uniformly more powerful, so the plain version is strictly",
+    "worse with no compensating property. This matters at the design's",
+    "resolution limit: the exact two-sided randomization test at 5 vs 5 has a",
+    "floor of 2/C(10,5) = 0.00794, so plain Bonferroni over 7 comparisons",
+    "(0.05/7 = 0.00714) would sit BELOW the floor and no effect of any size",
+    "could be declared significant. Holm's easiest threshold in a family of 4 is",
+    "0.05/4 = 0.0125, a margin of 0.0046 above the floor.",
+    "",
+    "TWO FAMILIES, NOT ONE, and the reason must survive review. Family A asks",
+    "whether an architecture predicts better (metric: val/task_loss). Family B",
+    "asks whether recursion depth tracks per-token difficulty (metric:",
+    "depth/spearman_vs_model_loss). These are different hypotheses on different",
+    "quantities; pooling them would correct the depth claim for tests that cannot",
+    "bear on it. Splitting a family to buy power IS a degree of freedom, which is",
+    "why the split is declared here rather than chosen later -- and why no third",
+    "family may be added after results exist."
+  ],
+
+  "families": {
+    "A_predictive_quality": {
+      "primary_metric": "val/task_loss",
+      "metric_note": "Final-epoch validation task loss, nats/token, lower is better. Per CLAUDE.md 4 this is the primary predictive metric; total_loss is never used for a verdict. best == last on all 15 published cells (log_interval = 1, monotone decrease), so no model selection occurred on this split.",
+      "family_size": 4,
+      "tests": [
+        {
+          "id": "more_vs_moe",
+          "arms": ["langB_MoRE_routeonce", "langB_MoE"],
+          "n_per_arm": 5,
+          "hypothesis": "Recursion with routing predicts better than a single-pass sparse mixture at matched parameters.",
+          "pre_result": "unknown"
+        },
+        {
+          "id": "mor_vs_moe",
+          "arms": ["langB_MoR", "langB_MoE"],
+          "n_per_arm": 5,
+          "hypothesis": "Recursion alone predicts better than a single-pass sparse mixture at matched parameters.",
+          "pre_result": "known",
+          "pre_result_note": "gap +0.4327, p = 0.00794 (AT FLOOR). Declared after its data existed -- see _README."
+        },
+        {
+          "id": "more_vs_mor",
+          "arms": ["langB_MoRE_routeonce", "langB_MoR"],
+          "n_per_arm": 5,
+          "hypothesis": "Adding expert routing on top of recursion predicts better than recursion alone.",
+          "pre_result": "unknown",
+          "pre_result_note": "The per-step MoRE arm gave +0.0172, p = 0.4048 -- a genuine null. If the route-once arm reproduces that null, Outcome B/C language is the honest reading and must be reported as such (CLAUDE.md 8)."
+        },
+        {
+          "id": "more_vs_depth_matched_fixed",
+          "arms": ["langB_MoRE_routeonce", "langB_MoRE_fixeddepth_matched"],
+          "n_per_arm": 5,
+          "hypothesis": "Adaptive halting predicts better than a FIXED depth equal to the adaptive arm's mean depth -- i.e. the benefit is adaptivity, not merely the average compute it spends.",
+          "pre_result": "unknown",
+          "pre_result_note": "This is the control that tests the paper's actual novelty claim. The fixed-depth path is already plumbed (model.py fixed_depth), so the arm is config-only. If it is not run, this slot stays N/A and still consumes a Holm slot; it must NOT be deleted to raise the other three thresholds."
+        }
+      ]
+    },
+
+    "B_adaptive_depth_mechanism": {
+      "primary_metric": "depth/spearman_vs_model_loss",
+      "metric_note": "Spearman rho between a token's allocated recursion depth and the model's own loss on that token -- the operational form of 'spends more compute where it is harder'. Reported per CLAUDE.md 4 as depth allocation behaviour, never as 'compute efficiency'.",
+      "family_size": 2,
+      "tests": [
+        {
+          "id": "depth_more_routeonce_vs_mor",
+          "arms": ["langB_MoRE_routeonce", "langB_MoR"],
+          "n_per_arm": 5,
+          "hypothesis": "Routing once per token leaves depth allocation at least as difficulty-aligned as MoR's.",
+          "pre_result": "unknown",
+          "pre_result_note": "MoR measured +0.2953 +/- 0.0553. The per-step MoRE arm measured -0.0154 +/- 0.0186, i.e. no alignment at all; that is the defect the route-once fix addresses."
+        },
+        {
+          "id": "depth_routeonce_vs_perstep",
+          "arms": ["langB_MoRE_routeonce", "langB_MoRE_perstep"],
+          "n_per_arm": 5,
+          "hypothesis": "Routing once per token, rather than re-routing at every recursion step, is necessary for depth to align with difficulty.",
+          "pre_result": "unknown",
+          "pre_result_note": "The per-step arm is the five already-published MoRE cells, kept unedited as a labelled ablation (CLAUDE.md 6). Their resolved_config.json must never be rewritten to add routing_persistence."
+        }
+      ]
+    }
+  },
+
+  "exploratory": {
+    "note": [
+      "Everything below is EXPLORATORY and is reported with effect sizes and",
+      "intervals, UNCORRECTED and labelled as such. None of it may be promoted",
+      "into a confirmatory family after the fact, and none of it may carry a",
+      "significance verdict in the abstract or conclusions."
+    ],
+    "items": [
+      "Fixed-depth sweep d = 1..6 as a descriptive curve (not a test per d).",
+      "Shuffled-depth control matched on the depth histogram.",
+      "Depth vs input mutual information on existing checkpoints.",
+      "Per-epoch gap trajectory: the MoRE-vs-MoE gap widens +0.379 -> +0.426 -> +0.450 across the 3-epoch budget.",
+      "Seed dispersion: MoRE +/- 0.0133 against MoE +/- 0.0396 and MoR +/- 0.0406.",
+      "Routing diagnostics: entropy H/log(E), Hungarian-matched accuracy, AMI, purity, cosine similarity mean and max.",
+      "FLOPs accounting: MoR/MoRE 4.14x, MoR/MoE 9.07x, MoRE/MoE 2.19x, against measured throughputs within 3% for MoR and MoRE (the workload is latency-bound, so the FLOP ratio is not a speedup -- CLAUDE.md 4)."
+    ]
+  },
+
+  "prohibited": [
+    "Reading a verdict off an uncorrected p-value when more than one comparison in a family is reported.",
+    "Reporting 'not significant' for a comparison whose min_p exceeds its Holm threshold -- that is undecidable and prints N/A.",
+    "Reducing family_size after results exist, by any route, including deleting an arm that was not run.",
+    "Adding a third confirmatory family, or moving an exploratory item into a confirmatory one.",
+    "Quoting 1/C(n_a+n_b, n_a) as the two-sided floor for equal arms. It is 2/C. See code/seed_stats.py."
+  ]
+}

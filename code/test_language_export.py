@@ -446,8 +446,16 @@ else:
           str([p["pair"] for p in pw]))
     check("every pair reports p, min_p and the permutation count",
           all({"p_value", "min_p", "n_perms"} <= set(p) for p in pw))
-    check("min_p at 5v5 is 1/252 = 0.0040, the resolution limit five seeds can buy",
-          all(abs(p["min_p"] - 1 / 252) < 1e-9 for p in pw),
+    # T-LX.18: was `1 / 252 = 0.0040`. That is the ONE-SIDED floor, and this test
+    # asserting it is why the defect survived -- the suite was pinning the wrong
+    # value in place. The exact test is two-sided on |mean(a) - mean(b)|, and at
+    # equal arm sizes the complement of a group-a subset is also a group-a subset
+    # with the same absolute difference, so extremes come in mirror pairs and the
+    # attainable floor is 2/252 = 0.00794. Do NOT "restore" the old constant;
+    # code/test_seed_stats.py re-derives this by brute-force enumeration.
+    check("min_p at 5v5 is 2/252 = 0.00794, the two-sided resolution limit "
+          "five seeds can buy",
+          all(abs(p["min_p"] - 2 / 252) < 1e-9 for p in pw),
           f"{pw[0]['min_p']:.6f}")
     check("no p-value is below its own floor",
           all(p["p_value"] >= p["min_p"] - 1e-12 for p in pw))

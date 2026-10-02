@@ -376,7 +376,11 @@ seed-blind configs within each arm.
 
 **The six ablations, each against canonical MoRE on `val/task_loss`.** Family-wise
 threshold is Bonferroni α = 0.05/6 = **0.0083**; p comes from an exact two-sided
-randomization test, and the resolution floor is 0.0040 at 5-vs-5 and 0.0179 at 3-vs-5:
+randomization test, and the resolution floor is **0.00794** at 5-vs-5 (`2/C(10,5)`)
+and 0.0179 at 3-vs-5 (`1/C(8,3)`) — corrected at T-LX.18, see `code/seed_stats.py`.
+Note how tight that is: a 5-vs-5 arm clears α = 0.0083 by 0.0004, so every
+"survives Bonferroni" verdict below is a result sitting one arrangement above
+the threshold, not a comfortable margin:
 
 | ablation | n | Δ vs MoRE | d | p | verdict |
 | :--- | :---: | ---: | ---: | ---: | :--- |

@@ -22,15 +22,46 @@ assumption, and it is the test a reviewer will ask for.
 
 RESOLUTION LIMITS -- read these before quoting a p-value
 --------------------------------------------------------
-The smallest attainable p is 1 / C(n_a + n_b, n_a):
+THE FLOOR IS NOT 1 / C(n_a + n_b, n_a) WHEN THE ARMS ARE THE SAME SIZE. It was
+reported that way here until T-LX.18, and the wrong value reached
+`ARCHITECTURE.md`, both `canonical_spec*.json` protocol notes, the paper, and a
+reviewer, who caught it.
 
-    n=5 vs n=5  ->  1/252  = 0.0040   (clears Bonferroni for 3 or 6 comparisons)
+The test is TWO-SIDED on |mean(a) - mean(b)|. When n_a == n_b, the complement of
+any group-a subset is itself a valid group-a subset, and swapping the two groups
+negates the difference while preserving its absolute value. So every arrangement
+is paired with a mirror of identical statistic, the count at the extreme can
+never be 1, and the floor is 2 / C. When n_a != n_b the complement has the wrong
+size and is not an admissible regrouping, so no mirror is forced and the floor
+really is 1 / C.
+
+    n=5 vs n=5  ->  2/252  = 0.00794  (clears Bonferroni at 6; margin 0.0004)
+    n=7 vs n=7  ->  2/3432 = 0.00058  (clears Bonferroni at 7 and beyond)
     n=3 vs n=5  ->  1/56   = 0.0179   (does NOT clear Bonferroni at 6 arms)
-    n=3 vs n=3  ->  1/20   = 0.0500   (cannot clear alpha = 0.05 after correction)
+    n=3 vs n=3  ->  2/20   = 0.1000   (cannot reach alpha = 0.05 AT ALL, even
+                                       uncorrected -- the old table said 0.0500
+                                       and "after correction", both too kind)
 
-So a Phase 10 arm at n=3 that reports p = 0.0179 is AT the floor: it is as
-extreme as the design can show, and adding seeds is the only way to strengthen
-it. Report the floor alongside the p-value; `perm_test` returns it as `min_p`.
+Verify, do not trust this table -- `test_seed_stats.py` re-derives every row by
+enumerating the most extreme data the design admits.
+
+So a Phase 10 arm at n=3 vs n=5 that reports p = 0.0179 is AT the floor: it is
+as extreme as the design can show, and adding seeds is the only way to
+strengthen it. Report the floor alongside the p-value; `perm_test` returns it as
+`min_p`. The 5-vs-5 language cells at p = 0.00794 are likewise AT the floor --
+before T-LX.18 they printed without the AT-FLOOR marker, because the detector
+compared them against a floor that was 2x too small to ever be reached.
+
+MULTIPLE COMPARISONS
+--------------------
+A per-test alpha = 0.05 is not a verdict when several comparisons are read off
+one results table. Use `holm()` over a family DECLARED BEFORE THE RESULTS EXIST
+(`code/confirmatory_tests.json`). Holm-Bonferroni is uniformly more powerful
+than plain Bonferroni and controls the same familywise error rate, so there is
+no reason to use the plain version: at m = 4 its easiest threshold is
+alpha/4 = 0.0125 against a 5-vs-5 floor of 0.00794, a margin of 0.0046, where
+plain Bonferroni at m = 7 gives 0.00714 -- BELOW the floor, i.e. a design that
+cannot produce a significant result however large the effect.
 
 Do NOT use the paired sign-flip variant at five seeds: it enumerates 2**5 = 32
 sign assignments, so its minimum two-sided p is 2/32 = 0.0625 and it can never
@@ -50,7 +81,8 @@ import itertools
 import math
 import statistics as st
 
-__all__ = ["mean_std", "se_of_difference", "perm_test", "cohens_d", "format_row"]
+__all__ = ["mean_std", "se_of_difference", "perm_test", "cohens_d", "holm",
+           "format_row"]
 
 
 def mean_std(values) -> dict | None:
@@ -106,8 +138,10 @@ def perm_test(a: list, b: list) -> dict | None:
     least the observed one. Exhaustive, so the result is deterministic -- there
     is no sampling error and no seed.
 
-    Returns `min_p`, the floor 1 / C(n_a+n_b, n_a). A p equal to min_p means the
-    observed split is the single most extreme arrangement, i.e. the design is at
+    Returns `min_p`, the smallest p the two arm sizes can produce. That is
+    2 / C(n_a+n_b, n_a) for equal arms and 1 / C(n_a+n_b, n_a) otherwise -- see
+    the module docstring for why the two cases differ. A p equal to min_p means
+    the observed split is as extreme as the design admits, i.e. the design is at
     its resolution limit and only more seeds can strengthen the claim.
 
     `n_perms` is C(n_a+n_b, n_a); it is 252 at 5-vs-5 and 3432 at 7-vs-7, so
@@ -130,10 +164,18 @@ def perm_test(a: list, b: list) -> dict | None:
         # round-trips of an identical regrouping are not dropped.
         if abs(st.mean(ga) - st.mean(gb)) >= obs - 1e-15:
             at_least += 1
+    # Equal arms: the complement of a group-a subset is also a group-a subset and
+    # has the same |mean difference|, so extremes come in mirror pairs and the
+    # count can never be 1. Unequal arms: the complement has the wrong size, is
+    # not an admissible regrouping, and no mirror is forced. Do NOT "simplify"
+    # this to a single branch -- a blanket 2/total inflates the floor for the
+    # n=3-vs-5 Phase 10 arms and makes them spuriously AT-FLOOR, and a blanket
+    # 1/total is the T-LX.18 defect this comment exists to prevent recurring.
+    mirrored = 2.0 if len(a) == len(b) else 1.0
     return {
         "gap": st.mean(a) - st.mean(b),
         "p_value": at_least / total,
-        "min_p": 1.0 / total,
+        "min_p": mirrored / total,
         "n_perms": total,
         "se_diff": se_of_difference(a, b),
         "cohens_d": cohens_d(a, b),
@@ -144,15 +186,95 @@ def perm_test(a: list, b: list) -> dict | None:
     }
 
 
+def holm(tests: dict, alpha: float = 0.05, family_size: int | None = None) -> dict:
+    """Holm-Bonferroni over a DECLARED family of comparisons.
+
+    `tests` maps a label to a `perm_test` result (or None when an arm had n < 2).
+    Returns the same labels mapped to the input dict plus `holm_threshold`,
+    `holm_reject`, `holm_rank`, `floor_above_threshold` and `at_floor`.
+
+    Procedure: sort the computable p-values ascending and compare the i-th
+    (0-based) against alpha / (m - i). Reject while that holds; at the first
+    failure, stop and retain that test and every larger p. The step-down is what
+    makes Holm uniformly more powerful than plain Bonferroni (which would use
+    alpha/m for all m) while controlling the same familywise error rate.
+
+    `m` IS THE DECLARED FAMILY SIZE, NOT THE NUMBER OF TESTS THAT RAN. If a
+    comparison in the pre-registered family could not be computed, its slot is
+    still consumed. Shrinking m after seeing the data is exactly the degree of
+    freedom pre-registration exists to remove, so dropping a failed arm must not
+    be allowed to make the survivors easier to call significant. Pass
+    `family_size` explicitly from `confirmatory_tests.json`; it defaults to
+    `len(tests)` and MUST NOT be smaller than it (that would be a correction
+    weaker than the number of comparisons actually read).
+
+    `floor_above_threshold` is the one every reader of this repo must check: it
+    is True when `min_p > holm_threshold`, meaning the design CANNOT produce a
+    significant result for that comparison however large the true effect. At
+    5-vs-5 the floor is 0.00794, so a family of 7 corrected at 0.05/7 = 0.00714
+    is unachievable by construction -- the test is not weak evidence, it is no
+    test at all, and must be reported as N/A rather than "not significant"
+    (CLAUDE.md 4: no sentinel may be reported as a measurement).
+    """
+    m = len(tests) if family_size is None else int(family_size)
+    if m < len(tests):
+        raise ValueError(
+            f"declared family_size={m} is smaller than the {len(tests)} "
+            "comparisons supplied. Holm would then correct for fewer tests than "
+            "are being read off the table, which inflates the familywise error "
+            "rate. Declare the full family in code/confirmatory_tests.json."
+        )
+    out = {label: (dict(res) if res is not None else None)
+           for label, res in tests.items()}
+    computable = sorted(((res["p_value"], label) for label, res in tests.items()
+                         if res is not None),
+                        key=lambda t: t[0])
+    still_rejecting = True
+    for rank, (p, label) in enumerate(computable):
+        thr = alpha / (m - rank)
+        if p > thr:
+            still_rejecting = False
+        row = out[label]
+        row["holm_rank"] = rank
+        row["holm_threshold"] = thr
+        row["holm_reject"] = still_rejecting
+        row["at_floor"] = p <= row["min_p"] + 1e-12
+        row["floor_above_threshold"] = row["min_p"] > thr
+    out["_family"] = {"alpha": alpha, "family_size": m,
+                      "n_computable": len(computable),
+                      "n_rejected": sum(1 for _, lb in computable
+                                        if out[lb]["holm_reject"])}
+    return out
+
+
 def format_row(label: str, res: dict | None, alpha: float = 0.05) -> str:
-    """One fixed-width line. Emits N/A rather than a fabricated verdict."""
+    """One fixed-width line. Emits N/A rather than a fabricated verdict.
+
+    When `res` carries Holm fields (i.e. it came through `holm()`), the verdict
+    is the FAMILYWISE one and the threshold is printed. Without them the line is
+    marked UNCORRECTED, because a bare per-test alpha read off a table of
+    several comparisons is not a familywise verdict and must not look like one.
+    """
     if res is None:
         return f"{label:34s}  n<2 in one arm -- no test is possible (N/A)"
     at_floor = " AT-FLOOR" if res["p_value"] <= res["min_p"] + 1e-12 else ""
-    verdict = ("significant" if res["p_value"] < alpha else "not significant")
+    if "holm_threshold" in res:
+        thr = res["holm_threshold"]
+        if res.get("floor_above_threshold"):
+            # Reporting "not significant" here would blame the data for a limit
+            # of the design. The comparison was never decidable.
+            verdict = (f"N/A -- floor {res['min_p']:.5f} exceeds Holm threshold "
+                       f"{thr:.5f}; undecidable at this n")
+        else:
+            verdict = (("significant" if res["holm_reject"]
+                        else "not significant")
+                       + f" (Holm, thr {thr:.5f})")
+    else:
+        verdict = (("significant" if res["p_value"] < alpha
+                    else "not significant") + " (UNCORRECTED)")
     return (f"{label:34s} gap={res['gap']:+.6f} "
             f"d={res['cohens_d']:+.2f} p={res['p_value']:.4f} "
-            f"(floor {res['min_p']:.4f}{at_floor})  {verdict}")
+            f"(floor {res['min_p']:.5f}{at_floor})  {verdict}")
 
 
 if __name__ == "__main__":

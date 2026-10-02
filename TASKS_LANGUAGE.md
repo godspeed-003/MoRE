@@ -2486,8 +2486,10 @@ does not exist here (T-L0.0).
   val task loss, perplexity, average depth, normalized entropy, Hungarian/AMI/
   purity, the depth correlations, and throughput. Then the exact two-sided
   randomization test between arms with Bonferroni correction, and the resolution
-  floor stated: at 5-vs-5 the smallest attainable two-sided p is 0.0040, so no
-  pairwise claim can be made below it no matter how large the effect looks.
+  floor stated: at 5-vs-5 the smallest attainable two-sided p is **0.00794**
+  (`2/C(10,5)`, corrected at T-LX.18 — not 0.0040, which was the one-sided
+  count), so no pairwise claim can be made below it no matter how large the
+  effect looks. Both headline language comparisons sit exactly AT that floor.
   **Verify:** the statistics are computed by the existing script from the run
   directories — never hand-copied — and the floor is printed alongside every p.
 
