@@ -12,10 +12,10 @@ numbers out of a run directory into this file -- regenerate it.
 - admitted runs: MoE 5/5 (seeds [42, 43, 44, 45, 46]), MoR 5/5 (seeds [42, 43, 44, 45, 46]), MoRE 5/5 (seeds [42, 43, 44, 45, 46])
 - git commits of the admitted runs: **4 distinct commits** across 15 cells. A canonical matrix is frozen by `canonical_spec_language.json`, not by a single code revision; the seed-blind config equality check below is what holds the arms comparable. Listed newest-directory-first:
   - `29fe5892fb3b09fc9be4c23c5c628d71c322bdb7` (dirty=True) -- 5 cell(s): MoE s42, MoE s43, MoE s44, MoE s45, MoE s46
+  - `681622892fbd5d559b05bbe5d75d7667535da968` (dirty=True) -- 5 cell(s): MoRE s42, MoRE s43, MoRE s44, MoRE s45, MoRE s46
   - `079de08a2dc17d754173f1f62f1cf0af412a16a4` (dirty=True) -- 1 cell(s): MoR s42
   - `f464c966b5f3921daa7e386d3470e11f1af89cb4` (dirty=True) -- 4 cell(s): MoR s43, MoR s44, MoR s45, MoR s46
-  - `ba60b0b817e09dfd102a63ccce3f3d8866ebd761` (dirty=True) -- 5 cell(s): MoRE s42, MoRE s43, MoRE s44, MoRE s45, MoRE s46
-- refused directories: 295 (listed at the end; a refusal is the admission filter working)
+- refused directories: 184 (listed at the end; a refusal is the admission filter working)
 
 ## 1. Headline
 
@@ -23,7 +23,7 @@ numbers out of a run directory into this file -- regenerate it.
 |---|---|---|---|---|---|---|
 | MoE | 3.952933 +- 0.039624 | 3.952933 +- 0.039624 | 5.7029 | 52.09 | +1.0320 | 5,584,908 |
 | MoR | 3.520222 +- 0.040555 | 3.520222 +- 0.040555 | 5.0786 | 33.79 | +1.4647 | 5,581,063 |
-| MoRE | 3.503064 +- 0.013326 | 3.503064 +- 0.013326 | 5.0539 | 33.22 | +1.4819 | 5,584,908 |
+| MoRE | 3.636966 +- 0.013387 | 3.636966 +- 0.013387 | 5.2470 | 37.98 | +1.3480 | 5,584,908 |
 
 The derived columns are transforms of the mean nats, in that order: `bits = nats / ln 2`, `perplexity = exp(nats)`, `margin = 4.9849 - nats` (positive BEATS the bigram baseline).
 `exp` is convex, so the perplexity above is **not** the mean of the five
@@ -37,30 +37,16 @@ selection bias stays checkable; it is never the headline.
 
 ## 2. Pairwise tests on the primary metric
 
-| pair | gap | se(diff) | Cohen d | p (exact) | min_p | Holm thr | verdict |
+| pair | gap | se(diff) | Cohen d | p (exact) | min_p | perms | verdict |
 |---|---|---|---|---|---|---|---|
-| MoRE - MoE | -0.449869 | 0.018696 | -15.22 | 0.0079 | 0.00794 | 0.01250 | SIGNIFICANT (AT RESOLUTION FLOOR) |
-| MoRE - MoR | -0.017158 | 0.019091 | -0.57 | 0.4048 | 0.00794 | 0.02500 | not significant |
-| MoE - MoR | +0.432711 | 0.025356 | +10.79 | 0.0079 | 0.00794 | 0.01667 | SIGNIFICANT (AT RESOLUTION FLOOR) |
+| MoRE - MoE | -0.315967 | 0.018704 | -10.68 | 0.0079 | 0.0040 | 252 | SIGNIFICANT |
+| MoRE - MoR | +0.116744 | 0.019099 | +3.87 | 0.0079 | 0.0040 | 252 | SIGNIFICANT |
+| MoE - MoR | +0.432711 | 0.025356 | +10.79 | 0.0079 | 0.0040 | 252 | SIGNIFICANT |
 
 Exact two-sided randomization test (`code/seed_stats.py`); no k x std
 threshold is used anywhere (superseded, T11.0b). `min_p` is the smallest
-p-value these arm sizes can produce -- **2**/C(n_a+n_b, n_a) for equal
-arms, because the two-sided statistic is invariant under swapping the
-groups and the complement of an equal-size subset is itself admissible,
-so extremes come in mirror pairs (corrected at T-LX.18; the old 1/C was
-2x too small and the AT-FLOOR flag could never fire). A p at the floor is
-the test's resolution limit: it is as extreme as the design admits, which
-is a weaker statement than significance.
-
-The verdict is **familywise**, Holm-Bonferroni at alpha = 0.05 over the
-4 comparisons declared in
-`code/confirmatory_tests.json`, which was committed before these results
-existed. Holm is a step-down procedure, so the thresholds differ by rank
-(alpha/m for the smallest p, alpha/(m-1) for the next, and so on); the
-`Holm thr` column is the one that pair actually faced. A pair whose floor
-exceeds its threshold is reported UNDECIDABLE rather than
-"not significant" -- no effect size could have passed it at this n.
+p-value these arm sizes can produce: a p at the floor is the test's
+resolution limit and will not survive a multiple-comparison correction.
 
 ## 2b. Depth on the validation pass (offline, from checkpoint)
 
@@ -85,13 +71,13 @@ Non-scalar metrics (the routing confusion matrix, the Hungarian assignment
 vector) are not table cells and are not shown here; they are carried in
 `results.json` under each run's `metrics_nonscalar`.
 
-20 of the 207 keys in the union are `N/A` in **all 3 columns** and are listed in the footnote below instead of being rendered as a row of `N/A` (T-LX.5). They remain in `results.csv`, `results_aggregate.csv` and every run's `metrics.json` unchanged. **No key is dropped for being `N/A` in only some columns** -- that asymmetry is the point of the table.
+21 of the 210 keys in the union are `N/A` in **all 3 columns** and are listed in the footnote below instead of being rendered as a row of `N/A` (T-LX.5). They remain in `results.csv`, `results_aggregate.csv` and every run's `metrics.json` unchanged. **No key is dropped for being `N/A` in only some columns** -- that asymmetry is the point of the table.
 
 ### `(no prefix)`
 
 | metric | MoE | MoR | MoRE |
 |---|---|---|---|
-| `best_val_loss` | 3.9529 +- 0.0396 | 3.5202 +- 0.0406 | 3.5031 +- 0.0133 |
+| `best_val_loss` | 3.9529 +- 0.0396 | 3.5202 +- 0.0406 | 3.6370 +- 0.0134 |
 | `embedding_params` | 2162688.0000 +- 0.0000 | 2162688.0000 +- 0.0000 | 2162688.0000 +- 0.0000 |
 | `epoch` | 3.0000 +- 0.0000 | 3.0000 +- 0.0000 | 3.0000 +- 0.0000 |
 | `non_embedding_params` | 3422220.0000 +- 0.0000 | 3418375.0000 +- 0.0000 | 3422220.0000 +- 0.0000 |
@@ -102,127 +88,129 @@ vector) are not table cells and are not shown here; they are carried in
 
 | metric | MoE | MoR | MoRE |
 |---|---|---|---|
-| `depth/by_document/between` | N/A | 0.0133 +- 0.0200 | 0.0001 +- 0.0001 |
-| `depth/by_document/between_share` | N/A | 0.0104 +- 0.0099 | 0.0003 +- 0.0002 |
+| `depth/by_document/between` | N/A | 0.0133 +- 0.0200 | 0.0001 +- 0.0000 |
+| `depth/by_document/between_share` | N/A | 0.0104 +- 0.0099 | 0.0005 +- 0.0001 |
 | `depth/by_document/n_documents` | N/A | 61.0000 +- 0.0000 | 61.0000 +- 0.0000 |
-| `depth/by_document/per_document_mean_max` | N/A | 6.7396 +- 0.3366 | 6.9615 +- 0.0235 |
-| `depth/by_document/per_document_mean_min` | N/A | 4.1419 +- 1.5199 | 3.7893 +- 2.4728 |
-| `depth/by_document/per_document_mean_std` | N/A | 0.3406 +- 0.1772 | 0.4017 +- 0.3125 |
+| `depth/by_document/per_document_mean_max` | N/A | 6.7396 +- 0.3366 | 6.9468 +- 0.0036 |
+| `depth/by_document/per_document_mean_min` | N/A | 4.1419 +- 1.5199 | 2.0000 +- 0.0000 |
+| `depth/by_document/per_document_mean_std` | N/A | 0.3406 +- 0.1772 | 0.6266 +- 0.0006 |
 | `depth/by_document/sum_matches_total` | N/A | 1.0000 +- 0.0000 | 1.0000 +- 0.0000 |
-| `depth/by_document/total` | N/A | 0.7370 +- 0.7141 | 0.2655 +- 0.0816 |
-| `depth/by_document/within` | N/A | 0.7237 +- 0.6948 | 0.2654 +- 0.0816 |
-| `depth/distinct_exit_depths` | N/A | 6.0000 +- 0.0000 | 7.0000 +- 0.0000 |
-| `depth/embed_norm_depth_vs_norm` | N/A | -0.1317 +- 0.0213 | -0.0186 +- 0.0150 |
-| `depth/embed_norm_logfreq_partial_norm` | N/A | 0.1722 +- 0.0608 | -0.0156 +- 0.0117 |
-| `depth/embed_norm_logfreq_vs_norm` | N/A | -0.4471 +- 0.0445 | -0.4012 +- 0.0219 |
-| `depth/embed_norm_logfreq_within_bins_max` | N/A | 0.3897 +- 0.1244 | 0.0854 +- 0.0490 |
-| `depth/embed_norm_logfreq_within_bins_mean` | N/A | 0.1790 +- 0.0400 | -0.0050 +- 0.0078 |
-| `depth/embed_norm_logfreq_within_bins_min` | N/A | -0.2017 +- 0.1368 | -0.1604 +- 0.0638 |
-| `depth/embed_norm_logfreq_within_bins_n_bins_used` | N/A | 47.4000 +- 0.5477 | 47.2000 +- 0.8367 |
-| `depth/embed_norm_norm_max` | N/A | 3.7605 +- 0.0913 | 3.6081 +- 0.0361 |
-| `depth/embed_norm_norm_mean` | N/A | 2.2703 +- 0.0259 | 2.2057 +- 0.0082 |
-| `depth/embed_norm_norm_min` | N/A | 1.6030 +- 0.0689 | 1.6042 +- 0.0137 |
-| `depth/embed_norm_surprisal_partial_norm` | N/A | -0.1722 +- 0.0608 | 0.0156 +- 0.0117 |
-| `depth/hist/step_1` | N/A | 0.0000 +- 0.0000 | 384.4000 +- 506.7261 |
-| `depth/hist/step_2` | N/A | 897.2000 +- 1693.2837 | 827.8000 +- 124.1257 |
-| `depth/hist/step_3` | N/A | 5384.2000 +- 7582.8878 | 275.0000 +- 122.7212 |
-| `depth/hist/step_4` | N/A | 8566.4000 +- 11374.9276 | 85.2000 +- 57.4865 |
-| `depth/hist/step_5` | N/A | 13380.8000 +- 14225.5664 | 132.8000 +- 97.5177 |
-| `depth/hist/step_6` | N/A | 28842.0000 +- 22517.8566 | 1698.0000 +- 549.6885 |
-| `depth/hist/step_7` | N/A | 222919.4000 +- 57096.6160 | 276586.8000 +- 809.9723 |
-| `depth/mean` | N/A | 6.6167 +- 0.4393 | 6.9651 +- 0.0119 |
-| `depth/mean_by_family/L1_FUNCTION` | N/A | 6.8257 +- 0.2419 | 6.9640 +- 0.0117 |
-| `depth/mean_by_family/L2_NOUN` | N/A | 6.4386 +- 0.6345 | 6.9663 +- 0.0128 |
-| `depth/mean_by_family/L3_VERB` | N/A | 6.7688 +- 0.3317 | 6.9695 +- 0.0120 |
-| `depth/mean_by_family/L4_MODIFIER` | N/A | 6.6168 +- 0.4879 | 6.9643 +- 0.0135 |
-| `depth/mean_by_family/L5_PUNCT_SYM` | N/A | 6.7921 +- 0.2462 | 6.9721 +- 0.0110 |
-| `depth/mean_by_family/L6_NUM_SUBWORD` | N/A | 6.4958 +- 0.5335 | 6.9614 +- 0.0124 |
+| `depth/by_document/total` | N/A | 0.7370 +- 0.7141 | 0.2949 +- 0.0204 |
+| `depth/by_document/within` | N/A | 0.7237 +- 0.6948 | 0.2947 +- 0.0204 |
+| `depth/distinct_exit_depths` | N/A | 6.0000 +- 0.0000 | 6.8000 +- 0.4472 |
+| `depth/embed_norm_depth_vs_norm` | N/A | -0.1317 +- 0.0213 | -0.0083 +- 0.0039 |
+| `depth/embed_norm_logfreq_partial_norm` | N/A | 0.1722 +- 0.0608 | 0.0272 +- 0.0080 |
+| `depth/embed_norm_logfreq_vs_norm` | N/A | -0.4471 +- 0.0445 | -0.3583 +- 0.0468 |
+| `depth/embed_norm_logfreq_within_bins_max` | N/A | 0.3897 +- 0.1244 | 0.1267 +- 0.0310 |
+| `depth/embed_norm_logfreq_within_bins_mean` | N/A | 0.1790 +- 0.0400 | 0.0249 +- 0.0070 |
+| `depth/embed_norm_logfreq_within_bins_min` | N/A | -0.2017 +- 0.1368 | -0.1941 +- 0.0951 |
+| `depth/embed_norm_logfreq_within_bins_n_bins_used` | N/A | 47.4000 +- 0.5477 | 47.2000 +- 0.4472 |
+| `depth/embed_norm_norm_max` | N/A | 3.7605 +- 0.0913 | 3.7839 +- 0.0898 |
+| `depth/embed_norm_norm_mean` | N/A | 2.2703 +- 0.0259 | 2.2141 +- 0.0050 |
+| `depth/embed_norm_norm_min` | N/A | 1.6030 +- 0.0689 | 1.5401 +- 0.0203 |
+| `depth/embed_norm_surprisal_partial_norm` | N/A | -0.1722 +- 0.0608 | -0.0272 +- 0.0080 |
+| `depth/hist/step_1` | N/A | 0.0000 +- 0.0000 | 162.2000 +- 140.1756 |
+| `depth/hist/step_2` | N/A | 897.2000 +- 1693.2837 | 1383.8000 +- 717.0883 |
+| `depth/hist/step_3` | N/A | 5384.2000 +- 7582.8878 | 400.0000 +- 378.7328 |
+| `depth/hist/step_4` | N/A | 8566.4000 +- 11374.9276 | 226.6000 +- 206.9717 |
+| `depth/hist/step_5` | N/A | 13380.8000 +- 14225.5664 | 256.0000 +- 185.4319 |
+| `depth/hist/step_6` | N/A | 28842.0000 +- 22517.8566 | 1855.0000 +- 969.0797 |
+| `depth/hist/step_7` | N/A | 222919.4000 +- 57096.6160 | 275706.4000 +- 1174.9482 |
+| `depth/mean` | N/A | 6.6167 +- 0.4393 | 6.9552 +- 0.0044 |
+| `depth/mean_by_family/L1_FUNCTION` | N/A | 6.8257 +- 0.2419 | 6.9601 +- 0.0031 |
+| `depth/mean_by_family/L2_NOUN` | N/A | 6.4386 +- 0.6345 | 6.9531 +- 0.0061 |
+| `depth/mean_by_family/L3_VERB` | N/A | 6.7688 +- 0.3317 | 6.9572 +- 0.0042 |
+| `depth/mean_by_family/L4_MODIFIER` | N/A | 6.6168 +- 0.4879 | 6.9551 +- 0.0041 |
+| `depth/mean_by_family/L5_PUNCT_SYM` | N/A | 6.7921 +- 0.2462 | 6.9619 +- 0.0073 |
+| `depth/mean_by_family/L6_NUM_SUBWORD` | N/A | 6.4958 +- 0.5335 | 6.9529 +- 0.0067 |
 | `depth/n_tokens` | N/A | 279990.0000 +- 0.0000 | 279990.0000 +- 0.0000 |
-| `depth/spearman_vs_logfreq` | N/A | 0.2108 +- 0.0635 | -0.0068 +- 0.0061 |
-| `depth/spearman_vs_logfreq_exceeds_null` | N/A | 1.0000 +- 0.0000 | 0.8000 +- 0.4472 |
-| `depth/spearman_vs_logfreq_null_high` | N/A | 0.0037 +- 0.0005 | 0.0034 +- 0.0003 |
-| `depth/spearman_vs_logfreq_null_low` | N/A | -0.0038 +- 0.0003 | -0.0035 +- 0.0004 |
+| `depth/spearman_vs_logfreq` | N/A | 0.2108 +- 0.0635 | 0.0284 +- 0.0087 |
+| `depth/spearman_vs_logfreq_exceeds_null` | N/A | 1.0000 +- 0.0000 | 1.0000 +- 0.0000 |
+| `depth/spearman_vs_logfreq_null_high` | N/A | 0.0037 +- 0.0005 | 0.0034 +- 0.0002 |
+| `depth/spearman_vs_logfreq_null_low` | N/A | -0.0038 +- 0.0003 | -0.0037 +- 0.0002 |
 | `depth/spearman_vs_logfreq_null_mean` | N/A | 0.0001 +- 0.0001 | -0.0001 +- 0.0001 |
-| `depth/spearman_vs_model_loss` | N/A | 0.2953 +- 0.0553 | -0.0154 +- 0.0186 |
-| `depth/spearman_vs_model_loss_exceeds_null` | N/A | 1.0000 +- 0.0000 | 0.6000 +- 0.5477 |
-| `depth/spearman_vs_model_loss_null_high` | N/A | 0.0037 +- 0.0002 | 0.0040 +- 0.0001 |
-| `depth/spearman_vs_model_loss_null_low` | N/A | -0.0037 +- 0.0003 | -0.0034 +- 0.0004 |
-| `depth/spearman_vs_model_loss_null_mean` | N/A | 0.0001 +- 0.0002 | 0.0000 +- 0.0002 |
-| `depth/spearman_vs_unigram_surprisal` | N/A | -0.2108 +- 0.0635 | 0.0068 +- 0.0061 |
-| `depth/spearman_vs_unigram_surprisal_exceeds_null` | N/A | 1.0000 +- 0.0000 | 0.8000 +- 0.4472 |
-| `depth/spearman_vs_unigram_surprisal_null_high` | N/A | 0.0037 +- 0.0005 | 0.0039 +- 0.0003 |
-| `depth/spearman_vs_unigram_surprisal_null_low` | N/A | -0.0037 +- 0.0003 | -0.0038 +- 0.0004 |
-| `depth/spearman_vs_unigram_surprisal_null_mean` | N/A | -0.0000 +- 0.0001 | 0.0001 +- 0.0002 |
-| `depth/std` | N/A | 0.7039 +- 0.4480 | 0.3780 +- 0.0832 |
+| `depth/spearman_vs_model_loss` | N/A | 0.2953 +- 0.0553 | -0.0230 +- 0.0115 |
+| `depth/spearman_vs_model_loss_exceeds_null` | N/A | 1.0000 +- 0.0000 | 1.0000 +- 0.0000 |
+| `depth/spearman_vs_model_loss_null_high` | N/A | 0.0037 +- 0.0002 | 0.0037 +- 0.0004 |
+| `depth/spearman_vs_model_loss_null_low` | N/A | -0.0037 +- 0.0003 | -0.0035 +- 0.0003 |
+| `depth/spearman_vs_model_loss_null_mean` | N/A | 0.0001 +- 0.0002 | 0.0000 +- 0.0000 |
+| `depth/spearman_vs_unigram_surprisal` | N/A | -0.2108 +- 0.0635 | -0.0284 +- 0.0087 |
+| `depth/spearman_vs_unigram_surprisal_exceeds_null` | N/A | 1.0000 +- 0.0000 | 1.0000 +- 0.0000 |
+| `depth/spearman_vs_unigram_surprisal_null_high` | N/A | 0.0037 +- 0.0005 | 0.0037 +- 0.0002 |
+| `depth/spearman_vs_unigram_surprisal_null_low` | N/A | -0.0037 +- 0.0003 | -0.0031 +- 0.0005 |
+| `depth/spearman_vs_unigram_surprisal_null_mean` | N/A | -0.0000 +- 0.0001 | 0.0002 +- 0.0002 |
+| `depth/std` | N/A | 0.7039 +- 0.4480 | 0.4270 +- 0.0246 |
 
 ### `depth_dist`
 
 | metric | MoE | MoR | MoRE |
 |---|---|---|---|
-| `depth_dist/step_1_pct` | 100.0000 +- 0.0000 | 0.0000 +- 0.0000 | 0.3112 +- 0.3040 |
-| `depth_dist/step_2_pct` | N/A | 0.6989 +- 0.6003 | 0.5012 +- 0.1734 |
-| `depth_dist/step_3_pct` | N/A | 2.0548 +- 3.1495 | 0.0955 +- 0.0331 |
-| `depth_dist/step_4_pct` | N/A | 3.8061 +- 5.4269 | 0.0637 +- 0.0196 |
-| `depth_dist/step_5_pct` | N/A | 6.9360 +- 8.9095 | 0.0998 +- 0.0441 |
-| `depth_dist/step_6_pct` | N/A | 13.2270 +- 11.5680 | 0.8707 +- 0.2499 |
-| `depth_dist/step_7_pct` | N/A | 73.2772 +- 29.6131 | 98.0580 +- 0.3034 |
+| `depth_dist/step_1_pct` | 100.0000 +- 0.0000 | 0.0000 +- 0.0000 | 0.2061 +- 0.0308 |
+| `depth_dist/step_2_pct` | N/A | 0.6989 +- 0.6003 | 0.7271 +- 0.2371 |
+| `depth_dist/step_3_pct` | N/A | 2.0548 +- 3.1495 | 0.1115 +- 0.1039 |
+| `depth_dist/step_4_pct` | N/A | 3.8061 +- 5.4269 | 0.0991 +- 0.0783 |
+| `depth_dist/step_5_pct` | N/A | 6.9360 +- 8.9095 | 0.1750 +- 0.0964 |
+| `depth_dist/step_6_pct` | N/A | 13.2270 +- 11.5680 | 1.3407 +- 0.7136 |
+| `depth_dist/step_7_pct` | N/A | 73.2772 +- 29.6131 | 97.3405 +- 0.7540 |
 
 ### `diag`
 
 | metric | MoE | MoR | MoRE |
 |---|---|---|---|
-| `diag/max_pairwise_cosine_sim` | 0.0545 +- 0.0075 | N/A | 0.0672 +- 0.0075 |
-| `diag/mean_pairwise_cosine_sim` | 0.0291 +- 0.0036 | N/A | 0.0523 +- 0.0036 |
+| `diag/max_pairwise_cosine_sim` | 0.0545 +- 0.0075 | N/A | 0.0968 +- 0.0047 |
+| `diag/mean_pairwise_cosine_sim` | 0.0291 +- 0.0036 | N/A | 0.0791 +- 0.0036 |
 
 ### `dispatch`
 
 | metric | MoE | MoR | MoRE |
 |---|---|---|---|
 | `dispatch/evals_per_token` | 1.0000 +- 0.0000 | 1.0000 +- 0.0000 | 1.0000 +- 0.0000 |
-| `dispatch/expert_evaluations` | 134737920.0000 +- 0.0000 | 875485355.0000 +- 82334154.9218 | 935059223.2000 +- 1644893.3379 |
+| `dispatch/expert_evaluations` | 134737920.0000 +- 0.0000 | 875485355.0000 +- 82334154.9218 | 933321286.4000 +- 734318.6509 |
 | `dispatch/experts_called_max` | 6.0000 +- 0.0000 | 1.0000 +- 0.0000 | 6.0000 +- 0.0000 |
-| `dispatch/max_load_fraction` | 0.6858 +- 0.0629 | 1.0000 +- 0.0000 | 0.5340 +- 0.1294 |
+| `dispatch/max_load_fraction` | 0.6858 +- 0.0629 | 1.0000 +- 0.0000 | 0.4478 +- 0.0171 |
 | `dispatch/overflow_rate` | 0.0000 +- 0.0000 | 0.0000 +- 0.0000 | 0.0000 +- 0.0000 |
 | `dispatch/overflow_tokens` | 0.0000 +- 0.0000 | 0.0000 +- 0.0000 | 0.0000 +- 0.0000 |
+| `dispatch/router_calls` | N/A | N/A | 10965.0000 +- 0.0000 |
+| `dispatch/router_calls_per_dispatch` | N/A | N/A | 0.1429 +- 0.0000 |
 | `dispatch/router_noise_scale` | 0.0000 +- 0.0000 | 0.0000 +- 0.0000 | 0.0000 +- 0.0000 |
-| `dispatch/tokens_dispatched` | 134737920.0000 +- 0.0000 | 875485355.0000 +- 82334154.9218 | 935059223.2000 +- 1644893.3379 |
+| `dispatch/tokens_dispatched` | 134737920.0000 +- 0.0000 | 875485355.0000 +- 82334154.9218 | 933321286.4000 +- 734318.6509 |
 
 ### `expert_load`
 
 | metric | MoE | MoR | MoRE |
 |---|---|---|---|
-| `expert_load/expert_0_pct` | 19.0912 +- 25.5157 | 100.0000 +- 0.0000 | 16.4890 +- 5.5861 |
-| `expert_load/expert_1_pct` | 24.7616 +- 24.0396 | N/A | 16.1038 +- 6.3380 |
-| `expert_load/expert_2_pct` | 39.2430 +- 24.8250 | N/A | 19.8198 +- 5.4389 |
-| `expert_load/expert_3_pct` | 6.1662 +- 4.8264 | N/A | 14.4558 +- 6.7820 |
-| `expert_load/expert_4_pct` | 4.8928 +- 4.0521 | N/A | 16.6250 +- 5.3402 |
-| `expert_load/expert_5_pct` | 5.8452 +- 6.0244 | N/A | 16.5066 +- 7.3260 |
+| `expert_load/expert_0_pct` | 19.0912 +- 25.5157 | 100.0000 +- 0.0000 | 16.3326 +- 6.8841 |
+| `expert_load/expert_1_pct` | 24.7616 +- 24.0396 | N/A | 14.1315 +- 1.3221 |
+| `expert_load/expert_2_pct` | 39.2430 +- 24.8250 | N/A | 19.4930 +- 8.2765 |
+| `expert_load/expert_3_pct` | 6.1662 +- 4.8264 | N/A | 21.2478 +- 9.1859 |
+| `expert_load/expert_4_pct` | 4.8928 +- 4.0521 | N/A | 15.6273 +- 9.3332 |
+| `expert_load/expert_5_pct` | 5.8452 +- 6.0244 | N/A | 13.1678 +- 2.3403 |
 
 ### `halt`
 
 | metric | MoE | MoR | MoRE |
 |---|---|---|---|
-| `halt/early_exit_rate` | N/A | 0.2672 +- 0.2961 | 0.0194 +- 0.0030 |
-| `halt/early_exits` | N/A | 36005742.8000 +- 39900013.6601 | 2616676.4000 +- 408732.5944 |
-| `halt/forced_exit_rate` | N/A | 0.7328 +- 0.2961 | 0.9806 +- 0.0030 |
-| `halt/forced_exits` | N/A | 98732177.2000 +- 39900013.6601 | 132121243.6000 +- 408732.5944 |
+| `halt/early_exit_rate` | N/A | 0.2672 +- 0.2961 | 0.0266 +- 0.0075 |
+| `halt/early_exits` | N/A | 36005742.8000 +- 39900013.6601 | 3583421.4000 +- 1015887.0866 |
+| `halt/forced_exit_rate` | N/A | 0.7328 +- 0.2961 | 0.9734 +- 0.0075 |
+| `halt/forced_exits` | N/A | 98732177.2000 +- 39900013.6601 | 131154498.6000 +- 1015887.0866 |
 | `halt/mean_halt_mass` | N/A | 1.0000 +- 0.0000 | 1.0000 +- 0.0000 |
-| `halt/mean_remainder` | N/A | 0.1703 +- 0.0567 | 0.6095 +- 0.0157 |
+| `halt/mean_remainder` | N/A | 0.1703 +- 0.0567 | 0.6549 +- 0.0085 |
 
 ### `perf`
 
 | metric | MoE | MoR | MoRE |
 |---|---|---|---|
-| `perf/gpu_peak_alloc_gib` | N/A | 7.3346 +- 0.2905 | N/A |
-| `perf/gpu_peak_reserved_gib` | N/A | 7.7949 +- 0.2705 | N/A |
-| `perf/throughput_items_sec` | 718.8116 +- 7.2022 | 173.7715 +- 6.3370 | 168.5385 +- 2.4992 |
-| `perf/throughput_tokens_sec` | N/A | 44485.5120 +- 1622.2804 | 43145.8525 +- 639.7833 |
+| `perf/gpu_peak_alloc_gib` | N/A | 7.3346 +- 0.2905 | 3.8441 +- 0.0022 |
+| `perf/gpu_peak_reserved_gib` | N/A | 7.7949 +- 0.2705 | 4.3578 +- 0.0186 |
+| `perf/throughput_items_sec` | 718.8116 +- 7.2022 | 173.7715 +- 6.3370 | 96.9804 +- 0.9758 |
+| `perf/throughput_tokens_sec` | N/A | 44485.5120 +- 1622.2804 | 24826.9878 +- 249.8132 |
 
 ### `probe`
 
 | metric | MoE | MoR | MoRE |
 |---|---|---|---|
-| `probe/family_ce` | 1.9087 +- 0.0727 | 1.8835 +- 0.0350 | 1.9315 +- 0.0497 |
+| `probe/family_ce` | 1.9087 +- 0.0727 | 1.8835 +- 0.0350 | 1.9249 +- 0.0407 |
 
 ### `prov`
 
@@ -234,110 +222,110 @@ vector) are not table cells and are not shown here; they are carried in
 
 | metric | MoE | MoR | MoRE |
 |---|---|---|---|
-| `recursion/avg_depth_by_family/L1_FUNCTION` | 1.0000 +- 0.0000 | 6.8059 +- 0.2409 | 6.9414 +- 0.0130 |
-| `recursion/avg_depth_by_family/L2_NOUN` | 1.0000 +- 0.0000 | 6.4213 +- 0.6321 | 6.9452 +- 0.0141 |
-| `recursion/avg_depth_by_family/L3_VERB` | 1.0000 +- 0.0000 | 6.7469 +- 0.3302 | 6.9445 +- 0.0135 |
-| `recursion/avg_depth_by_family/L4_MODIFIER` | 1.0000 +- 0.0000 | 6.6003 +- 0.4862 | 6.9447 +- 0.0143 |
-| `recursion/avg_depth_by_family/L5_PUNCT_SYM` | 1.0000 +- 0.0000 | 6.7726 +- 0.2452 | 6.9494 +- 0.0120 |
-| `recursion/avg_depth_by_family/L6_NUM_SUBWORD` | 1.0000 +- 0.0000 | 6.4797 +- 0.5316 | 6.9417 +- 0.0133 |
+| `recursion/avg_depth_by_family/L1_FUNCTION` | 1.0000 +- 0.0000 | 6.8059 +- 0.2409 | 6.9381 +- 0.0032 |
+| `recursion/avg_depth_by_family/L2_NOUN` | 1.0000 +- 0.0000 | 6.4213 +- 0.6321 | 6.9321 +- 0.0063 |
+| `recursion/avg_depth_by_family/L3_VERB` | 1.0000 +- 0.0000 | 6.7469 +- 0.3302 | 6.9316 +- 0.0046 |
+| `recursion/avg_depth_by_family/L4_MODIFIER` | 1.0000 +- 0.0000 | 6.6003 +- 0.4862 | 6.9360 +- 0.0042 |
+| `recursion/avg_depth_by_family/L5_PUNCT_SYM` | 1.0000 +- 0.0000 | 6.7726 +- 0.2452 | 6.9393 +- 0.0066 |
+| `recursion/avg_depth_by_family/L6_NUM_SUBWORD` | 1.0000 +- 0.0000 | 6.4797 +- 0.5316 | 6.9342 +- 0.0064 |
 
 ### `train`
 
 | metric | MoE | MoR | MoRE |
 |---|---|---|---|
-| `train/aux_routing_loss` | 0.1235 +- 0.2556 | N/A | -0.7655 +- 0.0056 |
-| `train/avg_recursion_steps` | N/A | 6.5935 +- 0.4669 | 6.9416 +- 0.0110 |
+| `train/aux_routing_loss` | 0.1235 +- 0.2556 | N/A | -0.7822 +- 0.0012 |
+| `train/avg_recursion_steps` | N/A | 6.5935 +- 0.4669 | 6.9309 +- 0.0042 |
 | `train/balance_to_task_ratio` | 0.0000 +- 0.0000 | N/A | 0.0002 +- 0.0000 |
 | `train/classification_loss` | 0.0000 +- 0.0000 | 0.0000 +- 0.0000 | 0.0000 +- 0.0000 |
-| `train/entropy_term` | 1.6168 +- 0.0613 | N/A | 1.7902 +- 0.0005 |
-| `train/entropy_term_normalized` | 0.9024 +- 0.0342 | N/A | 0.9991 +- 0.0003 |
-| `train/expert_load_entropy_normalized` | 0.6515 +- 0.0852 | N/A | 0.9681 +- 0.0102 |
+| `train/entropy_term` | 1.6168 +- 0.0613 | N/A | 1.7915 +- 0.0001 |
+| `train/entropy_term_normalized` | 0.9024 +- 0.0342 | N/A | 0.9999 +- 0.0000 |
+| `train/expert_load_entropy_normalized` | 0.6515 +- 0.0852 | N/A | 0.9582 +- 0.0061 |
 | `train/family_cls_loss` | 0.0000 +- 0.0000 | 0.0000 +- 0.0000 | 0.0000 +- 0.0000 |
-| `train/halting_loss` | N/A | 0.8335 +- 0.0829 | 0.9437 +- 0.0024 |
-| `train/ponder_cost` | N/A | 0.8335 +- 0.0829 | 0.9437 +- 0.0024 |
-| `train/routing_balance_loss` | 0.1235 +- 0.2556 | N/A | -0.7655 +- 0.0056 |
-| `train/step_routing_loss` | 0.5976 +- 0.0209 | 0.5651 +- 0.0105 | 0.5974 +- 0.0151 |
-| `train/switch_aux_term` | 1.7403 +- 0.1977 | N/A | 1.0247 +- 0.0052 |
-| `train/task_loss` | 4.1050 +- 0.0383 | 3.6806 +- 0.0499 | 3.6183 +- 0.0146 |
-| `train/total_loss` | 4.1052 +- 0.0386 | 3.6814 +- 0.0498 | 3.6185 +- 0.0146 |
+| `train/halting_loss` | N/A | 0.8335 +- 0.0829 | 0.9477 +- 0.0015 |
+| `train/ponder_cost` | N/A | 0.8335 +- 0.0829 | 0.9477 +- 0.0015 |
+| `train/routing_balance_loss` | 0.1235 +- 0.2556 | N/A | -0.7822 +- 0.0012 |
+| `train/step_routing_loss` | 0.5976 +- 0.0209 | 0.5651 +- 0.0105 | 0.5953 +- 0.0121 |
+| `train/switch_aux_term` | 1.7403 +- 0.1977 | N/A | 1.0093 +- 0.0011 |
+| `train/task_loss` | 4.1050 +- 0.0383 | 3.6806 +- 0.0499 | 3.7537 +- 0.0159 |
+| `train/total_loss` | 4.1052 +- 0.0386 | 3.6814 +- 0.0498 | 3.7539 +- 0.0159 |
 
 ### `val`
 
 | metric | MoE | MoR | MoRE |
 |---|---|---|---|
-| `val/avg_recursion_steps` | N/A | 6.7775 +- 0.4916 | 7.5661 +- 0.0190 |
-| `val/bits_per_token` | 5.7029 +- 0.0572 | 5.0786 +- 0.0585 | 5.0539 +- 0.0192 |
-| `val/early_exit_rate` | N/A | 0.2069 +- 0.2031 | 0.0160 +- 0.0029 |
-| `val/forced_exit_rate` | N/A | 0.7931 +- 0.2031 | 0.9840 +- 0.0029 |
-| `val/loss` | 3.9529 +- 0.0396 | 3.5202 +- 0.0406 | 3.5031 +- 0.0133 |
-| `val/mean_remainder` | N/A | 0.1788 +- 0.0554 | 0.6224 +- 0.0131 |
-| `val/nats_below_bigram_floor` | 1.0320 +- 0.0396 | 1.4647 +- 0.0406 | 1.4819 +- 0.0133 |
-| `val/perplexity` | 52.1208 +- 2.0805 | 33.8143 +- 1.3778 | 33.2194 +- 0.4428 |
-| `val/routing_agreement_with_pos` | 0.1617 +- 0.0734 | N/A | 0.1524 +- 0.0498 |
-| `val/routing_ami` | 0.1615 +- 0.0231 | N/A | 0.1410 +- 0.0160 |
-| `val/routing_control_pos/ami_control_mean` | 0.0228 +- 0.0145 | N/A | 0.0285 +- 0.0054 |
-| `val/routing_control_pos/ami_control_std` | 0.0118 +- 0.0048 | N/A | 0.0139 +- 0.0022 |
-| `val/routing_control_pos/ami_delta` | 0.1387 +- 0.0106 | N/A | 0.1125 +- 0.0170 |
-| `val/routing_control_pos/ami_delta_z` | 13.5968 +- 5.9935 | N/A | 8.1269 +- 0.5896 |
-| `val/routing_control_pos/ami_real` | 0.1615 +- 0.0231 | N/A | 0.1410 +- 0.0160 |
-| `val/routing_control_pos/hungarian_accuracy_control_mean` | 0.2888 +- 0.0111 | N/A | 0.2603 +- 0.0127 |
-| `val/routing_control_pos/hungarian_accuracy_control_std` | 0.0110 +- 0.0026 | N/A | 0.0209 +- 0.0059 |
-| `val/routing_control_pos/hungarian_accuracy_delta` | 0.1056 +- 0.0246 | N/A | 0.0858 +- 0.0350 |
-| `val/routing_control_pos/hungarian_accuracy_delta_z` | 9.9588 +- 3.1683 | N/A | 4.8162 +- 3.3575 |
-| `val/routing_control_pos/hungarian_accuracy_real` | 0.3944 +- 0.0185 | N/A | 0.3461 +- 0.0286 |
+| `val/avg_recursion_steps` | N/A | 6.7775 +- 0.4916 | 7.6152 +- 0.0142 |
+| `val/bits_per_token` | 5.7029 +- 0.0572 | 5.0786 +- 0.0585 | 5.2470 +- 0.0193 |
+| `val/early_exit_rate` | N/A | 0.2069 +- 0.2031 | 0.0191 +- 0.0042 |
+| `val/forced_exit_rate` | N/A | 0.7931 +- 0.2031 | 0.9809 +- 0.0042 |
+| `val/loss` | 3.9529 +- 0.0396 | 3.5202 +- 0.0406 | 3.6370 +- 0.0134 |
+| `val/mean_remainder` | N/A | 0.1788 +- 0.0554 | 0.6810 +- 0.0125 |
+| `val/nats_below_bigram_floor` | 1.0320 +- 0.0396 | 1.4647 +- 0.0406 | 1.3480 +- 0.0134 |
+| `val/perplexity` | 52.1208 +- 2.0805 | 33.8143 +- 1.3778 | 37.9792 +- 0.5080 |
+| `val/routing_agreement_with_pos` | 0.1617 +- 0.0734 | N/A | 0.2009 +- 0.0526 |
+| `val/routing_ami` | 0.1615 +- 0.0231 | N/A | 0.1803 +- 0.0246 |
+| `val/routing_control_pos/ami_control_mean` | 0.0228 +- 0.0145 | N/A | 0.0249 +- 0.0055 |
+| `val/routing_control_pos/ami_control_std` | 0.0118 +- 0.0048 | N/A | 0.0123 +- 0.0039 |
+| `val/routing_control_pos/ami_delta` | 0.1387 +- 0.0106 | N/A | 0.1555 +- 0.0259 |
+| `val/routing_control_pos/ami_delta_z` | 13.5968 +- 5.9935 | N/A | 13.4268 +- 3.8659 |
+| `val/routing_control_pos/ami_real` | 0.1615 +- 0.0231 | N/A | 0.1803 +- 0.0246 |
+| `val/routing_control_pos/hungarian_accuracy_control_mean` | 0.2888 +- 0.0111 | N/A | 0.2464 +- 0.0099 |
+| `val/routing_control_pos/hungarian_accuracy_control_std` | 0.0110 +- 0.0026 | N/A | 0.0211 +- 0.0036 |
+| `val/routing_control_pos/hungarian_accuracy_delta` | 0.1056 +- 0.0246 | N/A | 0.1128 +- 0.0364 |
+| `val/routing_control_pos/hungarian_accuracy_delta_z` | 9.9588 +- 3.1683 | N/A | 5.4412 +- 1.9336 |
+| `val/routing_control_pos/hungarian_accuracy_real` | 0.3944 +- 0.0185 | N/A | 0.3592 +- 0.0271 |
 | `val/routing_control_pos/n_draws` | 10.0000 +- 0.0000 | N/A | 10.0000 +- 0.0000 |
-| `val/routing_control_pos/purity_control_mean` | 0.3229 +- 0.0146 | N/A | 0.3382 +- 0.0098 |
-| `val/routing_control_pos/purity_control_std` | 0.0103 +- 0.0037 | N/A | 0.0173 +- 0.0025 |
-| `val/routing_control_pos/purity_delta` | 0.1266 +- 0.0249 | N/A | 0.1133 +- 0.0403 |
-| `val/routing_control_pos/purity_delta_z` | 13.3119 +- 4.5518 | N/A | 6.8220 +- 3.1678 |
-| `val/routing_control_pos/purity_real` | 0.4495 +- 0.0244 | N/A | 0.4516 +- 0.0332 |
-| `val/routing_control_pos/raw_accuracy_control_mean` | 0.1590 +- 0.0602 | N/A | 0.1651 +- 0.0061 |
-| `val/routing_control_pos/raw_accuracy_control_std` | 0.0140 +- 0.0044 | N/A | 0.0223 +- 0.0055 |
-| `val/routing_control_pos/raw_accuracy_delta` | 0.0026 +- 0.0582 | N/A | -0.0127 +- 0.0513 |
-| `val/routing_control_pos/raw_accuracy_delta_z` | 0.2525 +- 3.8507 | N/A | -0.7309 +- 2.4443 |
-| `val/routing_control_pos/raw_accuracy_real` | 0.1617 +- 0.0734 | N/A | 0.1524 +- 0.0498 |
-| `val/routing_f1/E1_ADD_SUB` | 0.1559 +- 0.2071 | N/A | 0.1443 +- 0.1694 |
-| `val/routing_f1/E2_MULT_DIV` | 0.2676 +- 0.1757 | N/A | 0.1777 +- 0.1314 |
-| `val/routing_f1/E3_MOD_POW` | 0.0784 +- 0.0553 | N/A | 0.0697 +- 0.0399 |
-| `val/routing_f1/E4_LOGIC` | 0.0791 +- 0.0790 | N/A | 0.0829 +- 0.0220 |
-| `val/routing_f1/E5_SHIFT` | 0.0139 +- 0.0186 | N/A | 0.0769 +- 0.1578 |
-| `val/routing_f1/E6_SORT_STAT` | 0.0506 +- 0.0312 | N/A | 0.2327 +- 0.0751 |
-| `val/routing_f1_matched/E1_ADD_SUB` | 0.5513 +- 0.0496 | N/A | 0.4664 +- 0.1179 |
-| `val/routing_f1_matched/E2_MULT_DIV` | 0.3250 +- 0.1541 | N/A | 0.3926 +- 0.0516 |
-| `val/routing_f1_matched/E3_MOD_POW` | 0.0594 +- 0.0397 | N/A | 0.1142 +- 0.0209 |
-| `val/routing_f1_matched/E4_LOGIC` | 0.0871 +- 0.0965 | N/A | 0.1348 +- 0.0572 |
-| `val/routing_f1_matched/E5_SHIFT` | 0.1751 +- 0.1823 | N/A | 0.2523 +- 0.2057 |
-| `val/routing_f1_matched/E6_SORT_STAT` | 0.3806 +- 0.1453 | N/A | 0.3204 +- 0.0246 |
-| `val/routing_hungarian_accuracy` | 0.3944 +- 0.0185 | N/A | 0.3461 +- 0.0286 |
-| `val/routing_macro_recall` | 0.1638 +- 0.0350 | N/A | 0.1521 +- 0.0575 |
-| `val/routing_matched_macro_recall` | 0.2880 +- 0.0293 | N/A | 0.3179 +- 0.0322 |
+| `val/routing_control_pos/purity_control_mean` | 0.3229 +- 0.0146 | N/A | 0.3332 +- 0.0090 |
+| `val/routing_control_pos/purity_control_std` | 0.0103 +- 0.0037 | N/A | 0.0184 +- 0.0031 |
+| `val/routing_control_pos/purity_delta` | 0.1266 +- 0.0249 | N/A | 0.1380 +- 0.0333 |
+| `val/routing_control_pos/purity_delta_z` | 13.3119 +- 4.5518 | N/A | 7.6632 +- 2.1218 |
+| `val/routing_control_pos/purity_real` | 0.4495 +- 0.0244 | N/A | 0.4712 +- 0.0260 |
+| `val/routing_control_pos/raw_accuracy_control_mean` | 0.1590 +- 0.0602 | N/A | 0.1564 +- 0.0188 |
+| `val/routing_control_pos/raw_accuracy_control_std` | 0.0140 +- 0.0044 | N/A | 0.0226 +- 0.0125 |
+| `val/routing_control_pos/raw_accuracy_delta` | 0.0026 +- 0.0582 | N/A | 0.0445 +- 0.0366 |
+| `val/routing_control_pos/raw_accuracy_delta_z` | 0.2525 +- 3.8507 | N/A | 2.6520 +- 3.3660 |
+| `val/routing_control_pos/raw_accuracy_real` | 0.1617 +- 0.0734 | N/A | 0.2009 +- 0.0526 |
+| `val/routing_f1/E1_ADD_SUB` | 0.1559 +- 0.2071 | N/A | 0.2105 +- 0.1912 |
+| `val/routing_f1/E2_MULT_DIV` | 0.2676 +- 0.1757 | N/A | 0.2978 +- 0.0907 |
+| `val/routing_f1/E3_MOD_POW` | 0.0784 +- 0.0553 | N/A | 0.0865 +- 0.0412 |
+| `val/routing_f1/E4_LOGIC` | 0.0791 +- 0.0790 | N/A | 0.0721 +- 0.0489 |
+| `val/routing_f1/E5_SHIFT` | 0.0139 +- 0.0186 | N/A | 0.0836 +- 0.1712 |
+| `val/routing_f1/E6_SORT_STAT` | 0.0506 +- 0.0312 | N/A | 0.2734 +- 0.0707 |
+| `val/routing_f1_matched/E1_ADD_SUB` | 0.5513 +- 0.0496 | N/A | 0.5977 +- 0.0780 |
+| `val/routing_f1_matched/E2_MULT_DIV` | 0.3250 +- 0.1541 | N/A | 0.3608 +- 0.0192 |
+| `val/routing_f1_matched/E3_MOD_POW` | 0.0594 +- 0.0397 | N/A | 0.1507 +- 0.0357 |
+| `val/routing_f1_matched/E4_LOGIC` | 0.0871 +- 0.0965 | N/A | 0.1410 +- 0.0398 |
+| `val/routing_f1_matched/E5_SHIFT` | 0.1751 +- 0.1823 | N/A | 0.0076 +- 0.0131 |
+| `val/routing_f1_matched/E6_SORT_STAT` | 0.3806 +- 0.1453 | N/A | 0.3751 +- 0.0636 |
+| `val/routing_hungarian_accuracy` | 0.3944 +- 0.0185 | N/A | 0.3592 +- 0.0271 |
+| `val/routing_macro_recall` | 0.1638 +- 0.0350 | N/A | 0.1856 +- 0.0695 |
+| `val/routing_matched_macro_recall` | 0.2880 +- 0.0293 | N/A | 0.2852 +- 0.0215 |
 | `val/routing_pos_partition_load_entropy` | 0.8942 +- 0.0000 | 0.8942 +- 0.0000 | 0.8942 +- 0.0000 |
-| `val/routing_precision/E1_ADD_SUB` | 0.2524 +- 0.3577 | N/A | 0.1566 +- 0.1479 |
-| `val/routing_precision/E2_MULT_DIV` | 0.3633 +- 0.2140 | N/A | 0.3165 +- 0.1191 |
-| `val/routing_precision/E3_MOD_POW` | 0.0441 +- 0.0290 | N/A | 0.0467 +- 0.0249 |
-| `val/routing_precision/E4_LOGIC` | 0.0814 +- 0.0493 | N/A | 0.0651 +- 0.0212 |
-| `val/routing_precision/E5_SHIFT` | 0.0157 +- 0.0208 | N/A | 0.0518 +- 0.1029 |
-| `val/routing_precision/E6_SORT_STAT` | 0.1682 +- 0.1339 | N/A | 0.2990 +- 0.1281 |
-| `val/routing_precision_matched/E1_ADD_SUB` | 0.6280 +- 0.2354 | N/A | 0.5097 +- 0.0792 |
-| `val/routing_precision_matched/E2_MULT_DIV` | 0.4175 +- 0.1440 | N/A | 0.4711 +- 0.0497 |
-| `val/routing_precision_matched/E3_MOD_POW` | 0.0881 +- 0.0770 | N/A | 0.0913 +- 0.0129 |
-| `val/routing_precision_matched/E4_LOGIC` | 0.1500 +- 0.1810 | N/A | 0.1062 +- 0.0393 |
-| `val/routing_precision_matched/E5_SHIFT` | 0.2462 +- 0.2533 | N/A | 0.1679 +- 0.1337 |
-| `val/routing_precision_matched/E6_SORT_STAT` | 0.5342 +- 0.1594 | N/A | 0.5504 +- 0.0521 |
-| `val/routing_purity` | 0.4495 +- 0.0244 | N/A | 0.4516 +- 0.0332 |
-| `val/routing_recall/E1_ADD_SUB` | 0.1464 +- 0.1844 | N/A | 0.1424 +- 0.1867 |
-| `val/routing_recall/E2_MULT_DIV` | 0.2676 +- 0.2186 | N/A | 0.1372 +- 0.1188 |
-| `val/routing_recall/E3_MOD_POW` | 0.4164 +- 0.3470 | N/A | 0.1581 +- 0.1141 |
-| `val/routing_recall/E4_LOGIC` | 0.1048 +- 0.1147 | N/A | 0.1242 +- 0.0261 |
-| `val/routing_recall/E5_SHIFT` | 0.0128 +- 0.0170 | N/A | 0.1567 +- 0.3343 |
-| `val/routing_recall/E6_SORT_STAT` | 0.0351 +- 0.0238 | N/A | 0.1941 +- 0.0528 |
-| `val/routing_recall_matched/E1_ADD_SUB` | 0.6316 +- 0.2677 | N/A | 0.4540 +- 0.1823 |
-| `val/routing_recall_matched/E2_MULT_DIV` | 0.3507 +- 0.2478 | N/A | 0.3428 +- 0.0722 |
-| `val/routing_recall_matched/E3_MOD_POW` | 0.0473 +- 0.0259 | N/A | 0.1693 +- 0.0657 |
-| `val/routing_recall_matched/E4_LOGIC` | 0.0677 +- 0.0685 | N/A | 0.1929 +- 0.1090 |
-| `val/routing_recall_matched/E5_SHIFT` | 0.2192 +- 0.3180 | N/A | 0.5202 +- 0.4415 |
-| `val/routing_recall_matched/E6_SORT_STAT` | 0.4113 +- 0.2796 | N/A | 0.2282 +- 0.0278 |
-| `val/task_loss` | 3.9529 +- 0.0396 | 3.5202 +- 0.0406 | 3.5031 +- 0.0133 |
+| `val/routing_precision/E1_ADD_SUB` | 0.2524 +- 0.3577 | N/A | 0.2719 +- 0.1878 |
+| `val/routing_precision/E2_MULT_DIV` | 0.3633 +- 0.2140 | N/A | 0.4687 +- 0.0615 |
+| `val/routing_precision/E3_MOD_POW` | 0.0441 +- 0.0290 | N/A | 0.0614 +- 0.0299 |
+| `val/routing_precision/E4_LOGIC` | 0.0814 +- 0.0493 | N/A | 0.0524 +- 0.0379 |
+| `val/routing_precision/E5_SHIFT` | 0.0157 +- 0.0208 | N/A | 0.0546 +- 0.1074 |
+| `val/routing_precision/E6_SORT_STAT` | 0.1682 +- 0.1339 | N/A | 0.3473 +- 0.1183 |
+| `val/routing_precision_matched/E1_ADD_SUB` | 0.6280 +- 0.2354 | N/A | 0.5791 +- 0.0539 |
+| `val/routing_precision_matched/E2_MULT_DIV` | 0.4175 +- 0.1440 | N/A | 0.4820 +- 0.0502 |
+| `val/routing_precision_matched/E3_MOD_POW` | 0.0881 +- 0.0770 | N/A | 0.1078 +- 0.0238 |
+| `val/routing_precision_matched/E4_LOGIC` | 0.1500 +- 0.1810 | N/A | 0.1109 +- 0.0293 |
+| `val/routing_precision_matched/E5_SHIFT` | 0.2462 +- 0.2533 | N/A | 0.0073 +- 0.0126 |
+| `val/routing_precision_matched/E6_SORT_STAT` | 0.5342 +- 0.1594 | N/A | 0.4478 +- 0.0743 |
+| `val/routing_purity` | 0.4495 +- 0.0244 | N/A | 0.4712 +- 0.0260 |
+| `val/routing_recall/E1_ADD_SUB` | 0.1464 +- 0.1844 | N/A | 0.1808 +- 0.1905 |
+| `val/routing_recall/E2_MULT_DIV` | 0.2676 +- 0.2186 | N/A | 0.2262 +- 0.0915 |
+| `val/routing_recall/E3_MOD_POW` | 0.4164 +- 0.3470 | N/A | 0.1569 +- 0.0755 |
+| `val/routing_recall/E4_LOGIC` | 0.1048 +- 0.1147 | N/A | 0.1255 +- 0.0743 |
+| `val/routing_recall/E5_SHIFT` | 0.0128 +- 0.0170 | N/A | 0.1928 +- 0.4123 |
+| `val/routing_recall/E6_SORT_STAT` | 0.0351 +- 0.0238 | N/A | 0.2312 +- 0.0634 |
+| `val/routing_recall_matched/E1_ADD_SUB` | 0.6316 +- 0.2677 | N/A | 0.6196 +- 0.1065 |
+| `val/routing_recall_matched/E2_MULT_DIV` | 0.3507 +- 0.2478 | N/A | 0.2921 +- 0.0347 |
+| `val/routing_recall_matched/E3_MOD_POW` | 0.0473 +- 0.0259 | N/A | 0.2600 +- 0.0785 |
+| `val/routing_recall_matched/E4_LOGIC` | 0.0677 +- 0.0685 | N/A | 0.2020 +- 0.0726 |
+| `val/routing_recall_matched/E5_SHIFT` | 0.2192 +- 0.3180 | N/A | 0.0079 +- 0.0137 |
+| `val/routing_recall_matched/E6_SORT_STAT` | 0.4113 +- 0.2796 | N/A | 0.3295 +- 0.0772 |
+| `val/task_loss` | 3.9529 +- 0.0396 | 3.5202 +- 0.0406 | 3.6370 +- 0.0134 |
 
 **Throughput units.** `perf/throughput_tokens_sec` is `N/A` for MoE because those runs predate the T-LX.8 fix, which is detectable without commit archaeology: before T-LX.8 the engine divided batch ITEMS by elapsed seconds and labelled the quotient tokens/s, and it published no items/s key at all. On this task an item is one `seq_len`-token block, so the figure those runs recorded is items/s and it is reported above in the `perf/throughput_items_sec` row, where it is directly comparable to every other arm. It is relabelled, never rescaled: multiplying by `seq_len` recovers the tokens figure exactly, but that product appears in no run's `metrics.json`, and this exporter reports `N/A` rather than synthesize a cell. **Compare throughput on the `perf/throughput_items_sec` row.** Reading the tokens row alone would show these arms as missing, and an earlier export that mixed the two units in one row showed them as ~62x slower than the truth.
 
@@ -352,6 +340,7 @@ vector) are not table cells and are not shown here; they are carried in
 | `dispatch/capacity_policy` | categorical, not a measurement | `no_capacity_limit` |
 | `dispatch/router_noise` | categorical, not a measurement | `none` |
 | `dispatch/routing_mode` | categorical, not a measurement | `top1_sparse` |
+| `dispatch/routing_persistence` | categorical, not a measurement | `per_token` |
 | `experiment_group` | categorical, not a measurement | `canonical_lang_b` |
 | `experiment_id` | categorical, not a measurement | 15 distinct values (one per run or per arm) -- read the `experiment_id` column of `results.csv` |
 | `halting_mode` | categorical, not a measurement | `pure_act` |
@@ -409,10 +398,6 @@ skipped these would be indistinguishable from one that found nothing wrong.
 | `famcls_nofam_seed43__ca305b98` | experiment_group='exploratory' != 'canonical_lang_b' |
 | `famcls_nofam_seed44__1d8e55dd` | experiment_group='exploratory' != 'canonical_lang_b' |
 | `gate1_dataset_check__seedNA__fa24821c` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `langB_MoR_seed43__c1873a66` | experiment_group='lang_smoke2' != 'canonical_lang_b' |
-| `langB_MoR_seed44__14356af7` | experiment_group='langB_smoke' != 'canonical_lang_b' |
-| `langB_MoR_seed44__78580ac8` | no metrics.json (run did not finish) |
-| `langB_MoR_seed44__78580ac8__r2` | experiment_group='langB_smoke' != 'canonical_lang_b' |
 | `langB_MoRE_seed42__1304961e` | no metrics.json (run did not finish) |
 | `langB_MoRE_seed42__1304961e__r4` | experiment_group='langB_gate_l7' != 'canonical_lang_b' |
 | `langB_MoRE_seed42__91c9bba1` | experiment_group='lang_smoke' != 'canonical_lang_b' |
@@ -423,6 +408,7 @@ skipped these would be indistinguishable from one that found nothing wrong.
 | `langB_MoRE_seed44__2b8030a8` | experiment_group='lang_calib_b0p05_h0p001' != 'canonical_lang_b' |
 | `langB_MoRE_seed44__2ca6e831` | experiment_group='langB_smoke' != 'canonical_lang_b' |
 | `langB_MoRE_seed44__2ce26c0d` | experiment_group='lang_axes' != 'canonical_lang_b' |
+| `langB_MoRE_seed44__405e2629` | experiment_group='langB_smoke' != 'canonical_lang_b' |
 | `langB_MoRE_seed44__45a2bfbc` | experiment_group='lang_calib_b0p001_h0p5' != 'canonical_lang_b' |
 | `langB_MoRE_seed44__4fb3cbf2` | experiment_group='lang_calib_lr0p002_d0p1' != 'canonical_lang_b' |
 | `langB_MoRE_seed44__4fb3cbf2__r2` | experiment_group='lang_calib_lr0p002_d0p1' != 'canonical_lang_b' |
@@ -456,6 +442,10 @@ skipped these would be indistinguishable from one that found nothing wrong.
 | `langB_MoRE_seed45__90b9896f` | no metrics.json (run did not finish) |
 | `langB_MoRE_seed45__d6025531` | experiment_group='lang_rho_fix' != 'canonical_lang_b' |
 | `langB_MoRE_seed46__d9882139` | no metrics.json (run did not finish) |
+| `langB_MoR_seed43__c1873a66` | experiment_group='lang_smoke2' != 'canonical_lang_b' |
+| `langB_MoR_seed44__14356af7` | experiment_group='langB_smoke' != 'canonical_lang_b' |
+| `langB_MoR_seed44__78580ac8` | no metrics.json (run did not finish) |
+| `langB_MoR_seed44__78580ac8__r2` | experiment_group='langB_smoke' != 'canonical_lang_b' |
 | `nacheck_moe__seedNA__27d97bf3` | experiment_group='exploratory' != 'canonical_lang_b' |
 | `nacheck_mor__seedNA__a2494065` | experiment_group='exploratory' != 'canonical_lang_b' |
 | `nacheck_more__seedNA__9f1a6c31` | experiment_group='exploratory' != 'canonical_lang_b' |
@@ -546,126 +536,14 @@ skipped these would be indistinguishable from one that found nothing wrong.
 | `t67_provenance_check_seed44__59000a77__r7` | experiment_group='exploratory' != 'canonical_lang_b' |
 | `t67_provenance_check_seed44__59000a77__r8` | experiment_group='exploratory' != 'canonical_lang_b' |
 | `t67_provenance_check_seed44__59000a77__r9` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67_provenance_check_seed44__6b711a59` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67_provenance_check_seed44__6b711a59__r10` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67_provenance_check_seed44__6b711a59__r11` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67_provenance_check_seed44__6b711a59__r12` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67_provenance_check_seed44__6b711a59__r13` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67_provenance_check_seed44__6b711a59__r14` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67_provenance_check_seed44__6b711a59__r15` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67_provenance_check_seed44__6b711a59__r16` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67_provenance_check_seed44__6b711a59__r17` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67_provenance_check_seed44__6b711a59__r18` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67_provenance_check_seed44__6b711a59__r19` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67_provenance_check_seed44__6b711a59__r2` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67_provenance_check_seed44__6b711a59__r20` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67_provenance_check_seed44__6b711a59__r21` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67_provenance_check_seed44__6b711a59__r22` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67_provenance_check_seed44__6b711a59__r23` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67_provenance_check_seed44__6b711a59__r24` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67_provenance_check_seed44__6b711a59__r25` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67_provenance_check_seed44__6b711a59__r26` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67_provenance_check_seed44__6b711a59__r27` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67_provenance_check_seed44__6b711a59__r28` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67_provenance_check_seed44__6b711a59__r29` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67_provenance_check_seed44__6b711a59__r3` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67_provenance_check_seed44__6b711a59__r30` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67_provenance_check_seed44__6b711a59__r31` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67_provenance_check_seed44__6b711a59__r32` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67_provenance_check_seed44__6b711a59__r33` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67_provenance_check_seed44__6b711a59__r34` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67_provenance_check_seed44__6b711a59__r35` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67_provenance_check_seed44__6b711a59__r36` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67_provenance_check_seed44__6b711a59__r37` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67_provenance_check_seed44__6b711a59__r38` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67_provenance_check_seed44__6b711a59__r39` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67_provenance_check_seed44__6b711a59__r4` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67_provenance_check_seed44__6b711a59__r40` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67_provenance_check_seed44__6b711a59__r41` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67_provenance_check_seed44__6b711a59__r42` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67_provenance_check_seed44__6b711a59__r43` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67_provenance_check_seed44__6b711a59__r44` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67_provenance_check_seed44__6b711a59__r45` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67_provenance_check_seed44__6b711a59__r46` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67_provenance_check_seed44__6b711a59__r47` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67_provenance_check_seed44__6b711a59__r48` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67_provenance_check_seed44__6b711a59__r49` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67_provenance_check_seed44__6b711a59__r5` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67_provenance_check_seed44__6b711a59__r50` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67_provenance_check_seed44__6b711a59__r51` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67_provenance_check_seed44__6b711a59__r52` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67_provenance_check_seed44__6b711a59__r53` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67_provenance_check_seed44__6b711a59__r54` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67_provenance_check_seed44__6b711a59__r55` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67_provenance_check_seed44__6b711a59__r56` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67_provenance_check_seed44__6b711a59__r57` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67_provenance_check_seed44__6b711a59__r58` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67_provenance_check_seed44__6b711a59__r6` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67_provenance_check_seed44__6b711a59__r7` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67_provenance_check_seed44__6b711a59__r8` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67_provenance_check_seed44__6b711a59__r9` | no metrics.json (run did not finish) |
 | `t67_provenance_check_seed44__c1c47354` | no metrics.json (run did not finish) |
 | `t67_provenance_check_seed44__c1c47354__r2` | experiment_group='exploratory' != 'canonical_lang_b' |
 | `t67_provenance_check_seed44__c1c47354__r3` | experiment_group='exploratory' != 'canonical_lang_b' |
 | `t67_provenance_check_seed44__c1c47354__r4` | experiment_group='exploratory' != 'canonical_lang_b' |
 | `t67_provenance_check_seed44__c1c47354__r5` | experiment_group='exploratory' != 'canonical_lang_b' |
 | `t67_provenance_check_seed44__c3571d3a` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67d_provenance_check_mor_seed44__fa9339bc` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67d_provenance_check_mor_seed44__fa9339bc__r10` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67d_provenance_check_mor_seed44__fa9339bc__r11` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67d_provenance_check_mor_seed44__fa9339bc__r12` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67d_provenance_check_mor_seed44__fa9339bc__r13` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67d_provenance_check_mor_seed44__fa9339bc__r14` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67d_provenance_check_mor_seed44__fa9339bc__r15` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67d_provenance_check_mor_seed44__fa9339bc__r16` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67d_provenance_check_mor_seed44__fa9339bc__r17` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67d_provenance_check_mor_seed44__fa9339bc__r18` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67d_provenance_check_mor_seed44__fa9339bc__r19` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67d_provenance_check_mor_seed44__fa9339bc__r2` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67d_provenance_check_mor_seed44__fa9339bc__r20` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67d_provenance_check_mor_seed44__fa9339bc__r21` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67d_provenance_check_mor_seed44__fa9339bc__r22` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67d_provenance_check_mor_seed44__fa9339bc__r23` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67d_provenance_check_mor_seed44__fa9339bc__r24` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67d_provenance_check_mor_seed44__fa9339bc__r25` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67d_provenance_check_mor_seed44__fa9339bc__r26` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67d_provenance_check_mor_seed44__fa9339bc__r27` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67d_provenance_check_mor_seed44__fa9339bc__r28` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67d_provenance_check_mor_seed44__fa9339bc__r29` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67d_provenance_check_mor_seed44__fa9339bc__r3` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67d_provenance_check_mor_seed44__fa9339bc__r30` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67d_provenance_check_mor_seed44__fa9339bc__r31` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67d_provenance_check_mor_seed44__fa9339bc__r32` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67d_provenance_check_mor_seed44__fa9339bc__r33` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67d_provenance_check_mor_seed44__fa9339bc__r34` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67d_provenance_check_mor_seed44__fa9339bc__r35` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67d_provenance_check_mor_seed44__fa9339bc__r36` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67d_provenance_check_mor_seed44__fa9339bc__r37` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67d_provenance_check_mor_seed44__fa9339bc__r38` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67d_provenance_check_mor_seed44__fa9339bc__r39` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67d_provenance_check_mor_seed44__fa9339bc__r4` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67d_provenance_check_mor_seed44__fa9339bc__r40` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67d_provenance_check_mor_seed44__fa9339bc__r41` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67d_provenance_check_mor_seed44__fa9339bc__r42` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67d_provenance_check_mor_seed44__fa9339bc__r43` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67d_provenance_check_mor_seed44__fa9339bc__r44` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67d_provenance_check_mor_seed44__fa9339bc__r45` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67d_provenance_check_mor_seed44__fa9339bc__r46` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67d_provenance_check_mor_seed44__fa9339bc__r47` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67d_provenance_check_mor_seed44__fa9339bc__r48` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67d_provenance_check_mor_seed44__fa9339bc__r49` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67d_provenance_check_mor_seed44__fa9339bc__r5` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67d_provenance_check_mor_seed44__fa9339bc__r50` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67d_provenance_check_mor_seed44__fa9339bc__r51` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67d_provenance_check_mor_seed44__fa9339bc__r52` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67d_provenance_check_mor_seed44__fa9339bc__r53` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67d_provenance_check_mor_seed44__fa9339bc__r54` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67d_provenance_check_mor_seed44__fa9339bc__r55` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67d_provenance_check_mor_seed44__fa9339bc__r56` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67d_provenance_check_mor_seed44__fa9339bc__r6` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67d_provenance_check_mor_seed44__fa9339bc__r7` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67d_provenance_check_mor_seed44__fa9339bc__r8` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67d_provenance_check_mor_seed44__fa9339bc__r9` | experiment_group='exploratory' != 'canonical_lang_b' |
+| `t67_provenance_check_seed44__eae3d416` | experiment_group='exploratory' != 'canonical_lang_b' |
+| `t67d_provenance_check_mor_seed44__224c7453` | experiment_group='exploratory' != 'canonical_lang_b' |
 | `t68_matched_check_seed42__2d8b6203` | experiment_group='exploratory' != 'canonical_lang_b' |
 | `t81_moe__seedNA__b5532075` | experiment_group='t81_smoke' != 'canonical_lang_b' |
 | `t81_mor__seedNA__30831ff6` | experiment_group='t81_smoke' != 'canonical_lang_b' |

@@ -1,5 +1,5 @@
 {
-  "bigram_ce": 5.398304166059712,
+  "bigram_ce": 5.398304166059714,
   "bigram_distinct_pairs": 565449,
   "bigram_smoothing": "backoff, absolute discounting D=0.75",
   "bigram_train_bigrams": 2694911,
@@ -89,7 +89,7 @@
     "normalized": 0.28105765358776674
   },
   "decile_generator": "data/lang/build_depth_deciles.py",
-  "decile_generator_commit": "11c36d223862ba185f9b579cb2a93b14829b5c31",
+  "decile_generator_commit": "681622892fbd5d559b05bbe5d75d7667535da968",
   "decile_is_canonical": false,
   "decile_purpose": "ablation F (supervised_curriculum) only. plan_language.md \u00a75: canonical language runs invent no depth target, so loss_weights.halting_supervision stays 0.0 and halting stays pure ACT. The decile->depth mapping is a DESIGN CHOICE and lives in code/more/lang_families.py:decile_target_depth, not in this artifact.",
   "decile_table": [
@@ -271,10 +271,10 @@
   "floors_eval_tokens": 284160,
   "floors_fitted_on": "train",
   "floors_generator": "data/lang/build_baseline_floors.py",
-  "floors_generator_commit": "5aae2e3fd3245c0fae3fde96f13cd786a7897c41",
+  "floors_generator_commit": "681622892fbd5d559b05bbe5d75d7667535da968",
   "floors_ordered_uniform_ge_unigram_ge_bigram": true,
   "floors_units": "nats per token",
-  "generator_commit": "9470ff273d126565e5c18a3661c5c7eae2e4a6af",
+  "generator_commit": "681622892fbd5d559b05bbe5d75d7667535da968",
   "generator_script": "data/lang/build_language_dataset.py",
   "hf_config": "wikitext-2-raw-v1",
   "hf_dataset": "Salesforce/wikitext",
@@ -282,7 +282,7 @@
   "is_canonical_corpus": false,
   "n_frequency_deciles": 10,
   "n_topics": 6,
-  "primary_metric_floor": 5.398304166059712,
+  "primary_metric_floor": 5.398304166059714,
   "raw_bytes": {
     "test": 1287656,
     "train": 10914845,
@@ -489,7 +489,7 @@
     }
   ],
   "shuffled_control_generator": "data/lang/build_shuffled_control.py",
-  "shuffled_control_generator_commit": "82e521d4a311512de6cda0745b6eff455f6da0d4",
+  "shuffled_control_generator_commit": "681622892fbd5d559b05bbe5d75d7667535da968",
   "shuffled_control_marginal_entropy_draws": [
     0.8884551517701869,
     0.8884254616120028,
@@ -695,7 +695,7 @@
   "train_documents": 630,
   "train_text_bytes": 10914845,
   "uniform_ce": 9.010913347279288,
-  "unigram_ce": 7.1864730591087875,
+  "unigram_ce": 7.186473059108788,
   "unigram_smoothing": "add-1 (Laplace)",
   "unigram_unseen_types": 151,
   "unk_literal_occurrences": {
