@@ -95,7 +95,44 @@ Then set the environment once per shell:
 export WANDB_MODE=offline && export WANDB_SILENT=true
 ```
 
-MoE, all five seeds:
+**STEP ZERO, before any training: archive the lost-weight cells. If you skip this, the
+runner trains nothing.** The runner treats a cell as complete on arm + seed + canonical
+group + a finished `metrics.json` (`run_language_matrix.py:435`), and the published MoE/MoR
+cells have all four. So `--arch moe` would print `skip ... already complete` for all five
+seeds and exit. Archiving them first is also what prevents the duplicate-cell export refusal
+later — one move solves both. **Use `git mv`, never plain `mv`** (the reason is below):
+
+```bash
+mkdir -p archive/pre_finalization/lang_v100_no_checkpoints
+```
+
+```bash
+git mv runs/langB_MoE_seed42__1958b9a5 runs/langB_MoE_seed43__b595f8f2 runs/langB_MoE_seed44__6a66e9bd runs/langB_MoE_seed45__abe5e12e runs/langB_MoE_seed46__d949c1d6 archive/pre_finalization/lang_v100_no_checkpoints/
+```
+
+```bash
+git mv runs/langB_MoR_seed42__547e435b__r4 runs/langB_MoR_seed43__84a6b29d__r4 runs/langB_MoR_seed44__5ce4b087 runs/langB_MoR_seed45__bef0bdd0 runs/langB_MoR_seed46__699aa4a1 archive/pre_finalization/lang_v100_no_checkpoints/
+```
+
+Confirm the ten directories moved and nothing is left behind at the old paths:
+
+```bash
+git status --short | grep "^R" | wc -l
+```
+
+Expect 20 renames (`git mv` records a move as a rename of each of the two tracked files per
+cell). Archive, never delete (`CLAUDE.md` §6): these cells are the provenance record for the
+MoE/MoR numbers currently in the paper, even though their weights are gone.
+
+**Why `git mv` and not `mv`.** Plain `mv` removes a directory from the working tree but
+leaves it in the index at the old path, so a later `git add <newpath>` stages the copy
+without the deletion and the commit carries the cell at **both** paths. The local export
+still succeeds and the duplication only surfaces on the next machine to pull, where
+`export_results.py` refuses with `duplicate cell ('moe', 42)`. This exact trap already cost
+one debugging cycle on the V100 (T-LX.19); `git mv` moves the index entry atomically and
+avoids it.
+
+Now train. MoE, all five seeds:
 
 ```bash
 PYTHONIOENCODING=utf-8 C:/Users/Hp/anaconda3/envs/more_env/python.exe code/run_language_matrix.py --arch moe
@@ -113,37 +150,7 @@ the artifact that ends up in a table by accident.
 
 **Do not pass `--arch more` and do not pass `--all`.** MoRE's five cells are complete, they
 carry their checkpoints, and a re-run produces a second cell for the same `(arch, seed)` —
-which the exporter rejects as a duplicate. That refusal already cost one debugging cycle;
-see §Phase 6 of `RUNBOOK_V100.md`.
-
-### The duplicate-cell trap, which you will hit
-
-The new MoE/MoR cells will have the same `(arch, seed)` as the published ones. Two
-canonical cells per seed makes `export_results.py` refuse the whole export with
-`duplicate cell ('moe', 42)` and write nothing. That guard is correct — it is what stops
-two different runs being averaged into one row.
-
-Retire the superseded directories into `archive/`, and **use `git mv`, never plain `mv`**:
-
-```bash
-mkdir -p archive/pre_finalization/lang_v100_no_checkpoints
-```
-
-```bash
-git mv runs/langB_MoE_seed42__1958b9a5 archive/pre_finalization/lang_v100_no_checkpoints/
-```
-
-`mv` removes the directory from the working tree but leaves it in the index at the old path,
-so `git add <newpath>` stages the copy without the deletion and the commit carries the cell
-at **both** paths. The local export still succeeds and the duplication only surfaces on the
-next machine to pull. Confirm the deletions are staged before committing:
-
-```bash
-git status --short | grep "^D"
-```
-
-Archive, never delete (`CLAUDE.md` §6). The V100 cells are the provenance record for the
-numbers currently in the paper.
+which the exporter rejects as a duplicate.
 
 ---
 

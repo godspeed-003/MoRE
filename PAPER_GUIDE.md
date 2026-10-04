@@ -99,7 +99,7 @@ numbers are not trustworthy — stop and fix it before writing (`CLAUDE.md` §7)
   paper reports** (§7), not garbage.
 - `archive/pre_finalization/sweep_results/rules.md` and `.../objective.md` are superseded.
   The old primary criterion `expert_entropy > baseline` is **void** — high entropy is a
-  load-balance diagnostic only, and in this study it is a *symptom of a problem* (§6).
+  load-balance diagnostic only, never a quality score (§6, and the router-entropy note).
 - `results/results_tables.md`, `results/results.json`, `moe_batch1_results.md`,
   `results_exp.md` — arithmetic. Not for this paper.
 - `README.md` describes the arithmetic POC. Historically correct, left alone on purpose
@@ -217,11 +217,20 @@ names are stale. **Relabel in the paper's table; do not rewrite the run artifact
 | MoE | 0.9024 ± 0.0342 | 0.6515 ± 0.0852 | +0.1235 ± 0.2556 |
 | MoRE | **0.9999 ± 0.0000** | 0.9582 ± 0.0061 | −0.7822 ± 0.0012 |
 
-MoRE's router softmax sits at 99.99% of maximum entropy — **near-uniform over six
-experts**, so Top-1 argmax selects among six near-tied logits. `CLAUDE.md` §2 forbids
-tuning toward maximal entropy and §6 forbids reading high entropy as specialization. In
-this paper high entropy is a **symptom**, and the sentence to write is the opposite of the
-one the old superseded rules invited.
+MoRE's router softmax sits at 99.99% of maximum PER-TOKEN entropy — near-uniform over six
+experts, so Top-1 argmax selects among six near-tied logits. **But do not write that this is
+a balance-loss pathology** — T-LX.19 did, and T-LX.21 withdrew it. Two distinct quantities
+are at play and the table above keeps them separate: per-token router-output entropy (0.9999)
+is NOT the aggregate load entropy (0.9582), and MoRE's AMI (0.1803) is a healthy ~0.15 above
+its permutation control. A near-maximal per-token entropy coexisting with balanced load and
+real, above-chance specialization is not evidence of a broken router. The T-LX.20 sweep
+confirms the direction: setting the balance weight to 0 **collapses** load (entropy 0.0001,
+one expert takes everything) and drives AMI to zero, so the balance term is load-bearing and
+"lower the balance weight" is the wrong fix. `CLAUDE.md` §2 still forbids *tuning toward*
+maximal entropy and §6 forbids reading high entropy *as* specialization — both hold — but the
+honest sentence is that the high per-token entropy is a benign property here, not the cause
+of MoRE's deficit. The cause is the depth/specialization competition (§6) and the budget
+dilution, not the router being miscalibrated.
 
 Compare against the corpus's own POS-partition load entropy, read from the manifest and
 never pasted: **0.894156 for wikitext-103** (wikitext-2 is 0.888442, and the difference
@@ -545,8 +554,9 @@ From `CLAUDE.md` §4, §6 and §8. Grep the draft for each.
   are in the metric. A FLOP ratio is not a speedup — this workload is latency-bound.
 - ✗ "proves orthogonality" from cosine similarity. Correct phrasing: *"consistent with
   differentiated parameterizations."* Report mean **and** max pairwise.
-- ✗ High entropy as evidence of specialization. In this paper it is a symptom of a
-  problem.
+- ✗ High entropy as evidence of specialization — but equally, ✗ high per-token router
+  entropy as evidence of a *broken* router (it coexists with balanced load and real AMI
+  here; see the router-entropy note).
 - ✗ Low cosine similarity as proof of orthogonality.
 - ✗ "discovers intrinsic mathematical complexity" — and no language analogue of it either.
 - ✗ Any sentinel (`-1`, `0.0` placeholder) reported as a measurement. Use `N/A`.
