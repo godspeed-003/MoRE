@@ -319,8 +319,20 @@ def main(argv=None):
             types_cache[corpus] = load_type_arrays(corpus)
         ta = types_cache[corpus]
 
-        loss, tgt, depth, pos = per_token_losses(
-            d, args.split, device, args.fixed_depth, args.corpus)
+        loss, tgt, depth, pos = (None,) * 4
+        try:
+            loss, tgt, depth, pos = per_token_losses(
+                d, args.split, device, args.fixed_depth, args.corpus)
+        except ValueError as e:
+            # A forced depth beyond this arm's max_depth: MoE has max_depth 1, so the
+            # budgeted-depth curve does not apply to it and the cell is SKIPPED, not a
+            # crash. This keeps an overnight `--fixed-depth` sweep alive once the MoE
+            # checkpoints are present -- MoE is a single compute point by construction.
+            if "fixed-depth" in str(e):
+                print(f"  skip  {arm_of(rc):5s} s{seed_of(rc)}  "
+                      f"({str(e).split('--')[1].strip() if '--' in str(e) else e})")
+                continue
+            raise
         mean_loss = float(loss.mean())
         check = verify_matches_metrics(d, mean_loss, args.split)
 
