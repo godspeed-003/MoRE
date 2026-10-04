@@ -76,6 +76,25 @@ or explicit SDPA backend selection, so nothing in the code needs an Ampere-or-ne
 packed corpus ~269 MB, and each MoRE checkpoint is ~64 MB — but the image itself plus a
 second torch install (see Phase 2) is most of it.
 
+**Pick the host on reliability, not on price.** At this scale the whole arm is ~15 GPU-hours,
+so the spread between the cheapest V100 offers is single-digit dollars — $0.06/hr and
+$0.085/hr differ by about $0.40 over the job. Host *reliability* is not a rounding error on
+the same axis: an interruption partway through a 2.6 h cell loses that cell's wall-clock,
+and the runner's resume logic deliberately re-runs any directory holding a checkpoint
+without a `metrics.json`, because a checkpoint at an unknown epoch is exactly the artifact
+that ends up in a table by accident. A 93.9%-reliability host is a worse buy than a
+98.2%-reliability host at any price difference this job can generate. Sort by reliability,
+then take the cheapest offer above ~98%.
+
+**Record the card in the artifacts, not in your memory.** `engine.py` writes
+`provenance.gpu_name`, `gpu_total_mem_gib`, `gpu_capability`, `torch_version` and
+`torch_cuda_version` into each `resolved_config.json` (this arm reads
+`Tesla V100-SXM2-16GB`, 15.766 GiB, `sm_70`, torch `2.6.0+cu124`). The MoE and MoR cells
+predate those fields and carry `None`, so for those ten the V100 16 GB attribution rests on
+the operator record in this file and nothing else — which is precisely why the fields exist
+now. Do not retrofit them into the older `resolved_config.json` files; a provenance field
+invented after the fact is worse than an absent one.
+
 ---
 
 ## Phase 2 — environment
@@ -245,7 +264,7 @@ tmux new -s more_matrix
 Inside tmux, re-export the environment (a new shell does not inherit it):
 
 ```bash
-cd /root/MoRE && export WANDB_MODE=offline && export WANDB_DIR=/root/wandb_offline
+cd /workspace/MoRE && export WANDB_MODE=offline && export WANDB_DIR=/root/wandb_offline
 ```
 
 Prove the box can train, on the dev corpus, in ~10 min:
@@ -294,7 +313,7 @@ first matrix: the checkpoints existed, were never copied off, and the box was re
 Copy them first, from your **local** machine:
 
 ```bash
-rsync -avP -e "ssh -p <PORT>" root@<IP>:/root/MoRE/runs/ ./runs_v100_backup/
+rsync -avP -e "ssh -p <PORT>" root@<IP>:/workspace/MoRE/runs/ ./runs_v100_backup/
 ```
 
 Then verify locally that you actually have 5 checkpoints before going any further:
@@ -310,6 +329,40 @@ argparse; any invocation without `--check` performs a real export and rewrites f
 ```bash
 python code/export_results.py --task language --check
 ```
+
+### Retiring the superseded cells: use `git mv`, not `mv`
+
+The new arm and the arm it supersedes are both `canonical_lang_b` cells for the same five
+seeds, so while both sit under `runs/` the exporter refuses the whole export with
+`duplicate cell ('more', 42)` and writes nothing. That refusal is the guard working — it is
+the check that stops two different architectures being averaged into one row.
+
+Retire the old five into `archive/`, and **use `git mv`**:
+
+```bash
+mkdir -p archive/pre_finalization/more_l7_1_per_step
+```
+
+```bash
+git mv runs/langB_MoRE_seed42__5c34c9dd archive/pre_finalization/more_l7_1_per_step/
+```
+
+Plain `mv` is the trap, and it was hit on this run. `mv` removes the directory from the
+working tree but leaves it in the index at the old path; `git add <newpath>` then stages the
+copy without staging the deletion. The commit therefore carries the cell at **both** paths,
+the box exports fine because its own working tree is clean, and the duplicate only appears
+on the next machine to pull — where the exporter refuses. Confirm before committing that the
+old paths are staged as deletions:
+
+```bash
+git status --short | grep '^D' | head
+```
+
+Archive, never delete (`CLAUDE.md` §6): the retired cells are the labelled ablation the new
+arm is measured against, and `depth_routeonce_vs_perstep` in `code/confirmatory_tests.json`
+is a declared comparison against exactly those five directories.
+
+Then export for real:
 
 ```bash
 python code/export_results.py --task language

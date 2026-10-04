@@ -13018,14 +13018,19 @@
       "a": "more",
       "b": "moe",
       "test": "exact two-sided randomization",
+      "holm_family_size": 4,
       "gap": -0.31596740034760007,
       "p_value": 0.007936507936507936,
-      "min_p": 0.003968253968253968,
+      "min_p": 0.007936507936507936,
       "n_perms": 252,
       "se_diff": 0.018704211624011192,
       "cohens_d": -10.683975048464696,
       "gap_over_std": 7.974202869773097,
-      "at_floor": false,
+      "holm_rank": 0,
+      "holm_threshold": 0.0125,
+      "holm_reject": true,
+      "at_floor": true,
+      "floor_above_threshold": false,
       "significant_alpha05": true
     },
     {
@@ -13034,14 +13039,19 @@
       "a": "more",
       "b": "mor",
       "test": "exact two-sided randomization",
+      "holm_family_size": 4,
       "gap": 0.11674350102742492,
       "p_value": 0.007936507936507936,
-      "min_p": 0.003968253968253968,
+      "min_p": 0.007936507936507936,
       "n_perms": 252,
       "se_diff": 0.019099310566647695,
       "cohens_d": 3.8658501727653474,
       "gap_over_std": 2.8786375418732293,
-      "at_floor": false,
+      "holm_rank": 1,
+      "holm_threshold": 0.016666666666666666,
+      "holm_reject": true,
+      "at_floor": true,
+      "floor_above_threshold": false,
       "significant_alpha05": true
     },
     {
@@ -13050,14 +13060,19 @@
       "a": "moe",
       "b": "mor",
       "test": "exact two-sided randomization",
+      "holm_family_size": 4,
       "gap": 0.432710901375025,
       "p_value": 0.007936507936507936,
-      "min_p": 0.003968253968253968,
+      "min_p": 0.007936507936507936,
       "n_perms": 252,
       "se_diff": 0.025356480143174664,
       "cohens_d": 10.792917699958375,
       "gap_over_std": 10.669697537881238,
-      "at_floor": false,
+      "holm_rank": 2,
+      "holm_threshold": 0.025,
+      "holm_reject": true,
+      "at_floor": true,
+      "floor_above_threshold": false,
       "significant_alpha05": true
     }
   ],
@@ -13137,6 +13152,22 @@
       "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
     },
     {
+      "run_dir": "langB_MoR_seed43__c1873a66",
+      "reason": "experiment_group='lang_smoke2' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "langB_MoR_seed44__14356af7",
+      "reason": "experiment_group='langB_smoke' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "langB_MoR_seed44__78580ac8",
+      "reason": "no metrics.json (run did not finish)"
+    },
+    {
+      "run_dir": "langB_MoR_seed44__78580ac8__r2",
+      "reason": "experiment_group='langB_smoke' != 'canonical_lang_b'"
+    },
+    {
       "run_dir": "langB_MoRE_seed42__1304961e",
       "reason": "no metrics.json (run did not finish)"
     },
@@ -13175,10 +13206,6 @@
     {
       "run_dir": "langB_MoRE_seed44__2ce26c0d",
       "reason": "experiment_group='lang_axes' != 'canonical_lang_b'"
-    },
-    {
-      "run_dir": "langB_MoRE_seed44__405e2629",
-      "reason": "experiment_group='langB_smoke' != 'canonical_lang_b'"
     },
     {
       "run_dir": "langB_MoRE_seed44__45a2bfbc",
@@ -13311,22 +13338,6 @@
     {
       "run_dir": "langB_MoRE_seed46__d9882139",
       "reason": "no metrics.json (run did not finish)"
-    },
-    {
-      "run_dir": "langB_MoR_seed43__c1873a66",
-      "reason": "experiment_group='lang_smoke2' != 'canonical_lang_b'"
-    },
-    {
-      "run_dir": "langB_MoR_seed44__14356af7",
-      "reason": "experiment_group='langB_smoke' != 'canonical_lang_b'"
-    },
-    {
-      "run_dir": "langB_MoR_seed44__78580ac8",
-      "reason": "no metrics.json (run did not finish)"
-    },
-    {
-      "run_dir": "langB_MoR_seed44__78580ac8__r2",
-      "reason": "experiment_group='langB_smoke' != 'canonical_lang_b'"
     },
     {
       "run_dir": "nacheck_moe__seedNA__27d97bf3",
@@ -13689,6 +13700,246 @@
       "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
     },
     {
+      "run_dir": "t67_provenance_check_seed44__6b711a59",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67_provenance_check_seed44__6b711a59__r10",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67_provenance_check_seed44__6b711a59__r11",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67_provenance_check_seed44__6b711a59__r12",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67_provenance_check_seed44__6b711a59__r13",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67_provenance_check_seed44__6b711a59__r14",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67_provenance_check_seed44__6b711a59__r15",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67_provenance_check_seed44__6b711a59__r16",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67_provenance_check_seed44__6b711a59__r17",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67_provenance_check_seed44__6b711a59__r18",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67_provenance_check_seed44__6b711a59__r19",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67_provenance_check_seed44__6b711a59__r2",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67_provenance_check_seed44__6b711a59__r20",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67_provenance_check_seed44__6b711a59__r21",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67_provenance_check_seed44__6b711a59__r22",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67_provenance_check_seed44__6b711a59__r23",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67_provenance_check_seed44__6b711a59__r24",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67_provenance_check_seed44__6b711a59__r25",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67_provenance_check_seed44__6b711a59__r26",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67_provenance_check_seed44__6b711a59__r27",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67_provenance_check_seed44__6b711a59__r28",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67_provenance_check_seed44__6b711a59__r29",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67_provenance_check_seed44__6b711a59__r3",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67_provenance_check_seed44__6b711a59__r30",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67_provenance_check_seed44__6b711a59__r31",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67_provenance_check_seed44__6b711a59__r32",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67_provenance_check_seed44__6b711a59__r33",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67_provenance_check_seed44__6b711a59__r34",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67_provenance_check_seed44__6b711a59__r35",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67_provenance_check_seed44__6b711a59__r36",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67_provenance_check_seed44__6b711a59__r37",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67_provenance_check_seed44__6b711a59__r38",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67_provenance_check_seed44__6b711a59__r39",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67_provenance_check_seed44__6b711a59__r4",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67_provenance_check_seed44__6b711a59__r40",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67_provenance_check_seed44__6b711a59__r41",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67_provenance_check_seed44__6b711a59__r42",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67_provenance_check_seed44__6b711a59__r43",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67_provenance_check_seed44__6b711a59__r44",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67_provenance_check_seed44__6b711a59__r45",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67_provenance_check_seed44__6b711a59__r46",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67_provenance_check_seed44__6b711a59__r47",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67_provenance_check_seed44__6b711a59__r48",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67_provenance_check_seed44__6b711a59__r49",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67_provenance_check_seed44__6b711a59__r5",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67_provenance_check_seed44__6b711a59__r50",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67_provenance_check_seed44__6b711a59__r51",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67_provenance_check_seed44__6b711a59__r52",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67_provenance_check_seed44__6b711a59__r53",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67_provenance_check_seed44__6b711a59__r54",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67_provenance_check_seed44__6b711a59__r55",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67_provenance_check_seed44__6b711a59__r56",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67_provenance_check_seed44__6b711a59__r57",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67_provenance_check_seed44__6b711a59__r58",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67_provenance_check_seed44__6b711a59__r59",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67_provenance_check_seed44__6b711a59__r6",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67_provenance_check_seed44__6b711a59__r60",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67_provenance_check_seed44__6b711a59__r7",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67_provenance_check_seed44__6b711a59__r8",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67_provenance_check_seed44__6b711a59__r9",
+      "reason": "no metrics.json (run did not finish)"
+    },
+    {
       "run_dir": "t67_provenance_check_seed44__c1c47354",
       "reason": "no metrics.json (run did not finish)"
     },
@@ -13713,11 +13964,235 @@
       "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
     },
     {
-      "run_dir": "t67_provenance_check_seed44__eae3d416",
+      "run_dir": "t67d_provenance_check_mor_seed44__fa9339bc",
       "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
     },
     {
-      "run_dir": "t67d_provenance_check_mor_seed44__224c7453",
+      "run_dir": "t67d_provenance_check_mor_seed44__fa9339bc__r10",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67d_provenance_check_mor_seed44__fa9339bc__r11",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67d_provenance_check_mor_seed44__fa9339bc__r12",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67d_provenance_check_mor_seed44__fa9339bc__r13",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67d_provenance_check_mor_seed44__fa9339bc__r14",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67d_provenance_check_mor_seed44__fa9339bc__r15",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67d_provenance_check_mor_seed44__fa9339bc__r16",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67d_provenance_check_mor_seed44__fa9339bc__r17",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67d_provenance_check_mor_seed44__fa9339bc__r18",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67d_provenance_check_mor_seed44__fa9339bc__r19",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67d_provenance_check_mor_seed44__fa9339bc__r2",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67d_provenance_check_mor_seed44__fa9339bc__r20",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67d_provenance_check_mor_seed44__fa9339bc__r21",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67d_provenance_check_mor_seed44__fa9339bc__r22",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67d_provenance_check_mor_seed44__fa9339bc__r23",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67d_provenance_check_mor_seed44__fa9339bc__r24",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67d_provenance_check_mor_seed44__fa9339bc__r25",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67d_provenance_check_mor_seed44__fa9339bc__r26",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67d_provenance_check_mor_seed44__fa9339bc__r27",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67d_provenance_check_mor_seed44__fa9339bc__r28",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67d_provenance_check_mor_seed44__fa9339bc__r29",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67d_provenance_check_mor_seed44__fa9339bc__r3",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67d_provenance_check_mor_seed44__fa9339bc__r30",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67d_provenance_check_mor_seed44__fa9339bc__r31",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67d_provenance_check_mor_seed44__fa9339bc__r32",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67d_provenance_check_mor_seed44__fa9339bc__r33",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67d_provenance_check_mor_seed44__fa9339bc__r34",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67d_provenance_check_mor_seed44__fa9339bc__r35",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67d_provenance_check_mor_seed44__fa9339bc__r36",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67d_provenance_check_mor_seed44__fa9339bc__r37",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67d_provenance_check_mor_seed44__fa9339bc__r38",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67d_provenance_check_mor_seed44__fa9339bc__r39",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67d_provenance_check_mor_seed44__fa9339bc__r4",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67d_provenance_check_mor_seed44__fa9339bc__r40",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67d_provenance_check_mor_seed44__fa9339bc__r41",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67d_provenance_check_mor_seed44__fa9339bc__r42",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67d_provenance_check_mor_seed44__fa9339bc__r43",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67d_provenance_check_mor_seed44__fa9339bc__r44",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67d_provenance_check_mor_seed44__fa9339bc__r45",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67d_provenance_check_mor_seed44__fa9339bc__r46",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67d_provenance_check_mor_seed44__fa9339bc__r47",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67d_provenance_check_mor_seed44__fa9339bc__r48",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67d_provenance_check_mor_seed44__fa9339bc__r49",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67d_provenance_check_mor_seed44__fa9339bc__r5",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67d_provenance_check_mor_seed44__fa9339bc__r50",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67d_provenance_check_mor_seed44__fa9339bc__r51",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67d_provenance_check_mor_seed44__fa9339bc__r52",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67d_provenance_check_mor_seed44__fa9339bc__r53",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67d_provenance_check_mor_seed44__fa9339bc__r54",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67d_provenance_check_mor_seed44__fa9339bc__r55",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67d_provenance_check_mor_seed44__fa9339bc__r56",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67d_provenance_check_mor_seed44__fa9339bc__r57",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67d_provenance_check_mor_seed44__fa9339bc__r58",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67d_provenance_check_mor_seed44__fa9339bc__r6",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67d_provenance_check_mor_seed44__fa9339bc__r7",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67d_provenance_check_mor_seed44__fa9339bc__r8",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67d_provenance_check_mor_seed44__fa9339bc__r9",
       "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
     },
     {

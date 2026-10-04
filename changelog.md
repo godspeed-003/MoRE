@@ -7544,3 +7544,146 @@ The exporter was run against the real 15 admitted cells, not only the suites: it
 reproduced the three pairwise rows above with the corrected floor, and the 30
 canonical `config_hash` values are unmoved (TLX12p), confirming that correcting
 prose inside the frozen spec notes does not touch any run's identity.
+
+---
+
+## T-LX.19 — the route-once MoRE arm landed; the adaptive-depth hypothesis is falsified
+
+**Task.** Re-run the five canonical `canonical_lang_b` MoRE cells with
+`model.routing_persistence = "per_token"` (T-LX.12), retire the five per-step
+cells into `archive/`, and regenerate `results/language/`.
+
+### What the artifacts say
+
+All five new cells are canonical and the fix is verifiable at the artifact
+level: `dispatch/routing_persistence = "per_token"`,
+`dispatch/router_calls_per_dispatch = 0.142857` (= 1/7) with **zero** variance
+across seeds, `variant = "language"` (not `language+route_per_step`),
+`total_params = 5,584,908`,
+`dataset_version = lang-wikitext-103-bpe8192-len256-800d6154`.
+A seed-blind diff of `resolved_config.json` against the retired per-step cells
+returns exactly three fields: `model.routing_persistence` and the two
+`provenance.torch_*` keys that did not exist when the old cells ran. **There is
+no config confound**; the effects below are the routing-persistence axis and
+nothing else.
+
+`provenance.gpu_name = "Tesla V100-SXM2-16GB"`, `gpu_capability = "7.0"`,
+`torch_version = "2.6.0+cu124"` are recorded for the first time. The ten MoE/MoR
+cells carry `None` in those fields and their V100 attribution rests on the
+operator record in `RUNBOOK_V100.md` Phase 1. Do not retrofit them.
+
+### The headline, on `val/task_loss` (nats/token, lower better, n = 5)
+
+| arm | val/task_loss | ppl | depth/mean | halt early-exit | rho(depth, token loss) | items/s |
+|---|---|---|---|---|---|---|
+| MoE | 3.9529 +- 0.0396 | 52.12 | N/A (max_depth 1) | N/A | N/A | 718.8 +- 7.2 |
+| **MoR** | **3.5202 +- 0.0406** | **33.81** | 6.617 +- 0.439 | **26.7% +- 29.6%** | **+0.2953 +- 0.0553** | 173.8 +- 6.3 |
+| MoRE route-once | 3.6370 +- 0.0134 | 37.98 | 6.955 +- 0.004 | 2.66% +- 0.75% | -0.0230 +- 0.0115 | 97.0 +- 1.0 |
+| *MoRE per-step (retired)* | *3.5031 +- 0.0133* | *33.22* | *6.965 +- 0.012* | *1.94% +- 0.30%* | *-0.0154 +- 0.0186* | *168.5 +- 2.5* |
+
+Holm over the declared family of 4 in `code/confirmatory_tests.json`: all three
+pairwise comparisons reject, each with p = 0.00794 **at the resolution floor**
+(T-LX.18). MoRE - MoE -0.3160 (d -10.68, thr 0.0125); MoRE - MoR **+0.1167**
+(d +3.87, thr 0.0167); MoE - MoR +0.4327 (d +10.79, thr 0.0250).
+
+### Three findings, in descending order of how much they change the paper
+
+**1. `depth_routeonce_vs_perstep` is falsified, and T-LX.11's diagnosis was
+wrong.** T-LX.11 attributed MoRE's absent adaptive depth to per-step
+re-routing. Routing once per token did not restore alignment:
+rho(depth, per-token loss) went -0.0154 +- 0.0186 -> **-0.0230 +- 0.0115**, i.e.
+it stayed at zero and did not even change sign. The actual cause is visible in
+the halting block and was present in both variants: `halt/forced_exit_rate` is
+0.9806 (per-step) and 0.9734 (route-once), `depth/hist/step_7` is 97.85% of
+validation tokens, and `halt/mean_remainder` is 0.61-0.65 against MoR's 0.170.
+**MoRE's halt head never accumulates enough halt mass to exit**, so there is
+almost no depth variance for any correlation to find. Per-step re-routing was a
+real spec violation and was right to fix, but it was never the binding
+constraint on adaptivity.
+
+**2. MoRE is significantly worse than MoR, and fixing the architecture made it
+worse.** The per-step arm was statistically indistinguishable from MoR
+(+0.0172, p = 0.4048 - a genuine null). The architecturally-canonical route-once
+arm is **+0.1167 worse** than MoR at d = +3.87, p at floor. Mechanism, stated
+as a hypothesis and not as a measurement: per-step re-routing lets a token
+traverse up to 7 *different* expert FFNs, which is a heterogeneous 7-layer
+composition rather than one block iterated; route-once applies a single expert's
+FFN 7 times, so it is strictly less expressive, and each of the six experts sees
+~1/6 of the tokens within the same frozen 3-epoch budget while MoR's single
+block trains on all of them. This makes the per-step arm's apparent parity with
+MoR an artifact of accidental extra expressiveness, which is a result worth
+reporting as such.
+
+**3. The router sits at the entropy ceiling and the balance loss is why.**
+`train/entropy_term_normalized = 0.9999 +- 0.0000` for MoRE against
+`0.9024 +- 0.0342` for MoE, and `train/routing_balance_loss = -0.7822 +- 0.0012`
+against MoE's `+0.1235 +- 0.2556`. A normalized entropy of 0.9999 means the
+router softmax is **near-uniform over six experts**, so Top-1 argmax selects
+among six near-tied logits and the selected gate probability multiplying the
+expert output is ~1/6 for nearly every token. This is the failure mode
+`CLAUDE.md` section 2 names ("never tune blindly toward maximal entropy") and
+section 6 prohibits reading as specialization. MoE, under less entropy pressure,
+routes *more* informatively (Hungarian 0.394 +- 0.019 vs 0.359 +- 0.027, control
+delta_z 9.96 vs 5.44).
+
+**The one unambiguous positive.** Expert specialization is real in both sparse
+arms, against proper permutation controls: MoRE AMI 0.1803 +- 0.0246 with
+`ami_delta_z = 13.43 +- 3.87`, purity 0.4712 +- 0.0260 (above MoE's 0.4495),
+Hungarian 0.3592 +- 0.0271 at `delta_z = 5.44`, `collapsed_experts = none`,
+`max_load_fraction = 0.4478 +- 0.0171`. Experts do differentiate along
+POS-aligned lines well beyond chance. It simply does not buy predictive quality
+at this scale.
+
+**Throughput is an implementation cost, not a compute cost.** Route-once makes
+7x fewer router calls and exits early *more* often (2.66% vs 1.94%), so it does
+strictly less arithmetic than per-step - yet throughput fell 168.5 -> 97.0
+items/s, a 1.74x regression. That is overhead in the persistent per-token
+dispatch path, not extra work. MoRE is 7.4x slower per item than MoE for worse
+loss than MoR.
+
+### Export hygiene - the `mv` trap
+
+The box retired the old cells with plain `mv`, which removes a directory from
+the working tree but leaves it in the index at the old path. `git add <newpath>`
+then stages the copy without the deletion, so commit `9ec8798` carried each
+retired cell at **both** `runs/` and `archive/...`. The box's own export
+succeeded (its working tree was clean); the duplication only surfaced on pull,
+where `export_results.py` refused the entire export with
+`duplicate cell ('more', 42)` through `('more', 46)` and wrote nothing. **The
+guard worked exactly as designed** - it is what stops two architectures being
+averaged into one row. Resolved by `git rm -r` on the five `runs/` paths after
+confirming all four files in all five directories are byte-identical (SHA-256)
+to the `archive/` copies, so no evidence was lost. `RUNBOOK_V100.md` Phase 6
+now mandates `git mv` and a `git status --short` deletion check.
+
+### Open, and the cheapest next experiment
+
+The entropy ceiling is the one finding with a cheap falsifiable test: sweep the
+balance-loss weight as a **labelled ablation** (never as a change to canonical,
+`CLAUDE.md` section 6). If 0.9999 is an artifact of over-weighting rather than a
+property of the task, the router should sharpen and part of the MoRE-MoR deficit
+should close. If it does not, Outcome C stands on firmer ground than it does
+today. The halt-mass collapse is the second axis and is consistent with
+T-LX.14's measured 285x task-dominance of the halt gradient.
+
+Family A test 4 (`more_vs_depth_matched_fixed`) is still unrun and still
+consumes its Holm slot, as declared.
+
+**Failure tracing.**
+- *Exporter refuses with `duplicate cell`* -> two `canonical_lang_b` cells for
+  one `(arch, seed)` under `runs/`. Retire one with `git mv`; see the Phase 6
+  note in `RUNBOOK_V100.md`.
+- *`router_calls_per_dispatch` reads 1.0 on a MoRE run* -> `routing_persistence`
+  did not reach the model; `code/more/model.py` dispatch path.
+- *rho(depth, loss) ~ 0 on a recursive arm* -> read `halt/forced_exit_rate` and
+  `halt/mean_remainder` **first**. Above ~0.95 and ~0.6 respectively there is no
+  depth variance to correlate and the correlation is uninformative, not negative
+  evidence about allocation.
+- *A MoRE arm's normalized entropy reads ~1.0* -> the balance loss is dominating
+  the router; `code/more/losses.py` and the entropy term's weight.
+
+**Verified by.**
+- `python code/export_results.py --task language --check` -> `admitted: 15
+  refused: 299`, consistency clean.
+- `python code/export_results.py --task language` -> `results/language/` regenerated.
+- `python code/run_correctness_suite.py` -> `TOTAL 356 356 0 0`, all five gates PASS.
