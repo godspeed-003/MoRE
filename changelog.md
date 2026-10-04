@@ -7690,6 +7690,107 @@ consumes its Holm slot, as declared.
 
 ---
 
+## T-LX.20 (results) / T-LX.21 — the balance-loss diagnosis is falsified; stratified eval harness
+
+Two things landed together: the T-LX.20 weight sweep returned, and `code/eval_stratified.py`
+was written for the per-token-loss evaluations the ACL submission needs.
+
+### T-LX.20 sweep result -- it overturns the T-LX.19 reading of the entropy ceiling
+
+Eight points on the CANONICAL corpus, seed 44, 3 epochs (`code/lang_sweep_tlx20.json`).
+EXPLORATORY: `subset_fraction < 1` and one seed, so these pick a hypothesis and may never be
+quoted as a canonical result.
+
+The balance axis, with the routing-balance term switched fully OFF:
+
+    balance 0.0     val 4.3632   load_entropy 0.0001   AMI 0.000
+    balance 1e-4    val 4.2856   load_entropy 0.0585   AMI 0.017
+    balance 1e-3    val 4.5124   load_entropy 0.0106   AMI 0.001   (canonical weight)
+
+T-LX.19 claimed the balance loss over-drove the router to near-uniform
+(`entropy_term_normalized = 0.9999`) and proposed lowering it. **The prescription is not
+supported and the diagnosis is withdrawn**, with one honesty caveat on the regime. The
+sweep ran at subset 0.1, not the full corpus where the 0.9999 was observed, so this is
+directional, not a point-for-point refutation. What it shows: with the balance term at 0.0
+the expert LOAD collapses (`load_entropy 0.0001`, one expert takes everything) and AMI falls
+to 0.000 -- no specialization at all. Lowering the weight moves TOWARD collapse, not away
+from it, so "lower the balance weight to fix the router" is the wrong direction. The deeper
+error in T-LX.19 was conflating two different quantities: `entropy_term_normalized` is the
+PER-TOKEN router-output entropy (0.9999 on the full corpus), while
+`expert_load_entropy_normalized` is the aggregate LOAD entropy (0.9582) -- and AMI is a
+healthy 0.18 above its permutation control. A near-maximal per-token entropy coexisting with
+balanced load and real specialization is not a balance-loss pathology, so T-LX.19 finding 3
+("the router sits at the entropy ceiling and the balance loss is why") is withdrawn.
+
+The depth story from T-LX.20's premise HOLDS and sharpens. Every reduced-data point in the
+sweep shows `forced_exit_rate` ~ 0.0 and `depth_mean` 1.8-4.0 -- genuinely adaptive -- while
+the full-corpus canonical arm is 97.3% forced at depth 6.96. So the ponder weight DOES
+produce adaptive depth; full-corpus training is what saturates it. HONEST LIMIT: the subset
+axis is NOT cleanly monotone (0.025 -> 2.43, 0.1 -> 1.92, 0.4 -> 1.97, 1.0 -> 6.96), so the
+paper says "saturation emerges between 40% and 100% of the data", not "depth is monotone in
+steps". One seed; no error bars; directional only. A second coupling appears: AMI is high
+(0.276) only at the smallest subset and collapses as data grows, so specialization and
+training amount trade off as well as specialization and depth (T-LX.19 finding on the dev
+grid).
+
+### T-LX.21 -- eval_stratified.py, one script for three evaluations
+
+`code/eval_stratified.py`: load a checkpoint, one forward pass, emit PER-TOKEN loss, group
+it. Difficulty-stratified loss (by frequency decile), the held-out test split (`--split
+test`) and the budgeted-inference curve (`--fixed-depth d`) are the same operation with a
+different split, grouping or forced depth, so they are one script, not three. Out-of-domain
+perplexity is the same operation on a corpus packed with the SAME tokenizer (`--corpus`), not
+implemented until such a corpus exists; BLiMP is a separate harness (minimal-pair scoring,
+not single-corpus grouping) and is not yet written.
+
+Reuses `eval_test_split.build_model` -- including its T-LX.12 `routing_persistence` legacy
+fallback, without which a checkpoint's `state_dict` loads cleanly while the forward pass
+differs and the number describes a model that never trained.
+
+Three alignment rules the file enforces, each of which silently corrupts the table if
+broken: (1) stratify by the TARGET token id `x[:, 1:]`, not the input -- difficulty is a
+property of what must be predicted, and `token_decile.npy`/`token_family.npy` are per-type
+arrays; (2) the population is every position except each block's last, identical to
+`depth/hist`, so depth columns align; (3) `reduction="none"`, since a per-batch mean cannot
+be regrouped. Correctness check built in: on the val split the recomputed mean per-token loss
+must reproduce the run's published `val/task_loss`, and it does to < 2e-3.
+
+First run (MoRE only -- the only arm with surviving checkpoints): recomputed val loss matches
+published to 7 figures; loss rises monotonically across frequency deciles (easy -> hard) as
+it must; and `depth_by_decile` is FLAT at ~6.96 across every decile. MoRE spends identical
+compute on the easiest and hardest tokens. Per the file's own caveat, that flatness is the
+halting collapse (T-LX.19/T-LX.20), not a statement about the routing architecture, and must
+be reported as such.
+
+A three-arm stratified COMPARISON is blocked on the MoE and MoR checkpoints, which were lost
+with the first V100 (only metrics were committed, not weights). Those two arms must be
+retrained before the headline stratified table exists -- see below.
+
+### Retrain safety -- the runbooks now archive before training
+
+The MoE/MoR retrain hits two traps that `RUNBOOK_ACL_4060.md` §4 now orders correctly:
+(1) the runner skips a cell that is already complete, so the ten lost-weight cells must be
+`git mv`-d into `archive/pre_finalization/lang_v100_no_checkpoints/` BEFORE training or
+`--arch moe` trains nothing; (2) `git mv`, never `mv`, or the cell is committed at both the
+old and new path and the duplicate only surfaces on the next pull (the T-LX.19 trap).
+`RUNBOOK_V100.md`'s "do not re-run MoE/MoR" instruction is explicitly superseded for this
+job, since it was written for the completed MoRE-only re-run.
+
+**Failure tracing.**
+- *Stratified loss looks wrong but no error* -> check stratification is by the target id
+  `x[:, 1:]`, not the input; `code/eval_stratified.py` `per_token_losses`.
+- *Recomputed val loss != published* -> alignment or population bug; the `MISMATCH` line in
+  `verify_matches_metrics` fires below 2e-3 tolerance.
+- *`--arch moe` trains nothing on the retrain* -> the lost-weight cells were not archived
+  first; `RUNBOOK_ACL_4060.md` §4 step zero.
+- *Depth flat across deciles read as a routing finding* -> it is the halting collapse; see
+  the `depth_caveat` field in the output JSON.
+
+**Verified by.**
+- `python automated/sweep_tlx20_weights.py` -> 8/8 points, `code/lang_sweep_tlx20.json`.
+- `python code/eval_stratified.py` -> `results/language/stratified_val.json`, recomputed val
+  loss reproduces published `val/task_loss` to < 2e-3 on all cells with a checkpoint.
+
 ## T-LA.1 — MoE weights recovered on the 4060; the MoR retrain was a silent no-op as documented
 
 **Date.** 2026-10-04. **Machine.** Ayan's RTX 4060 8 GB (`C:\Users\Hp`), interpreter
@@ -7800,11 +7901,17 @@ d −10.68 → **−15.92**, `MoE − MoR` d +10.79 → **+12.82**; `MoRE − Mo
 added after those files were written; 0 fail / 0 skip, so this is doc drift, not a
 regression. Both files updated.
 
-`code/lang_sweep_tlx20.json` is **absent** — the T-LX.20 weight sweep on Vedant's 3050 has
-produced no rows that have reached this machine. Per `PAPER_GUIDE.md` §9 and
-`RUNBOOK_ACL_4060.md` §9, §6 Cause 2 and Cause 3 of the paper must therefore be written from
-the dev-corpus grid in `code/lang_calibration_weights.json`, stating explicitly that the
-canonical-corpus confirmation was not run.
+`code/lang_sweep_tlx20.json` was **absent when this work started** and arrived in the same
+merge, from Vedant's T-LX.21 commit `bca2bb1`. **Superseded: ignore the contingency below.**
+§6 Cause 2 and Cause 3 of the paper are now written from the canonical-corpus sweep, not the
+dev-corpus grid — which is the strengthening `PAPER_GUIDE.md` §9 anticipated. Two consequences
+for anything drafted against the pre-merge state: the ponder weight **does** produce adaptive
+depth (every reduced-data point runs `forced_exit_rate ≈ 0` at depth 1.8–4.0 while the
+full-corpus arm is 97.3% forced at 6.96, so saturation is a data-scale effect, phrased
+"emerges between 40% and 100% of the data" because the subset axis is not monotone), and the
+T-LX.19 balance-loss prescription is **withdrawn** — lowering the balance weight moves toward
+load collapse, and the 0.9999 figure is per-token router entropy, not the aggregate load
+entropy of 0.9582. Do not write "high entropy is a balance-loss pathology."
 
 **Failure tracing.**
 - *A matrix launch prints `nothing to do` and exits 0 when cells visibly lack weights* →

@@ -19,6 +19,17 @@ exactly what `CLAUDE.md` §9 refuses for the seed matrix. **Rent a V100.**
 
 ## What is actually being run, and what is not
 
+> **SUPERSEDED FOR THE RETRAIN JOB (T-LX.21, 2026-10-04).** The table below described the
+> MoRE-only re-run. That re-run is **done** — the five route-once MoRE cells are trained,
+> committed and carry their checkpoints. The job now is the opposite: **the MoE and MoR
+> language checkpoints were lost** (committed metrics but not weights, then the box was
+> released), so **MoE and MoR must be re-trained** and MoRE must **not**. The authoritative
+> plan for that is [RUNBOOK_ACL_4060.md](RUNBOOK_ACL_4060.md) §4 — it applies verbatim on a
+> V100 too, only the interpreter path changes. In particular: **archive the ten lost-weight
+> cells with `git mv` BEFORE training, or the runner sees them as complete and trains
+> nothing**, and run `--arch moe` then `--arch mor` (never `--arch more`). Read that section
+> before the per-arm instructions here, which are now historical.
+
 | arm | cells on disk | status after T-LX.12 | action |
 |---|---|---|---|
 | MoE | 5 | canonical, untouched — no protocol field moved | **keep. Do not re-run.** |
