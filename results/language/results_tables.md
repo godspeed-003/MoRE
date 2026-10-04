@@ -10,18 +10,19 @@ numbers out of a run directory into this file -- regenerate it.
 - baseline floor on val: `4.984947` nats/token -- the backoff BIGRAM (T-L2.5), = 7.1918 bits, perplexity 146.2. A run that does not beat it has learned nothing a two-column count table could not. The derived columns below are monotone transforms of the nats; no verdict is taken on them.
 - **this is a per-token cross-entropy and the arithmetic tables are a mean squared error. They may never appear in one table (CLAUDE.md 6).**
 - admitted runs: MoE 5/5 (seeds [42, 43, 44, 45, 46]), MoR 5/5 (seeds [42, 43, 44, 45, 46]), MoRE 5/5 (seeds [42, 43, 44, 45, 46])
-- git commits of the admitted runs: **4 distinct commits** across 15 cells. A canonical matrix is frozen by `canonical_spec_language.json`, not by a single code revision; the seed-blind config equality check below is what holds the arms comparable. Listed newest-directory-first:
-  - `29fe5892fb3b09fc9be4c23c5c628d71c322bdb7` (dirty=True) -- 5 cell(s): MoE s42, MoE s43, MoE s44, MoE s45, MoE s46
+- git commits of the admitted runs: **5 distinct commits** across 15 cells. A canonical matrix is frozen by `canonical_spec_language.json`, not by a single code revision; the seed-blind config equality check below is what holds the arms comparable. Listed newest-directory-first:
+  - `2eee856bf6f16e8fbc69a251f6e2de97f124f156` (dirty=False) -- 1 cell(s): MoE s42
+  - `2eee856bf6f16e8fbc69a251f6e2de97f124f156` (dirty=True) -- 4 cell(s): MoE s43, MoE s44, MoE s45, MoE s46
   - `079de08a2dc17d754173f1f62f1cf0af412a16a4` (dirty=True) -- 1 cell(s): MoR s42
   - `f464c966b5f3921daa7e386d3470e11f1af89cb4` (dirty=True) -- 4 cell(s): MoR s43, MoR s44, MoR s45, MoR s46
   - `681622892fbd5d559b05bbe5d75d7667535da968` (dirty=True) -- 5 cell(s): MoRE s42, MoRE s43, MoRE s44, MoRE s45, MoRE s46
-- refused directories: 299 (listed at the end; a refusal is the admission filter working)
+- refused directories: 205 (listed at the end; a refusal is the admission filter working)
 
 ## 1. Headline
 
 | architecture | val/task_loss (mean +- std) | best_val_loss (secondary) | bits/token | perplexity | margin vs floor (nats) | params |
 |---|---|---|---|---|---|---|
-| MoE | 3.952933 +- 0.039624 | 3.952933 +- 0.039624 | 5.7029 | 52.09 | +1.0320 | 5,584,908 |
+| MoE | 3.948311 +- 0.024202 | 3.948311 +- 0.024202 | 5.6962 | 51.85 | +1.0366 | 5,584,908 |
 | MoR | 3.520222 +- 0.040555 | 3.520222 +- 0.040555 | 5.0786 | 33.79 | +1.4647 | 5,581,063 |
 | MoRE | 3.636966 +- 0.013387 | 3.636966 +- 0.013387 | 5.2470 | 37.98 | +1.3480 | 5,584,908 |
 
@@ -39,9 +40,9 @@ selection bias stays checkable; it is never the headline.
 
 | pair | gap | se(diff) | Cohen d | p (exact) | min_p | Holm thr | verdict |
 |---|---|---|---|---|---|---|---|
-| MoRE - MoE | -0.315967 | 0.018704 | -10.68 | 0.0079 | 0.00794 | 0.01250 | SIGNIFICANT (AT RESOLUTION FLOOR) |
+| MoRE - MoE | -0.311346 | 0.012369 | -15.92 | 0.0079 | 0.00794 | 0.01250 | SIGNIFICANT (AT RESOLUTION FLOOR) |
 | MoRE - MoR | +0.116744 | 0.019099 | +3.87 | 0.0079 | 0.00794 | 0.01667 | SIGNIFICANT (AT RESOLUTION FLOOR) |
-| MoE - MoR | +0.432711 | 0.025356 | +10.79 | 0.0079 | 0.00794 | 0.02500 | SIGNIFICANT (AT RESOLUTION FLOOR) |
+| MoE - MoR | +0.428089 | 0.021121 | +12.82 | 0.0079 | 0.00794 | 0.02500 | SIGNIFICANT (AT RESOLUTION FLOOR) |
 
 Exact two-sided randomization test (`code/seed_stats.py`); no k x std
 threshold is used anywhere (superseded, T11.0b). `min_p` is the smallest
@@ -85,13 +86,13 @@ Non-scalar metrics (the routing confusion matrix, the Hungarian assignment
 vector) are not table cells and are not shown here; they are carried in
 `results.json` under each run's `metrics_nonscalar`.
 
-21 of the 210 keys in the union are `N/A` in **all 3 columns** and are listed in the footnote below instead of being rendered as a row of `N/A` (T-LX.5). They remain in `results.csv`, `results_aggregate.csv` and every run's `metrics.json` unchanged. **No key is dropped for being `N/A` in only some columns** -- that asymmetry is the point of the table.
+21 of the 233 keys in the union are `N/A` in **all 3 columns** and are listed in the footnote below instead of being rendered as a row of `N/A` (T-LX.5). They remain in `results.csv`, `results_aggregate.csv` and every run's `metrics.json` unchanged. **No key is dropped for being `N/A` in only some columns** -- that asymmetry is the point of the table.
 
 ### `(no prefix)`
 
 | metric | MoE | MoR | MoRE |
 |---|---|---|---|
-| `best_val_loss` | 3.9529 +- 0.0396 | 3.5202 +- 0.0406 | 3.6370 +- 0.0134 |
+| `best_val_loss` | 3.9483 +- 0.0242 | 3.5202 +- 0.0406 | 3.6370 +- 0.0134 |
 | `embedding_params` | 2162688.0000 +- 0.0000 | 2162688.0000 +- 0.0000 | 2162688.0000 +- 0.0000 |
 | `epoch` | 3.0000 +- 0.0000 | 3.0000 +- 0.0000 | 3.0000 +- 0.0000 |
 | `non_embedding_params` | 3422220.0000 +- 0.0000 | 3418375.0000 +- 0.0000 | 3422220.0000 +- 0.0000 |
@@ -171,8 +172,8 @@ vector) are not table cells and are not shown here; they are carried in
 
 | metric | MoE | MoR | MoRE |
 |---|---|---|---|
-| `diag/max_pairwise_cosine_sim` | 0.0545 +- 0.0075 | N/A | 0.0968 +- 0.0047 |
-| `diag/mean_pairwise_cosine_sim` | 0.0291 +- 0.0036 | N/A | 0.0791 +- 0.0036 |
+| `diag/max_pairwise_cosine_sim` | 0.0572 +- 0.0097 | N/A | 0.0968 +- 0.0047 |
+| `diag/mean_pairwise_cosine_sim` | 0.0304 +- 0.0043 | N/A | 0.0791 +- 0.0036 |
 
 ### `dispatch`
 
@@ -181,7 +182,7 @@ vector) are not table cells and are not shown here; they are carried in
 | `dispatch/evals_per_token` | 1.0000 +- 0.0000 | 1.0000 +- 0.0000 | 1.0000 +- 0.0000 |
 | `dispatch/expert_evaluations` | 134737920.0000 +- 0.0000 | 875485355.0000 +- 82334154.9218 | 933321286.4000 +- 734318.6509 |
 | `dispatch/experts_called_max` | 6.0000 +- 0.0000 | 1.0000 +- 0.0000 | 6.0000 +- 0.0000 |
-| `dispatch/max_load_fraction` | 0.6858 +- 0.0629 | 1.0000 +- 0.0000 | 0.4478 +- 0.0171 |
+| `dispatch/max_load_fraction` | 0.7639 +- 0.0700 | 1.0000 +- 0.0000 | 0.4478 +- 0.0171 |
 | `dispatch/overflow_rate` | 0.0000 +- 0.0000 | 0.0000 +- 0.0000 | 0.0000 +- 0.0000 |
 | `dispatch/overflow_tokens` | 0.0000 +- 0.0000 | 0.0000 +- 0.0000 | 0.0000 +- 0.0000 |
 | `dispatch/router_calls` | N/A | N/A | 10965.0000 +- 0.0000 |
@@ -193,12 +194,12 @@ vector) are not table cells and are not shown here; they are carried in
 
 | metric | MoE | MoR | MoRE |
 |---|---|---|---|
-| `expert_load/expert_0_pct` | 19.0912 +- 25.5157 | 100.0000 +- 0.0000 | 16.3326 +- 6.8841 |
-| `expert_load/expert_1_pct` | 24.7616 +- 24.0396 | N/A | 14.1315 +- 1.3221 |
-| `expert_load/expert_2_pct` | 39.2430 +- 24.8250 | N/A | 19.4930 +- 8.2765 |
-| `expert_load/expert_3_pct` | 6.1662 +- 4.8264 | N/A | 21.2478 +- 9.1859 |
-| `expert_load/expert_4_pct` | 4.8928 +- 4.0521 | N/A | 15.6273 +- 9.3332 |
-| `expert_load/expert_5_pct` | 5.8452 +- 6.0244 | N/A | 13.1678 +- 2.3403 |
+| `expert_load/expert_0_pct` | 35.3438 +- 36.0542 | 100.0000 +- 0.0000 | 16.3326 +- 6.8841 |
+| `expert_load/expert_1_pct` | 21.0963 +- 26.9503 | N/A | 14.1315 +- 1.3221 |
+| `expert_load/expert_2_pct` | 27.9144 +- 29.5037 | N/A | 19.4930 +- 8.2765 |
+| `expert_load/expert_3_pct` | 7.7208 +- 5.5494 | N/A | 21.2478 +- 9.1859 |
+| `expert_load/expert_4_pct` | 3.5063 +- 2.1848 | N/A | 15.6273 +- 9.3332 |
+| `expert_load/expert_5_pct` | 4.4185 +- 3.4856 | N/A | 13.1678 +- 2.3403 |
 
 ### `halt`
 
@@ -217,14 +218,14 @@ vector) are not table cells and are not shown here; they are carried in
 |---|---|---|---|
 | `perf/gpu_peak_alloc_gib` | N/A | 7.3346 +- 0.2905 | 3.8441 +- 0.0022 |
 | `perf/gpu_peak_reserved_gib` | N/A | 7.7949 +- 0.2705 | 4.3578 +- 0.0186 |
-| `perf/throughput_items_sec` | 718.8116 +- 7.2022 | 173.7715 +- 6.3370 | 96.9804 +- 0.9758 |
+| `perf/throughput_items_sec` | 335.4724 +- 6.9394 | 173.7715 +- 6.3370 | 96.9804 +- 0.9758 |
 | `perf/throughput_tokens_sec` | N/A | 44485.5120 +- 1622.2804 | 24826.9878 +- 249.8132 |
 
 ### `probe`
 
 | metric | MoE | MoR | MoRE |
 |---|---|---|---|
-| `probe/family_ce` | 1.9087 +- 0.0727 | 1.8835 +- 0.0350 | 1.9249 +- 0.0407 |
+| `probe/family_ce` | 1.8656 +- 0.0685 | 1.8835 +- 0.0350 | 1.9249 +- 0.0407 |
 
 ### `prov`
 
@@ -247,99 +248,122 @@ vector) are not table cells and are not shown here; they are carried in
 
 | metric | MoE | MoR | MoRE |
 |---|---|---|---|
-| `train/aux_routing_loss` | 0.1235 +- 0.2556 | N/A | -0.7822 +- 0.0012 |
+| `train/aux_routing_loss` | 0.2321 +- 0.4271 | N/A | -0.7822 +- 0.0012 |
 | `train/avg_recursion_steps` | N/A | 6.5935 +- 0.4669 | 6.9309 +- 0.0042 |
-| `train/balance_to_task_ratio` | 0.0000 +- 0.0000 | N/A | 0.0002 +- 0.0000 |
+| `train/balance_to_task_ratio` | 0.0001 +- 0.0001 | N/A | 0.0002 +- 0.0000 |
 | `train/classification_loss` | 0.0000 +- 0.0000 | 0.0000 +- 0.0000 | 0.0000 +- 0.0000 |
-| `train/entropy_term` | 1.6168 +- 0.0613 | N/A | 1.7915 +- 0.0001 |
-| `train/entropy_term_normalized` | 0.9024 +- 0.0342 | N/A | 0.9999 +- 0.0000 |
-| `train/expert_load_entropy_normalized` | 0.6515 +- 0.0852 | N/A | 0.9582 +- 0.0061 |
+| `train/entropy_term` | 1.6263 +- 0.0665 | N/A | 1.7915 +- 0.0001 |
+| `train/entropy_term_normalized` | 0.9077 +- 0.0371 | N/A | 0.9999 +- 0.0000 |
+| `train/expert_load_entropy_normalized` | 0.6003 +- 0.1326 | N/A | 0.9582 +- 0.0061 |
 | `train/family_cls_loss` | 0.0000 +- 0.0000 | 0.0000 +- 0.0000 | 0.0000 +- 0.0000 |
 | `train/halting_loss` | N/A | 0.8335 +- 0.0829 | 0.9477 +- 0.0015 |
 | `train/ponder_cost` | N/A | 0.8335 +- 0.0829 | 0.9477 +- 0.0015 |
-| `train/routing_balance_loss` | 0.1235 +- 0.2556 | N/A | -0.7822 +- 0.0012 |
-| `train/step_routing_loss` | 0.5976 +- 0.0209 | 0.5651 +- 0.0105 | 0.5953 +- 0.0121 |
-| `train/switch_aux_term` | 1.7403 +- 0.1977 | N/A | 1.0093 +- 0.0011 |
-| `train/task_loss` | 4.1050 +- 0.0383 | 3.6806 +- 0.0499 | 3.7537 +- 0.0159 |
-| `train/total_loss` | 4.1052 +- 0.0386 | 3.6814 +- 0.0498 | 3.7539 +- 0.0159 |
+| `train/routing_balance_loss` | 0.2321 +- 0.4271 | N/A | -0.7822 +- 0.0012 |
+| `train/step_routing_loss` | 0.5833 +- 0.0172 | 0.5651 +- 0.0105 | 0.5953 +- 0.0121 |
+| `train/switch_aux_term` | 1.8584 +- 0.3606 | N/A | 1.0093 +- 0.0011 |
+| `train/task_loss` | 4.1008 +- 0.0302 | 3.6806 +- 0.0499 | 3.7537 +- 0.0159 |
+| `train/total_loss` | 4.1011 +- 0.0306 | 3.6814 +- 0.0498 | 3.7539 +- 0.0159 |
 
 ### `val`
 
 | metric | MoE | MoR | MoRE |
 |---|---|---|---|
 | `val/avg_recursion_steps` | N/A | 6.7775 +- 0.4916 | 7.6152 +- 0.0142 |
-| `val/bits_per_token` | 5.7029 +- 0.0572 | 5.0786 +- 0.0585 | 5.2470 +- 0.0193 |
+| `val/bits_per_token` | 5.6962 +- 0.0349 | 5.0786 +- 0.0585 | 5.2470 +- 0.0193 |
 | `val/early_exit_rate` | N/A | 0.2069 +- 0.2031 | 0.0191 +- 0.0042 |
 | `val/forced_exit_rate` | N/A | 0.7931 +- 0.2031 | 0.9809 +- 0.0042 |
-| `val/loss` | 3.9529 +- 0.0396 | 3.5202 +- 0.0406 | 3.6370 +- 0.0134 |
+| `val/loss` | 3.9483 +- 0.0242 | 3.5202 +- 0.0406 | 3.6370 +- 0.0134 |
 | `val/mean_remainder` | N/A | 0.1788 +- 0.0554 | 0.6810 +- 0.0125 |
-| `val/nats_below_bigram_floor` | 1.0320 +- 0.0396 | 1.4647 +- 0.0406 | 1.3480 +- 0.0134 |
-| `val/perplexity` | 52.1208 +- 2.0805 | 33.8143 +- 1.3778 | 37.9792 +- 0.5080 |
-| `val/routing_agreement_with_pos` | 0.1617 +- 0.0734 | N/A | 0.2009 +- 0.0526 |
-| `val/routing_ami` | 0.1615 +- 0.0231 | N/A | 0.1803 +- 0.0246 |
-| `val/routing_control_pos/ami_control_mean` | 0.0228 +- 0.0145 | N/A | 0.0249 +- 0.0055 |
-| `val/routing_control_pos/ami_control_std` | 0.0118 +- 0.0048 | N/A | 0.0123 +- 0.0039 |
-| `val/routing_control_pos/ami_delta` | 0.1387 +- 0.0106 | N/A | 0.1555 +- 0.0259 |
-| `val/routing_control_pos/ami_delta_z` | 13.5968 +- 5.9935 | N/A | 13.4268 +- 3.8659 |
-| `val/routing_control_pos/ami_real` | 0.1615 +- 0.0231 | N/A | 0.1803 +- 0.0246 |
-| `val/routing_control_pos/hungarian_accuracy_control_mean` | 0.2888 +- 0.0111 | N/A | 0.2464 +- 0.0099 |
-| `val/routing_control_pos/hungarian_accuracy_control_std` | 0.0110 +- 0.0026 | N/A | 0.0211 +- 0.0036 |
-| `val/routing_control_pos/hungarian_accuracy_delta` | 0.1056 +- 0.0246 | N/A | 0.1128 +- 0.0364 |
-| `val/routing_control_pos/hungarian_accuracy_delta_z` | 9.9588 +- 3.1683 | N/A | 5.4412 +- 1.9336 |
-| `val/routing_control_pos/hungarian_accuracy_real` | 0.3944 +- 0.0185 | N/A | 0.3592 +- 0.0271 |
+| `val/nats_below_bigram_floor` | 1.0366 +- 0.0242 | 1.4647 +- 0.0406 | 1.3480 +- 0.0134 |
+| `val/perplexity` | 51.8599 +- 1.2619 | 33.8143 +- 1.3778 | 37.9792 +- 0.5080 |
+| `val/routing_agreement_with_pos` | 0.1951 +- 0.0971 | N/A | 0.2009 +- 0.0526 |
+| `val/routing_ami` | 0.1637 +- 0.0478 | N/A | 0.1803 +- 0.0246 |
+| `val/routing_control_pos/ami_control_mean` | 0.0364 +- 0.0107 | N/A | 0.0249 +- 0.0055 |
+| `val/routing_control_pos/ami_control_std` | 0.0203 +- 0.0067 | N/A | 0.0123 +- 0.0039 |
+| `val/routing_control_pos/ami_delta` | 0.1273 +- 0.0400 | N/A | 0.1555 +- 0.0259 |
+| `val/routing_control_pos/ami_delta_z` | 6.8159 +- 2.9758 | N/A | 13.4268 +- 3.8659 |
+| `val/routing_control_pos/ami_real` | 0.1637 +- 0.0478 | N/A | 0.1803 +- 0.0246 |
+| `val/routing_control_pos/hungarian_accuracy_control_mean` | 0.2966 +- 0.0126 | N/A | 0.2464 +- 0.0099 |
+| `val/routing_control_pos/hungarian_accuracy_control_std` | 0.0167 +- 0.0082 | N/A | 0.0211 +- 0.0036 |
+| `val/routing_control_pos/hungarian_accuracy_delta` | 0.0650 +- 0.0242 | N/A | 0.1128 +- 0.0364 |
+| `val/routing_control_pos/hungarian_accuracy_delta_z` | 4.1340 +- 1.3168 | N/A | 5.4412 +- 1.9336 |
+| `val/routing_control_pos/hungarian_accuracy_real` | 0.3616 +- 0.0327 | N/A | 0.3592 +- 0.0271 |
 | `val/routing_control_pos/n_draws` | 10.0000 +- 0.0000 | N/A | 10.0000 +- 0.0000 |
-| `val/routing_control_pos/purity_control_mean` | 0.3229 +- 0.0146 | N/A | 0.3332 +- 0.0090 |
-| `val/routing_control_pos/purity_control_std` | 0.0103 +- 0.0037 | N/A | 0.0184 +- 0.0031 |
-| `val/routing_control_pos/purity_delta` | 0.1266 +- 0.0249 | N/A | 0.1380 +- 0.0333 |
-| `val/routing_control_pos/purity_delta_z` | 13.3119 +- 4.5518 | N/A | 7.6632 +- 2.1218 |
-| `val/routing_control_pos/purity_real` | 0.4495 +- 0.0244 | N/A | 0.4712 +- 0.0260 |
-| `val/routing_control_pos/raw_accuracy_control_mean` | 0.1590 +- 0.0602 | N/A | 0.1564 +- 0.0188 |
-| `val/routing_control_pos/raw_accuracy_control_std` | 0.0140 +- 0.0044 | N/A | 0.0226 +- 0.0125 |
-| `val/routing_control_pos/raw_accuracy_delta` | 0.0026 +- 0.0582 | N/A | 0.0445 +- 0.0366 |
-| `val/routing_control_pos/raw_accuracy_delta_z` | 0.2525 +- 3.8507 | N/A | 2.6520 +- 3.3660 |
-| `val/routing_control_pos/raw_accuracy_real` | 0.1617 +- 0.0734 | N/A | 0.2009 +- 0.0526 |
-| `val/routing_f1/E1_ADD_SUB` | 0.1559 +- 0.2071 | N/A | 0.2105 +- 0.1912 |
-| `val/routing_f1/E2_MULT_DIV` | 0.2676 +- 0.1757 | N/A | 0.2978 +- 0.0907 |
-| `val/routing_f1/E3_MOD_POW` | 0.0784 +- 0.0553 | N/A | 0.0865 +- 0.0412 |
-| `val/routing_f1/E4_LOGIC` | 0.0791 +- 0.0790 | N/A | 0.0721 +- 0.0489 |
-| `val/routing_f1/E5_SHIFT` | 0.0139 +- 0.0186 | N/A | 0.0836 +- 0.1712 |
-| `val/routing_f1/E6_SORT_STAT` | 0.0506 +- 0.0312 | N/A | 0.2734 +- 0.0707 |
-| `val/routing_f1_matched/E1_ADD_SUB` | 0.5513 +- 0.0496 | N/A | 0.5977 +- 0.0780 |
-| `val/routing_f1_matched/E2_MULT_DIV` | 0.3250 +- 0.1541 | N/A | 0.3608 +- 0.0192 |
-| `val/routing_f1_matched/E3_MOD_POW` | 0.0594 +- 0.0397 | N/A | 0.1507 +- 0.0357 |
-| `val/routing_f1_matched/E4_LOGIC` | 0.0871 +- 0.0965 | N/A | 0.1410 +- 0.0398 |
-| `val/routing_f1_matched/E5_SHIFT` | 0.1751 +- 0.1823 | N/A | 0.0076 +- 0.0131 |
-| `val/routing_f1_matched/E6_SORT_STAT` | 0.3806 +- 0.1453 | N/A | 0.3751 +- 0.0636 |
-| `val/routing_hungarian_accuracy` | 0.3944 +- 0.0185 | N/A | 0.3592 +- 0.0271 |
-| `val/routing_macro_recall` | 0.1638 +- 0.0350 | N/A | 0.1856 +- 0.0695 |
-| `val/routing_matched_macro_recall` | 0.2880 +- 0.0293 | N/A | 0.2852 +- 0.0215 |
-| `val/routing_pos_partition_load_entropy` | 0.8942 +- 0.0000 | 0.8942 +- 0.0000 | 0.8942 +- 0.0000 |
-| `val/routing_precision/E1_ADD_SUB` | 0.2524 +- 0.3577 | N/A | 0.2719 +- 0.1878 |
-| `val/routing_precision/E2_MULT_DIV` | 0.3633 +- 0.2140 | N/A | 0.4687 +- 0.0615 |
-| `val/routing_precision/E3_MOD_POW` | 0.0441 +- 0.0290 | N/A | 0.0614 +- 0.0299 |
-| `val/routing_precision/E4_LOGIC` | 0.0814 +- 0.0493 | N/A | 0.0524 +- 0.0379 |
-| `val/routing_precision/E5_SHIFT` | 0.0157 +- 0.0208 | N/A | 0.0546 +- 0.1074 |
-| `val/routing_precision/E6_SORT_STAT` | 0.1682 +- 0.1339 | N/A | 0.3473 +- 0.1183 |
-| `val/routing_precision_matched/E1_ADD_SUB` | 0.6280 +- 0.2354 | N/A | 0.5791 +- 0.0539 |
-| `val/routing_precision_matched/E2_MULT_DIV` | 0.4175 +- 0.1440 | N/A | 0.4820 +- 0.0502 |
-| `val/routing_precision_matched/E3_MOD_POW` | 0.0881 +- 0.0770 | N/A | 0.1078 +- 0.0238 |
-| `val/routing_precision_matched/E4_LOGIC` | 0.1500 +- 0.1810 | N/A | 0.1109 +- 0.0293 |
-| `val/routing_precision_matched/E5_SHIFT` | 0.2462 +- 0.2533 | N/A | 0.0073 +- 0.0126 |
-| `val/routing_precision_matched/E6_SORT_STAT` | 0.5342 +- 0.1594 | N/A | 0.4478 +- 0.0743 |
-| `val/routing_purity` | 0.4495 +- 0.0244 | N/A | 0.4712 +- 0.0260 |
-| `val/routing_recall/E1_ADD_SUB` | 0.1464 +- 0.1844 | N/A | 0.1808 +- 0.1905 |
-| `val/routing_recall/E2_MULT_DIV` | 0.2676 +- 0.2186 | N/A | 0.2262 +- 0.0915 |
-| `val/routing_recall/E3_MOD_POW` | 0.4164 +- 0.3470 | N/A | 0.1569 +- 0.0755 |
-| `val/routing_recall/E4_LOGIC` | 0.1048 +- 0.1147 | N/A | 0.1255 +- 0.0743 |
-| `val/routing_recall/E5_SHIFT` | 0.0128 +- 0.0170 | N/A | 0.1928 +- 0.4123 |
-| `val/routing_recall/E6_SORT_STAT` | 0.0351 +- 0.0238 | N/A | 0.2312 +- 0.0634 |
-| `val/routing_recall_matched/E1_ADD_SUB` | 0.6316 +- 0.2677 | N/A | 0.6196 +- 0.1065 |
-| `val/routing_recall_matched/E2_MULT_DIV` | 0.3507 +- 0.2478 | N/A | 0.2921 +- 0.0347 |
-| `val/routing_recall_matched/E3_MOD_POW` | 0.0473 +- 0.0259 | N/A | 0.2600 +- 0.0785 |
-| `val/routing_recall_matched/E4_LOGIC` | 0.0677 +- 0.0685 | N/A | 0.2020 +- 0.0726 |
-| `val/routing_recall_matched/E5_SHIFT` | 0.2192 +- 0.3180 | N/A | 0.0079 +- 0.0137 |
-| `val/routing_recall_matched/E6_SORT_STAT` | 0.4113 +- 0.2796 | N/A | 0.3295 +- 0.0772 |
-| `val/task_loss` | 3.9529 +- 0.0396 | 3.5202 +- 0.0406 | 3.6370 +- 0.0134 |
+| `val/routing_control_pos/purity_control_mean` | 0.3313 +- 0.0159 | N/A | 0.3332 +- 0.0090 |
+| `val/routing_control_pos/purity_control_std` | 0.0126 +- 0.0065 | N/A | 0.0184 +- 0.0031 |
+| `val/routing_control_pos/purity_delta` | 0.1032 +- 0.0302 | N/A | 0.1380 +- 0.0333 |
+| `val/routing_control_pos/purity_delta_z` | 8.8468 +- 1.9382 | N/A | 7.6632 +- 2.1218 |
+| `val/routing_control_pos/purity_real` | 0.4345 +- 0.0435 | N/A | 0.4712 +- 0.0260 |
+| `val/routing_control_pos/raw_accuracy_control_mean` | 0.1956 +- 0.0564 | N/A | 0.1564 +- 0.0188 |
+| `val/routing_control_pos/raw_accuracy_control_std` | 0.0217 +- 0.0104 | N/A | 0.0226 +- 0.0125 |
+| `val/routing_control_pos/raw_accuracy_delta` | -0.0005 +- 0.0601 | N/A | 0.0445 +- 0.0366 |
+| `val/routing_control_pos/raw_accuracy_delta_z` | -0.0937 +- 2.4316 | N/A | 2.6520 +- 3.3660 |
+| `val/routing_control_pos/raw_accuracy_real` | 0.1951 +- 0.0971 | N/A | 0.2009 +- 0.0526 |
+| `val/routing_control_topic/ami_control_mean` | -0.0000 +- 0.0006 | N/A | N/A |
+| `val/routing_control_topic/ami_control_std` | 0.0006 +- 0.0010 | N/A | N/A |
+| `val/routing_control_topic/ami_delta` | 0.0008 +- 0.0011 | N/A | N/A |
+| `val/routing_control_topic/ami_delta_z` | 1.8460 +- 1.4143 [3 N/A] | N/A | N/A |
+| `val/routing_control_topic/ami_real` | 0.0008 +- 0.0012 | N/A | N/A |
+| `val/routing_control_topic/concentration` | 0.6081 +- 0.1294 | N/A | N/A |
+| `val/routing_control_topic/hungarian_accuracy_control_mean` | 0.6428 +- 0.0123 | N/A | N/A |
+| `val/routing_control_topic/hungarian_accuracy_control_std` | 0.0006 +- 0.0011 | N/A | N/A |
+| `val/routing_control_topic/hungarian_accuracy_delta` | 0.0017 +- 0.0029 | N/A | N/A |
+| `val/routing_control_topic/hungarian_accuracy_delta_z` | 2.7460 +- 0.1416 [3 N/A] | N/A | N/A |
+| `val/routing_control_topic/hungarian_accuracy_real` | 0.6444 +- 0.0095 | N/A | N/A |
+| `val/routing_control_topic/n_blocks` | 1098.0000 +- 0.0000 | N/A | N/A |
+| `val/routing_control_topic/n_draws` | 10.0000 +- 0.0000 | N/A | N/A |
+| `val/routing_control_topic/purity_control_mean` | 0.6485 +- 0.0000 | N/A | N/A |
+| `val/routing_control_topic/purity_control_std` | 0.0001 +- 0.0001 | N/A | N/A |
+| `val/routing_control_topic/purity_delta` | 0.0002 +- 0.0004 | N/A | N/A |
+| `val/routing_control_topic/purity_delta_z` | 2.8460 +- N/A (n=1) [4 N/A] | N/A | N/A |
+| `val/routing_control_topic/purity_real` | 0.6486 +- 0.0004 | N/A | N/A |
+| `val/routing_control_topic/raw_accuracy_control_mean` | 0.0645 +- 0.0233 | N/A | N/A |
+| `val/routing_control_topic/raw_accuracy_control_std` | 0.0005 +- 0.0012 | N/A | N/A |
+| `val/routing_control_topic/raw_accuracy_delta` | 0.0018 +- 0.0040 | N/A | N/A |
+| `val/routing_control_topic/raw_accuracy_delta_z` | 3.2546 +- N/A (n=1) [4 N/A] | N/A | N/A |
+| `val/routing_control_topic/raw_accuracy_real` | 0.0663 +- 0.0213 | N/A | N/A |
+| `val/routing_f1/E1_ADD_SUB` | 0.2625 +- 0.2236 | N/A | 0.2105 +- 0.1912 |
+| `val/routing_f1/E2_MULT_DIV` | 0.1474 +- 0.1868 | N/A | 0.2978 +- 0.0907 |
+| `val/routing_f1/E3_MOD_POW` | 0.0571 +- 0.0707 | N/A | 0.0865 +- 0.0412 |
+| `val/routing_f1/E4_LOGIC` | 0.1134 +- 0.0956 | N/A | 0.0721 +- 0.0489 |
+| `val/routing_f1/E5_SHIFT` | 0.0693 +- 0.1367 | N/A | 0.0836 +- 0.1712 |
+| `val/routing_f1/E6_SORT_STAT` | 0.0819 +- 0.0903 | N/A | 0.2734 +- 0.0707 |
+| `val/routing_f1_matched/E1_ADD_SUB` | 0.3711 +- 0.1706 | N/A | 0.5977 +- 0.0780 |
+| `val/routing_f1_matched/E2_MULT_DIV` | 0.4171 +- 0.0493 | N/A | 0.3608 +- 0.0192 |
+| `val/routing_f1_matched/E3_MOD_POW` | 0.0916 +- 0.1044 | N/A | 0.1507 +- 0.0357 |
+| `val/routing_f1_matched/E4_LOGIC` | 0.1019 +- 0.0415 | N/A | 0.1410 +- 0.0398 |
+| `val/routing_f1_matched/E5_SHIFT` | 0.1166 +- 0.1743 | N/A | 0.0076 +- 0.0131 |
+| `val/routing_f1_matched/E6_SORT_STAT` | 0.3736 +- 0.0904 | N/A | 0.3751 +- 0.0636 |
+| `val/routing_hungarian_accuracy` | 0.3616 +- 0.0327 | N/A | 0.3592 +- 0.0271 |
+| `val/routing_macro_recall` | 0.1833 +- 0.0440 | N/A | 0.1856 +- 0.0695 |
+| `val/routing_matched_macro_recall` | 0.2752 +- 0.0380 | N/A | 0.2852 +- 0.0215 |
+| `val/routing_pos_partition_load_entropy` | N/A | 0.8942 +- 0.0000 | 0.8942 +- 0.0000 |
+| `val/routing_precision/E1_ADD_SUB` | 0.2794 +- 0.2915 | N/A | 0.2719 +- 0.1878 |
+| `val/routing_precision/E2_MULT_DIV` | 0.1608 +- 0.1657 | N/A | 0.4687 +- 0.0615 |
+| `val/routing_precision/E3_MOD_POW` | 0.0335 +- 0.0379 | N/A | 0.0614 +- 0.0299 |
+| `val/routing_precision/E4_LOGIC` | 0.0982 +- 0.0529 | N/A | 0.0524 +- 0.0379 |
+| `val/routing_precision/E5_SHIFT` | 0.0818 +- 0.1410 | N/A | 0.0546 +- 0.1074 |
+| `val/routing_precision/E6_SORT_STAT` | 0.2143 +- 0.2603 | N/A | 0.3473 +- 0.1183 |
+| `val/routing_precision_matched/E1_ADD_SUB` | 0.7227 +- 0.1173 | N/A | 0.5791 +- 0.0539 |
+| `val/routing_precision_matched/E2_MULT_DIV` | 0.5056 +- 0.2104 | N/A | 0.4820 +- 0.0502 |
+| `val/routing_precision_matched/E3_MOD_POW` | 0.1073 +- 0.0887 | N/A | 0.1078 +- 0.0238 |
+| `val/routing_precision_matched/E4_LOGIC` | 0.1371 +- 0.0483 | N/A | 0.1109 +- 0.0293 |
+| `val/routing_precision_matched/E5_SHIFT` | 0.1172 +- 0.1460 | N/A | 0.0073 +- 0.0126 |
+| `val/routing_precision_matched/E6_SORT_STAT` | 0.4489 +- 0.2148 | N/A | 0.4478 +- 0.0743 |
+| `val/routing_purity` | 0.4345 +- 0.0435 | N/A | 0.4712 +- 0.0260 |
+| `val/routing_recall/E1_ADD_SUB` | 0.3444 +- 0.3364 | N/A | 0.1808 +- 0.1905 |
+| `val/routing_recall/E2_MULT_DIV` | 0.1775 +- 0.2615 | N/A | 0.2262 +- 0.0915 |
+| `val/routing_recall/E3_MOD_POW` | 0.2743 +- 0.3683 | N/A | 0.1569 +- 0.0755 |
+| `val/routing_recall/E4_LOGIC` | 0.1878 +- 0.2132 | N/A | 0.1255 +- 0.0743 |
+| `val/routing_recall/E5_SHIFT` | 0.0635 +- 0.1301 | N/A | 0.1928 +- 0.4123 |
+| `val/routing_recall/E6_SORT_STAT` | 0.0525 +- 0.0568 | N/A | 0.2312 +- 0.0634 |
+| `val/routing_recall_matched/E1_ADD_SUB` | 0.2771 +- 0.1564 | N/A | 0.6196 +- 0.1065 |
+| `val/routing_recall_matched/E2_MULT_DIV` | 0.4807 +- 0.2785 | N/A | 0.2921 +- 0.0347 |
+| `val/routing_recall_matched/E3_MOD_POW` | 0.0871 +- 0.1144 | N/A | 0.2600 +- 0.0785 |
+| `val/routing_recall_matched/E4_LOGIC` | 0.0971 +- 0.0724 | N/A | 0.2020 +- 0.0726 |
+| `val/routing_recall_matched/E5_SHIFT` | 0.1590 +- 0.2873 | N/A | 0.0079 +- 0.0137 |
+| `val/routing_recall_matched/E6_SORT_STAT` | 0.5498 +- 0.3321 | N/A | 0.3295 +- 0.0772 |
+| `val/task_loss` | 3.9483 +- 0.0242 | 3.5202 +- 0.0406 | 3.6370 +- 0.0134 |
 
 **Throughput units.** `perf/throughput_tokens_sec` is `N/A` for MoE because those runs predate the T-LX.8 fix, which is detectable without commit archaeology: before T-LX.8 the engine divided batch ITEMS by elapsed seconds and labelled the quotient tokens/s, and it published no items/s key at all. On this task an item is one `seq_len`-token block, so the figure those runs recorded is items/s and it is reported above in the `perf/throughput_items_sec` row, where it is directly comparable to every other arm. It is relabelled, never rescaled: multiplying by `seq_len` recovers the tokens figure exactly, but that product appears in no run's `metrics.json`, and this exporter reports `N/A` rather than synthesize a cell. **Compare throughput on the `perf/throughput_items_sec` row.** Reading the tokens row alone would show these arms as missing, and an earlier export that mixed the two units in one row showed them as ~62x slower than the truth.
 
@@ -359,7 +383,7 @@ vector) are not table cells and are not shown here; they are carried in
 | `experiment_id` | categorical, not a measurement | 15 distinct values (one per run or per arm) -- read the `experiment_id` column of `results.csv` |
 | `halting_mode` | categorical, not a measurement | `pure_act` |
 | `router_noise` | categorical, not a measurement | `none` |
-| `routing_agreement_caption` | categorical, not a measurement | `AGREEMENT WITH A PRIOR, NOT ACCURACY. mean(predicted_expert == token_family[input_id]) against a majority-POS partition, which is a linguistic hypothesis about a useful expert split rather than a functional ground truth. A router may be better for next-token prediction and still score low here. Read the permutation-invariant metrics first (see LANGUAGE_SPECIALIZATION_ORDER), and read load entropy against this corpus's own partition entropy -- published per run as val/routing_pos_partition_load_entropy, ~0.89 and NOT 1.0. It differs between corpora (dev 0.8884, canonical 0.8942), so use the run's value.` |
+| `routing_agreement_caption` | categorical, not a measurement | `AGREEMENT WITH A PRIOR, NOT ACCURACY. mean(predicted_expert == token_family[input_id]) against a majority-POS partition, which is a linguistic hypothesis about a useful expert split rather than a functional ground truth. A router may be better for next-token prediction and still score low here. Read the permutation-invariant metrics first (see LANGUAGE_SPECIALIZATION_ORDER), and read load entropy against the partition's own 0.8884, not against 1.0.`, `AGREEMENT WITH A PRIOR, NOT ACCURACY. mean(predicted_expert == token_family[input_id]) against a majority-POS partition, which is a linguistic hypothesis about a useful expert split rather than a functional ground truth. A router may be better for next-token prediction and still score low here. Read the permutation-invariant metrics first (see LANGUAGE_SPECIALIZATION_ORDER), and read load entropy against this corpus's own partition entropy -- published per run as val/routing_pos_partition_load_entropy, ~0.89 and NOT 1.0. It differs between corpora (dev 0.8884, canonical 0.8942), so use the run's value.` |
 | `routing_agreement_metric_key` | categorical, not a measurement | `val/routing_agreement_with_pos` |
 | `routing_balance_normalization` | categorical, not a measurement | `mean over depth calls per block, then mean over blocks` |
 | `routing_mode` | categorical, not a measurement | `top1_sparse` |
@@ -412,6 +436,8 @@ skipped these would be indistinguishable from one that found nothing wrong.
 | `famcls_nofam_seed43__ca305b98` | experiment_group='exploratory' != 'canonical_lang_b' |
 | `famcls_nofam_seed44__1d8e55dd` | experiment_group='exploratory' != 'canonical_lang_b' |
 | `gate1_dataset_check__seedNA__fa24821c` | experiment_group='exploratory' != 'canonical_lang_b' |
+| `langB_MoR_seed42__c93f0fe8` | no metrics.json (run did not finish) |
+| `langB_MoR_seed42__c93f0fe8__r2` | no metrics.json (run did not finish) |
 | `langB_MoR_seed43__c1873a66` | experiment_group='lang_smoke2' != 'canonical_lang_b' |
 | `langB_MoR_seed44__14356af7` | experiment_group='langB_smoke' != 'canonical_lang_b' |
 | `langB_MoR_seed44__78580ac8` | no metrics.json (run did not finish) |
@@ -541,6 +567,11 @@ skipped these would be indistinguishable from one that found nothing wrong.
 | `t67_provenance_check_seed44__59000a77__r11` | experiment_group='exploratory' != 'canonical_lang_b' |
 | `t67_provenance_check_seed44__59000a77__r12` | experiment_group='exploratory' != 'canonical_lang_b' |
 | `t67_provenance_check_seed44__59000a77__r13` | experiment_group='exploratory' != 'canonical_lang_b' |
+| `t67_provenance_check_seed44__59000a77__r14` | experiment_group='exploratory' != 'canonical_lang_b' |
+| `t67_provenance_check_seed44__59000a77__r15` | experiment_group='exploratory' != 'canonical_lang_b' |
+| `t67_provenance_check_seed44__59000a77__r16` | experiment_group='exploratory' != 'canonical_lang_b' |
+| `t67_provenance_check_seed44__59000a77__r17` | experiment_group='exploratory' != 'canonical_lang_b' |
+| `t67_provenance_check_seed44__59000a77__r18` | experiment_group='exploratory' != 'canonical_lang_b' |
 | `t67_provenance_check_seed44__59000a77__r2` | experiment_group='exploratory' != 'canonical_lang_b' |
 | `t67_provenance_check_seed44__59000a77__r3` | experiment_group='exploratory' != 'canonical_lang_b' |
 | `t67_provenance_check_seed44__59000a77__r4` | experiment_group='exploratory' != 'canonical_lang_b' |
@@ -549,130 +580,17 @@ skipped these would be indistinguishable from one that found nothing wrong.
 | `t67_provenance_check_seed44__59000a77__r7` | experiment_group='exploratory' != 'canonical_lang_b' |
 | `t67_provenance_check_seed44__59000a77__r8` | experiment_group='exploratory' != 'canonical_lang_b' |
 | `t67_provenance_check_seed44__59000a77__r9` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67_provenance_check_seed44__6b711a59` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67_provenance_check_seed44__6b711a59__r10` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67_provenance_check_seed44__6b711a59__r11` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67_provenance_check_seed44__6b711a59__r12` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67_provenance_check_seed44__6b711a59__r13` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67_provenance_check_seed44__6b711a59__r14` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67_provenance_check_seed44__6b711a59__r15` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67_provenance_check_seed44__6b711a59__r16` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67_provenance_check_seed44__6b711a59__r17` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67_provenance_check_seed44__6b711a59__r18` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67_provenance_check_seed44__6b711a59__r19` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67_provenance_check_seed44__6b711a59__r2` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67_provenance_check_seed44__6b711a59__r20` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67_provenance_check_seed44__6b711a59__r21` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67_provenance_check_seed44__6b711a59__r22` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67_provenance_check_seed44__6b711a59__r23` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67_provenance_check_seed44__6b711a59__r24` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67_provenance_check_seed44__6b711a59__r25` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67_provenance_check_seed44__6b711a59__r26` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67_provenance_check_seed44__6b711a59__r27` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67_provenance_check_seed44__6b711a59__r28` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67_provenance_check_seed44__6b711a59__r29` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67_provenance_check_seed44__6b711a59__r3` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67_provenance_check_seed44__6b711a59__r30` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67_provenance_check_seed44__6b711a59__r31` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67_provenance_check_seed44__6b711a59__r32` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67_provenance_check_seed44__6b711a59__r33` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67_provenance_check_seed44__6b711a59__r34` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67_provenance_check_seed44__6b711a59__r35` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67_provenance_check_seed44__6b711a59__r36` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67_provenance_check_seed44__6b711a59__r37` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67_provenance_check_seed44__6b711a59__r38` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67_provenance_check_seed44__6b711a59__r39` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67_provenance_check_seed44__6b711a59__r4` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67_provenance_check_seed44__6b711a59__r40` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67_provenance_check_seed44__6b711a59__r41` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67_provenance_check_seed44__6b711a59__r42` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67_provenance_check_seed44__6b711a59__r43` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67_provenance_check_seed44__6b711a59__r44` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67_provenance_check_seed44__6b711a59__r45` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67_provenance_check_seed44__6b711a59__r46` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67_provenance_check_seed44__6b711a59__r47` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67_provenance_check_seed44__6b711a59__r48` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67_provenance_check_seed44__6b711a59__r49` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67_provenance_check_seed44__6b711a59__r5` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67_provenance_check_seed44__6b711a59__r50` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67_provenance_check_seed44__6b711a59__r51` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67_provenance_check_seed44__6b711a59__r52` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67_provenance_check_seed44__6b711a59__r53` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67_provenance_check_seed44__6b711a59__r54` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67_provenance_check_seed44__6b711a59__r55` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67_provenance_check_seed44__6b711a59__r56` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67_provenance_check_seed44__6b711a59__r57` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67_provenance_check_seed44__6b711a59__r58` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67_provenance_check_seed44__6b711a59__r59` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67_provenance_check_seed44__6b711a59__r6` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67_provenance_check_seed44__6b711a59__r60` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67_provenance_check_seed44__6b711a59__r7` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67_provenance_check_seed44__6b711a59__r8` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67_provenance_check_seed44__6b711a59__r9` | no metrics.json (run did not finish) |
 | `t67_provenance_check_seed44__c1c47354` | no metrics.json (run did not finish) |
 | `t67_provenance_check_seed44__c1c47354__r2` | experiment_group='exploratory' != 'canonical_lang_b' |
 | `t67_provenance_check_seed44__c1c47354__r3` | experiment_group='exploratory' != 'canonical_lang_b' |
 | `t67_provenance_check_seed44__c1c47354__r4` | experiment_group='exploratory' != 'canonical_lang_b' |
 | `t67_provenance_check_seed44__c1c47354__r5` | experiment_group='exploratory' != 'canonical_lang_b' |
 | `t67_provenance_check_seed44__c3571d3a` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67d_provenance_check_mor_seed44__fa9339bc` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67d_provenance_check_mor_seed44__fa9339bc__r10` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67d_provenance_check_mor_seed44__fa9339bc__r11` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67d_provenance_check_mor_seed44__fa9339bc__r12` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67d_provenance_check_mor_seed44__fa9339bc__r13` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67d_provenance_check_mor_seed44__fa9339bc__r14` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67d_provenance_check_mor_seed44__fa9339bc__r15` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67d_provenance_check_mor_seed44__fa9339bc__r16` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67d_provenance_check_mor_seed44__fa9339bc__r17` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67d_provenance_check_mor_seed44__fa9339bc__r18` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67d_provenance_check_mor_seed44__fa9339bc__r19` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67d_provenance_check_mor_seed44__fa9339bc__r2` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67d_provenance_check_mor_seed44__fa9339bc__r20` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67d_provenance_check_mor_seed44__fa9339bc__r21` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67d_provenance_check_mor_seed44__fa9339bc__r22` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67d_provenance_check_mor_seed44__fa9339bc__r23` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67d_provenance_check_mor_seed44__fa9339bc__r24` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67d_provenance_check_mor_seed44__fa9339bc__r25` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67d_provenance_check_mor_seed44__fa9339bc__r26` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67d_provenance_check_mor_seed44__fa9339bc__r27` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67d_provenance_check_mor_seed44__fa9339bc__r28` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67d_provenance_check_mor_seed44__fa9339bc__r29` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67d_provenance_check_mor_seed44__fa9339bc__r3` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67d_provenance_check_mor_seed44__fa9339bc__r30` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67d_provenance_check_mor_seed44__fa9339bc__r31` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67d_provenance_check_mor_seed44__fa9339bc__r32` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67d_provenance_check_mor_seed44__fa9339bc__r33` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67d_provenance_check_mor_seed44__fa9339bc__r34` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67d_provenance_check_mor_seed44__fa9339bc__r35` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67d_provenance_check_mor_seed44__fa9339bc__r36` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67d_provenance_check_mor_seed44__fa9339bc__r37` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67d_provenance_check_mor_seed44__fa9339bc__r38` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67d_provenance_check_mor_seed44__fa9339bc__r39` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67d_provenance_check_mor_seed44__fa9339bc__r4` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67d_provenance_check_mor_seed44__fa9339bc__r40` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67d_provenance_check_mor_seed44__fa9339bc__r41` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67d_provenance_check_mor_seed44__fa9339bc__r42` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67d_provenance_check_mor_seed44__fa9339bc__r43` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67d_provenance_check_mor_seed44__fa9339bc__r44` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67d_provenance_check_mor_seed44__fa9339bc__r45` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67d_provenance_check_mor_seed44__fa9339bc__r46` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67d_provenance_check_mor_seed44__fa9339bc__r47` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67d_provenance_check_mor_seed44__fa9339bc__r48` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67d_provenance_check_mor_seed44__fa9339bc__r49` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67d_provenance_check_mor_seed44__fa9339bc__r5` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67d_provenance_check_mor_seed44__fa9339bc__r50` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67d_provenance_check_mor_seed44__fa9339bc__r51` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67d_provenance_check_mor_seed44__fa9339bc__r52` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67d_provenance_check_mor_seed44__fa9339bc__r53` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67d_provenance_check_mor_seed44__fa9339bc__r54` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67d_provenance_check_mor_seed44__fa9339bc__r55` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67d_provenance_check_mor_seed44__fa9339bc__r56` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67d_provenance_check_mor_seed44__fa9339bc__r57` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67d_provenance_check_mor_seed44__fa9339bc__r58` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67d_provenance_check_mor_seed44__fa9339bc__r6` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67d_provenance_check_mor_seed44__fa9339bc__r7` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67d_provenance_check_mor_seed44__fa9339bc__r8` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `t67d_provenance_check_mor_seed44__fa9339bc__r9` | experiment_group='exploratory' != 'canonical_lang_b' |
+| `t67d_provenance_check_mor_seed44__3e055f47` | experiment_group='exploratory' != 'canonical_lang_b' |
+| `t67d_provenance_check_mor_seed44__3e055f47__r2` | experiment_group='exploratory' != 'canonical_lang_b' |
+| `t67d_provenance_check_mor_seed44__3e055f47__r3` | experiment_group='exploratory' != 'canonical_lang_b' |
+| `t67d_provenance_check_mor_seed44__3e055f47__r4` | experiment_group='exploratory' != 'canonical_lang_b' |
+| `t67d_provenance_check_mor_seed44__3e055f47__r5` | experiment_group='exploratory' != 'canonical_lang_b' |
 | `t68_matched_check_seed42__2d8b6203` | experiment_group='exploratory' != 'canonical_lang_b' |
 | `t81_moe__seedNA__b5532075` | experiment_group='t81_smoke' != 'canonical_lang_b' |
 | `t81_mor__seedNA__30831ff6` | experiment_group='t81_smoke' != 'canonical_lang_b' |
@@ -693,4 +611,16 @@ skipped these would be indistinguishable from one that found nothing wrong.
 | `t_l03_mor_timing_seed44__fa9339bc` | experiment_group='exploratory' != 'canonical_lang_b' |
 | `t_l03_mor_timing_seed44__fa9339bc__r2` | no metrics.json (run did not finish) |
 | `t_l03_mor_timing_seed44__fa9339bc__r3` | experiment_group='exploratory' != 'canonical_lang_b' |
+| `t_l77_rate2_wt2_moe_seed42__12570ce4` | no resolved_config.json (run never reached provenance write) |
+| `t_l77_rate2_wt2_mor_seed42__ba40c482` | no resolved_config.json (run never reached provenance write) |
+| `t_l77_rate2_wt2_more_seed42__d0894436` | no resolved_config.json (run never reached provenance write) |
+| `t_l77_rate3_wt2_mor_seed42__ba40c482` | no resolved_config.json (run never reached provenance write) |
+| `t_l77_realrate_moe_seed42__e1565fc7` | no resolved_config.json (run never reached provenance write) |
+| `t_l77_realrate_mor_seed42__e382819a` | no resolved_config.json (run never reached provenance write) |
+| `t_l77_realrate_more_seed42__6bef3242` | no resolved_config.json (run never reached provenance write) |
+| `t_l77_realrate_wt2_seed42__6bef3242` | no resolved_config.json (run never reached provenance write) |
+| `t_l77_wandb_fallback2_seed42__98b9ab61` | no resolved_config.json (run never reached provenance write) |
+| `t_l77_wandb_fallback_seed42__98b9ab61` | no resolved_config.json (run never reached provenance write) |
+| `t_l77_wandb_offline_seed42__98b9ab61` | no resolved_config.json (run never reached provenance write) |
+| `t_l77_wandb_offline_seed42__98b9ab61__r2` | no resolved_config.json (run never reached provenance write) |
 

@@ -23,6 +23,12 @@ PYTHONIOENCODING=utf-8 C:/Users/Hp/anaconda3/envs/more_env/python.exe -c "import
 
 Expect `5 of 15`.
 
+> **Superseded as of T-LA.1 (2026-10-04): MoE has been retrained on this 4060 and all five
+> of its cells now carry `checkpoint.pt`.** The count above reads `11 of 21` while both the
+> V100 and 4060 MoE cells are on disk, and `10 of 16` after the V100 MoE cells are archived.
+> MoE reproduced at 3.9483 ± 0.0242 against the published 3.9529 ± 0.0396 (−0.117 σ), so the
+> §5 reproduction gate has **passed for MoE**. Only the MoR arm still needs weights.
+
 **Consequence.** Every evaluation worth adding to this paper is a *checkpoint* evaluation —
 held-out test split, difficulty-stratified loss, out-of-domain perplexity. None of them can
 be run for MoE or MoR until those two arms are retrained. So the critical path is: retrain
@@ -83,11 +89,15 @@ blocking item), the statistics layer, and the pre-registration. Do not wait for 
 
 ## 4. Launching the retrains
 
-Gate first — if this is not 356/356 the numbers are not trustworthy and nothing else matters:
+Gate first — if this is not 357/357 the numbers are not trustworthy and nothing else matters:
 
 ```bash
 PYTHONIOENCODING=utf-8 C:/Users/Hp/anaconda3/envs/more_env/python.exe code/run_correctness_suite.py
 ```
+
+> **Expect `TOTAL 357 357 0 0`, not 356.** One check was added after this file was first
+> written (measured 2026-10-04, T-LA.1). A count *above* 357 with 0 fail / 0 skip is
+> likewise fine; any non-zero fail or skip column is a STOP.
 
 Then set the environment once per shell:
 
@@ -95,21 +105,54 @@ Then set the environment once per shell:
 export WANDB_MODE=offline && export WANDB_SILENT=true
 ```
 
-MoE, all five seeds:
+**MoE is already retrained and reproduced** (T-LA.1: 3.9483 ± 0.0242 against the published
+3.9529 ± 0.0396, a −0.117 σ difference). All five cells carry `checkpoint.pt`. Do not re-run
+it. The line below is kept only for the case where those cells are lost again:
 
 ```bash
-PYTHONIOENCODING=utf-8 C:/Users/Hp/anaconda3/envs/more_env/python.exe code/run_language_matrix.py --arch moe
+PYTHONIOENCODING=utf-8 C:/Users/Hp/anaconda3/envs/more_env/python.exe code/run_language_matrix.py --arch moe --force
 ```
 
-Then MoR:
+Then MoR. **`--force` is mandatory and `--dry-run` first is mandatory:**
 
 ```bash
-PYTHONIOENCODING=utf-8 C:/Users/Hp/anaconda3/envs/more_env/python.exe code/run_language_matrix.py --arch mor
+PYTHONIOENCODING=utf-8 C:/Users/Hp/anaconda3/envs/more_env/python.exe code/run_language_matrix.py --arch mor --dry-run
 ```
 
-The runner is interruption-safe: it skips completed cells and re-runs any directory holding
-a checkpoint without a `metrics.json`, because a checkpoint at an unknown epoch is exactly
-the artifact that ends up in a table by accident.
+```bash
+PYTHONIOENCODING=utf-8 C:/Users/Hp/anaconda3/envs/more_env/python.exe code/run_language_matrix.py --arch mor --force
+```
+
+### Why `--force`, and why the plain form is a silent no-op
+
+**An earlier revision of this section told you to run `--arch mor` with no flags. That
+trains nothing and exits 0.** `run_language_matrix.py:finished_run()`
+(code/run_language_matrix.py:284-311) decides completeness from `metrics.json` +
+`resolved_config.json` + canonical group + arch + seed + a non-null `val/task_loss`.
+**`checkpoint.pt` is not one of the clauses.** The V100 MoR cells lost *only* their weights,
+so they satisfy every clause and all five seeds print
+
+    skip  mor seed 42  -- already complete: langB_MoR_seed42__547e435b__r4
+    ...
+    nothing to do; every requested run is already complete.
+
+The runner is interruption-safe in the *opposite* direction — it re-runs any directory
+holding a checkpoint without a `metrics.json`, because a checkpoint at an unknown epoch is
+exactly the artifact that ends up in a table by accident. The weights-lost case is that
+case's mirror and the completeness test does not cover it. Always `--dry-run` first and read
+the skip lines before committing 15 h.
+
+**Use `--force` rather than archiving the V100 cells first.** Archiving also unblocks the
+runner, but it removes the admitted MoR arm from `runs/` for the whole retrain, during which
+the exporter cannot regenerate the published table at all. `--force` writes the new cells
+alongside and the duplicate state is resolved afterwards (§4 below).
+
+Long runs belong in a **separate Windows Terminal tab**, not in an agent tool call: a 15 h
+job outlives any single call, and the operator needs to be able to read it. `_launch_mor_retrain.ps1`
+in the repo root is the launcher — it sets `PYTHONIOENCODING`, `WANDB_MODE=offline` and
+`WANDB_SILENT` (the Terminal tool types one literal PowerShell line into a fresh tab, so
+Git-Bash `export VAR=... && python ...` does not work and env vars do not persist across
+tabs) and tees to `runs/_mor_retrain_console.log`.
 
 **Do not pass `--arch more` and do not pass `--all`.** MoRE's five cells are complete, they
 carry their checkpoints, and a re-run produces a second cell for the same `(arch, seed)` —
@@ -141,6 +184,23 @@ next machine to pull. Confirm the deletions are staged before committing:
 ```bash
 git status --short | grep "^D"
 ```
+
+> **This check reports 0 after a correct `git mv`, and that is not a failure.** When the
+> content is byte-identical git records a **rename** (`R old -> new`) rather than a
+> delete-plus-add, which carries the same guarantee the check exists to verify: the old path
+> leaves the index. Measured at T-LA.1 — the five MoE cells staged as 20 `R` entries and 0
+> `D` entries. Use this instead, expecting one line per moved file:
+>
+> ```bash
+> git status --short | grep -cE "^R"
+> ```
+>
+> The real `mv` trap shows up as a surviving `runs/...` path in `git status`, so the
+> unambiguous test is that no retired `runs/` path appears there at all.
+
+**The MoE half of this is already done** (T-LA.1): the five V100 MoE cells are in
+`archive/pre_finalization/lang_v100_no_checkpoints/`. The MoR half is still pending and must
+happen after the retrain completes, not before.
 
 Archive, never delete (`CLAUDE.md` §6). The V100 cells are the provenance record for the
 numbers currently in the paper.
@@ -176,6 +236,27 @@ measurement, with the training-time throughputs cited separately as per-run prov
 ---
 
 ## 6. The evaluations — your best shot at a positive finding
+
+> **Division of labour changed 2026-10-04 (T-LA.1): every evaluation in this section now
+> runs on Vedant's 3050, not here.** This 4060 is occupied by the MoR retrain, and the two
+> jobs cannot share one card without contending for VRAM and corrupting any timing number.
+> That is the reason the canonical checkpoints are force-added into git (see `.gitignore`
+> §"Per-run output directories"): the weights have to *travel*, and they are the only
+> artifact that does not regenerate from a config. MoE's five are pushed; MoR's follow when
+> the retrain lands. Benchmarks and specialized tests are Vedant's machine's work — do not
+> start them here.
+>
+> **BLiMP specifically is in scope on that machine and is not caught by the warning below.**
+> The ban is on MMLU/HellaSwag/ARC/PIQA, which need world knowledge and sit at chance at this
+> scale. BLiMP scores a *relative* preference inside a matched minimal pair, so it degrades
+> gracefully rather than collapsing — its own paper's baselines include an n-gram model above
+> 50%. Two conditions on it, both load-bearing: (a) the BPE-8192 WikiText vocab tokenizes the
+> two members of a pair to *different lengths* whenever they differ at rare morphology, and a
+> summed log-prob then measures token count rather than grammaticality — score only the
+> diverging positions, and report how many pairs fail an equal-length assertion; (b) BLiMP is
+> **not** in the pre-registered families and `code/confirmatory_tests.json` forbids adding a
+> family after results exist, so it reports uncorrected effect sizes, labelled exploratory,
+> and stays out of every significance claim in the abstract.
 
 This is the answer to "where can MoRE shine." **Not** on general benchmarks. On the thing
 its architecture is actually for.

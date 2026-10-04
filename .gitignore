@@ -18,9 +18,37 @@ code/wandb/
 # runs/<experiment_id>/ IS the canonical record, so the small provenance and
 # metric files ARE tracked (updated_rules.md 9: every figure must be traceable
 # to exact run IDs). Only the large or regenerable payloads are excluded.
+#
+# T-LA.1: these two rules are DELIBERATELY OVERRIDDEN with `git add -f` for the
+# canonical language cells, and the override is the reason the MoRE arm still
+# exists. The five MoRE checkpoints were trained on a rented V100 and committed;
+# the MoE and MoR checkpoints were not, the instance was released, and ~25
+# GPU-hours had to be re-run to recover weights that every checkpoint evaluation
+# (held-out test split, difficulty-stratified loss, OOD perplexity) depends on.
+# A `canonical_lang_b` checkpoint is therefore treated as EVIDENCE, not weight:
+# it is not regenerable in practice, because reproducing it costs hours on a
+# thermally-throttled laptop and lands at a slightly different point in seed
+# noise. The rule below still applies to everything else, which is the point --
+# exploratory and smoke checkpoints stay out.
+#
+# Force-add only cells that carry BOTH checkpoint.pt and metrics.json:
+#   for d in runs/langB_*/; do [ -f "$d/checkpoint.pt" ] && \
+#     [ -f "$d/metrics.json" ] && git add -f "$d/checkpoint.pt"; done
+# A checkpoint WITHOUT metrics is an interrupted run at an unknown epoch, and is
+# exactly the artifact that reaches a results table by accident -- never commit
+# one. A bare `git add -f runs/**/checkpoint.pt` does commit one; the guard above
+# refuses it by construction.
 runs/**/checkpoint.pt
 runs/**/*.pt
 runs/**/stdout.log
+
+# T-LA.1: matrix-level console logs from the _launch_*.ps1 helpers. These tee a
+# whole multi-run job, so they are not attached to any single run and by
+# CLAUDE.md 5 can never be provenance -- the per-run record is
+# runs/<experiment_id>/stdout.log, which is itself untracked above. Ignored
+# rather than forbidden because teeing a 15 h job is the right thing to do; what
+# is not right is committing the tee.
+runs/_*.log
 
 # T-LX.8: stray logs at the REPO ROOT, from `python ... > foo.log` invocations.
 # CLAUDE.md 5 is per-run output directories only; a root-level log is by

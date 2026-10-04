@@ -70,8 +70,13 @@ the admission filter working, not an error.
 PYTHONIOENCODING=utf-8 C:/Users/Hp/anaconda3/envs/more_env/python.exe code/run_correctness_suite.py
 ```
 
-Expect `TOTAL 356 356 0 0`. If this is not 356/356, something is broken and the paper
-numbers are not trustworthy — stop and fix it before writing (`CLAUDE.md` §7).
+Expect `TOTAL 357 357 0 0`. If the pass column does not equal the checks column, or either
+the fail or skip column is non-zero, something is broken and the paper numbers are not
+trustworthy — stop and fix it before writing (`CLAUDE.md` §7).
+
+> This line read `356 356` until T-LA.1 (2026-10-04); one check was added after this file
+> was written. Read the **fail and skip columns**, not the absolute total, which drifts
+> upward as gates are added.
 
 ---
 
@@ -151,9 +156,18 @@ data** — the paper must cite the generated table, not this file.
 
 | arm | val/task_loss | perplexity | margin vs bigram floor | params |
 |---|---|---|---|---|
-| MoE | 3.9529 ± 0.0396 | 52.12 | +1.0320 | 5,584,908 |
-| **MoR** | **3.5202 ± 0.0406** | **33.81** | **+1.4647** | 5,581,063 |
+| MoE | 3.9483 ± 0.0242 | 51.85 | +1.0366 | 5,584,908 |
+| **MoR** | **3.5202 ± 0.0406** | **33.79** | **+1.4647** | 5,581,063 |
 | MoRE (route-once, canonical) | 3.6370 ± 0.0134 | 37.98 | +1.3480 | 5,584,908 |
+
+> **MoE updated at T-LA.1 (2026-10-04)**, from 3.9529 ± 0.0396 to 3.9483 ± 0.0242. The arm
+> was retrained on Ayan's 4060 to recover the checkpoints lost with the rented V100; the five
+> V100 cells are now in `archive/pre_finalization/lang_v100_no_checkpoints/` and the 4060
+> cells are the admitted ones. The retrain reproduced at **−0.117 σ** of the published std,
+> which is also the study's only direct evidence that `val/task_loss` is hardware-independent
+> beyond numerics. **The MoR row is still the V100 cells and will move the same way** once
+> its retrain lands — re-read the generated table before quoting it, and re-read the effect
+> sizes too, because an arm's std changing moves every d it appears in.
 
 Perplexity is `exp(mean nats)` and is **not** the mean of the five per-seed perplexities —
 `exp` is convex. The verdict is taken on nats either way. Do not report a mean perplexity
@@ -163,9 +177,14 @@ with a ± derived from the nats std.
 
 | pair | gap | Cohen d | p (exact) | floor | Holm threshold | verdict |
 |---|---|---|---|---|---|---|
-| MoRE − MoE | −0.315967 | −10.68 | 0.00794 | 0.00794 | 0.01250 | significant, **at the resolution floor** |
+| MoRE − MoE | −0.311346 | −15.92 | 0.00794 | 0.00794 | 0.01250 | significant, **at the resolution floor** |
 | MoRE − MoR | +0.116744 | +3.87 | 0.00794 | 0.00794 | 0.01667 | significant, **at the resolution floor** |
-| MoE − MoR | +0.432711 | +10.79 | 0.00794 | 0.00794 | 0.02500 | significant, **at the resolution floor** |
+| MoE − MoR | +0.428089 | +12.82 | 0.00794 | 0.00794 | 0.02500 | significant, **at the resolution floor** |
+
+> Also updated at T-LA.1. The two MoE-involving effect sizes grew (d −10.68 → −15.92 and
+> +10.79 → +12.82) purely because the retrained MoE arm has a tighter std, not because any
+> gap grew; `MoRE − MoR` is untouched. This is exactly the case `CLAUDE.md` §4 warns about —
+> **a large d is not a large difference**, and the gaps here moved by ≤ 0.005 nats.
 
 ### Depth and halting
 

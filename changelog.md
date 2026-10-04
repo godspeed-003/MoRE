@@ -7687,3 +7687,141 @@ consumes its Holm slot, as declared.
   refused: 299`, consistency clean.
 - `python code/export_results.py --task language` -> `results/language/` regenerated.
 - `python code/run_correctness_suite.py` -> `TOTAL 356 356 0 0`, all five gates PASS.
+
+---
+
+## T-LA.1 — MoE weights recovered on the 4060; the MoR retrain was a silent no-op as documented
+
+**Date.** 2026-10-04. **Machine.** Ayan's RTX 4060 8 GB (`C:\Users\Hp`), interpreter
+`C:\Users\Hp\anaconda3\envs\more_env\python.exe`.
+
+**Context.** `RUNBOOK_ACL_4060.md` §1 established that only the five MoRE cells kept their
+`checkpoint.pt`; the MoE and MoR language weights were lost with the first rented V100. Every
+evaluation the paper still wants — held-out test split (§6b), difficulty-stratified loss
+(§6a), OOD perplexity (§6c) — is a *checkpoint* evaluation, so the critical path is
+retrain-two-arms → evaluate-three-arms → write.
+
+### MoE was already retrained, and it reproduced
+
+All five canonical MoE cells on disk now carry `checkpoint.pt`:
+`langB_MoE_seed42__51000018`, `..._seed43__7d85fe81`, `..._seed44__c348b39a`,
+`..._seed45__64800f08`, `..._seed46__3d9d12a9` (commit `29fe5892`). The runbook's §1
+one-liner reports `11 of 21`, not `5 of 15`, because the retrain left the superseded V100
+cells in place — 21 canonical cells with 10 MoE and 6 MoR directories.
+
+Reproduction against the published V100 mean, per `RUNBOOK_ACL_4060.md` §5:
+
+| arm | source | mean `val/task_loss` | std | n |
+|---|---|---|---|---|
+| MoE | V100 (published) | 3.952933 | 0.039624 | 5 |
+| MoE | 4060 (retrain) | **3.948311** | **0.024202** | 5 |
+
+Delta of means **−0.004622 nats = −0.117 σ** of the published std. Far inside the ±1 σ
+reproduction band; nowhere near the ±2 σ STOP threshold. The retrain std is *tighter*
+(0.0242 vs 0.0396). This is a V100 `sm_70` → Ada `sm_89` hardware change at identical frozen
+config, so it is also the project's only direct evidence that `val/task_loss` is not
+hardware-dependent beyond numerics — which is what licenses reporting a mixed-GPU matrix
+(MoE/MoR on the 4060, MoRE on the V100) without a per-arm hardware confound.
+
+### The trap: `--arch mor` without `--force` trains nothing and exits 0
+
+`RUNBOOK_ACL_4060.md` §4 instructs
+
+    code/run_language_matrix.py --arch mor
+
+which is **wrong for the weights-only case** and silently wastes the window.
+`run_language_matrix.py:finished_run()` (code/run_language_matrix.py:284-311) treats a cell
+as complete on these clauses — directory glob match, `metrics.json` exists,
+`resolved_config.json` exists, `logging.experiment_group == canonical_lang_b`,
+`architecture == arch`, `provenance.seed == seed`, and a non-null
+`val/task_loss`/`best_val_loss`. **`checkpoint.pt` is not one of them.** The five V100 MoR
+cells satisfy every clause — they lost only their weights — so the runner skips all five:
+
+    skip  mor seed 42  -- already complete: langB_MoR_seed42__547e435b__r4
+    skip  mor seed 43  -- already complete: langB_MoR_seed43__84a6b29d__r4
+    skip  mor seed 44  -- already complete: langB_MoR_seed44__5ce4b087
+    skip  mor seed 45  -- already complete: langB_MoR_seed45__bef0bdd0
+    skip  mor seed 46  -- already complete: langB_MoR_seed46__699aa4a1
+
+    nothing to do; every requested run is already complete.
+
+Caught with `--dry-run` *before* launching, which is the only reason it cost minutes rather
+than a day. Note the docstring at code/run_language_matrix.py:42-48 describes the opposite
+failure (checkpoint present, metrics absent → re-run) and is correct about that case; the
+weights-lost case is its exact mirror and was not anticipated.
+
+**Resolution: `--force`, not `git mv`-first.** Archiving the V100 MoR cells first would also
+unblock the runner, but it removes the admitted MoR arm from `runs/` for the ~15 h the
+retrain takes, during which the exporter cannot regenerate the published table at all.
+`--force` writes the new cells alongside, keeping the provenance record live until a
+replacement exists. The duplicate-cell state this creates is expected and is resolved
+*after* the run. Launched via `_launch_mor_retrain.ps1` (untracked local helper; the
+Terminal-panel tool types one literal PowerShell line into a fresh tab, so Git-Bash
+`export VAR=... && python ...` cannot be used and env vars do not persist between tabs).
+
+### Export unblocked; MoE headline moves by −0.005 nats
+
+`export_results.py --task language --check` refused the whole export with
+`duplicate cell ('moe', 42)` … `('moe', 46)` plus a seed-blind config difference on
+`data.jsonl_path`, `data.test_path`, `data.train_path`, `data.val_path` — absolute path
+strings, the V100's vs this machine's, not a scientific difference.
+
+Retired the five superseded V100 MoE cells with **`git mv`** into
+`archive/pre_finalization/lang_v100_no_checkpoints/`. Git staged all 20 files as renames
+(`R`), not delete+add, so the runbook's `git status --short | grep "^D"` check reports 0 —
+**that is correct here and not the `mv` trap**. The rename form carries the same guarantee
+the check exists to verify (the old path leaves the index); the T-LX.19 failure was plain
+`mv`, which leaves the old path *in* the index. Verify with `grep -cE "^R"` → 20, or confirm
+no `runs/` path survives in `git status`.
+
+Post-archive consistency: *one dataset_version, one split version, no duplicate cells,
+seed-blind configs identical within each arm*. The config-equality check is **within-arm**,
+which is why a mixed-GPU matrix passes — the V100 MoRE paths never get compared against the
+4060 MoE paths.
+
+Regenerated headline (`results/language/results_tables.md`, MoR still the V100 cells pending
+the retrain):
+
+| arm | `val/task_loss` | was | perplexity | params |
+|---|---|---|---|---|
+| MoE | 3.948311 ± 0.024202 | 3.952933 ± 0.039624 | 51.85 | 5,584,908 |
+| MoR | 3.520222 ± 0.040555 | unchanged | 33.79 | 5,581,063 |
+| MoRE | 3.636966 ± 0.013387 | unchanged | 37.98 | 5,584,908 |
+
+Ordering **MoR > MoRE > MoE** is unchanged and all three pairwise tests remain at the
+resolution floor `p = 0.0079`. MoE's tighter std moves two effect sizes: `MoRE − MoE`
+d −10.68 → **−15.92**, `MoE − MoR` d +10.79 → **+12.82**; `MoRE − MoR` is untouched at
++3.87. Any paper sentence quoting the old d values must be regenerated, not edited.
+
+### Gate and doc drift
+
+`code/run_correctness_suite.py` → **`TOTAL 357 357 0 0`**, all five gates PASS.
+`RUNBOOK_ACL_4060.md` §4 and `PAPER_GUIDE.md` §1 both say to expect **356**. One check was
+added after those files were written; 0 fail / 0 skip, so this is doc drift, not a
+regression. Both files updated.
+
+`code/lang_sweep_tlx20.json` is **absent** — the T-LX.20 weight sweep on Vedant's 3050 has
+produced no rows that have reached this machine. Per `PAPER_GUIDE.md` §9 and
+`RUNBOOK_ACL_4060.md` §9, §6 Cause 2 and Cause 3 of the paper must therefore be written from
+the dev-corpus grid in `code/lang_calibration_weights.json`, stating explicitly that the
+canonical-corpus confirmation was not run.
+
+**Failure tracing.**
+- *A matrix launch prints `nothing to do` and exits 0 when cells visibly lack weights* →
+  `run_language_matrix.py:finished_run()`; `checkpoint.pt` is not a completeness clause. Use
+  `--dry-run` first, always, then `--force`.
+- *`git status --short | grep "^D"` reports 0 after a `git mv`* → git recorded renames.
+  Check `grep -cE "^R"` instead. Only a surviving `runs/` path indicates the real `mv` trap.
+- *Exporter refuses on `data.*_path` seed-blind differences* → two machines' absolute paths
+  in one arm. Archive the off-machine cells; the check is within-arm so cross-arm path
+  differences are harmless.
+- *A published effect size no longer matches the table* → an arm's std changed under
+  retrain. Regenerate through `code/export_results.py --task language`; never edit a d.
+
+**Verified by.**
+- `code/run_correctness_suite.py` → `TOTAL 357 357 0 0`, five gates PASS.
+- `code/run_language_matrix.py --arch mor --dry-run` → all five seeds `skip`, the no-op.
+- `code/export_results.py --task language --check` → consistency clean after the `git mv`.
+- `code/export_results.py --task language` → `results/language/` regenerated, 15 admitted.
+- `nvidia-smi` during the retrain → 83% GPU, 6320/8188 MiB, 86 °C (thermal throttling
+  expected; `RUNBOOK_ACL_4060.md` §2 budgets 1.3× for it).
