@@ -79,6 +79,24 @@ def _find(d: dict, names):
     return None
 
 
+def expand_ewok(row: dict):
+    """EWoK-core schema -> two (context, good, bad) items per row.
+
+    A row is {Context1, Context2, Target1, Target2, Domain, ContextType, ...} where
+    Context1/Context2 are minimally different setups and Target1/Target2 the two
+    competing completions. The congruence task: Target1 fits Context1 and Target2
+    fits Context2, so we emit both crossings and the model is correct when it
+    prefers the congruent target given each context. Aggregated by `Domain`."""
+    c1, c2 = row.get("Context1"), row.get("Context2")
+    t1, t2 = row.get("Target1"), row.get("Target2")
+    if not all(isinstance(x, str) and x for x in (c1, c2, t1, t2)):
+        return None
+    meta = {"domain": row.get("Domain"), "context_type": row.get("ContextType"),
+            "target_diff": row.get("TargetDiff")}
+    return [({"context": c1, "sentence_good": t1, "sentence_bad": t2, **meta}),
+            ({"context": c2, "sentence_good": t2, "sentence_bad": t1, **meta})]
+
+
 def parse_item(d: dict):
     """Return (context, good_text, bad_text, meta) or None if unrecognised.
 
@@ -114,8 +132,14 @@ def load_local(data_dir: Path):
         if isinstance(rows, dict):
             rows = rows.get("data") or rows.get("examples") or list(rows.values())
         for r in rows:
-            if isinstance(r, dict):
-                items.append(r)
+            if not isinstance(r, dict):
+                continue
+            if "Context1" in r and "Target1" in r:      # EWoK-core schema
+                ex = expand_ewok(r)
+                if ex:
+                    items.extend(ex)
+                continue
+            items.append(r)
     return items
 
 

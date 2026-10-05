@@ -21,6 +21,25 @@
         "std": 0.02947603940403729
       }
     },
+    "mor": {
+      "n_seeds": 3,
+      "global_pr": {
+        "mean": 67.84772151976432,
+        "std": 5.545010081058856
+      },
+      "mean_per_expert_pr": {
+        "mean": 67.84772151976432,
+        "std": 5.545010081058856
+      },
+      "between_expert_mean_cosine": {
+        "mean": NaN,
+        "std": null
+      },
+      "between_over_total_variance": {
+        "mean": NaN,
+        "std": null
+      }
+    },
     "more": {
       "n_seeds": 5,
       "global_pr": {
@@ -42,10 +61,22 @@
     }
   },
   "pairwise_uncorrected": {
+    "moe_vs_mor_globalPR": {
+      "gap": -26.332291650135225,
+      "p_value": 0.017857142857142856,
+      "min_p": 0.017857142857142856,
+      "status": "UNCORRECTED -- exploratory"
+    },
     "moe_vs_more_globalPR": {
       "gap": -15.758365924685137,
       "p_value": 0.007936507936507936,
       "min_p": 0.007936507936507936,
+      "status": "UNCORRECTED -- exploratory"
+    },
+    "mor_vs_more_globalPR": {
+      "gap": 10.573925725450088,
+      "p_value": 0.017857142857142856,
+      "min_p": 0.017857142857142856,
       "status": "UNCORRECTED -- exploratory"
     }
   },
@@ -184,6 +215,57 @@
       ],
       "between_expert_mean_cosine": 0.6021392345428467,
       "between_over_total_variance": 0.1662923214382885
+    },
+    {
+      "run": "langB_MoR_seed42__c93f0fe8__r2",
+      "arch": "mor",
+      "seed": 42,
+      "n_tokens": 12288,
+      "d_model": 256,
+      "global_participation_ratio": 63.0106402375783,
+      "mean_per_expert_pr": 63.0106402375783,
+      "per_expert_pr": {
+        "0": 63.0106402375783
+      },
+      "expert_token_counts": [
+        12288
+      ],
+      "between_expert_mean_cosine": NaN,
+      "between_over_total_variance": NaN
+    },
+    {
+      "run": "langB_MoR_seed43__8b54a65f",
+      "arch": "mor",
+      "seed": 43,
+      "n_tokens": 12288,
+      "d_model": 256,
+      "global_participation_ratio": 73.89932151919275,
+      "mean_per_expert_pr": 73.89932151919275,
+      "per_expert_pr": {
+        "0": 73.89932151919275
+      },
+      "expert_token_counts": [
+        12288
+      ],
+      "between_expert_mean_cosine": NaN,
+      "between_over_total_variance": NaN
+    },
+    {
+      "run": "langB_MoR_seed44__c11db02d",
+      "arch": "mor",
+      "seed": 44,
+      "n_tokens": 12288,
+      "d_model": 256,
+      "global_participation_ratio": 66.63320280252192,
+      "mean_per_expert_pr": 66.63320280252192,
+      "per_expert_pr": {
+        "0": 66.63320280252192
+      },
+      "expert_token_counts": [
+        12288
+      ],
+      "between_expert_mean_cosine": NaN,
+      "between_over_total_variance": NaN
     },
     {
       "run": "langB_MoRE_seed42__9cfd3f1c",

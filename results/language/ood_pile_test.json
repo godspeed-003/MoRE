@@ -11,6 +11,12 @@
       "std_loss": 0.08852877684163514,
       "mean_perplexity": 4060.9385151735587
     },
+    "mor": {
+      "n_seeds": 3,
+      "mean_loss": 7.88849065308415,
+      "std_loss": 0.13798518388356365,
+      "mean_perplexity": 2666.416334658064
+    },
     "more": {
       "n_seeds": 5,
       "mean_loss": 7.653642969515931,
@@ -19,10 +25,22 @@
     }
   },
   "pairwise_uncorrected": {
+    "moe_vs_mor": {
+      "gap": 0.4206787341707523,
+      "p_value": 0.017857142857142856,
+      "min_p": 0.017857142857142856,
+      "status": "UNCORRECTED -- exploratory"
+    },
     "moe_vs_more": {
       "gap": 0.6555264177389715,
       "p_value": 0.007936507936507936,
       "min_p": 0.007936507936507936,
+      "status": "UNCORRECTED -- exploratory"
+    },
+    "mor_vs_more": {
+      "gap": 0.23484768356821917,
+      "p_value": 0.05357142857142857,
+      "min_p": 0.017857142857142856,
       "status": "UNCORRECTED -- exploratory"
     }
   },
@@ -65,6 +83,30 @@
       "seed": 46,
       "mean_loss": 8.333170810355393,
       "perplexity": 4159.585922145945,
+      "n_tokens": 510000
+    },
+    {
+      "run": "langB_MoR_seed42__c93f0fe8__r2",
+      "arch": "mor",
+      "seed": 42,
+      "mean_loss": 7.871985830269608,
+      "perplexity": 2622.768793796889,
+      "n_tokens": 510000
+    },
+    {
+      "run": "langB_MoR_seed43__8b54a65f",
+      "arch": "mor",
+      "seed": 43,
+      "mean_loss": 7.759500199142157,
+      "perplexity": 2343.7329127734665,
+      "n_tokens": 510000
+    },
+    {
+      "run": "langB_MoR_seed44__c11db02d",
+      "arch": "mor",
+      "seed": 44,
+      "mean_loss": 8.033985929840686,
+      "perplexity": 3084.0098538813663,
       "n_tokens": 510000
     },
     {
