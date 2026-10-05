@@ -160,6 +160,8 @@ def main(argv=None):
     ap.add_argument("--arch", default=None, choices=["moe", "mor", "more"])
     ap.add_argument("--run", action="append", default=None)
     ap.add_argument("--seq_len", type=int, default=256)
+    ap.add_argument("--max_blocks", type=int, default=2000,
+                    help="cap scored blocks (0 = all); a few thousand give stable ppl")
     ap.add_argument("--out", default=None)
     args = ap.parse_args(argv)
 
@@ -173,8 +175,12 @@ def main(argv=None):
     tok = load_tokenizer()
     lines = fetch_ood_lines(args.corpus, args.split)
     blocks = pack(tok, lines, args.seq_len)
+    if args.max_blocks and blocks.shape[0] > args.max_blocks:
+        # A few thousand blocks give a stable perplexity; the Pile's long documents
+        # otherwise pack into tens of thousands and the scoring never finishes.
+        blocks = blocks[: args.max_blocks]
     print(f"device={device}  OOD={args.corpus}:{args.split}  "
-          f"{blocks.shape[0]} blocks x {args.seq_len}  runs={len(runs)}")
+          f"{blocks.shape[0]} blocks x {args.seq_len}  runs={len(runs)}", flush=True)
     print("EXPLORATORY -- uncorrected, not a declared family.\n")
 
     cells = []
