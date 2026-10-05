@@ -1,0 +1,324 @@
+{
+  "probe": "subspace-trapping (Gemini hypothesis): final-state confinement",
+  "status": "EXPLORATORY. Final-state participation ratio and inter-expert separation on lm_head input. LOWER global/per-expert PR and HIGHER separation for MoRE than MoE would support trapping. The across-depth dynamic form is the post-ACL follow-up. Uncorrected.",
+  "by_arm": {
+    "moe": {
+      "n_seeds": 5,
+      "global_pr": {
+        "mean": 41.515429869629095,
+        "std": 1.6028808797364154
+      },
+      "mean_per_expert_pr": {
+        "mean": 30.596494748634704,
+        "std": 2.707718632341283
+      },
+      "between_expert_mean_cosine": {
+        "mean": 0.6296292781829834,
+        "std": 0.03984048666644464
+      },
+      "between_over_total_variance": {
+        "mean": 0.16449182910559293,
+        "std": 0.02947603940403729
+      }
+    },
+    "more": {
+      "n_seeds": 5,
+      "global_pr": {
+        "mean": 57.27379579431423,
+        "std": 2.812137429780748
+      },
+      "mean_per_expert_pr": {
+        "mean": 44.447377764445235,
+        "std": 2.0151139876743382
+      },
+      "between_expert_mean_cosine": {
+        "mean": 0.9161291480064392,
+        "std": 0.013626916687050855
+      },
+      "between_over_total_variance": {
+        "mean": 0.030144428451953295,
+        "std": 0.00451151111132032
+      }
+    }
+  },
+  "pairwise_uncorrected": {
+    "moe_vs_more_globalPR": {
+      "gap": -15.758365924685137,
+      "p_value": 0.007936507936507936,
+      "min_p": 0.007936507936507936,
+      "status": "UNCORRECTED -- exploratory"
+    }
+  },
+  "cells": [
+    {
+      "run": "langB_MoE_seed42__51000018",
+      "arch": "moe",
+      "seed": 42,
+      "n_tokens": 12288,
+      "d_model": 256,
+      "global_participation_ratio": 40.44603392761923,
+      "mean_per_expert_pr": 29.429481462424825,
+      "per_expert_pr": {
+        "0": 47.76975924613921,
+        "1": 28.085213170946343,
+        "2": 34.04641277384234,
+        "3": 31.342024598157355,
+        "4": 16.29423903222137,
+        "5": 19.039239953242323
+      },
+      "expert_token_counts": [
+        6624,
+        499,
+        939,
+        2747,
+        950,
+        529
+      ],
+      "between_expert_mean_cosine": 0.6419160962104797,
+      "between_over_total_variance": 0.1437823117949377
+    },
+    {
+      "run": "langB_MoE_seed43__7d85fe81",
+      "arch": "moe",
+      "seed": 43,
+      "n_tokens": 12288,
+      "d_model": 256,
+      "global_participation_ratio": 40.32600434818037,
+      "mean_per_expert_pr": 26.3851896422701,
+      "per_expert_pr": {
+        "0": 39.92242301072113,
+        "1": 29.478701336915332,
+        "2": 11.844926610225025,
+        "3": 37.579967654280686,
+        "4": 21.31592916145824,
+        "5": 18.16919008002018
+      },
+      "expert_token_counts": [
+        10007,
+        214,
+        448,
+        1111,
+        233,
+        275
+      ],
+      "between_expert_mean_cosine": 0.5849208831787109,
+      "between_over_total_variance": 0.1792108253631536
+    },
+    {
+      "run": "langB_MoE_seed44__c348b39a",
+      "arch": "moe",
+      "seed": 44,
+      "n_tokens": 12288,
+      "d_model": 256,
+      "global_participation_ratio": 40.876631366622725,
+      "mean_per_expert_pr": 31.77017582854861,
+      "per_expert_pr": {
+        "0": 19.571239872432145,
+        "1": 49.76930014608696,
+        "2": 23.490051064020303,
+        "3": 39.207119517854316,
+        "4": 22.840639273003553,
+        "5": 35.74270509789437
+      },
+      "expert_token_counts": [
+        1665,
+        7935,
+        1349,
+        299,
+        358,
+        682
+      ],
+      "between_expert_mean_cosine": 0.6308723092079163,
+      "between_over_total_variance": 0.20412212483375372
+    },
+    {
+      "run": "langB_MoE_seed45__64800f08",
+      "arch": "moe",
+      "seed": 45,
+      "n_tokens": 12288,
+      "d_model": 256,
+      "global_participation_ratio": 44.21171799779363,
+      "mean_per_expert_pr": 32.77923515504846,
+      "per_expert_pr": {
+        "0": 46.15170898329592,
+        "1": 20.562484932161972,
+        "2": 49.78885376776231,
+        "3": 31.603020076343803,
+        "4": 27.358977484997947,
+        "5": 21.210365685728817
+      },
+      "expert_token_counts": [
+        735,
+        2520,
+        6830,
+        1343,
+        590,
+        270
+      ],
+      "between_expert_mean_cosine": 0.6882978677749634,
+      "between_over_total_variance": 0.12905156209783117
+    },
+    {
+      "run": "langB_MoE_seed46__3d9d12a9",
+      "arch": "moe",
+      "seed": 46,
+      "n_tokens": 12288,
+      "d_model": 256,
+      "global_participation_ratio": 41.71676170792952,
+      "mean_per_expert_pr": 32.61839165488152,
+      "per_expert_pr": {
+        "0": 52.79279217268605,
+        "1": 23.736123768106626,
+        "2": 52.81031400535446,
+        "3": 24.107185338936592,
+        "4": 14.10958408846351,
+        "5": 28.15435055574188
+      },
+      "expert_token_counts": [
+        1534,
+        2624,
+        6361,
+        301,
+        257,
+        1211
+      ],
+      "between_expert_mean_cosine": 0.6021392345428467,
+      "between_over_total_variance": 0.1662923214382885
+    },
+    {
+      "run": "langB_MoRE_seed42__9cfd3f1c",
+      "arch": "more",
+      "seed": 42,
+      "n_tokens": 12288,
+      "d_model": 256,
+      "global_participation_ratio": 57.89133894520542,
+      "mean_per_expert_pr": 43.628507875819075,
+      "per_expert_pr": {
+        "0": 38.34732779573576,
+        "1": 50.53185388094912,
+        "2": 40.4633208078885,
+        "3": 47.750976483989156,
+        "4": 42.859095151544985,
+        "5": 41.818473134806936
+      },
+      "expert_token_counts": [
+        3293,
+        1456,
+        1130,
+        2241,
+        2566,
+        1602
+      ],
+      "between_expert_mean_cosine": 0.9260308146476746,
+      "between_over_total_variance": 0.028956396975988775
+    },
+    {
+      "run": "langB_MoRE_seed43__dbe38cbd",
+      "arch": "more",
+      "seed": 43,
+      "n_tokens": 12288,
+      "d_model": 256,
+      "global_participation_ratio": 55.6690613415169,
+      "mean_per_expert_pr": 44.28148433748668,
+      "per_expert_pr": {
+        "0": 48.4291484756167,
+        "1": 39.0547060407581,
+        "2": 38.08890465585281,
+        "3": 47.71330086268652,
+        "4": 43.01946789826912,
+        "5": 49.38337809173684
+      },
+      "expert_token_counts": [
+        1863,
+        1333,
+        3932,
+        2137,
+        1683,
+        1340
+      ],
+      "between_expert_mean_cosine": 0.9084275364875793,
+      "between_over_total_variance": 0.0341165996965417
+    },
+    {
+      "run": "langB_MoRE_seed44__16027752",
+      "arch": "more",
+      "seed": 44,
+      "n_tokens": 12288,
+      "d_model": 256,
+      "global_participation_ratio": 60.00533426905465,
+      "mean_per_expert_pr": 47.95579198994342,
+      "per_expert_pr": {
+        "0": 49.930841512871744,
+        "1": 48.38871528357169,
+        "2": 44.98695259222864,
+        "3": 45.203477945216925,
+        "4": 43.67062118755716,
+        "5": 55.55414341821438
+      },
+      "expert_token_counts": [
+        1151,
+        2983,
+        1392,
+        1124,
+        4155,
+        1483
+      ],
+      "between_expert_mean_cosine": 0.9114667773246765,
+      "between_over_total_variance": 0.026646468944681062
+    },
+    {
+      "run": "langB_MoRE_seed45__f6c47448",
+      "arch": "more",
+      "seed": 45,
+      "n_tokens": 12288,
+      "d_model": 256,
+      "global_participation_ratio": 59.5395562033799,
+      "mean_per_expert_pr": 43.34569548674698,
+      "per_expert_pr": {
+        "0": 45.19887598639241,
+        "1": 40.90785931008532,
+        "2": 50.9315592532343,
+        "3": 40.63859531041915,
+        "4": 28.73573115611302,
+        "5": 53.66155190423769
+      },
+      "expert_token_counts": [
+        1848,
+        1258,
+        2208,
+        3472,
+        972,
+        2530
+      ],
+      "between_expert_mean_cosine": 0.9006174802780151,
+      "between_over_total_variance": 0.03558734249065697
+    },
+    {
+      "run": "langB_MoRE_seed46__d069325c",
+      "arch": "more",
+      "seed": 46,
+      "n_tokens": 12288,
+      "d_model": 256,
+      "global_participation_ratio": 53.26368821241428,
+      "mean_per_expert_pr": 43.02540913223003,
+      "per_expert_pr": {
+        "0": 46.60933897029722,
+        "1": 43.70087753857612,
+        "2": 46.28468489883628,
+        "3": 38.28189100957525,
+        "4": 34.33790053930099,
+        "5": 48.93776183679433
+      },
+      "expert_token_counts": [
+        1176,
+        2051,
+        1893,
+        3845,
+        1635,
+        1688
+      ],
+      "between_expert_mean_cosine": 0.9341031312942505,
+      "between_over_total_variance": 0.025415334151897975
+    }
+  ]
+}

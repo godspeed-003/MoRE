@@ -1,0 +1,440 @@
+{
+  "status": "EXPLORATORY. Uncorrected and outside both declared families in code/confirmatory_tests.json, which prohibits adding a family after results exist. No significance verdict from this file may appear in an abstract or conclusion.",
+  "split": "val",
+  "fixed_depth": 5,
+  "corpus_override": null,
+  "stratified_by": "TARGET token id (the token being predicted), not the input token -- difficulty is a property of what must be predicted",
+  "population": "every position except each block's last, which has no next-token target; identical to the depth/hist population",
+  "depth_caveat": "The canonical MoRE arm forced-exits 97.3% of tokens at step 7 with depth/std 0.43, so a flat depth_by_decile is expected and is a statement about the halting collapse (T-LX.19/T-LX.20), NOT about the routing architecture.",
+  "n_deciles": 10,
+  "position_edges": [
+    0,
+    8,
+    32,
+    64,
+    128,
+    256
+  ],
+  "cells": [
+    {
+      "run": "langB_MoRE_seed42__9cfd3f1c",
+      "arch": "more",
+      "seed": 42,
+      "corpus": "wikitext-103",
+      "split": "val",
+      "fixed_depth": 5,
+      "n_tokens": 279990,
+      "mean_loss": 4.16891622543335,
+      "perplexity": 64.64535313894066,
+      "reproduces_published_val_task_loss": "MISMATCH recomputed 4.168916 vs published 3.652544 (delta 5.16e-01)",
+      "mean_exit_depth": 5.0,
+      "loss_by_decile": [
+        2.386864423751831,
+        2.6002397537231445,
+        2.9030826091766357,
+        3.8548388481140137,
+        3.825976848602295,
+        4.2420430183410645,
+        4.849365234375,
+        5.36138916015625,
+        5.7355570793151855,
+        5.975855350494385
+      ],
+      "depth_by_decile": [
+        5.0,
+        5.0,
+        5.0,
+        5.0,
+        5.0,
+        5.0,
+        5.0,
+        5.0,
+        5.0,
+        5.0
+      ],
+      "n_by_decile": [
+        30356,
+        28679,
+        26199,
+        26948,
+        26773,
+        28800,
+        27804,
+        27527,
+        28213,
+        28691
+      ],
+      "loss_by_family": [
+        3.3500280380249023,
+        5.280937194824219,
+        6.143228530883789,
+        5.678162574768066,
+        2.7635319232940674,
+        3.347146511077881
+      ],
+      "n_by_family": [
+        77637,
+        83616,
+        16252,
+        17908,
+        24186,
+        56829
+      ],
+      "position_edges": [
+        0,
+        8,
+        32,
+        64,
+        128,
+        256
+      ],
+      "loss_by_position": [
+        5.246716499328613,
+        4.372198104858398,
+        4.239794731140137,
+        4.1475725173950195,
+        4.055504322052002
+      ]
+    },
+    {
+      "run": "langB_MoRE_seed43__dbe38cbd",
+      "arch": "more",
+      "seed": 43,
+      "corpus": "wikitext-103",
+      "split": "val",
+      "fixed_depth": 5,
+      "n_tokens": 279990,
+      "mean_loss": 4.250247001647949,
+      "perplexity": 70.12273063780282,
+      "reproduces_published_val_task_loss": "MISMATCH recomputed 4.250247 vs published 3.629645 (delta 6.21e-01)",
+      "mean_exit_depth": 5.0,
+      "loss_by_decile": [
+        2.5952489376068115,
+        2.723851203918457,
+        3.1288530826568604,
+        4.013258457183838,
+        3.966541051864624,
+        4.300243377685547,
+        4.879721641540527,
+        5.340672969818115,
+        5.693953514099121,
+        5.912325382232666
+      ],
+      "depth_by_decile": [
+        5.0,
+        5.0,
+        5.0,
+        5.0,
+        5.0,
+        5.0,
+        5.0,
+        5.0,
+        5.0,
+        5.0
+      ],
+      "n_by_decile": [
+        30356,
+        28679,
+        26199,
+        26948,
+        26773,
+        28800,
+        27804,
+        27527,
+        28213,
+        28691
+      ],
+      "loss_by_family": [
+        3.4872865676879883,
+        5.305728912353516,
+        6.053644180297852,
+        5.715700626373291,
+        3.028761148452759,
+        3.4264440536499023
+      ],
+      "n_by_family": [
+        77637,
+        83616,
+        16252,
+        17908,
+        24186,
+        56829
+      ],
+      "position_edges": [
+        0,
+        8,
+        32,
+        64,
+        128,
+        256
+      ],
+      "loss_by_position": [
+        5.537001609802246,
+        4.541773796081543,
+        4.369015693664551,
+        4.225668907165527,
+        4.096559524536133
+      ]
+    },
+    {
+      "run": "langB_MoRE_seed44__16027752",
+      "arch": "more",
+      "seed": 44,
+      "corpus": "wikitext-103",
+      "split": "val",
+      "fixed_depth": 5,
+      "n_tokens": 279990,
+      "mean_loss": 4.066945552825928,
+      "perplexity": 58.378376322989055,
+      "reproduces_published_val_task_loss": "MISMATCH recomputed 4.066946 vs published 3.619213 (delta 4.48e-01)",
+      "mean_exit_depth": 5.0,
+      "loss_by_decile": [
+        2.2953500747680664,
+        2.4843528270721436,
+        2.8762335777282715,
+        3.761931896209717,
+        3.810696840286255,
+        4.17487907409668,
+        4.7440924644470215,
+        5.227980613708496,
+        5.555688381195068,
+        5.793746471405029
+      ],
+      "depth_by_decile": [
+        5.0,
+        5.0,
+        5.0,
+        5.0,
+        5.0,
+        5.0,
+        5.0,
+        5.0,
+        5.0,
+        5.0
+      ],
+      "n_by_decile": [
+        30356,
+        28679,
+        26199,
+        26948,
+        26773,
+        28800,
+        27804,
+        27527,
+        28213,
+        28691
+      ],
+      "loss_by_family": [
+        3.265660524368286,
+        5.111831188201904,
+        5.871687412261963,
+        5.592941761016846,
+        2.6532740592956543,
+        3.3566055297851562
+      ],
+      "n_by_family": [
+        77637,
+        83616,
+        16252,
+        17908,
+        24186,
+        56829
+      ],
+      "position_edges": [
+        0,
+        8,
+        32,
+        64,
+        128,
+        256
+      ],
+      "loss_by_position": [
+        5.425719738006592,
+        4.352695465087891,
+        4.135102272033691,
+        4.014380931854248,
+        3.9366703033447266
+      ]
+    },
+    {
+      "run": "langB_MoRE_seed45__f6c47448",
+      "arch": "more",
+      "seed": 45,
+      "corpus": "wikitext-103",
+      "split": "val",
+      "fixed_depth": 5,
+      "n_tokens": 279990,
+      "mean_loss": 4.105971813201904,
+      "perplexity": 60.701706612773336,
+      "reproduces_published_val_task_loss": "MISMATCH recomputed 4.105972 vs published 3.647203 (delta 4.59e-01)",
+      "mean_exit_depth": 5.0,
+      "loss_by_decile": [
+        2.267756938934326,
+        2.5096635818481445,
+        2.878150701522827,
+        3.8159725666046143,
+        3.8003170490264893,
+        4.180091381072998,
+        4.809332847595215,
+        5.30770206451416,
+        5.654632091522217,
+        5.893434047698975
+      ],
+      "depth_by_decile": [
+        5.0,
+        5.0,
+        5.0,
+        5.0,
+        5.0,
+        5.0,
+        5.0,
+        5.0,
+        5.0,
+        5.0
+      ],
+      "n_by_decile": [
+        30356,
+        28679,
+        26199,
+        26948,
+        26773,
+        28800,
+        27804,
+        27527,
+        28213,
+        28691
+      ],
+      "loss_by_family": [
+        3.3025124073028564,
+        5.223695278167725,
+        6.0438642501831055,
+        5.643886089324951,
+        2.594107151031494,
+        3.3048906326293945
+      ],
+      "n_by_family": [
+        77637,
+        83616,
+        16252,
+        17908,
+        24186,
+        56829
+      ],
+      "position_edges": [
+        0,
+        8,
+        32,
+        64,
+        128,
+        256
+      ],
+      "loss_by_position": [
+        5.1420063972473145,
+        4.372827053070068,
+        4.190250873565674,
+        4.069005966186523,
+        3.98767352104187
+      ]
+    },
+    {
+      "run": "langB_MoRE_seed46__d069325c",
+      "arch": "more",
+      "seed": 46,
+      "corpus": "wikitext-103",
+      "split": "val",
+      "fixed_depth": 5,
+      "n_tokens": 279990,
+      "mean_loss": 4.145535945892334,
+      "perplexity": 63.15145859844654,
+      "reproduces_published_val_task_loss": "MISMATCH recomputed 4.145536 vs published 3.636225 (delta 5.09e-01)",
+      "mean_exit_depth": 5.0,
+      "loss_by_decile": [
+        2.3514885902404785,
+        2.582063913345337,
+        2.955803394317627,
+        3.8832457065582275,
+        3.837123155593872,
+        4.222567081451416,
+        4.8171563148498535,
+        5.308489799499512,
+        5.661641597747803,
+        5.892262935638428
+      ],
+      "depth_by_decile": [
+        5.0,
+        5.0,
+        5.0,
+        5.0,
+        5.0,
+        5.0,
+        5.0,
+        5.0,
+        5.0,
+        5.0
+      ],
+      "n_by_decile": [
+        30356,
+        28679,
+        26199,
+        26948,
+        26773,
+        28800,
+        27804,
+        27527,
+        28213,
+        28691
+      ],
+      "loss_by_family": [
+        3.3758656978607178,
+        5.228630542755127,
+        6.020556449890137,
+        5.657536029815674,
+        2.704929828643799,
+        3.3435311317443848
+      ],
+      "n_by_family": [
+        77637,
+        83616,
+        16252,
+        17908,
+        24186,
+        56829
+      ],
+      "position_edges": [
+        0,
+        8,
+        32,
+        64,
+        128,
+        256
+      ],
+      "loss_by_position": [
+        5.141010284423828,
+        4.428510665893555,
+        4.26300048828125,
+        4.104000568389893,
+        4.020687580108643
+      ]
+    }
+  ],
+  "by_arm": {
+    "more": {
+      "n_seeds": 5,
+      "mean_loss": 4.147523307800293,
+      "std_loss": 0.06934166335974305,
+      "loss_by_decile_mean": [
+        2.379341793060303,
+        2.5800342559814453,
+        2.9484246730804444,
+        3.865849494934082,
+        3.848130989074707,
+        4.223964786529541,
+        4.819933700561523,
+        5.309246921539307,
+        5.660294532775879,
+        5.893524837493897
+      ]
+    }
+  },
+  "pairwise_uncorrected": {}
+}
