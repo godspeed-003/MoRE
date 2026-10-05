@@ -1,0 +1,283 @@
+{
+  "probe": "across-depth dynamic (velocity + update collinearity)",
+  "status": "EXPLORATORY. fixed_depth forced so per-step states align. velocity = mean L2 of consecutive post-norm states; update_collinearity = mean cos(h_k - h_{k-1}, h_{k-1}) (near 0 orthogonal/new features, near +-1 pure rescale). MoE is single-step N/A. Uncorrected.",
+  "by_arm": {
+    "more": {
+      "n_seeds": 5,
+      "transition_k": [
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ],
+      "velocity_mean": [
+        9.092048645019531,
+        5.478525161743164,
+        4.740161387125651,
+        4.243427276611328,
+        3.8185296376546223,
+        3.490232213338216
+      ],
+      "cos_distance_mean": [
+        0.17377417385578156,
+        0.06125813126564026,
+        0.04469165081779162,
+        0.03350659670929114,
+        0.02632993298272292,
+        0.021857616305351258
+      ],
+      "update_collinearity_mean": [
+        -0.26730115711688995,
+        -0.1242458110054334,
+        -0.08199334815144539,
+        -0.05096483727296194,
+        -0.05577654034520189,
+        -0.0745797215650479
+      ]
+    }
+  },
+  "cells": [
+    {
+      "run": "langB_MoE_seed42__51000018",
+      "arch": "moe",
+      "seed": 42,
+      "max_depth": 1,
+      "velocity": null,
+      "cos_distance": null,
+      "update_collinearity": null,
+      "note": "max_depth 1 -- single step, no across-depth trajectory"
+    },
+    {
+      "run": "langB_MoE_seed43__7d85fe81",
+      "arch": "moe",
+      "seed": 43,
+      "max_depth": 1,
+      "velocity": null,
+      "cos_distance": null,
+      "update_collinearity": null,
+      "note": "max_depth 1 -- single step, no across-depth trajectory"
+    },
+    {
+      "run": "langB_MoE_seed44__c348b39a",
+      "arch": "moe",
+      "seed": 44,
+      "max_depth": 1,
+      "velocity": null,
+      "cos_distance": null,
+      "update_collinearity": null,
+      "note": "max_depth 1 -- single step, no across-depth trajectory"
+    },
+    {
+      "run": "langB_MoE_seed45__64800f08",
+      "arch": "moe",
+      "seed": 45,
+      "max_depth": 1,
+      "velocity": null,
+      "cos_distance": null,
+      "update_collinearity": null,
+      "note": "max_depth 1 -- single step, no across-depth trajectory"
+    },
+    {
+      "run": "langB_MoE_seed46__3d9d12a9",
+      "arch": "moe",
+      "seed": 46,
+      "max_depth": 1,
+      "velocity": null,
+      "cos_distance": null,
+      "update_collinearity": null,
+      "note": "max_depth 1 -- single step, no across-depth trajectory"
+    },
+    {
+      "run": "langB_MoRE_seed42__9cfd3f1c",
+      "arch": "more",
+      "seed": 42,
+      "max_depth": 7,
+      "transition_k": [
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ],
+      "velocity": [
+        9.501504262288412,
+        5.605379104614258,
+        4.752860069274902,
+        4.259628613789876,
+        3.809854427973429,
+        3.45443065961202
+      ],
+      "cos_distance": [
+        0.17097894350687662,
+        0.05706612765789032,
+        0.04039125392834345,
+        0.031700040524204574,
+        0.02484668294588725,
+        0.020146502802769344
+      ],
+      "update_collinearity": [
+        -0.23103784024715424,
+        -0.15079553922017416,
+        -0.10688265164693196,
+        -0.08036005000273387,
+        -0.07247402767340343,
+        -0.06932071099678676
+      ]
+    },
+    {
+      "run": "langB_MoRE_seed43__dbe38cbd",
+      "arch": "more",
+      "seed": 43,
+      "max_depth": 7,
+      "transition_k": [
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ],
+      "velocity": [
+        8.862553596496582,
+        5.732333819071452,
+        4.954489866892497,
+        4.421734809875488,
+        3.85455592473348,
+        3.3767731189727783
+      ],
+      "cos_distance": [
+        0.1723201423883438,
+        0.06825179606676102,
+        0.049493628243605294,
+        0.035488719741503395,
+        0.02644218939046065,
+        0.020724589005112648
+      ],
+      "update_collinearity": [
+        -0.22949285308519998,
+        -0.0991869072119395,
+        -0.056169105072816215,
+        -0.06355640292167664,
+        -0.0959950586160024,
+        -0.12994821618000665
+      ]
+    },
+    {
+      "run": "langB_MoRE_seed44__16027752",
+      "arch": "more",
+      "seed": 44,
+      "max_depth": 7,
+      "transition_k": [
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ],
+      "velocity": [
+        9.040593465169271,
+        5.40921417872111,
+        4.810981750488281,
+        4.35100793838501,
+        4.134489297866821,
+        3.8518146673838296
+      ],
+      "cos_distance": [
+        0.181756854057312,
+        0.06271080921093623,
+        0.0498196172217528,
+        0.03729944924513499,
+        0.032331147541602455,
+        0.028336387127637863
+      ],
+      "update_collinearity": [
+        -0.25553499658902484,
+        -0.1310443083445231,
+        -0.11919012665748596,
+        -0.06076812123258909,
+        -0.07215094442168872,
+        -0.1075043057401975
+      ]
+    },
+    {
+      "run": "langB_MoRE_seed45__f6c47448",
+      "arch": "more",
+      "seed": 45,
+      "max_depth": 7,
+      "transition_k": [
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ],
+      "velocity": [
+        9.150018056233725,
+        5.306427955627441,
+        4.441362063090007,
+        3.9457527796427407,
+        3.5440706411997476,
+        3.2744917074839273
+      ],
+      "cos_distance": [
+        0.17207167049249014,
+        0.0572048748532931,
+        0.03873779997229576,
+        0.029317925373713177,
+        0.022802049294114113,
+        0.018855528285106022
+      ],
+      "update_collinearity": [
+        -0.29734038313229877,
+        -0.13146001597245535,
+        -0.08148992558320363,
+        -0.03909573641916116,
+        -0.027245059609413147,
+        -0.02356127214928468
+      ]
+    },
+    {
+      "run": "langB_MoRE_seed46__d069325c",
+      "arch": "more",
+      "seed": 46,
+      "max_depth": 7,
+      "transition_k": [
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ],
+      "velocity": [
+        8.905573844909668,
+        5.3392707506815595,
+        4.741113185882568,
+        4.239012241363525,
+        3.749677896499634,
+        3.4936509132385254
+      ],
+      "cos_distance": [
+        0.1717432588338852,
+        0.061057048539320626,
+        0.04501595472296079,
+        0.03372684866189957,
+        0.02522759574155013,
+        0.02122507430613041
+      ],
+      "update_collinearity": [
+        -0.3230997125307719,
+        -0.1087422842780749,
+        -0.04623493179678917,
+        -0.011043875788648924,
+        -0.011017611405501762,
+        -0.042564102758963905
+      ]
+    }
+  ]
+}
