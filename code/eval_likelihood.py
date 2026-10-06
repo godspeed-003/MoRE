@@ -170,7 +170,7 @@ def score_option(model, tok, ctx, opt, device):
     return total
 
 
-def eval_dir(run_dir, data_dir, tok, device):
+def eval_dir(run_dir, raw_items, tok, device):
     rc = json.loads((run_dir / "resolved_config.json").read_text(encoding="utf-8"))
     mc, dc = rc.get("model", {}), rc.get("data", {})
     task = rc.get("task") or (rc.get("provenance", {}) or {}).get("task")
@@ -181,9 +181,8 @@ def eval_dir(run_dir, data_dir, tok, device):
     model.load_state_dict(torch.load(run_dir / "checkpoint.pt", map_location=device))
     model.eval()
 
-    raw = load_local(data_dir)
     parsed, skipped = [], 0
-    for d in raw:
+    for d in raw_items:
         got = parse_item(d)
         if got is None:
             skipped += 1
@@ -216,6 +215,8 @@ def main(argv=None):
     ap.add_argument("--arch", default=None, choices=["moe", "mor", "more"])
     ap.add_argument("--run", action="append", default=None)
     ap.add_argument("--out", default=None)
+    ap.add_argument("--max_items", type=int, default=0,
+                    help="cap items (0 = all); even-stride subsample for speed")
     args = ap.parse_args(argv)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -233,12 +234,20 @@ def main(argv=None):
         print("no canonical cell with a checkpoint found.")
         return 2
     tok = load_tokenizer()
-    print(f"device={device}  eval={args.name}  dir={data_dir}  runs={len(runs)}")
+    all_items = load_local(data_dir)
+    if args.max_items and len(all_items) > args.max_items:
+        # Deterministic even-stride subsample: EWoK is uniformly at chance here, so a
+        # few thousand items give a tight estimate and the full 8748 x 13 cells runs
+        # past the 30-min background cap. Stride keeps all domains represented.
+        step = len(all_items) / args.max_items
+        all_items = [all_items[int(i * step)] for i in range(args.max_items)]
+    print(f"device={device}  eval={args.name}  dir={data_dir}  runs={len(runs)}  "
+          f"items={len(all_items)}")
     print("EXPLORATORY -- uncorrected; near-chance is the honest expectation.\n")
 
     cells, skipped = [], 0
     for d in runs:
-        c, sk = eval_dir(d, data_dir, tok, device)
+        c, sk = eval_dir(d, all_items, tok, device)
         skipped += sk
         if c is None:
             print(f"  {d.name}: no recognised items (skipped {sk})")

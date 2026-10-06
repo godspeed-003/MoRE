@@ -1,0 +1,305 @@
+{
+  "benchmark": "ewok (zero-shot likelihood scoring)",
+  "status": "EXPLORATORY. Scored with the wikitext-103 8192-BPE tokenizer so absolute accuracy is not comparable to published models; cross-arm only. Near-chance expected at this scale -- a limitation, not a finding. Uncorrected.",
+  "data_dir": "data\\ewok",
+  "chance": 0.5,
+  "by_arm": {
+    "moe": {
+      "n_seeds": 5,
+      "overall_mean": 0.4961666666666667,
+      "overall_std": 0.004273627134986028
+    },
+    "mor": {
+      "n_seeds": 3,
+      "overall_mean": 0.5091666666666667,
+      "overall_std": 0.006614378277661503
+    },
+    "more": {
+      "n_seeds": 5,
+      "overall_mean": 0.4995,
+      "overall_std": 0.007279155933974176
+    }
+  },
+  "pairwise_uncorrected": {
+    "moe_vs_mor": {
+      "gap": -0.012999999999999956,
+      "p_value": 0.017857142857142856,
+      "min_p": 0.017857142857142856,
+      "status": "UNCORRECTED -- exploratory"
+    },
+    "moe_vs_more": {
+      "gap": -0.0033333333333332993,
+      "p_value": 0.42063492063492064,
+      "min_p": 0.007936507936507936,
+      "status": "UNCORRECTED -- exploratory"
+    },
+    "mor_vs_more": {
+      "gap": 0.009666666666666657,
+      "p_value": 0.17857142857142858,
+      "min_p": 0.017857142857142856,
+      "status": "UNCORRECTED -- exploratory"
+    }
+  },
+  "cells": [
+    {
+      "run": "langB_MoE_seed42__51000018",
+      "arch": "moe",
+      "seed": 42,
+      "n_items": 1200,
+      "overall": 0.5,
+      "by_slice": {
+        "domain:agent-properties": 0.512987012987013,
+        "domain:material-dynamics": 0.4766355140186916,
+        "domain:material-properties": 0.5294117647058824,
+        "domain:physical-dynamics": 0.45,
+        "domain:physical-interactions": 0.5064935064935064,
+        "domain:physical-relations": 0.4824561403508772,
+        "domain:quantitative-properties": 0.46153846153846156,
+        "domain:social-interactions": 0.4791666666666667,
+        "domain:social-properties": 0.49019607843137253,
+        "domain:social-relations": 0.5116279069767442,
+        "domain:spatial-relations": 0.5522388059701493
+      }
+    },
+    {
+      "run": "langB_MoE_seed43__7d85fe81",
+      "arch": "moe",
+      "seed": 43,
+      "n_items": 1200,
+      "overall": 0.49083333333333334,
+      "by_slice": {
+        "domain:agent-properties": 0.4707792207792208,
+        "domain:material-dynamics": 0.4953271028037383,
+        "domain:material-properties": 0.5294117647058824,
+        "domain:physical-dynamics": 0.4,
+        "domain:physical-interactions": 0.4675324675324675,
+        "domain:physical-relations": 0.5263157894736842,
+        "domain:quantitative-properties": 0.5769230769230769,
+        "domain:social-interactions": 0.4375,
+        "domain:social-properties": 0.5490196078431373,
+        "domain:social-relations": 0.4930232558139535,
+        "domain:spatial-relations": 0.4626865671641791
+      }
+    },
+    {
+      "run": "langB_MoE_seed44__c348b39a",
+      "arch": "moe",
+      "seed": 44,
+      "n_items": 1200,
+      "overall": 0.49583333333333335,
+      "by_slice": {
+        "domain:agent-properties": 0.5227272727272727,
+        "domain:material-dynamics": 0.4766355140186916,
+        "domain:material-properties": 0.4411764705882353,
+        "domain:physical-dynamics": 0.4,
+        "domain:physical-interactions": 0.5064935064935064,
+        "domain:physical-relations": 0.4649122807017544,
+        "domain:quantitative-properties": 0.4807692307692308,
+        "domain:social-interactions": 0.5208333333333334,
+        "domain:social-properties": 0.5490196078431373,
+        "domain:social-relations": 0.4744186046511628,
+        "domain:spatial-relations": 0.5522388059701493
+      }
+    },
+    {
+      "run": "langB_MoE_seed45__64800f08",
+      "arch": "moe",
+      "seed": 45,
+      "n_items": 1200,
+      "overall": 0.5008333333333334,
+      "by_slice": {
+        "domain:agent-properties": 0.5097402597402597,
+        "domain:material-dynamics": 0.49065420560747663,
+        "domain:material-properties": 0.4117647058823529,
+        "domain:physical-dynamics": 0.4,
+        "domain:physical-interactions": 0.5324675324675324,
+        "domain:physical-relations": 0.5350877192982456,
+        "domain:quantitative-properties": 0.5384615384615384,
+        "domain:social-interactions": 0.5,
+        "domain:social-properties": 0.5490196078431373,
+        "domain:social-relations": 0.4790697674418605,
+        "domain:spatial-relations": 0.47761194029850745
+      }
+    },
+    {
+      "run": "langB_MoE_seed46__3d9d12a9",
+      "arch": "moe",
+      "seed": 46,
+      "n_items": 1200,
+      "overall": 0.49333333333333335,
+      "by_slice": {
+        "domain:agent-properties": 0.5227272727272727,
+        "domain:material-dynamics": 0.4532710280373832,
+        "domain:material-properties": 0.5,
+        "domain:physical-dynamics": 0.55,
+        "domain:physical-interactions": 0.4935064935064935,
+        "domain:physical-relations": 0.49122807017543857,
+        "domain:quantitative-properties": 0.5,
+        "domain:social-interactions": 0.4375,
+        "domain:social-properties": 0.5490196078431373,
+        "domain:social-relations": 0.48372093023255813,
+        "domain:spatial-relations": 0.4925373134328358
+      }
+    },
+    {
+      "run": "langB_MoR_seed42__c93f0fe8__r2",
+      "arch": "mor",
+      "seed": 42,
+      "n_items": 1200,
+      "overall": 0.5166666666666667,
+      "by_slice": {
+        "domain:agent-properties": 0.5292207792207793,
+        "domain:material-dynamics": 0.5,
+        "domain:material-properties": 0.5294117647058824,
+        "domain:physical-dynamics": 0.45,
+        "domain:physical-interactions": 0.6103896103896104,
+        "domain:physical-relations": 0.5175438596491229,
+        "domain:quantitative-properties": 0.4807692307692308,
+        "domain:social-interactions": 0.5416666666666666,
+        "domain:social-properties": 0.5490196078431373,
+        "domain:social-relations": 0.5069767441860465,
+        "domain:spatial-relations": 0.43283582089552236
+      }
+    },
+    {
+      "run": "langB_MoR_seed43__8b54a65f",
+      "arch": "mor",
+      "seed": 43,
+      "n_items": 1200,
+      "overall": 0.5041666666666667,
+      "by_slice": {
+        "domain:agent-properties": 0.5454545454545454,
+        "domain:material-dynamics": 0.4766355140186916,
+        "domain:material-properties": 0.47058823529411764,
+        "domain:physical-dynamics": 0.5,
+        "domain:physical-interactions": 0.5194805194805194,
+        "domain:physical-relations": 0.49122807017543857,
+        "domain:quantitative-properties": 0.40384615384615385,
+        "domain:social-interactions": 0.4791666666666667,
+        "domain:social-properties": 0.5686274509803921,
+        "domain:social-relations": 0.4790697674418605,
+        "domain:spatial-relations": 0.5522388059701493
+      }
+    },
+    {
+      "run": "langB_MoR_seed44__c11db02d",
+      "arch": "mor",
+      "seed": 44,
+      "n_items": 1200,
+      "overall": 0.5066666666666667,
+      "by_slice": {
+        "domain:agent-properties": 0.5357142857142857,
+        "domain:material-dynamics": 0.48130841121495327,
+        "domain:material-properties": 0.47058823529411764,
+        "domain:physical-dynamics": 0.4,
+        "domain:physical-interactions": 0.5454545454545454,
+        "domain:physical-relations": 0.5175438596491229,
+        "domain:quantitative-properties": 0.4807692307692308,
+        "domain:social-interactions": 0.4791666666666667,
+        "domain:social-properties": 0.5294117647058824,
+        "domain:social-relations": 0.5162790697674419,
+        "domain:spatial-relations": 0.43283582089552236
+      }
+    },
+    {
+      "run": "langB_MoRE_seed42__9cfd3f1c",
+      "arch": "more",
+      "seed": 42,
+      "n_items": 1200,
+      "overall": 0.49416666666666664,
+      "by_slice": {
+        "domain:agent-properties": 0.5227272727272727,
+        "domain:material-dynamics": 0.45794392523364486,
+        "domain:material-properties": 0.5588235294117647,
+        "domain:physical-dynamics": 0.7,
+        "domain:physical-interactions": 0.5064935064935064,
+        "domain:physical-relations": 0.4649122807017544,
+        "domain:quantitative-properties": 0.5384615384615384,
+        "domain:social-interactions": 0.4791666666666667,
+        "domain:social-properties": 0.5882352941176471,
+        "domain:social-relations": 0.4604651162790698,
+        "domain:spatial-relations": 0.43283582089552236
+      }
+    },
+    {
+      "run": "langB_MoRE_seed43__dbe38cbd",
+      "arch": "more",
+      "seed": 43,
+      "n_items": 1200,
+      "overall": 0.5066666666666667,
+      "by_slice": {
+        "domain:agent-properties": 0.5,
+        "domain:material-dynamics": 0.514018691588785,
+        "domain:material-properties": 0.5882352941176471,
+        "domain:physical-dynamics": 0.45,
+        "domain:physical-interactions": 0.5194805194805194,
+        "domain:physical-relations": 0.5087719298245614,
+        "domain:quantitative-properties": 0.4807692307692308,
+        "domain:social-interactions": 0.5208333333333334,
+        "domain:social-properties": 0.5686274509803921,
+        "domain:social-relations": 0.48372093023255813,
+        "domain:spatial-relations": 0.5074626865671642
+      }
+    },
+    {
+      "run": "langB_MoRE_seed44__16027752",
+      "arch": "more",
+      "seed": 44,
+      "n_items": 1200,
+      "overall": 0.49,
+      "by_slice": {
+        "domain:agent-properties": 0.5292207792207793,
+        "domain:material-dynamics": 0.4439252336448598,
+        "domain:material-properties": 0.6470588235294118,
+        "domain:physical-dynamics": 0.4,
+        "domain:physical-interactions": 0.5324675324675324,
+        "domain:physical-relations": 0.47368421052631576,
+        "domain:quantitative-properties": 0.4423076923076923,
+        "domain:social-interactions": 0.4375,
+        "domain:social-properties": 0.49019607843137253,
+        "domain:social-relations": 0.4883720930232558,
+        "domain:spatial-relations": 0.4626865671641791
+      }
+    },
+    {
+      "run": "langB_MoRE_seed45__f6c47448",
+      "arch": "more",
+      "seed": 45,
+      "n_items": 1200,
+      "overall": 0.5008333333333334,
+      "by_slice": {
+        "domain:agent-properties": 0.5324675324675324,
+        "domain:material-dynamics": 0.48130841121495327,
+        "domain:material-properties": 0.5882352941176471,
+        "domain:physical-dynamics": 0.45,
+        "domain:physical-interactions": 0.5584415584415584,
+        "domain:physical-relations": 0.47368421052631576,
+        "domain:quantitative-properties": 0.5576923076923077,
+        "domain:social-interactions": 0.4583333333333333,
+        "domain:social-properties": 0.5686274509803921,
+        "domain:social-relations": 0.4558139534883721,
+        "domain:spatial-relations": 0.44776119402985076
+      }
+    },
+    {
+      "run": "langB_MoRE_seed46__d069325c",
+      "arch": "more",
+      "seed": 46,
+      "n_items": 1200,
+      "overall": 0.5058333333333334,
+      "by_slice": {
+        "domain:agent-properties": 0.5357142857142857,
+        "domain:material-dynamics": 0.49065420560747663,
+        "domain:material-properties": 0.4411764705882353,
+        "domain:physical-dynamics": 0.4,
+        "domain:physical-interactions": 0.5194805194805194,
+        "domain:physical-relations": 0.5175438596491229,
+        "domain:quantitative-properties": 0.5576923076923077,
+        "domain:social-interactions": 0.4791666666666667,
+        "domain:social-properties": 0.5686274509803921,
+        "domain:social-relations": 0.48372093023255813,
+        "domain:spatial-relations": 0.44776119402985076
+      }
+    }
+  ]
+}
