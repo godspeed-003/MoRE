@@ -736,9 +736,30 @@ def fmt_ms(a: dict, prec: int = 6) -> str:
 def write_runs_csv(rows: list[dict], keys: list[str]) -> Path:
     """Long format, one row per run: provenance then every metric. This is the file a
     reviewer re-analyses from; it contains no aggregates and no verdicts, so it cannot
-    encode a reading rule."""
+    encode a reading rule.
+
+    METRIC KEYS THAT COLLIDE WITH THE PROVENANCE HEADER ARE DROPPED FROM THE METRIC
+    BLOCK, NOT WRITTEN TWICE (T-LX.33). `metrics.json` carries top-level keys named
+    `architecture`, `experiment_id`, `experiment_group`, `config_hash` and
+    `total_params` -- the same names as PROV_KEYS -- so `PROV_KEYS + keys` emitted each
+    of those column names twice. `csv.reader` reads positionally and Markdown is built
+    from the row dicts, so both were correct; but `csv.DictReader` keeps the LAST
+    occurrence, which was the metric-block copy, and for a language run that copy is
+    `N/A` (the architecture is a provenance field there, not a metric). A reviewer
+    re-analysing `results.csv` as records therefore saw `architecture = N/A` on every
+    row. The provenance columns win because they are the authoritative identity; the
+    duplicate metric copies are dropped. Values are unchanged for any positionally-read
+    consumer -- every surviving column keeps its provenance value and the metric block
+    simply loses five redundant columns.
+    """
     path = OUT / "results.csv"
-    header = list(PROV_KEYS) + ["run_dir"] + keys
+    reserved = set(PROV_KEYS) | {"run_dir"}
+    metric_keys = [k for k in keys if k not in reserved]
+    dropped = [k for k in keys if k in reserved]
+    if dropped:
+        print(f"  [csv] dropped {len(dropped)} metric key(s) duplicating provenance "
+              f"columns: {sorted(dropped)}")
+    header = list(PROV_KEYS) + ["run_dir"] + metric_keys
     with path.open("w", newline="", encoding="utf-8") as fh:
         w = csv.writer(fh)
         w.writerow(header)
@@ -746,7 +767,7 @@ def write_runs_csv(rows: list[dict], keys: list[str]) -> Path:
             prov = r["provenance"]
             w.writerow([prov.get(k) if prov.get(k) is not None else "N/A"
                         for k in PROV_KEYS]
-                       + [r["run_dir"]] + [cell(r, k) for k in keys])
+                       + [r["run_dir"]] + [cell(r, k) for k in metric_keys])
     return path
 
 

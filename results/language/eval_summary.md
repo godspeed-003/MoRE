@@ -20,13 +20,18 @@ FLOPs and wall-clock disagree on purpose: MoR does the most FLOPs (deep single b
 
 ## Scores with compute bracket
 
+Format: `score (nats-or-pts difference vs the worst arm, inference FLOPs multiplier vs the cheapest arm, difference per compute multiplier)`. The worst arm shows only its multiplier. **diff/multiplier** is how much score each unit of extra compute bought -- higher is more efficient. Lower is better for loss rows, higher for accuracy rows.
+
 | eval | MoE | MoR | MoRE |
 |---|---|---|---|
-| Val loss (nats, lower better) | 3.9483 +- 0.0242 (worst, 1.00x) | 3.5154 +- 0.0340 (best, 9.07x) | 3.6370 +- 0.0134 (mid, 2.19x) |
-| Test loss (nats, lower better) | 3.9473 +- 0.0224 (worst, 1.00x) | 3.5127 +- 0.0333 (best, 9.07x) | 3.6210 +- 0.0139 (mid, 2.19x) |
-| OOD perplexity loss (nats, lower) | 8.2724 +- 0.0880 (worst, 1.00x) | 7.8019 +- 0.1576 (mid, 9.07x) | 7.5732 +- 0.1222 (best, 2.19x) |
-| BLiMP (acc, higher better) | 56.63% +- 1.37 (worst, 1.00x) | 58.74% +- 1.39 (best, 9.07x) | 58.36% +- 1.54 (mid, 2.19x) |
-| EWoK (acc, chance 50%) | 49.62% +- 0.43 (worst, 1.00x) | 50.33% +- 0.96 (best, 9.07x) | 49.95% +- 0.73 (mid, 2.19x) |
+| Val loss (nats, lower better) | 3.9483 +- 0.0242 (1.00x) | 3.5154 +- 0.0340 (-0.4329, 9.07x, 0.0477) | 3.6370 +- 0.0134 (-0.3113, 2.19x, 0.1420) |
+| Test loss (nats, lower better) | 3.9473 +- 0.0224 (1.00x) | 3.5127 +- 0.0333 (-0.4346, 9.07x, 0.0479) | 3.6210 +- 0.0139 (-0.3263, 2.19x, 0.1489) |
+| OOD perplexity loss (nats, lower) | 8.2724 +- 0.0880 (1.00x) | 7.8019 +- 0.1576 (-0.4705, 9.07x, 0.0519) | 7.5732 +- 0.1222 (-0.6993, 2.19x, 0.3190) |
+| BLiMP (acc, higher better) | 56.63% +- 1.37 (1.00x) | 58.74% +- 1.39 (+2.11%, 9.07x, 0.233) | 58.36% +- 1.54 (+1.73%, 2.19x, 0.791) |
+| EWoK (acc, chance 50%) | 49.62% +- 0.43 (1.00x) * | 50.33% +- 0.96 (+0.72%, 9.07x, 0.079) * | 49.95% +- 0.73 (+0.33%, 2.19x, 0.152) * |
+
+`*` EWoK: every arm is within noise of the 50% chance floor, so its rankings and per-compute figures are not meaningful -- shown for completeness, not as a result.
+
 
 ## Compute efficiency (val loss gain over MoE per extra FLOPs-x)
 

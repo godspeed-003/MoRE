@@ -6333,7 +6333,7 @@
         },
         "diag/max_pairwise_cosine_sim": {
           "mean": 0.057213543355464934,
-          "std": 0.009740106899431718,
+          "std": 0.00974010689943172,
           "n": 5,
           "raw": [
             0.060337863862514496,
@@ -6565,7 +6565,7 @@
         },
         "expert_load/expert_0_pct": {
           "mean": 35.34379243850708,
-          "std": 36.05415542118203,
+          "std": 36.05415542118204,
           "n": 5,
           "raw": [
             63.95833492279053,
@@ -7515,7 +7515,7 @@
         },
         "val/routing_control_pos/raw_accuracy_control_std": {
           "mean": 0.02173942388108478,
-          "std": 0.010401220239119262,
+          "std": 0.010401220239119264,
           "n": 5,
           "raw": [
             0.01503866880388841,
@@ -7529,7 +7529,7 @@
         },
         "val/routing_control_pos/raw_accuracy_delta": {
           "mean": -0.000496692082618666,
-          "std": 0.06009830271322081,
+          "std": 0.060098302713220815,
           "n": 5,
           "raw": [
             0.021426512345234155,
@@ -7571,7 +7571,7 @@
         },
         "val/routing_control_topic/ami_control_mean": {
           "mean": -2.131680880554913e-05,
-          "std": 0.0005849782520901861,
+          "std": 0.000584978252090186,
           "n": 5,
           "raw": [
             0.0007729616237094119,
@@ -7652,7 +7652,7 @@
         },
         "val/routing_control_topic/hungarian_accuracy_control_mean": {
           "mean": 0.6427686703096539,
-          "std": 0.012304455712981902,
+          "std": 0.012304455712981903,
           "n": 5,
           "raw": [
             0.6207650273224044,
@@ -7799,7 +7799,7 @@
         },
         "val/routing_control_topic/purity_real": {
           "mean": 0.6486338797814207,
-          "std": 0.0004072983565573227,
+          "std": 0.0004072983565573226,
           "n": 5,
           "raw": [
             0.6484517304189436,
@@ -7921,7 +7921,7 @@
         },
         "val/routing_f1/E4_LOGIC": {
           "mean": 0.11343737868072384,
-          "std": 0.09556333896186331,
+          "std": 0.0955633389618633,
           "n": 5,
           "raw": [
             0.2061163860895905,
@@ -7949,7 +7949,7 @@
         },
         "val/routing_f1/E6_SORT_STAT": {
           "mean": 0.08186241551780032,
-          "std": 0.09032352380055207,
+          "std": 0.09032352380055209,
           "n": 5,
           "raw": [
             0.15782230623818527,
@@ -7977,7 +7977,7 @@
         },
         "val/routing_f1_matched/E2_MULT_DIV": {
           "mean": 0.4170937376199193,
-          "std": 0.04925457132239457,
+          "std": 0.049254571322394566,
           "n": 5,
           "raw": [
             0.3579588126012886,
@@ -8033,7 +8033,7 @@
         },
         "val/routing_f1_matched/E6_SORT_STAT": {
           "mean": 0.37358725921988256,
-          "std": 0.09038796315858545,
+          "std": 0.09038796315858544,
           "n": 5,
           "raw": [
             0.427851912881853,
@@ -8161,7 +8161,7 @@
         },
         "val/routing_precision/E5_SHIFT": {
           "mean": 0.08183700851597928,
-          "std": 0.14096430738862553,
+          "std": 0.14096430738862556,
           "n": 5,
           "raw": [
             0.3336892437676988,
@@ -8231,7 +8231,7 @@
         },
         "val/routing_precision_matched/E4_LOGIC": {
           "mean": 0.137133480214969,
-          "std": 0.048283100223402,
+          "std": 0.048283100223401994,
           "n": 5,
           "raw": [
             0.07972690232353265,
@@ -8371,7 +8371,7 @@
         },
         "val/routing_recall_matched/E1_ADD_SUB": {
           "mean": 0.27713523359930214,
-          "std": 0.15639361852970374,
+          "std": 0.15639361852970377,
           "n": 5,
           "raw": [
             0.17457731482669267,
@@ -8385,7 +8385,7 @@
         },
         "val/routing_recall_matched/E2_MULT_DIV": {
           "mean": 0.48072762794243784,
-          "std": 0.27854620324051405,
+          "std": 0.278546203240514,
           "n": 5,
           "raw": [
             0.32364433431811684,
@@ -8427,7 +8427,7 @@
         },
         "val/routing_recall_matched/E5_SHIFT": {
           "mean": 0.15904239976925297,
-          "std": 0.28732180647145644,
+          "std": 0.2873218064714564,
           "n": 5,
           "raw": [
             0.004738555358688039,
@@ -8441,7 +8441,7 @@
         },
         "val/routing_recall_matched/E6_SORT_STAT": {
           "mean": 0.5497756118084286,
-          "std": 0.3320882523305241,
+          "std": 0.33208825233052414,
           "n": 5,
           "raw": [
             0.7646904144169413,
@@ -8602,7 +8602,7 @@
         },
         "depth/by_document/per_document_mean_std": {
           "mean": 0.3835948987803968,
-          "std": 0.10188431674715402,
+          "std": 0.10188431674715404,
           "n": 5,
           "raw": [
             0.46073565919984194,
@@ -8798,7 +8798,7 @@
         },
         "depth/embed_norm_norm_min": {
           "mean": 1.593846607208252,
-          "std": 0.0800675045951586,
+          "std": 0.08006750459515861,
           "n": 5,
           "raw": [
             1.6175283193588257,
@@ -8868,7 +8868,7 @@
         },
         "depth/hist/step_4": {
           "mean": 5931.6,
-          "std": 7243.55798623853,
+          "std": 7243.557986238531,
           "n": 5,
           "raw": [
             15870,
@@ -8952,7 +8952,7 @@
         },
         "depth/mean_by_family/L2_NOUN": {
           "mean": 6.590147936424411,
-          "std": 0.38180689943184076,
+          "std": 0.3818068994318407,
           "n": 5,
           "raw": [
             6.019051149885788,
@@ -8966,7 +8966,7 @@
         },
         "depth/mean_by_family/L3_VERB": {
           "mean": 6.879790704832256,
-          "std": 0.11758016066082569,
+          "std": 0.11758016066082567,
           "n": 5,
           "raw": [
             6.690366266543552,
@@ -8980,7 +8980,7 @@
         },
         "depth/mean_by_family/L4_MODIFIER": {
           "mean": 6.755727916968919,
-          "std": 0.2434752229402134,
+          "std": 0.24347522294021343,
           "n": 5,
           "raw": [
             6.376150884437252,
@@ -9148,7 +9148,7 @@
         },
         "depth/spearman_vs_model_loss_null_low": {
           "mean": -0.003601795503058016,
-          "std": 0.0003937878645942107,
+          "std": 0.00039378786459421067,
           "n": 5,
           "raw": [
             -0.0030208201794051097,
@@ -9162,7 +9162,7 @@
         },
         "depth/spearman_vs_model_loss_null_mean": {
           "mean": 4.86024696211514e-07,
-          "std": 0.0001446534366991341,
+          "std": 0.00014465343669913406,
           "n": 5,
           "raw": [
             4.157691313858984e-05,
@@ -9288,7 +9288,7 @@
         },
         "depth_dist/step_3_pct": {
           "mean": 1.1030485527589917,
-          "std": 1.5811391386325682,
+          "std": 1.5811391386325684,
           "n": 5,
           "raw": [
             3.858191892504692,
@@ -9302,7 +9302,7 @@
         },
         "depth_dist/step_4_pct": {
           "mean": 2.432996151037514,
-          "std": 3.0842002633211125,
+          "std": 3.084200263321112,
           "n": 5,
           "raw": [
             7.115095853805542,
@@ -9316,7 +9316,7 @@
         },
         "depth_dist/step_5_pct": {
           "mean": 4.365717899054289,
-          "std": 4.201606867520038,
+          "std": 4.201606867520037,
           "n": 5,
           "raw": [
             10.507739335298538,
@@ -9792,7 +9792,7 @@
         },
         "perf/throughput_items_sec": {
           "mean": 53.55562249136083,
-          "std": 5.166582399853174,
+          "std": 5.166582399853175,
           "n": 5,
           "raw": [
             55.11096043464958,
@@ -9806,7 +9806,7 @@
         },
         "perf/throughput_tokens_sec": {
           "mean": 13710.239357788372,
-          "std": 1322.6450943624125,
+          "std": 1322.6450943624127,
           "n": 5,
           "raw": [
             14108.405871270292,
@@ -10162,7 +10162,7 @@
         },
         "val/avg_recursion_steps": {
           "mean": 6.898458362016521,
-          "std": 0.28348893112057716,
+          "std": 0.2834889311205772,
           "n": 5,
           "raw": [
             6.480423640683701,
@@ -11379,7 +11379,7 @@
         },
         "depth/hist/step_1": {
           "mean": 162.2,
-          "std": 140.17560415421795,
+          "std": 140.17560415421792,
           "n": 5,
           "raw": [
             352,
@@ -11827,7 +11827,7 @@
         },
         "depth_dist/step_2_pct": {
           "mean": 0.727106798440218,
-          "std": 0.23714492421843245,
+          "std": 0.23714492421843247,
           "n": 5,
           "raw": [
             0.5572836380451918,
@@ -12415,7 +12415,7 @@
         },
         "probe/family_ce": {
           "mean": 1.9248952021970631,
-          "std": 0.04067177389095243,
+          "std": 0.040671773890952424,
           "n": 5,
           "raw": [
             1.8949627814856067,
@@ -12637,7 +12637,7 @@
         },
         "train/entropy_term": {
           "mean": 1.7915018106213565,
-          "std": 8.7485836323297e-05,
+          "std": 8.748583632329701e-05,
           "n": 5,
           "raw": [
             1.7916130740078302,
@@ -12813,7 +12813,7 @@
         },
         "val/bits_per_token": {
           "mean": 5.247032729709576,
-          "std": 0.019312739338987566,
+          "std": 0.019312739338987563,
           "n": 5,
           "raw": [
             5.26950740598392,
@@ -12941,7 +12941,7 @@
         },
         "val/routing_ami": {
           "mean": 0.18032468956528105,
-          "std": 0.024559725764223734,
+          "std": 0.02455972576422373,
           "n": 5,
           "raw": [
             0.1603270455887304,
@@ -13019,7 +13019,7 @@
         },
         "val/routing_control_pos/ami_real": {
           "mean": 0.18032468956528105,
-          "std": 0.024559725764223734,
+          "std": 0.02455972576422373,
           "n": 5,
           "raw": [
             0.1603270455887304,
@@ -13131,7 +13131,7 @@
         },
         "val/routing_control_pos/purity_control_std": {
           "mean": 0.018354514445582528,
-          "std": 0.003128061742926959,
+          "std": 0.0031280617429269584,
           "n": 5,
           "raw": [
             0.016306282086361288,
@@ -13441,7 +13441,7 @@
         },
         "val/routing_f1/E1_ADD_SUB": {
           "mean": 0.2105494516702121,
-          "std": 0.1911605909906264,
+          "std": 0.19116059099062643,
           "n": 5,
           "raw": [
             0.5047232758564019,
@@ -13525,7 +13525,7 @@
         },
         "val/routing_f1_matched/E1_ADD_SUB": {
           "mean": 0.5976571150967749,
-          "std": 0.07802561526824192,
+          "std": 0.07802561526824194,
           "n": 5,
           "raw": [
             0.5047232758564019,
@@ -13553,7 +13553,7 @@
         },
         "val/routing_f1_matched/E3_MOD_POW": {
           "mean": 0.1507329638097595,
-          "std": 0.03570215347961735,
+          "std": 0.03570215347961736,
           "n": 5,
           "raw": [
             0.12975428227439392,
@@ -13701,7 +13701,7 @@
         },
         "val/routing_precision/E3_MOD_POW": {
           "mean": 0.06137908278251922,
-          "std": 0.029943283119274154,
+          "std": 0.02994328311927415,
           "n": 5,
           "raw": [
             0.06879939781708694,
@@ -13715,7 +13715,7 @@
         },
         "val/routing_precision/E4_LOGIC": {
           "mean": 0.05235145994781454,
-          "std": 0.037853393162969214,
+          "std": 0.03785339316296922,
           "n": 5,
           "raw": [
             0.07218068060430337,
@@ -13869,7 +13869,7 @@
         },
         "val/routing_recall/E2_MULT_DIV": {
           "mean": 0.22620318307443057,
-          "std": 0.09150656044420453,
+          "std": 0.09150656044420455,
           "n": 5,
           "raw": [
             0.24363861622033736,
@@ -13995,7 +13995,7 @@
         },
         "val/routing_recall_matched/E5_SHIFT": {
           "mean": 0.007919568173389922,
-          "std": 0.013677471199047922,
+          "std": 0.01367747119904792,
           "n": 5,
           "raw": [
             0.0,
@@ -14239,12 +14239,20 @@
       "reason": "experiment_group='lang_calib_b0p001_h0p5' != 'canonical_lang_b'"
     },
     {
+      "run_dir": "langB_MoRE_seed44__4b749264",
+      "reason": "experiment_group='lang_sweep_tlx20_b0p0001_h0p001_s0p1' != 'canonical_lang_b'"
+    },
+    {
       "run_dir": "langB_MoRE_seed44__4fb3cbf2",
       "reason": "experiment_group='lang_calib_lr0p002_d0p1' != 'canonical_lang_b'"
     },
     {
       "run_dir": "langB_MoRE_seed44__4fb3cbf2__r2",
       "reason": "experiment_group='lang_calib_lr0p002_d0p1' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "langB_MoRE_seed44__663e23c3",
+      "reason": "experiment_group='lang_sweep_tlx20_b0p001_h0p1_s0p1' != 'canonical_lang_b'"
     },
     {
       "run_dir": "langB_MoRE_seed44__68d032ba",
@@ -14265,6 +14273,18 @@
     {
       "run_dir": "langB_MoRE_seed44__7d975f07",
       "reason": "experiment_group='lang_calib_b0p001_h0p5' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "langB_MoRE_seed44__82276f86",
+      "reason": "experiment_group='lang_sweep_tlx20_b0p001_h0p03_s0p1' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "langB_MoRE_seed44__84b19115",
+      "reason": "experiment_group='lang_sweep_tlx20_b0_h0p001_s0p01' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "langB_MoRE_seed44__89f943c3",
+      "reason": "experiment_group='lang_sweep_tlx20_b0p001_h0p001_s0p1' != 'canonical_lang_b'"
     },
     {
       "run_dir": "langB_MoRE_seed44__8ca3ef73",
@@ -14289,6 +14309,22 @@
     {
       "run_dir": "langB_MoRE_seed44__91f762a2__r4",
       "reason": "experiment_group='lang_calib_lr0p0005_d0p0' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "langB_MoRE_seed44__a6eb942f",
+      "reason": "experiment_group='lang_sweep_tlx20_b0p001_h0p01_s0p1' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "langB_MoRE_seed44__ad2fb00a",
+      "reason": "experiment_group='lang_sweep_tlx20_b0_h0p001_s0p1' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "langB_MoRE_seed44__afdd2561",
+      "reason": "experiment_group='lang_sweep_tlx20_b0p001_h0p001_s0p025' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "langB_MoRE_seed44__b210b65c",
+      "reason": "experiment_group='lang_sweep_tlx20_b0p001_h0p001_s0p4' != 'canonical_lang_b'"
     },
     {
       "run_dir": "langB_MoRE_seed44__d555126e",
@@ -14695,26 +14731,6 @@
       "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
     },
     {
-      "run_dir": "t67_provenance_check_seed44__59000a77__r14",
-      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
-    },
-    {
-      "run_dir": "t67_provenance_check_seed44__59000a77__r15",
-      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
-    },
-    {
-      "run_dir": "t67_provenance_check_seed44__59000a77__r16",
-      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
-    },
-    {
-      "run_dir": "t67_provenance_check_seed44__59000a77__r17",
-      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
-    },
-    {
-      "run_dir": "t67_provenance_check_seed44__59000a77__r18",
-      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
-    },
-    {
       "run_dir": "t67_provenance_check_seed44__59000a77__r2",
       "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
     },
@@ -14747,6 +14763,258 @@
       "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
     },
     {
+      "run_dir": "t67_provenance_check_seed44__6b711a59",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67_provenance_check_seed44__6b711a59__r10",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67_provenance_check_seed44__6b711a59__r11",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67_provenance_check_seed44__6b711a59__r12",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67_provenance_check_seed44__6b711a59__r13",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67_provenance_check_seed44__6b711a59__r14",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67_provenance_check_seed44__6b711a59__r15",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67_provenance_check_seed44__6b711a59__r16",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67_provenance_check_seed44__6b711a59__r17",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67_provenance_check_seed44__6b711a59__r18",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67_provenance_check_seed44__6b711a59__r19",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67_provenance_check_seed44__6b711a59__r2",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67_provenance_check_seed44__6b711a59__r20",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67_provenance_check_seed44__6b711a59__r21",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67_provenance_check_seed44__6b711a59__r22",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67_provenance_check_seed44__6b711a59__r23",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67_provenance_check_seed44__6b711a59__r24",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67_provenance_check_seed44__6b711a59__r25",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67_provenance_check_seed44__6b711a59__r26",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67_provenance_check_seed44__6b711a59__r27",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67_provenance_check_seed44__6b711a59__r28",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67_provenance_check_seed44__6b711a59__r29",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67_provenance_check_seed44__6b711a59__r3",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67_provenance_check_seed44__6b711a59__r30",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67_provenance_check_seed44__6b711a59__r31",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67_provenance_check_seed44__6b711a59__r32",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67_provenance_check_seed44__6b711a59__r33",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67_provenance_check_seed44__6b711a59__r34",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67_provenance_check_seed44__6b711a59__r35",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67_provenance_check_seed44__6b711a59__r36",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67_provenance_check_seed44__6b711a59__r37",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67_provenance_check_seed44__6b711a59__r38",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67_provenance_check_seed44__6b711a59__r39",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67_provenance_check_seed44__6b711a59__r4",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67_provenance_check_seed44__6b711a59__r40",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67_provenance_check_seed44__6b711a59__r41",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67_provenance_check_seed44__6b711a59__r42",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67_provenance_check_seed44__6b711a59__r43",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67_provenance_check_seed44__6b711a59__r44",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67_provenance_check_seed44__6b711a59__r45",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67_provenance_check_seed44__6b711a59__r46",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67_provenance_check_seed44__6b711a59__r47",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67_provenance_check_seed44__6b711a59__r48",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67_provenance_check_seed44__6b711a59__r49",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67_provenance_check_seed44__6b711a59__r5",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67_provenance_check_seed44__6b711a59__r50",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67_provenance_check_seed44__6b711a59__r51",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67_provenance_check_seed44__6b711a59__r52",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67_provenance_check_seed44__6b711a59__r53",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67_provenance_check_seed44__6b711a59__r54",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67_provenance_check_seed44__6b711a59__r55",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67_provenance_check_seed44__6b711a59__r56",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67_provenance_check_seed44__6b711a59__r57",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67_provenance_check_seed44__6b711a59__r58",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67_provenance_check_seed44__6b711a59__r59",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67_provenance_check_seed44__6b711a59__r6",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67_provenance_check_seed44__6b711a59__r60",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67_provenance_check_seed44__6b711a59__r61",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67_provenance_check_seed44__6b711a59__r62",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67_provenance_check_seed44__6b711a59__r63",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67_provenance_check_seed44__6b711a59__r7",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67_provenance_check_seed44__6b711a59__r8",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67_provenance_check_seed44__6b711a59__r9",
+      "reason": "no metrics.json (run did not finish)"
+    },
+    {
       "run_dir": "t67_provenance_check_seed44__c1c47354",
       "reason": "no metrics.json (run did not finish)"
     },
@@ -14771,23 +15039,247 @@
       "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
     },
     {
-      "run_dir": "t67d_provenance_check_mor_seed44__3e055f47",
+      "run_dir": "t67d_provenance_check_mor_seed44__fa9339bc",
       "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
     },
     {
-      "run_dir": "t67d_provenance_check_mor_seed44__3e055f47__r2",
+      "run_dir": "t67d_provenance_check_mor_seed44__fa9339bc__r10",
       "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
     },
     {
-      "run_dir": "t67d_provenance_check_mor_seed44__3e055f47__r3",
+      "run_dir": "t67d_provenance_check_mor_seed44__fa9339bc__r11",
       "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
     },
     {
-      "run_dir": "t67d_provenance_check_mor_seed44__3e055f47__r4",
+      "run_dir": "t67d_provenance_check_mor_seed44__fa9339bc__r12",
       "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
     },
     {
-      "run_dir": "t67d_provenance_check_mor_seed44__3e055f47__r5",
+      "run_dir": "t67d_provenance_check_mor_seed44__fa9339bc__r13",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67d_provenance_check_mor_seed44__fa9339bc__r14",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67d_provenance_check_mor_seed44__fa9339bc__r15",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67d_provenance_check_mor_seed44__fa9339bc__r16",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67d_provenance_check_mor_seed44__fa9339bc__r17",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67d_provenance_check_mor_seed44__fa9339bc__r18",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67d_provenance_check_mor_seed44__fa9339bc__r19",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67d_provenance_check_mor_seed44__fa9339bc__r2",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67d_provenance_check_mor_seed44__fa9339bc__r20",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67d_provenance_check_mor_seed44__fa9339bc__r21",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67d_provenance_check_mor_seed44__fa9339bc__r22",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67d_provenance_check_mor_seed44__fa9339bc__r23",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67d_provenance_check_mor_seed44__fa9339bc__r24",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67d_provenance_check_mor_seed44__fa9339bc__r25",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67d_provenance_check_mor_seed44__fa9339bc__r26",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67d_provenance_check_mor_seed44__fa9339bc__r27",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67d_provenance_check_mor_seed44__fa9339bc__r28",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67d_provenance_check_mor_seed44__fa9339bc__r29",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67d_provenance_check_mor_seed44__fa9339bc__r3",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67d_provenance_check_mor_seed44__fa9339bc__r30",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67d_provenance_check_mor_seed44__fa9339bc__r31",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67d_provenance_check_mor_seed44__fa9339bc__r32",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67d_provenance_check_mor_seed44__fa9339bc__r33",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67d_provenance_check_mor_seed44__fa9339bc__r34",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67d_provenance_check_mor_seed44__fa9339bc__r35",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67d_provenance_check_mor_seed44__fa9339bc__r36",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67d_provenance_check_mor_seed44__fa9339bc__r37",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67d_provenance_check_mor_seed44__fa9339bc__r38",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67d_provenance_check_mor_seed44__fa9339bc__r39",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67d_provenance_check_mor_seed44__fa9339bc__r4",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67d_provenance_check_mor_seed44__fa9339bc__r40",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67d_provenance_check_mor_seed44__fa9339bc__r41",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67d_provenance_check_mor_seed44__fa9339bc__r42",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67d_provenance_check_mor_seed44__fa9339bc__r43",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67d_provenance_check_mor_seed44__fa9339bc__r44",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67d_provenance_check_mor_seed44__fa9339bc__r45",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67d_provenance_check_mor_seed44__fa9339bc__r46",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67d_provenance_check_mor_seed44__fa9339bc__r47",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67d_provenance_check_mor_seed44__fa9339bc__r48",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67d_provenance_check_mor_seed44__fa9339bc__r49",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67d_provenance_check_mor_seed44__fa9339bc__r5",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67d_provenance_check_mor_seed44__fa9339bc__r50",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67d_provenance_check_mor_seed44__fa9339bc__r51",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67d_provenance_check_mor_seed44__fa9339bc__r52",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67d_provenance_check_mor_seed44__fa9339bc__r53",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67d_provenance_check_mor_seed44__fa9339bc__r54",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67d_provenance_check_mor_seed44__fa9339bc__r55",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67d_provenance_check_mor_seed44__fa9339bc__r56",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67d_provenance_check_mor_seed44__fa9339bc__r57",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67d_provenance_check_mor_seed44__fa9339bc__r58",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67d_provenance_check_mor_seed44__fa9339bc__r59",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67d_provenance_check_mor_seed44__fa9339bc__r6",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67d_provenance_check_mor_seed44__fa9339bc__r60",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67d_provenance_check_mor_seed44__fa9339bc__r61",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67d_provenance_check_mor_seed44__fa9339bc__r7",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67d_provenance_check_mor_seed44__fa9339bc__r8",
+      "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
+    },
+    {
+      "run_dir": "t67d_provenance_check_mor_seed44__fa9339bc__r9",
       "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
     },
     {
@@ -14869,54 +15361,6 @@
     {
       "run_dir": "t_l03_mor_timing_seed44__fa9339bc__r3",
       "reason": "experiment_group='exploratory' != 'canonical_lang_b'"
-    },
-    {
-      "run_dir": "t_l77_rate2_wt2_moe_seed42__12570ce4",
-      "reason": "no resolved_config.json (run never reached provenance write)"
-    },
-    {
-      "run_dir": "t_l77_rate2_wt2_mor_seed42__ba40c482",
-      "reason": "no resolved_config.json (run never reached provenance write)"
-    },
-    {
-      "run_dir": "t_l77_rate2_wt2_more_seed42__d0894436",
-      "reason": "no resolved_config.json (run never reached provenance write)"
-    },
-    {
-      "run_dir": "t_l77_rate3_wt2_mor_seed42__ba40c482",
-      "reason": "no resolved_config.json (run never reached provenance write)"
-    },
-    {
-      "run_dir": "t_l77_realrate_moe_seed42__e1565fc7",
-      "reason": "no resolved_config.json (run never reached provenance write)"
-    },
-    {
-      "run_dir": "t_l77_realrate_mor_seed42__e382819a",
-      "reason": "no resolved_config.json (run never reached provenance write)"
-    },
-    {
-      "run_dir": "t_l77_realrate_more_seed42__6bef3242",
-      "reason": "no resolved_config.json (run never reached provenance write)"
-    },
-    {
-      "run_dir": "t_l77_realrate_wt2_seed42__6bef3242",
-      "reason": "no resolved_config.json (run never reached provenance write)"
-    },
-    {
-      "run_dir": "t_l77_wandb_fallback2_seed42__98b9ab61",
-      "reason": "no resolved_config.json (run never reached provenance write)"
-    },
-    {
-      "run_dir": "t_l77_wandb_fallback_seed42__98b9ab61",
-      "reason": "no resolved_config.json (run never reached provenance write)"
-    },
-    {
-      "run_dir": "t_l77_wandb_offline_seed42__98b9ab61",
-      "reason": "no resolved_config.json (run never reached provenance write)"
-    },
-    {
-      "run_dir": "t_l77_wandb_offline_seed42__98b9ab61__r2",
-      "reason": "no resolved_config.json (run never reached provenance write)"
     }
   ],
   "ablations_exploratory": null,

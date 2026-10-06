@@ -499,6 +499,26 @@ else:
           "a run directory",
           all(k in rr[0] for k in ex.PROV_KEYS) and "run_dir" in rr[0])
 
+    # T-LX.33 regression guard. The check above tests that PROV_KEYS are PRESENT as
+    # dict keys, which is not enough: `metrics.json` carries top-level keys named
+    # `architecture`, `experiment_id`, `experiment_group`, `config_hash` and
+    # `total_params` -- the same names as PROV_KEYS -- so the header used to contain
+    # each of those names TWICE. `csv.DictReader` keeps the LAST occurrence, which was
+    # the metric-block copy, and on a language run that copy is `N/A`. So every check
+    # here passed while `rr[0]["architecture"]` read `N/A`, because "architecture" was
+    # still a key. Assert the VALUES, and assert no header name repeats.
+    with p_runs.open(encoding="utf-8") as fh:
+        hdr = next(_csv.reader(fh))
+    _dups = sorted({k for k in hdr if hdr.count(k) > 1})
+    check("results.csv header has no duplicate column names",
+          not _dups, f"duplicates: {_dups}" if _dups else "none")
+    check("results.csv architecture column reads the real arm, not the N/A metric copy",
+          sorted({r["architecture"] for r in rr}) == ["moe", "mor", "more"],
+          f"{sorted({r['architecture'] for r in rr})}")
+    check("results.csv experiment_id reads the run id, not the N/A metric copy",
+          all(str(r["experiment_id"]).startswith("langB_") for r in rr),
+          f"e.g. {rr[0]['experiment_id']}")
+
     md = p_md.read_text(encoding="utf-8")
     check("the markdown states nats/token and the bigram floor",
           "nats/token" in md and "4.9849" in md)

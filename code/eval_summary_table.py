@@ -121,8 +121,16 @@ def main():
                  "MoRE's per-token expert dispatch is latency-bound. FLOPs is the compute "
                  "measure; throughput is reported so the latency cost is visible.\n")
 
-    # Per-eval table.
+    # Per-eval table. Each cell: score (diff vs worst, FLOPs-x vs cheapest,
+    # diff per compute-multiplier). The worst-scoring arm shows only its multiple
+    # (it is the reference for the diff). "diff per multiplier" = |diff| / x, i.e.
+    # how much score each extra unit of compute bought -- higher is more efficient.
     lines.append("\n## Scores with compute bracket\n")
+    lines.append("Format: `score (nats-or-pts difference vs the worst arm, inference FLOPs "
+                 "multiplier vs the cheapest arm, difference per compute multiplier)`. "
+                 "The worst arm shows only its multiplier. **diff/multiplier** is how much "
+                 "score each unit of extra compute bought -- higher is more efficient. "
+                 "Lower is better for loss rows, higher for accuracy rows.\n")
     header = "| eval | " + " | ".join(LABEL[a] for a in ARMS) + " |"
     lines.append(header + "\n|" + "---|" * (len(ARMS) + 1))
     for title, fname, higher, fmt in EVALS:
@@ -132,16 +140,29 @@ def main():
             lines.append(f"| {title} | " + " | ".join("NA" for _ in ARMS) + " |")
             continue
         tags, worst_arm = rank_tag(sc, higher)
-        worst_ratio = ratio.get(worst_arm, 1.0)
+        worst_score = sc[worst_arm][0]
         cells = []
         for a in ARMS:
             if a not in sc:
                 cells.append("NA")
                 continue
             m, s = sc[a]
-            mult = ratio[a] / worst_ratio
-            cells.append(f"{fmt(m, s)} ({tags[a]}, {mult:.2f}x)")
+            x = ratio[a]
+            if a == worst_arm:
+                cells.append(f"{fmt(m, s)} ({x:.2f}x)")
+                continue
+            diff = m - worst_score                       # signed, in the row's own units
+            per_x = abs(diff) / x if x else float("nan")
+            unit = "%" if fmt is fmt_pct else ""
+            cells.append(f"{fmt(m, s)} ({diff*100:+.2f}{unit}, {x:.2f}x, {per_x*100:.3f})"
+                         if fmt is fmt_pct else
+                         f"{fmt(m, s)} ({diff:+.4f}, {x:.2f}x, {per_x:.4f})")
+        if "chance" in title:
+            cells = [c + " *" for c in cells]
         lines.append(f"| {title} | " + " | ".join(cells) + " |")
+    lines.append("\n`*` EWoK: every arm is within noise of the 50% chance floor, so its "
+                 "rankings and per-compute figures are not meaningful -- shown for "
+                 "completeness, not as a result.\n")
 
     # Efficiency note: quality gain per extra compute, val loss.
     sv = arm_scores(load("stratified_val.json"), False)
