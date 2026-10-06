@@ -157,17 +157,28 @@ data** — the paper must cite the generated table, not this file.
 | arm | val/task_loss | perplexity | margin vs bigram floor | params |
 |---|---|---|---|---|
 | MoE | 3.9483 ± 0.0242 | 51.85 | +1.0366 | 5,584,908 |
-| **MoR** | **3.5202 ± 0.0406** | **33.79** | **+1.4647** | 5,581,063 |
+| **MoR** | **3.5154 ± 0.0340** | **33.63** | **+1.4695** | 5,581,063 |
 | MoRE (route-once, canonical) | 3.6370 ± 0.0134 | 37.98 | +1.3480 | 5,584,908 |
 
-> **MoE updated at T-LA.1 (2026-10-04)**, from 3.9529 ± 0.0396 to 3.9483 ± 0.0242. The arm
-> was retrained on Ayan's 4060 to recover the checkpoints lost with the rented V100; the five
-> V100 cells are now in `archive/pre_finalization/lang_v100_no_checkpoints/` and the 4060
-> cells are the admitted ones. The retrain reproduced at **−0.117 σ** of the published std,
-> which is also the study's only direct evidence that `val/task_loss` is hardware-independent
-> beyond numerics. **The MoR row is still the V100 cells and will move the same way** once
-> its retrain lands — re-read the generated table before quoting it, and re-read the effect
-> sizes too, because an arm's std changing moves every d it appears in.
+> **Both MoE and MoR were retrained on Ayan's 4060** to recover the checkpoints lost with the
+> rented V100 (T-LA.1 2026-10-04, T-LA.2 2026-10-06). MoE 3.9529 ± 0.0396 → 3.9483 ± 0.0242;
+> MoR 3.5202 ± 0.0406 → 3.5154 ± 0.0340. Both V100 sets are in
+> `archive/pre_finalization/lang_v100_no_checkpoints/`; the 4060 cells are the admitted ones.
+> **MoRE is still the V100 arm**, so the matrix is two cards — justified, not merely caveated,
+> by the next paragraph.
+>
+> **The reproduction is the strongest hardware-independence evidence the study has, and it is
+> a two-arm result.** MoE moved −0.117 σ and MoR −0.119 σ; in absolute terms −0.0046 and
+> −0.0048 nats. Agreement to the third decimal across arms sharing no parameters is not
+> five-seed sampling noise — it is a small **common-mode** offset of the `sm_70 → sm_89` move
+> (kernel selection and reduction order; the seed-blind config check passes). A common-mode
+> shift **cancels in the between-arm gaps that carry every verdict**: `MoE − MoR` went
+> +0.432711 → +0.432896, a move of 0.000185 nats. Say it that way.
+>
+> **Do not claim per-seed reproduction.** Same-seed drift is +0.055, −0.068, −0.021, −0.009,
+> +0.019 for MoR — an order of magnitude above the shift in the mean. The seed fixes
+> initialization, data order and dropout, not non-deterministic CUDA reduction order. The
+> reproducible quantity is the **arm mean**, not the cell.
 
 Perplexity is `exp(mean nats)` and is **not** the mean of the five per-seed perplexities —
 `exp` is convex. The verdict is taken on nats either way. Do not report a mean perplexity
@@ -178,25 +189,30 @@ with a ± derived from the nats std.
 | pair | gap | Cohen d | p (exact) | floor | Holm threshold | verdict |
 |---|---|---|---|---|---|---|
 | MoRE − MoE | −0.311346 | −15.92 | 0.00794 | 0.00794 | 0.01250 | significant, **at the resolution floor** |
-| MoRE − MoR | +0.116744 | +3.87 | 0.00794 | 0.00794 | 0.01667 | significant, **at the resolution floor** |
-| MoE − MoR | +0.428089 | +12.82 | 0.00794 | 0.00794 | 0.02500 | significant, **at the resolution floor** |
+| MoRE − MoR | +0.121551 | +4.71 | 0.00794 | 0.00794 | 0.01667 | significant, **at the resolution floor** |
+| MoE − MoR | +0.432896 | +14.68 | 0.00794 | 0.00794 | 0.02500 | significant, **at the resolution floor** |
 
-> Also updated at T-LA.1. The two MoE-involving effect sizes grew (d −10.68 → −15.92 and
-> +10.79 → +12.82) purely because the retrained MoE arm has a tighter std, not because any
-> gap grew; `MoRE − MoR` is untouched. This is exactly the case `CLAUDE.md` §4 warns about —
-> **a large d is not a large difference**, and the gaps here moved by ≤ 0.005 nats.
+> Updated at T-LA.2. **Every effect size in this table has now moved twice while the gaps
+> moved by ≤ 0.005 nats**: across the two retrains `MoRE − MoE` went d −10.68 → −15.92,
+> `MoRE − MoR` +3.87 → +4.71, `MoE − MoR` +10.79 → +14.68 — driven entirely by both retrained
+> arms having tighter stds, not by any gap widening. This is the `CLAUDE.md` §4 trap and it has
+> now fired three times in three exports: **a large d is not a large difference.** Quote the
+> gap in nats first and the d second, and never carry a d forward by hand.
 
 ### Depth and halting
 
 | arm | depth mean | depth std | early exit | forced exit | leftover halt mass | ρ(depth, token loss) |
 |---|---|---|---|---|---|---|
-| MoR | 6.617 ± 0.439 | 0.704 | 26.7% ± 29.6% | 73.3% | 0.170 | **+0.2953 ± 0.0553** |
+| MoR | 6.730 ± 0.241 | 0.647 | 18.8% ± 15.1% | 81.2% | 0.175 | **+0.2985 ± 0.0654** |
 | MoRE | 6.955 ± 0.004 | 0.427 | 2.66% ± 0.75% | 97.3% | 0.655 | −0.0230 ± 0.0115 |
 | *MoRE per-step (retired)* | *6.965 ± 0.012* | *0.378* | *1.94% ± 0.30%* | *98.1%* | *0.610* | *−0.0154 ± 0.0186* |
 
 Per-seed, which matters for how strongly you may state it:
 
-- **MoR ρ is positive on 5/5 seeds** (+0.2577, +0.3512, +0.3508, +0.2275, +0.2896).
+- **MoR ρ is positive on 5/5 seeds** (+0.3573, +0.2736, +0.3600, +0.2023, +0.2991) — retrained
+  values, T-LA.2. The V100 arm gave +0.2577, +0.3512, +0.3508, +0.2275, +0.2896, i.e. the
+  **mean reproduced to +0.2953 → +0.2985 and the sign held 5/5 on both cards.** This is the
+  paper's main positive claim and it is now a cross-hardware replication, not a single run.
 - **MoRE ρ is negative on 5/5 seeds** (−0.0056, −0.0303, −0.0352, −0.0183, −0.0255).
 - **MoR's early-exit rate ranges 7%–76% across seeds** (8.26, 75.75, 33.86, 6.95, 8.79).
   The two seeds that exit most are the two with the **worst** loss (3.5693, 3.5572) and

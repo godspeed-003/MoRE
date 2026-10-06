@@ -7932,3 +7932,110 @@ entropy of 0.9582. Do not write "high entropy is a balance-loss pathology."
 - `code/export_results.py --task language` → `results/language/` regenerated, 15 admitted.
 - `nvidia-smi` during the retrain → 83% GPU, 6320/8188 MiB, 86 °C (thermal throttling
   expected; `RUNBOOK_ACL_4060.md` §2 budgets 1.3× for it).
+
+---
+
+## T-LA.2 — MoR weights recovered; the canonical language matrix is now one card, and the adaptive-depth result reproduced
+
+**Date.** 2026-10-06. **Machine.** Ayan's RTX 4060 8 GB. Completes T-LA.1.
+
+The five-seed MoR retrain launched at T-LA.1 ran to completion unattended:
+seed 42 `17:20→23:03` (5 h 43), seed 43 `→06:56` (7 h 53), seed 44 `→13:46`, seed 45 `→21:10`,
+seed 46 `→03:39`. **Measured cost 5.7–7.9 h per cell against the runner's own 3.1 h estimate**
+(`run_language_matrix.py:446`, `HOURS = {"mor": 1.03}` × 3 epochs, measured on a 6 GB 3050).
+The estimate is ~2.2× optimistic for this thermally-throttled laptop card; `RUNBOOK_ACL_4060.md`
+§2's 1.3× allowance is too small and its ~20 h MoR budget should read ~34 h.
+
+### Reproduction gate — PASSED, and the two arms agree suspiciously well
+
+| arm | V100 (published) | 4060 (retrain) | Δ means | in published σ |
+|---|---|---|---|---|
+| MoE | 3.952933 ± 0.039624 | 3.948311 ± 0.024202 | −0.004622 | **−0.117** |
+| MoR | 3.520222 ± 0.040555 | 3.515415 ± 0.033980 | −0.004807 | **−0.119** |
+
+Both inside ±1 σ, so both reproduce under `RUNBOOK_ACL_4060.md` §5.
+
+**The thing worth noticing: two independent arms displaced by −0.117 σ and −0.119 σ, and by
+−0.0046 and −0.0048 nats in absolute terms.** That agreement to the third decimal across arms
+that share no parameters is not what five-seed sampling noise looks like; it reads as a small
+**common-mode** offset of the V100 `sm_70` → Ada `sm_89` move (kernel selection and reduction
+order, not a config difference — the seed-blind config check passes). It is *harmless for every
+claim the paper makes*, because a common-mode shift cancels in the between-arm gaps that carry
+the verdicts: `MoE − MoR` moved +0.432711 → +0.432896, i.e. by 0.000185 nats. Do not describe
+this as "the retrain reproduced per-seed" — see below.
+
+**Per-seed values do NOT reproduce, and must not be claimed to.** Same-seed drift is
++0.0554, −0.0681, −0.0211, −0.0091, +0.0189 — an order of magnitude larger than the shift in
+the mean. The seed fixes initialization, data order and dropout; it does not fix non-deterministic
+CUDA kernel reduction order, which differs across architectures. **The reproducible quantity is
+the arm mean, not the cell.** A reviewer asking "why doesn't seed 42 match?" gets that answer.
+
+### Headline after the re-export (MoE and MoR now both 4060, MoRE still V100)
+
+| arm | `val/task_loss` | was | perplexity | params |
+|---|---|---|---|---|
+| MoE | 3.948311 ± 0.024202 | 3.952933 ± 0.039624 | 51.85 | 5,584,908 |
+| MoR | **3.515415 ± 0.033980** | 3.520222 ± 0.040555 | 33.63 | 5,581,063 |
+| MoRE | 3.636966 ± 0.013387 | unchanged | 37.98 | 5,584,908 |
+
+Ordering **MoR > MoRE > MoE** unchanged; all three pairwise still at the floor `p = 0.0079`.
+Both retrains having tighter stds raises two effect sizes again: `MoRE − MoR` d +3.87 → **+4.71**,
+`MoE − MoR` +12.82 → **+14.68**; `MoRE − MoE` is untouched at −15.92 (neither arm changed).
+Gaps moved by ≤ 0.005 nats while d moved by ~2 — the `CLAUDE.md` §4 trap, stated again because
+this export is the third time it has fired.
+
+### MoR's adaptive depth reproduced, which is the paper's main positive claim
+
+| metric | V100 | 4060 retrain |
+|---|---|---|
+| `depth/spearman_vs_model_loss` | +0.2953 ± 0.0553 | **+0.2985 ± 0.0654** |
+| `depth/spearman_vs_logfreq` | +0.2108 | +0.2085 |
+| `depth/mean` | 6.617 ± 0.439 | 6.730 ± 0.241 |
+| `halt/early_exit_rate` | 0.267 ± 0.296 | 0.188 ± 0.151 |
+| `halt/mean_remainder` | 0.170 | 0.175 |
+
+Per-seed sign stability holds and is the form the claim should take:
+**MoR ρ positive on 5/5** (+0.3573, +0.2736, +0.3600, +0.2023, +0.2991);
+**MoRE ρ negative on 5/5** (−0.0056, −0.0303, −0.0352, −0.0183, −0.0255, same V100 cells).
+Early-exit rate remains the seed-unstable quantity (6.4%–42.2% across seeds, was 7%–76%), and
+the previously-recorded pattern survives: the seeds that exit most are the worst on loss
+(seed 42 exits 42.2% at 3.5567) and the seeds that exit least are the best (seed 45 exits 6.4%
+at 3.4677). So depth–difficulty *alignment* is robust while the *amount* of compute skipped is
+seed-unstable and buys loss.
+
+### Checkpoint provenance closed
+
+All 15 canonical cells now carry `checkpoint.pt` and all 15 are force-added
+(`.gitignore` exception documented at T-LA.1). 15 × 21.3 MiB ≈ 320 MiB of weights in history;
+`.git` is ~588 MiB, under the 1 GiB working target but with roughly one arm's worth of room
+left — a third force-added arm should not be assumed affordable.
+
+Retired the five superseded V100 MoR cells into
+`archive/pre_finalization/lang_v100_no_checkpoints/` with `git mv` (20 renames, 0 surviving
+`runs/` paths), discharging the obligation `--force` deferred at T-LA.1. The exporter then
+admits 15 / refuses 203 with consistency clean.
+
+### Defect found in the export, not blocking
+
+`results/language/results.csv` carries `architecture = N/A`, `experiment_id = N/A` and
+`experiment_group = N/A` on all 15 rows, so the per-run CSV **cannot be grouped by arm** and is
+unusable for any per-seed-per-arm claim. The data is not lost: `results/language/results.json`
+→ `admitted_runs[]` carries `architecture`, `seed` and the full `metrics` dict per cell, and is
+where the per-seed numbers above came from. Fix the CSV writer before anyone builds a figure
+off it; until then **cite `results.json`, not `results.csv`, for per-seed values.**
+
+**Failure tracing.**
+- *Per-seed losses differ between two runs of the same seed* → expected, not a bug. Non-deterministic
+  CUDA reduction order is not seed-controlled. Compare arm means; `CLAUDE.md` §5 reports mean ± std.
+- *An effect size jumps while the gap does not* → an arm's std changed. Regenerate, never edit a d.
+- *`results.csv` grouping yields one `N/A` bucket* → the identity columns are unpopulated; use
+  `results.json` `admitted_runs[]`.
+- *Matrix wall-clock far exceeds the printed estimate* → `run_language_matrix.py:446` HOURS is
+  3050-measured; multiply by ~2.2 for this 4060.
+
+**Verified by.**
+- MoR reproduction gate → mean 3.515415, Δ −0.004807 = −0.119 σ, inside ±1 σ. PASS.
+- `code/export_results.py --task language` → admitted 15, refused 203, consistency clean.
+- `git status --short | grep -cE "^R"` → 20 renames, 0 retired `runs/` paths surviving.
+- 15/15 canonical cells carry `checkpoint.pt`; interrupted
+  `archive/.../lang_interrupted/langB_MoR_seed42__c93f0fe8` checkpoint confirmed still untracked.

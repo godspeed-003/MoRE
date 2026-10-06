@@ -13,17 +13,17 @@ numbers out of a run directory into this file -- regenerate it.
 - git commits of the admitted runs: **5 distinct commits** across 15 cells. A canonical matrix is frozen by `canonical_spec_language.json`, not by a single code revision; the seed-blind config equality check below is what holds the arms comparable. Listed newest-directory-first:
   - `2eee856bf6f16e8fbc69a251f6e2de97f124f156` (dirty=False) -- 1 cell(s): MoE s42
   - `2eee856bf6f16e8fbc69a251f6e2de97f124f156` (dirty=True) -- 4 cell(s): MoE s43, MoE s44, MoE s45, MoE s46
-  - `079de08a2dc17d754173f1f62f1cf0af412a16a4` (dirty=True) -- 1 cell(s): MoR s42
-  - `f464c966b5f3921daa7e386d3470e11f1af89cb4` (dirty=True) -- 4 cell(s): MoR s43, MoR s44, MoR s45, MoR s46
+  - `6cb2ad7a1bb4c4e8292dc77cd064a71b8aa042ec` (dirty=True) -- 1 cell(s): MoR s42
+  - `6ff8fb2b018f5461055dfefdbf5e7fbd452155c5` (dirty=True) -- 4 cell(s): MoR s43, MoR s44, MoR s45, MoR s46
   - `681622892fbd5d559b05bbe5d75d7667535da968` (dirty=True) -- 5 cell(s): MoRE s42, MoRE s43, MoRE s44, MoRE s45, MoRE s46
-- refused directories: 205 (listed at the end; a refusal is the admission filter working)
+- refused directories: 203 (listed at the end; a refusal is the admission filter working)
 
 ## 1. Headline
 
 | architecture | val/task_loss (mean +- std) | best_val_loss (secondary) | bits/token | perplexity | margin vs floor (nats) | params |
 |---|---|---|---|---|---|---|
 | MoE | 3.948311 +- 0.024202 | 3.948311 +- 0.024202 | 5.6962 | 51.85 | +1.0366 | 5,584,908 |
-| MoR | 3.520222 +- 0.040555 | 3.520222 +- 0.040555 | 5.0786 | 33.79 | +1.4647 | 5,581,063 |
+| MoR | 3.515415 +- 0.033980 | 3.515415 +- 0.033980 | 5.0717 | 33.63 | +1.4695 | 5,581,063 |
 | MoRE | 3.636966 +- 0.013387 | 3.636966 +- 0.013387 | 5.2470 | 37.98 | +1.3480 | 5,584,908 |
 
 The derived columns are transforms of the mean nats, in that order: `bits = nats / ln 2`, `perplexity = exp(nats)`, `margin = 4.9849 - nats` (positive BEATS the bigram baseline).
@@ -41,8 +41,8 @@ selection bias stays checkable; it is never the headline.
 | pair | gap | se(diff) | Cohen d | p (exact) | min_p | Holm thr | verdict |
 |---|---|---|---|---|---|---|---|
 | MoRE - MoE | -0.311346 | 0.012369 | -15.92 | 0.0079 | 0.00794 | 0.01250 | SIGNIFICANT (AT RESOLUTION FLOOR) |
-| MoRE - MoR | +0.116744 | 0.019099 | +3.87 | 0.0079 | 0.00794 | 0.01667 | SIGNIFICANT (AT RESOLUTION FLOOR) |
-| MoE - MoR | +0.428089 | 0.021121 | +12.82 | 0.0079 | 0.00794 | 0.02500 | SIGNIFICANT (AT RESOLUTION FLOOR) |
+| MoRE - MoR | +0.121551 | 0.016333 | +4.71 | 0.0079 | 0.00794 | 0.01667 | SIGNIFICANT (AT RESOLUTION FLOOR) |
+| MoE - MoR | +0.432896 | 0.018657 | +14.68 | 0.0079 | 0.00794 | 0.02500 | SIGNIFICANT (AT RESOLUTION FLOOR) |
 
 Exact two-sided randomization test (`code/seed_stats.py`); no k x std
 threshold is used anywhere (superseded, T11.0b). `min_p` is the smallest
@@ -92,7 +92,7 @@ vector) are not table cells and are not shown here; they are carried in
 
 | metric | MoE | MoR | MoRE |
 |---|---|---|---|
-| `best_val_loss` | 3.9483 +- 0.0242 | 3.5202 +- 0.0406 | 3.6370 +- 0.0134 |
+| `best_val_loss` | 3.9483 +- 0.0242 | 3.5154 +- 0.0340 | 3.6370 +- 0.0134 |
 | `embedding_params` | 2162688.0000 +- 0.0000 | 2162688.0000 +- 0.0000 | 2162688.0000 +- 0.0000 |
 | `epoch` | 3.0000 +- 0.0000 | 3.0000 +- 0.0000 | 3.0000 +- 0.0000 |
 | `non_embedding_params` | 3422220.0000 +- 0.0000 | 3418375.0000 +- 0.0000 | 3422220.0000 +- 0.0000 |
@@ -103,70 +103,70 @@ vector) are not table cells and are not shown here; they are carried in
 
 | metric | MoE | MoR | MoRE |
 |---|---|---|---|
-| `depth/by_document/between` | N/A | 0.0133 +- 0.0200 | 0.0001 +- 0.0000 |
-| `depth/by_document/between_share` | N/A | 0.0104 +- 0.0099 | 0.0005 +- 0.0001 |
+| `depth/by_document/between` | N/A | 0.0071 +- 0.0094 | 0.0001 +- 0.0000 |
+| `depth/by_document/between_share` | N/A | 0.0080 +- 0.0065 | 0.0005 +- 0.0001 |
 | `depth/by_document/n_documents` | N/A | 61.0000 +- 0.0000 | 61.0000 +- 0.0000 |
-| `depth/by_document/per_document_mean_max` | N/A | 6.7396 +- 0.3366 | 6.9468 +- 0.0036 |
-| `depth/by_document/per_document_mean_min` | N/A | 4.1419 +- 1.5199 | 2.0000 +- 0.0000 |
-| `depth/by_document/per_document_mean_std` | N/A | 0.3406 +- 0.1772 | 0.6266 +- 0.0006 |
+| `depth/by_document/per_document_mean_max` | N/A | 6.8155 +- 0.1617 | 6.9468 +- 0.0036 |
+| `depth/by_document/per_document_mean_min` | N/A | 3.8000 +- 0.8367 | 2.0000 +- 0.0000 |
+| `depth/by_document/per_document_mean_std` | N/A | 0.3836 +- 0.1019 | 0.6266 +- 0.0006 |
 | `depth/by_document/sum_matches_total` | N/A | 1.0000 +- 0.0000 | 1.0000 +- 0.0000 |
-| `depth/by_document/total` | N/A | 0.7370 +- 0.7141 | 0.2949 +- 0.0204 |
-| `depth/by_document/within` | N/A | 0.7237 +- 0.6948 | 0.2947 +- 0.0204 |
+| `depth/by_document/total` | N/A | 0.5893 +- 0.4691 | 0.2949 +- 0.0204 |
+| `depth/by_document/within` | N/A | 0.5822 +- 0.4598 | 0.2947 +- 0.0204 |
 | `depth/distinct_exit_depths` | N/A | 6.0000 +- 0.0000 | 6.8000 +- 0.4472 |
-| `depth/embed_norm_depth_vs_norm` | N/A | -0.1317 +- 0.0213 | -0.0083 +- 0.0039 |
-| `depth/embed_norm_logfreq_partial_norm` | N/A | 0.1722 +- 0.0608 | 0.0272 +- 0.0080 |
-| `depth/embed_norm_logfreq_vs_norm` | N/A | -0.4471 +- 0.0445 | -0.3583 +- 0.0468 |
-| `depth/embed_norm_logfreq_within_bins_max` | N/A | 0.3897 +- 0.1244 | 0.1267 +- 0.0310 |
-| `depth/embed_norm_logfreq_within_bins_mean` | N/A | 0.1790 +- 0.0400 | 0.0249 +- 0.0070 |
-| `depth/embed_norm_logfreq_within_bins_min` | N/A | -0.2017 +- 0.1368 | -0.1941 +- 0.0951 |
-| `depth/embed_norm_logfreq_within_bins_n_bins_used` | N/A | 47.4000 +- 0.5477 | 47.2000 +- 0.4472 |
-| `depth/embed_norm_norm_max` | N/A | 3.7605 +- 0.0913 | 3.7839 +- 0.0898 |
-| `depth/embed_norm_norm_mean` | N/A | 2.2703 +- 0.0259 | 2.2141 +- 0.0050 |
-| `depth/embed_norm_norm_min` | N/A | 1.6030 +- 0.0689 | 1.5401 +- 0.0203 |
-| `depth/embed_norm_surprisal_partial_norm` | N/A | -0.1722 +- 0.0608 | -0.0272 +- 0.0080 |
+| `depth/embed_norm_depth_vs_norm` | N/A | -0.1276 +- 0.0153 | -0.0083 +- 0.0039 |
+| `depth/embed_norm_logfreq_partial_norm` | N/A | 0.1726 +- 0.0555 | 0.0272 +- 0.0080 |
+| `depth/embed_norm_logfreq_vs_norm` | N/A | -0.4076 +- 0.0656 | -0.3583 +- 0.0468 |
+| `depth/embed_norm_logfreq_within_bins_max` | N/A | 0.3934 +- 0.1189 | 0.1267 +- 0.0310 |
+| `depth/embed_norm_logfreq_within_bins_mean` | N/A | 0.1677 +- 0.0333 | 0.0249 +- 0.0070 |
+| `depth/embed_norm_logfreq_within_bins_min` | N/A | -0.1171 +- 0.0798 | -0.1941 +- 0.0951 |
+| `depth/embed_norm_logfreq_within_bins_n_bins_used` | N/A | 47.0000 +- 0.7071 | 47.2000 +- 0.4472 |
+| `depth/embed_norm_norm_max` | N/A | 3.7335 +- 0.1010 | 3.7839 +- 0.0898 |
+| `depth/embed_norm_norm_mean` | N/A | 2.2841 +- 0.0425 | 2.2141 +- 0.0050 |
+| `depth/embed_norm_norm_min` | N/A | 1.5938 +- 0.0801 | 1.5401 +- 0.0203 |
+| `depth/embed_norm_surprisal_partial_norm` | N/A | -0.1726 +- 0.0555 | -0.0272 +- 0.0080 |
 | `depth/hist/step_1` | N/A | 0.0000 +- 0.0000 | 162.2000 +- 140.1756 |
-| `depth/hist/step_2` | N/A | 897.2000 +- 1693.2837 | 1383.8000 +- 717.0883 |
-| `depth/hist/step_3` | N/A | 5384.2000 +- 7582.8878 | 400.0000 +- 378.7328 |
-| `depth/hist/step_4` | N/A | 8566.4000 +- 11374.9276 | 226.6000 +- 206.9717 |
-| `depth/hist/step_5` | N/A | 13380.8000 +- 14225.5664 | 256.0000 +- 185.4319 |
-| `depth/hist/step_6` | N/A | 28842.0000 +- 22517.8566 | 1855.0000 +- 969.0797 |
-| `depth/hist/step_7` | N/A | 222919.4000 +- 57096.6160 | 275706.4000 +- 1174.9482 |
-| `depth/mean` | N/A | 6.6167 +- 0.4393 | 6.9552 +- 0.0044 |
-| `depth/mean_by_family/L1_FUNCTION` | N/A | 6.8257 +- 0.2419 | 6.9601 +- 0.0031 |
-| `depth/mean_by_family/L2_NOUN` | N/A | 6.4386 +- 0.6345 | 6.9531 +- 0.0061 |
-| `depth/mean_by_family/L3_VERB` | N/A | 6.7688 +- 0.3317 | 6.9572 +- 0.0042 |
-| `depth/mean_by_family/L4_MODIFIER` | N/A | 6.6168 +- 0.4879 | 6.9551 +- 0.0041 |
-| `depth/mean_by_family/L5_PUNCT_SYM` | N/A | 6.7921 +- 0.2462 | 6.9619 +- 0.0073 |
-| `depth/mean_by_family/L6_NUM_SUBWORD` | N/A | 6.4958 +- 0.5335 | 6.9529 +- 0.0067 |
+| `depth/hist/step_2` | N/A | 243.4000 +- 340.2048 | 1383.8000 +- 717.0883 |
+| `depth/hist/step_3` | N/A | 3130.4000 +- 4185.5404 | 400.0000 +- 378.7328 |
+| `depth/hist/step_4` | N/A | 5931.6000 +- 7243.5580 | 226.6000 +- 206.9717 |
+| `depth/hist/step_5` | N/A | 10446.2000 +- 9052.0363 | 256.0000 +- 185.4319 |
+| `depth/hist/step_6` | N/A | 23260.6000 +- 11289.9221 | 1855.0000 +- 969.0797 |
+| `depth/hist/step_7` | N/A | 236977.8000 +- 31449.9501 | 275706.4000 +- 1174.9482 |
+| `depth/mean` | N/A | 6.7297 +- 0.2410 | 6.9552 +- 0.0044 |
+| `depth/mean_by_family/L1_FUNCTION` | N/A | 6.9069 +- 0.0899 | 6.9601 +- 0.0031 |
+| `depth/mean_by_family/L2_NOUN` | N/A | 6.5901 +- 0.3818 | 6.9531 +- 0.0061 |
+| `depth/mean_by_family/L3_VERB` | N/A | 6.8798 +- 0.1176 | 6.9572 +- 0.0042 |
+| `depth/mean_by_family/L4_MODIFIER` | N/A | 6.7557 +- 0.2435 | 6.9551 +- 0.0041 |
+| `depth/mean_by_family/L5_PUNCT_SYM` | N/A | 6.8594 +- 0.1344 | 6.9619 +- 0.0073 |
+| `depth/mean_by_family/L6_NUM_SUBWORD` | N/A | 6.6103 +- 0.3194 | 6.9529 +- 0.0067 |
 | `depth/n_tokens` | N/A | 279990.0000 +- 0.0000 | 279990.0000 +- 0.0000 |
-| `depth/spearman_vs_logfreq` | N/A | 0.2108 +- 0.0635 | 0.0284 +- 0.0087 |
+| `depth/spearman_vs_logfreq` | N/A | 0.2085 +- 0.0524 | 0.0284 +- 0.0087 |
 | `depth/spearman_vs_logfreq_exceeds_null` | N/A | 1.0000 +- 0.0000 | 1.0000 +- 0.0000 |
-| `depth/spearman_vs_logfreq_null_high` | N/A | 0.0037 +- 0.0005 | 0.0034 +- 0.0002 |
-| `depth/spearman_vs_logfreq_null_low` | N/A | -0.0038 +- 0.0003 | -0.0037 +- 0.0002 |
-| `depth/spearman_vs_logfreq_null_mean` | N/A | 0.0001 +- 0.0001 | -0.0001 +- 0.0001 |
-| `depth/spearman_vs_model_loss` | N/A | 0.2953 +- 0.0553 | -0.0230 +- 0.0115 |
+| `depth/spearman_vs_logfreq_null_high` | N/A | 0.0037 +- 0.0003 | 0.0034 +- 0.0002 |
+| `depth/spearman_vs_logfreq_null_low` | N/A | -0.0034 +- 0.0003 | -0.0037 +- 0.0002 |
+| `depth/spearman_vs_logfreq_null_mean` | N/A | 0.0000 +- 0.0001 | -0.0001 +- 0.0001 |
+| `depth/spearman_vs_model_loss` | N/A | 0.2985 +- 0.0654 | -0.0230 +- 0.0115 |
 | `depth/spearman_vs_model_loss_exceeds_null` | N/A | 1.0000 +- 0.0000 | 1.0000 +- 0.0000 |
-| `depth/spearman_vs_model_loss_null_high` | N/A | 0.0037 +- 0.0002 | 0.0037 +- 0.0004 |
-| `depth/spearman_vs_model_loss_null_low` | N/A | -0.0037 +- 0.0003 | -0.0035 +- 0.0003 |
-| `depth/spearman_vs_model_loss_null_mean` | N/A | 0.0001 +- 0.0002 | 0.0000 +- 0.0000 |
-| `depth/spearman_vs_unigram_surprisal` | N/A | -0.2108 +- 0.0635 | -0.0284 +- 0.0087 |
+| `depth/spearman_vs_model_loss_null_high` | N/A | 0.0037 +- 0.0004 | 0.0037 +- 0.0004 |
+| `depth/spearman_vs_model_loss_null_low` | N/A | -0.0036 +- 0.0004 | -0.0035 +- 0.0003 |
+| `depth/spearman_vs_model_loss_null_mean` | N/A | 0.0000 +- 0.0001 | 0.0000 +- 0.0000 |
+| `depth/spearman_vs_unigram_surprisal` | N/A | -0.2085 +- 0.0524 | -0.0284 +- 0.0087 |
 | `depth/spearman_vs_unigram_surprisal_exceeds_null` | N/A | 1.0000 +- 0.0000 | 1.0000 +- 0.0000 |
-| `depth/spearman_vs_unigram_surprisal_null_high` | N/A | 0.0037 +- 0.0005 | 0.0037 +- 0.0002 |
-| `depth/spearman_vs_unigram_surprisal_null_low` | N/A | -0.0037 +- 0.0003 | -0.0031 +- 0.0005 |
-| `depth/spearman_vs_unigram_surprisal_null_mean` | N/A | -0.0000 +- 0.0001 | 0.0002 +- 0.0002 |
-| `depth/std` | N/A | 0.7039 +- 0.4480 | 0.4270 +- 0.0246 |
+| `depth/spearman_vs_unigram_surprisal_null_high` | N/A | 0.0039 +- 0.0004 | 0.0037 +- 0.0002 |
+| `depth/spearman_vs_unigram_surprisal_null_low` | N/A | -0.0036 +- 0.0003 | -0.0031 +- 0.0005 |
+| `depth/spearman_vs_unigram_surprisal_null_mean` | N/A | 0.0000 +- 0.0001 | 0.0002 +- 0.0002 |
+| `depth/std` | N/A | 0.6465 +- 0.3281 | 0.4270 +- 0.0246 |
 
 ### `depth_dist`
 
 | metric | MoE | MoR | MoRE |
 |---|---|---|---|
 | `depth_dist/step_1_pct` | 100.0000 +- 0.0000 | 0.0000 +- 0.0000 | 0.2061 +- 0.0308 |
-| `depth_dist/step_2_pct` | N/A | 0.6989 +- 0.6003 | 0.7271 +- 0.2371 |
-| `depth_dist/step_3_pct` | N/A | 2.0548 +- 3.1495 | 0.1115 +- 0.1039 |
-| `depth_dist/step_4_pct` | N/A | 3.8061 +- 5.4269 | 0.0991 +- 0.0783 |
-| `depth_dist/step_5_pct` | N/A | 6.9360 +- 8.9095 | 0.1750 +- 0.0964 |
-| `depth_dist/step_6_pct` | N/A | 13.2270 +- 11.5680 | 1.3407 +- 0.7136 |
-| `depth_dist/step_7_pct` | N/A | 73.2772 +- 29.6131 | 97.3405 +- 0.7540 |
+| `depth_dist/step_2_pct` | N/A | 0.4796 +- 0.1508 | 0.7271 +- 0.2371 |
+| `depth_dist/step_3_pct` | N/A | 1.1030 +- 1.5811 | 0.1115 +- 0.1039 |
+| `depth_dist/step_4_pct` | N/A | 2.4330 +- 3.0842 | 0.0991 +- 0.0783 |
+| `depth_dist/step_5_pct` | N/A | 4.3657 +- 4.2016 | 0.1750 +- 0.0964 |
+| `depth_dist/step_6_pct` | N/A | 10.3843 +- 6.1848 | 1.3407 +- 0.7136 |
+| `depth_dist/step_7_pct` | N/A | 81.2344 +- 15.0678 | 97.3405 +- 0.7540 |
 
 ### `diag`
 
@@ -180,15 +180,15 @@ vector) are not table cells and are not shown here; they are carried in
 | metric | MoE | MoR | MoRE |
 |---|---|---|---|
 | `dispatch/evals_per_token` | 1.0000 +- 0.0000 | 1.0000 +- 0.0000 | 1.0000 +- 0.0000 |
-| `dispatch/expert_evaluations` | 134737920.0000 +- 0.0000 | 875485355.0000 +- 82334154.9218 | 933321286.4000 +- 734318.6509 |
+| `dispatch/expert_evaluations` | 134737920.0000 +- 0.0000 | 898399035.4000 +- 41035715.9264 | 933321286.4000 +- 734318.6509 |
 | `dispatch/experts_called_max` | 6.0000 +- 0.0000 | 1.0000 +- 0.0000 | 6.0000 +- 0.0000 |
 | `dispatch/max_load_fraction` | 0.7639 +- 0.0700 | 1.0000 +- 0.0000 | 0.4478 +- 0.0171 |
 | `dispatch/overflow_rate` | 0.0000 +- 0.0000 | 0.0000 +- 0.0000 | 0.0000 +- 0.0000 |
 | `dispatch/overflow_tokens` | 0.0000 +- 0.0000 | 0.0000 +- 0.0000 | 0.0000 +- 0.0000 |
-| `dispatch/router_calls` | N/A | N/A | 10965.0000 +- 0.0000 |
-| `dispatch/router_calls_per_dispatch` | N/A | N/A | 0.1429 +- 0.0000 |
+| `dispatch/router_calls` | N/A | 76755.0000 +- 0.0000 | 10965.0000 +- 0.0000 |
+| `dispatch/router_calls_per_dispatch` | N/A | 1.0000 +- 0.0000 | 0.1429 +- 0.0000 |
 | `dispatch/router_noise_scale` | 0.0000 +- 0.0000 | 0.0000 +- 0.0000 | 0.0000 +- 0.0000 |
-| `dispatch/tokens_dispatched` | 134737920.0000 +- 0.0000 | 875485355.0000 +- 82334154.9218 | 933321286.4000 +- 734318.6509 |
+| `dispatch/tokens_dispatched` | 134737920.0000 +- 0.0000 | 898399035.4000 +- 41035715.9264 | 933321286.4000 +- 734318.6509 |
 
 ### `expert_load`
 
@@ -205,27 +205,27 @@ vector) are not table cells and are not shown here; they are carried in
 
 | metric | MoE | MoR | MoRE |
 |---|---|---|---|
-| `halt/early_exit_rate` | N/A | 0.2672 +- 0.2961 | 0.0266 +- 0.0075 |
-| `halt/early_exits` | N/A | 36005742.8000 +- 39900013.6601 | 3583421.4000 +- 1015887.0866 |
-| `halt/forced_exit_rate` | N/A | 0.7328 +- 0.2961 | 0.9734 +- 0.0075 |
-| `halt/forced_exits` | N/A | 98732177.2000 +- 39900013.6601 | 131154498.6000 +- 1015887.0866 |
+| `halt/early_exit_rate` | N/A | 0.1877 +- 0.1507 | 0.0266 +- 0.0075 |
+| `halt/early_exits` | N/A | 25284436.0000 +- 20302031.5133 | 3583421.4000 +- 1015887.0866 |
+| `halt/forced_exit_rate` | N/A | 0.8123 +- 0.1507 | 0.9734 +- 0.0075 |
+| `halt/forced_exits` | N/A | 109453484.0000 +- 20302031.5133 | 131154498.6000 +- 1015887.0866 |
 | `halt/mean_halt_mass` | N/A | 1.0000 +- 0.0000 | 1.0000 +- 0.0000 |
-| `halt/mean_remainder` | N/A | 0.1703 +- 0.0567 | 0.6549 +- 0.0085 |
+| `halt/mean_remainder` | N/A | 0.1750 +- 0.0470 | 0.6549 +- 0.0085 |
 
 ### `perf`
 
 | metric | MoE | MoR | MoRE |
 |---|---|---|---|
-| `perf/gpu_peak_alloc_gib` | N/A | 7.3346 +- 0.2905 | 3.8441 +- 0.0022 |
-| `perf/gpu_peak_reserved_gib` | N/A | 7.7949 +- 0.2705 | 4.3578 +- 0.0186 |
-| `perf/throughput_items_sec` | 335.4724 +- 6.9394 | 173.7715 +- 6.3370 | 96.9804 +- 0.9758 |
-| `perf/throughput_tokens_sec` | N/A | 44485.5120 +- 1622.2804 | 24826.9878 +- 249.8132 |
+| `perf/gpu_peak_alloc_gib` | N/A | 7.4146 +- 0.1437 | 3.8441 +- 0.0022 |
+| `perf/gpu_peak_reserved_gib` | N/A | 7.8281 +- 0.1493 | 4.3578 +- 0.0186 |
+| `perf/throughput_items_sec` | 335.4724 +- 6.9394 | 53.5556 +- 5.1666 | 96.9804 +- 0.9758 |
+| `perf/throughput_tokens_sec` | N/A | 13710.2394 +- 1322.6451 | 24826.9878 +- 249.8132 |
 
 ### `probe`
 
 | metric | MoE | MoR | MoRE |
 |---|---|---|---|
-| `probe/family_ce` | 1.8656 +- 0.0685 | 1.8835 +- 0.0350 | 1.9249 +- 0.0407 |
+| `probe/family_ce` | 1.8656 +- 0.0685 | 1.8787 +- 0.0397 | 1.9249 +- 0.0407 |
 
 ### `prov`
 
@@ -237,45 +237,45 @@ vector) are not table cells and are not shown here; they are carried in
 
 | metric | MoE | MoR | MoRE |
 |---|---|---|---|
-| `recursion/avg_depth_by_family/L1_FUNCTION` | 1.0000 +- 0.0000 | 6.8059 +- 0.2409 | 6.9381 +- 0.0032 |
-| `recursion/avg_depth_by_family/L2_NOUN` | 1.0000 +- 0.0000 | 6.4213 +- 0.6321 | 6.9321 +- 0.0063 |
-| `recursion/avg_depth_by_family/L3_VERB` | 1.0000 +- 0.0000 | 6.7469 +- 0.3302 | 6.9316 +- 0.0046 |
-| `recursion/avg_depth_by_family/L4_MODIFIER` | 1.0000 +- 0.0000 | 6.6003 +- 0.4862 | 6.9360 +- 0.0042 |
-| `recursion/avg_depth_by_family/L5_PUNCT_SYM` | 1.0000 +- 0.0000 | 6.7726 +- 0.2452 | 6.9393 +- 0.0066 |
-| `recursion/avg_depth_by_family/L6_NUM_SUBWORD` | 1.0000 +- 0.0000 | 6.4797 +- 0.5316 | 6.9342 +- 0.0064 |
+| `recursion/avg_depth_by_family/L1_FUNCTION` | 1.0000 +- 0.0000 | 6.8867 +- 0.0895 | 6.9381 +- 0.0032 |
+| `recursion/avg_depth_by_family/L2_NOUN` | 1.0000 +- 0.0000 | 6.5723 +- 0.3803 | 6.9321 +- 0.0063 |
+| `recursion/avg_depth_by_family/L3_VERB` | 1.0000 +- 0.0000 | 6.8574 +- 0.1170 | 6.9316 +- 0.0046 |
+| `recursion/avg_depth_by_family/L4_MODIFIER` | 1.0000 +- 0.0000 | 6.7388 +- 0.2426 | 6.9360 +- 0.0042 |
+| `recursion/avg_depth_by_family/L5_PUNCT_SYM` | 1.0000 +- 0.0000 | 6.8396 +- 0.1338 | 6.9393 +- 0.0066 |
+| `recursion/avg_depth_by_family/L6_NUM_SUBWORD` | 1.0000 +- 0.0000 | 6.5938 +- 0.3182 | 6.9342 +- 0.0064 |
 
 ### `train`
 
 | metric | MoE | MoR | MoRE |
 |---|---|---|---|
 | `train/aux_routing_loss` | 0.2321 +- 0.4271 | N/A | -0.7822 +- 0.0012 |
-| `train/avg_recursion_steps` | N/A | 6.5935 +- 0.4669 | 6.9309 +- 0.0042 |
+| `train/avg_recursion_steps` | N/A | 6.7072 +- 0.2680 | 6.9309 +- 0.0042 |
 | `train/balance_to_task_ratio` | 0.0001 +- 0.0001 | N/A | 0.0002 +- 0.0000 |
 | `train/classification_loss` | 0.0000 +- 0.0000 | 0.0000 +- 0.0000 | 0.0000 +- 0.0000 |
 | `train/entropy_term` | 1.6263 +- 0.0665 | N/A | 1.7915 +- 0.0001 |
 | `train/entropy_term_normalized` | 0.9077 +- 0.0371 | N/A | 0.9999 +- 0.0000 |
 | `train/expert_load_entropy_normalized` | 0.6003 +- 0.1326 | N/A | 0.9582 +- 0.0061 |
 | `train/family_cls_loss` | 0.0000 +- 0.0000 | 0.0000 +- 0.0000 | 0.0000 +- 0.0000 |
-| `train/halting_loss` | N/A | 0.8335 +- 0.0829 | 0.9477 +- 0.0015 |
-| `train/ponder_cost` | N/A | 0.8335 +- 0.0829 | 0.9477 +- 0.0015 |
+| `train/halting_loss` | N/A | 0.8553 +- 0.0437 | 0.9477 +- 0.0015 |
+| `train/ponder_cost` | N/A | 0.8553 +- 0.0437 | 0.9477 +- 0.0015 |
 | `train/routing_balance_loss` | 0.2321 +- 0.4271 | N/A | -0.7822 +- 0.0012 |
-| `train/step_routing_loss` | 0.5833 +- 0.0172 | 0.5651 +- 0.0105 | 0.5953 +- 0.0121 |
+| `train/step_routing_loss` | 0.5833 +- 0.0172 | 0.5636 +- 0.0119 | 0.5953 +- 0.0121 |
 | `train/switch_aux_term` | 1.8584 +- 0.3606 | N/A | 1.0093 +- 0.0011 |
-| `train/task_loss` | 4.1008 +- 0.0302 | 3.6806 +- 0.0499 | 3.7537 +- 0.0159 |
-| `train/total_loss` | 4.1011 +- 0.0306 | 3.6814 +- 0.0498 | 3.7539 +- 0.0159 |
+| `train/task_loss` | 4.1008 +- 0.0302 | 3.6760 +- 0.0407 | 3.7537 +- 0.0159 |
+| `train/total_loss` | 4.1011 +- 0.0306 | 3.6769 +- 0.0406 | 3.7539 +- 0.0159 |
 
 ### `val`
 
 | metric | MoE | MoR | MoRE |
 |---|---|---|---|
-| `val/avg_recursion_steps` | N/A | 6.7775 +- 0.4916 | 7.6152 +- 0.0142 |
-| `val/bits_per_token` | 5.6962 +- 0.0349 | 5.0786 +- 0.0585 | 5.2470 +- 0.0193 |
-| `val/early_exit_rate` | N/A | 0.2069 +- 0.2031 | 0.0191 +- 0.0042 |
-| `val/forced_exit_rate` | N/A | 0.7931 +- 0.2031 | 0.9809 +- 0.0042 |
-| `val/loss` | 3.9483 +- 0.0242 | 3.5202 +- 0.0406 | 3.6370 +- 0.0134 |
-| `val/mean_remainder` | N/A | 0.1788 +- 0.0554 | 0.6810 +- 0.0125 |
-| `val/nats_below_bigram_floor` | 1.0366 +- 0.0242 | 1.4647 +- 0.0406 | 1.3480 +- 0.0134 |
-| `val/perplexity` | 51.8599 +- 1.2619 | 33.8143 +- 1.3778 | 37.9792 +- 0.5080 |
+| `val/avg_recursion_steps` | N/A | 6.8985 +- 0.2835 | 7.6152 +- 0.0142 |
+| `val/bits_per_token` | 5.6962 +- 0.0349 | 5.0717 +- 0.0490 | 5.2470 +- 0.0193 |
+| `val/early_exit_rate` | N/A | 0.1569 +- 0.1119 | 0.0191 +- 0.0042 |
+| `val/forced_exit_rate` | N/A | 0.8431 +- 0.1119 | 0.9809 +- 0.0042 |
+| `val/loss` | 3.9483 +- 0.0242 | 3.5154 +- 0.0340 | 3.6370 +- 0.0134 |
+| `val/mean_remainder` | N/A | 0.1873 +- 0.0444 | 0.6810 +- 0.0125 |
+| `val/nats_below_bigram_floor` | 1.0366 +- 0.0242 | 1.4695 +- 0.0340 | 1.3480 +- 0.0134 |
+| `val/perplexity` | 51.8599 +- 1.2619 | 33.6454 +- 1.1392 | 37.9792 +- 0.5080 |
 | `val/routing_agreement_with_pos` | 0.1951 +- 0.0971 | N/A | 0.2009 +- 0.0526 |
 | `val/routing_ami` | 0.1637 +- 0.0478 | N/A | 0.1803 +- 0.0246 |
 | `val/routing_control_pos/ami_control_mean` | 0.0364 +- 0.0107 | N/A | 0.0249 +- 0.0055 |
@@ -363,7 +363,7 @@ vector) are not table cells and are not shown here; they are carried in
 | `val/routing_recall_matched/E4_LOGIC` | 0.0971 +- 0.0724 | N/A | 0.2020 +- 0.0726 |
 | `val/routing_recall_matched/E5_SHIFT` | 0.1590 +- 0.2873 | N/A | 0.0079 +- 0.0137 |
 | `val/routing_recall_matched/E6_SORT_STAT` | 0.5498 +- 0.3321 | N/A | 0.3295 +- 0.0772 |
-| `val/task_loss` | 3.9483 +- 0.0242 | 3.5202 +- 0.0406 | 3.6370 +- 0.0134 |
+| `val/task_loss` | 3.9483 +- 0.0242 | 3.5154 +- 0.0340 | 3.6370 +- 0.0134 |
 
 **Throughput units.** `perf/throughput_tokens_sec` is `N/A` for MoE because those runs predate the T-LX.8 fix, which is detectable without commit archaeology: before T-LX.8 the engine divided batch ITEMS by elapsed seconds and labelled the quotient tokens/s, and it published no items/s key at all. On this task an item is one `seq_len`-token block, so the figure those runs recorded is items/s and it is reported above in the `perf/throughput_items_sec` row, where it is directly comparable to every other arm. It is relabelled, never rescaled: multiplying by `seq_len` recovers the tokens figure exactly, but that product appears in no run's `metrics.json`, and this exporter reports `N/A` rather than synthesize a cell. **Compare throughput on the `perf/throughput_items_sec` row.** Reading the tokens row alone would show these arms as missing, and an earlier export that mixed the two units in one row showed them as ~62x slower than the truth.
 
@@ -378,7 +378,7 @@ vector) are not table cells and are not shown here; they are carried in
 | `dispatch/capacity_policy` | categorical, not a measurement | `no_capacity_limit` |
 | `dispatch/router_noise` | categorical, not a measurement | `none` |
 | `dispatch/routing_mode` | categorical, not a measurement | `top1_sparse` |
-| `dispatch/routing_persistence` | categorical, not a measurement | `per_token` |
+| `dispatch/routing_persistence` | categorical, not a measurement | `per_step`, `per_token` |
 | `experiment_group` | categorical, not a measurement | `canonical_lang_b` |
 | `experiment_id` | categorical, not a measurement | 15 distinct values (one per run or per arm) -- read the `experiment_id` column of `results.csv` |
 | `halting_mode` | categorical, not a measurement | `pure_act` |
@@ -436,8 +436,6 @@ skipped these would be indistinguishable from one that found nothing wrong.
 | `famcls_nofam_seed43__ca305b98` | experiment_group='exploratory' != 'canonical_lang_b' |
 | `famcls_nofam_seed44__1d8e55dd` | experiment_group='exploratory' != 'canonical_lang_b' |
 | `gate1_dataset_check__seedNA__fa24821c` | experiment_group='exploratory' != 'canonical_lang_b' |
-| `langB_MoR_seed42__c93f0fe8` | no metrics.json (run did not finish) |
-| `langB_MoR_seed42__c93f0fe8__r2` | no metrics.json (run did not finish) |
 | `langB_MoR_seed43__c1873a66` | experiment_group='lang_smoke2' != 'canonical_lang_b' |
 | `langB_MoR_seed44__14356af7` | experiment_group='langB_smoke' != 'canonical_lang_b' |
 | `langB_MoR_seed44__78580ac8` | no metrics.json (run did not finish) |
