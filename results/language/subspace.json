@@ -22,14 +22,14 @@
       }
     },
     "mor": {
-      "n_seeds": 3,
+      "n_seeds": 5,
       "global_pr": {
-        "mean": 67.84772151976432,
-        "std": 5.545010081058856
+        "mean": 70.25416104545651,
+        "std": 5.588608553926853
       },
       "mean_per_expert_pr": {
-        "mean": 67.84772151976432,
-        "std": 5.545010081058856
+        "mean": 70.25416104545651,
+        "std": 5.588608553926853
       },
       "between_expert_mean_cosine": {
         "mean": NaN,
@@ -62,9 +62,9 @@
   },
   "pairwise_uncorrected": {
     "moe_vs_mor_globalPR": {
-      "gap": -26.332291650135225,
-      "p_value": 0.017857142857142856,
-      "min_p": 0.017857142857142856,
+      "gap": -28.738731175827418,
+      "p_value": 0.007936507936507936,
+      "min_p": 0.007936507936507936,
       "status": "UNCORRECTED -- exploratory"
     },
     "moe_vs_more_globalPR": {
@@ -74,9 +74,9 @@
       "status": "UNCORRECTED -- exploratory"
     },
     "mor_vs_more_globalPR": {
-      "gap": 10.573925725450088,
-      "p_value": 0.017857142857142856,
-      "min_p": 0.017857142857142856,
+      "gap": 12.980365251142281,
+      "p_value": 0.007936507936507936,
+      "min_p": 0.007936507936507936,
       "status": "UNCORRECTED -- exploratory"
     }
   },
@@ -260,6 +260,40 @@
       "mean_per_expert_pr": 66.63320280252192,
       "per_expert_pr": {
         "0": 66.63320280252192
+      },
+      "expert_token_counts": [
+        12288
+      ],
+      "between_expert_mean_cosine": NaN,
+      "between_over_total_variance": NaN
+    },
+    {
+      "run": "langB_MoR_seed45__4041a890",
+      "arch": "mor",
+      "seed": 45,
+      "n_tokens": 12288,
+      "d_model": 256,
+      "global_participation_ratio": 70.70124426796042,
+      "mean_per_expert_pr": 70.70124426796042,
+      "per_expert_pr": {
+        "0": 70.70124426796042
+      },
+      "expert_token_counts": [
+        12288
+      ],
+      "between_expert_mean_cosine": NaN,
+      "between_over_total_variance": NaN
+    },
+    {
+      "run": "langB_MoR_seed46__fb91cdff",
+      "arch": "mor",
+      "seed": 46,
+      "n_tokens": 12288,
+      "d_model": 256,
+      "global_participation_ratio": 77.02639640002914,
+      "mean_per_expert_pr": 77.02639640002914,
+      "per_expert_pr": {
+        "0": 77.02639640002914
       },
       "expert_token_counts": [
         12288

@@ -3,44 +3,44 @@
   "status": "EXPLORATORY. Scored with the wikitext-103 8192-BPE tokenizer, so absolute perplexity is not comparable to published models; the cross-arm comparison is the valid one. Uncorrected.",
   "tokenizer": "wikitext-103 bpe8192",
   "seq_len": 256,
-  "n_blocks": 2000,
+  "n_blocks": 1500,
   "by_arm": {
     "moe": {
       "n_seeds": 5,
-      "mean_loss": 8.309169387254903,
-      "std_loss": 0.08852877684163514,
-      "mean_perplexity": 4060.9385151735587
+      "mean_loss": 8.272429773284314,
+      "std_loss": 0.08797995211867331,
+      "mean_perplexity": 3914.4486692488745
     },
     "mor": {
-      "n_seeds": 3,
-      "mean_loss": 7.88849065308415,
-      "std_loss": 0.13798518388356365,
-      "mean_perplexity": 2666.416334658064
+      "n_seeds": 5,
+      "mean_loss": 7.801941258169935,
+      "std_loss": 0.15755405586524185,
+      "mean_perplexity": 2445.344417814186
     },
     "more": {
       "n_seeds": 5,
-      "mean_loss": 7.653642969515931,
-      "std_loss": 0.12150436773025777,
-      "mean_perplexity": 2108.3121332802957
+      "mean_loss": 7.57317035743464,
+      "std_loss": 0.12218745075355958,
+      "mean_perplexity": 1945.2978049847677
     }
   },
   "pairwise_uncorrected": {
     "moe_vs_mor": {
-      "gap": 0.4206787341707523,
-      "p_value": 0.017857142857142856,
-      "min_p": 0.017857142857142856,
+      "gap": 0.47048851511437917,
+      "p_value": 0.007936507936507936,
+      "min_p": 0.007936507936507936,
       "status": "UNCORRECTED -- exploratory"
     },
     "moe_vs_more": {
-      "gap": 0.6555264177389715,
+      "gap": 0.6992594158496734,
       "p_value": 0.007936507936507936,
       "min_p": 0.007936507936507936,
       "status": "UNCORRECTED -- exploratory"
     },
     "mor_vs_more": {
-      "gap": 0.23484768356821917,
-      "p_value": 0.05357142857142857,
-      "min_p": 0.017857142857142856,
+      "gap": 0.22877090073529427,
+      "p_value": 0.047619047619047616,
+      "min_p": 0.007936507936507936,
       "status": "UNCORRECTED -- exploratory"
     }
   },
@@ -49,105 +49,121 @@
       "run": "langB_MoE_seed42__51000018",
       "arch": "moe",
       "seed": 42,
-      "mean_loss": 8.325628056066176,
-      "perplexity": 4128.329216606077,
-      "n_tokens": 510000
+      "mean_loss": 8.283225398284314,
+      "perplexity": 3956.9365179581314,
+      "n_tokens": 382500
     },
     {
       "run": "langB_MoE_seed43__7d85fe81",
       "arch": "moe",
       "seed": 43,
-      "mean_loss": 8.23229576439951,
-      "perplexity": 3760.4569731054958,
-      "n_tokens": 510000
+      "mean_loss": 8.186111407271241,
+      "perplexity": 3590.7321682336656,
+      "n_tokens": 382500
     },
     {
       "run": "langB_MoE_seed44__c348b39a",
       "arch": "moe",
       "seed": 44,
-      "mean_loss": 8.436760554534313,
-      "perplexity": 4613.585292942119,
-      "n_tokens": 510000
+      "mean_loss": 8.40335685253268,
+      "perplexity": 4462.019978829108,
+      "n_tokens": 382500
     },
     {
       "run": "langB_MoE_seed45__64800f08",
       "arch": "moe",
       "seed": 45,
-      "mean_loss": 8.217991750919118,
-      "perplexity": 3707.050221917604,
-      "n_tokens": 510000
+      "mean_loss": 8.196159293300653,
+      "perplexity": 3626.993304628561,
+      "n_tokens": 382500
     },
     {
       "run": "langB_MoE_seed46__3d9d12a9",
       "arch": "moe",
       "seed": 46,
-      "mean_loss": 8.333170810355393,
-      "perplexity": 4159.585922145945,
-      "n_tokens": 510000
+      "mean_loss": 8.29329591503268,
+      "perplexity": 3996.98623564016,
+      "n_tokens": 382500
     },
     {
       "run": "langB_MoR_seed42__c93f0fe8__r2",
       "arch": "mor",
       "seed": 42,
-      "mean_loss": 7.871985830269608,
-      "perplexity": 2622.768793796889,
-      "n_tokens": 510000
+      "mean_loss": 7.8018422589869285,
+      "perplexity": 2445.1023426974707,
+      "n_tokens": 382500
     },
     {
       "run": "langB_MoR_seed43__8b54a65f",
       "arch": "mor",
       "seed": 43,
-      "mean_loss": 7.759500199142157,
-      "perplexity": 2343.7329127734665,
-      "n_tokens": 510000
+      "mean_loss": 7.740039869281046,
+      "perplexity": 2298.5640233905538,
+      "n_tokens": 382500
     },
     {
       "run": "langB_MoR_seed44__c11db02d",
       "arch": "mor",
       "seed": 44,
-      "mean_loss": 8.033985929840686,
-      "perplexity": 3084.0098538813663,
-      "n_tokens": 510000
+      "mean_loss": 7.975375643382353,
+      "perplexity": 2908.450206997954,
+      "n_tokens": 382500
+    },
+    {
+      "run": "langB_MoR_seed45__4041a890",
+      "arch": "mor",
+      "seed": 45,
+      "mean_loss": 7.574216881127451,
+      "perplexity": 1947.3346708555532,
+      "n_tokens": 382500
+    },
+    {
+      "run": "langB_MoR_seed46__fb91cdff",
+      "arch": "mor",
+      "seed": 46,
+      "mean_loss": 7.918231638071895,
+      "perplexity": 2746.909218579861,
+      "n_tokens": 382500
     },
     {
       "run": "langB_MoRE_seed42__9cfd3f1c",
       "arch": "more",
       "seed": 42,
-      "mean_loss": 7.550338296568627,
-      "perplexity": 1901.3858548605417,
-      "n_tokens": 510000
+      "mean_loss": 7.472563562091503,
+      "perplexity": 1759.1104991961865,
+      "n_tokens": 382500
     },
     {
       "run": "langB_MoRE_seed43__dbe38cbd",
       "arch": "more",
       "seed": 43,
-      "mean_loss": 7.817949823835784,
-      "perplexity": 2484.805892564482,
-      "n_tokens": 510000
+      "mean_loss": 7.741051031454249,
+      "perplexity": 2300.889419862033,
+      "n_tokens": 382500
     },
     {
       "run": "langB_MoRE_seed44__16027752",
       "arch": "more",
       "seed": 44,
-      "mean_loss": 7.555903121170343,
-      "perplexity": 1911.9962286965203,
-      "n_tokens": 510000
+      "mean_loss": 7.480184824346405,
+      "perplexity": 1772.5683594470315,
+      "n_tokens": 382500
     },
     {
       "run": "langB_MoRE_seed45__f6c47448",
       "arch": "more",
       "seed": 45,
-      "mean_loss": 7.597323311121324,
-      "perplexity": 1992.8544981922403,
-      "n_tokens": 510000
+      "mean_loss": 7.507170016339869,
+      "perplexity": 1821.052694333322,
+      "n_tokens": 382500
     },
     {
       "run": "langB_MoRE_seed46__d069325c",
       "arch": "more",
       "seed": 46,
-      "mean_loss": 7.746700294883579,
-      "perplexity": 2313.9245350492906,
-      "n_tokens": 510000
+      "mean_loss": 7.664882352941176,
+      "perplexity": 2132.1419269652206,
+      "n_tokens": 382500
     }
   ]
 }
