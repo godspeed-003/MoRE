@@ -1,0 +1,129 @@
+\section{Experimental Setup}
+\label{sec:setup}
+
+\subsection{Data and split}
+\label{sec:data}
+
+All arms train on WikiText-103 \citep{merity2017wikitext} with a byte-pair
+vocabulary of 8{,}192 tokens and packed sequences of length 256
+(\texttt{lang-wikitext-103-bpe8192-len256-800d6154}). We use the corpus's own
+author-provided validation split rather than carving one out of the training
+material, which is what makes the leakage audit in \S\ref{sec:integrity}
+meaningful: no validation or test token was ever available to the trainer.
+
+The baseline floor is a backoff bigram estimated on the same corpus:
+\textbf{4.9849 nats/token} (7.19 bits, perplexity 146.2). A model that does not
+beat it has learned nothing a two-column count table could not. All three arms
+beat it, by margins of $+1.037$, $+1.470$ and $+1.348$ nats for MoE, MoR and MoRE
+respectively.
+
+\subsection{Training protocol}
+\label{sec:protocol}
+
+Every canonical arm runs at seeds $\{42,43,44,45,46\}$ and is reported as
+mean$\,\pm\,$std over five runs. Training is 3 epochs of AdamW (lr $10^{-3}$,
+weight decay $10^{-4}$, gradient clipping 1.0, dropout 0.1) with
+$d_{\text{model}} = 256$, one block, 4 attention heads, $T = 7$ and batch size 48
+on a single laptop GPU. These settings were fixed once, before the comparison, and
+not swept per architecture: they are a stable operating point, and no arm was tuned
+for itself.
+
+\textbf{Three epochs is a fixed compute budget, not convergence, and we state it
+as such.} One epoch is 526{,}320 blocks $\times$ 256 tokens $= 134.7$M tokens
+against $\approx$3.4M non-embedding parameters, so the runs sit in an underfitting
+regime; the choice of 3 over 2 was made because the halting axis needs more than
+two epochs to separate the arms at all, and going to 8 epochs was rejected on cost.
+Every arm receives the identical budget, so the comparison is valid even though no
+arm is converged. The consequences are stated in the Limitations section.
+
+\subsection{Metrics}
+\label{sec:metrics}
+
+\textbf{Primary metric: validation task loss}, the final-epoch per-token
+cross-entropy in nats. We deliberately do not select on best-epoch validation loss:
+that is an order statistic whose downward bias scales with each arm's per-epoch
+validation noise, which is not matched across architectures. On all 15 cells
+\texttt{best} equals \texttt{last}---the evaluation interval is one epoch and the
+curves decrease monotonically---so \emph{no model selection occurred} on either
+split. Best-epoch values are reported alongside so the selection effect stays
+checkable.
+
+Because the router is unsupervised, expert indices carry no semantic identity, so
+raw agreement with any externally defined partition measures label permutation as
+much as partition quality. We therefore report AMI \citep{vinh2010ami},
+Hungarian-matched accuracy and cluster purity, each against a \emph{per-run
+permutation control}: the same metric computed against shuffled linguistic labels,
+averaged over 10 draws. The controlled quantity is the z-score of the real value
+against that null, not the raw value. The externally defined partition is a
+part-of-speech hypothesis about a useful expert split---a hypothesis, not a
+functional ground truth---so a router can be better for next-token prediction and
+still score low against it. We therefore never call this ``routing accuracy''
+without that qualifier.
+
+For depth we report mean steps, exit rates, halt mass, and the Spearman correlation
+between per-token depth and per-token difficulty. \textbf{The correlation is only
+interpretable when depth has variance to correlate}: on an arm whose tokens almost
+all exit at the ceiling, the correlation is computed against a near-constant and a
+value near zero is uninformative rather than negative evidence. We report the exit
+rates next to every correlation for that reason (\S\ref{sec:halting}).
+
+\subsection{Statistics}
+\label{sec:stats}
+
+Comparisons use an exact two-sided randomization test on the difference of means,
+which enumerates every way of splitting the pooled values into groups of the
+original sizes---$\binom{10}{5} = 252$ at five-versus-five---and counts the
+fraction whose $|$mean difference$|$ is at least the observed one. It is
+exhaustive, hence deterministic: no sampling error, no seed, no normality
+assumption, and no threshold to choose. The superseded $k\times$std heuristic is
+not used anywhere.
+
+The \textbf{resolution floor} of this design is $2/\binom{n_a+n_b}{n_a}$ for equal
+arms. When the arms are the same size, the complement of any admissible group is
+itself admissible and swapping the groups negates the difference while preserving
+its absolute value, so extremes arrive in mirror pairs and the count at the extreme
+can never be one. At five-versus-five the floor is $2/252 = 0.00794$. \textbf{Every
+headline comparison in this paper sits exactly on that floor}, which we phrase as
+``as extreme as a five-seed design admits''---a weaker statement than significance,
+and not to be dressed up as a stronger one. Only more seeds can strengthen these
+claims; no larger effect can.
+
+Correction is Holm--Bonferroni over two \emph{pre-registered} families, declared
+before the final arm was trained: Family A (predictive quality, $m=4$, metric
+validation task loss) and Family B (adaptive depth, $m=2$, metric depth--difficulty
+correlation). The split is declared rather than chosen because the two families ask
+different questions on different quantities, and pooling them would correct the
+depth claim for tests that cannot bear on it. Holm controls the same familywise
+error rate as plain Bonferroni and is uniformly more powerful, and here the choice
+is load-bearing: plain Bonferroni over the seven comparisons would give
+$0.05/7 = 0.00714$, \emph{below} the floor of 0.00794---a design in which no effect
+of any size could be declared significant. Holm's easiest threshold at $m=4$ is
+$0.0125$, a margin of 0.0046 above the floor.
+
+Two consequences we hold ourselves to. A declared comparison that could not be run
+still consumes its slot: dropping a failed arm must never make the survivors easier
+to call significant. And a comparison whose floor exceeds its Holm threshold is
+\emph{undecidable} and reported \texttt{N/A}, never ``not significant''---that
+phrasing would blame the data for a limit of the design.
+
+\subsection{Integrity checks}
+\label{sec:integrity}
+
+Three mechanical invariants hold across the matrix, each enforced by an automated
+check rather than by inspection. \textbf{(i) Inputs are bit-identical across arms
+for the same record}: feature ranges are identical at $E \in \{1,5,6\}$, so a
+difference between arms cannot be a difference in representation. \textbf{(ii) The
+regression/classification target is absent from the input}, and no oracle routing
+label is encoded into a feature slot. \textbf{(iii) The arms are parameter-matched
+to 0.069\%} and the seed-blind configuration is identical within each arm, so
+comparability cannot rest on a single code revision: the matrix spans four commits,
+and it is the frozen specification plus the config-equality check that holds the
+arms comparable, not one revision.
+
+One disclosure belongs with the config table. Three loss terms are structurally
+zero on language: the family-classification term because its head reads a detached
+representation so its gradient cannot reach the trunk, and the routing-supervision
+and halting-supervision terms because natural language supplies no per-token oracle
+expert and no per-token oracle depth. The first is a genuine advantage over a
+comparable synthetic study, where a family cross-entropy is often one of the larger
+terms in the objective and every specialisation claim must be caveated for it.

@@ -167,3 +167,8 @@ data/lang/_hf_cache/
 .DS_Store
 Thumbs.db
 *.swp
+
+# T-LA.3: Overleaf upload bundles. Regenerable from paper/<venue>_submission/
+# via paper/assemble_submissions.py + shutil.make_archive -- build artifacts, not
+# provenance, and 311 KB each of mostly duplicated figures.
+paper/overleaf_*.zip

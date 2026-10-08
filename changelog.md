@@ -8039,3 +8039,176 @@ off it; until then **cite `results.json`, not `results.csv`, for per-seed values
 - `git status --short | grep -cE "^R"` → 20 renames, 0 retired `runs/` paths surviving.
 - 15/15 canonical cells carry `checkpoint.pt`; interrupted
   `archive/.../lang_interrupted/langB_MoR_seed42__c93f0fe8` checkpoint confirmed still untracked.
+
+---
+
+## T-LA.3 — two submission trees built; the dilution hypothesis was arithmetically false and the depth-matched control is answerable
+
+**Date.** 2026-10-08. **Machine.** Ayan's RTX 4060 8 GB. Writes the language paper
+for two venues and corrects two claims that were in `PAPER_GUIDE.md` / `PAPER_REVISION.md`.
+
+### Correction 1 — "sparse routing divides the update budget" is FALSE, and the arithmetic is in the paper
+
+`PAPER_GUIDE.md` §6 Cause 1 and `PAPER_REVISION.md` §3(a) both state that MoE/MoRE
+"split the FFN budget six ways" so "each expert receives roughly 1/E of the updates
+per parameter", and present this as the hypothesis consistent with the loss
+ordering. **It is arithmetically wrong, and the matching is exact rather than
+approximate.** Computed in `code/make_paper_figures.py`'s sibling check and
+reproduced in the paper:
+
+| per FFN parameter | MoE expert | MoR block | MoRE expert |
+|---|---|---|---|
+| tokens seen | 128.5 | **128.5** | 128.5 |
+| FFN applications | 128 | 865 | **894** |
+
+Each MoE/MoRE expert FFN holds $2\cdot4\cdot256^2 = 524{,}288$ weights; MoR's single
+FFN holds $2\cdot24\cdot256^2 = 3{,}145{,}728$, exactly $6\times$. A run sees
+$526{,}320 \times 256 \times 3 = 404{,}213{,}760$ tokens. The token split and the
+parameter split are **both by $E$, so they cancel exactly** — 128.5 tokens per
+parameter in all three arms. And once recursion is counted, applications per
+parameter slightly *favours* MoRE (894) over MoR (865), because MoRE runs
+marginally deeper (6.955 vs 6.730). Whatever costs MoRE 0.1216 nats against MoR, it
+is **not** that its parameters are trained less.
+
+The surviving hypothesis, and the one the paper now states, is about the
+**diversity** of what each parameter block sees, not its update count: MoR's block
+is exposed to the whole token distribution while each expert sees only the
+router-selected slice that reaches it, so structure shared across the distribution
+is learned once by MoR and must be re-learned six times inside the experts. This is
+still labelled HYPOTHESIS (not isolated — it needs a width sweep or a controlled
+manipulation of routing diversity), but it is now the only account left after the
+arithmetic excludes the update-count version, it predicts the stratified result
+(MoRE's advantage over MoE *grows* with token difficulty, $-0.147 \to -0.374$ nats),
+and it generates the falsifiable scale prediction. **Fix both source documents
+before anyone writes from them again.**
+
+### Correction 2 — the depth-matched fixed control IS answerable, and MoRE does not "tie"
+
+`PAPER_GUIDE.md` §9 and `code/confirmatory_tests.json` record Family A test 4
+(`more_vs_depth_matched_fixed`) as **unrun, N/A, slot consumed**, and
+`PAPER_REVISION.md` §3(b) says MoRE's learned policy "only ties forced-d7". The
+forced-depth sweep answers it, because `stratified_val_d7.json` is the same five
+canonical checkpoints evaluated at forced depth rather than a new training run:
+
+| arm | adaptive | depth-matched fixed (d7) | gain | d | p |
+|---|---|---|---|---|---|
+| MoR | 3.5154 | 4.9863 | **1.4709** | — | — |
+| MoRE | 3.6370 | 3.6971 | **0.0601** | −2.84 | 0.0079 |
+
+MoRE's adaptive policy beats its depth-matched fixed control by 0.060 nats at the
+resolution floor. **That is not a tie**, and the paper says so. The reframing is
+also *better* than the best-depth comparison it replaces: best-depth conflates
+adaptivity with the average compute spent, whereas depth-matched isolates *where*
+the compute goes. On it, both arms' halting does something real — MoR's buys 1.47
+nats, MoRE's 0.06, a factor of **24**. The honest headline is not that MoRE's depth
+mechanism is inert but that adding routing left it almost entirely without effect.
+
+Reported as EXPLORATORY: `stratified_val_d7.json` carries the uncorrected banner and
+`confirmatory_tests.json` prohibits promoting an exploratory item into a declared
+family. The declared slot stays consumed and unfilled; the finding is carried by the
+24× magnitude, not by the p-value, so the honest framing costs nothing.
+
+### Also disconfirmed: the context-length prediction
+
+Recursion is usually motivated as spending steps where context is thin, which
+predicts the recursive arms gain most at the *start* of a block. They do the
+opposite: MoRE's advantage over MoE is $-0.047$ nats in positions 0–8 and $-0.359$ in
+the last 128; MoR's goes $-0.250 \to -0.465$. Both gain most where context is
+*longest*. Reported in the paper because it disconfirms a mechanism we would
+otherwise have asserted, and because it is consistent with the diversity account:
+an iterated shared block accumulates representation rather than compensating for
+missing context.
+
+### The two submission trees
+
+`paper/common/` is the single source of the body (7 sections); `code/make_paper_figures.py`
+regenerates 3 figures from `results/language/*.json`; `paper/assemble_submissions.py`
+materialises two **independent, self-contained** trees so each uploads to its own
+Overleaf project with nothing to resolve outside the folder. Re-run the assembler
+after any edit to `paper/common/` — the `sections/*.tex` inside the venue folders are
+generated copies and will be overwritten.
+
+Three venue differences are handled by the assembler, and two of them fail silently
+if done by hand:
+
+1. **Section order.** `paper/common/` is numbered by the order the files were
+   *written* (02_setup predates 03_method), not read. The assembler's `ORDER` map is
+   the authority: intro → method → setup → results → mechanism.
+2. **Limitations placement.** TMLR takes it as a numbered section before the
+   conclusion. **ACL requires a dedicated section titled "Limitations" AFTER the
+   conclusion, starred, or the paper is desk-rejected** — and starring is also what
+   keeps it out of the 8-page count. The source file is split at
+   `\section{Conclusion}` and reassembled per venue.
+3. **A `\ref` to a starred section prints the previous numbered section's number and
+   LaTeX issues NO warning.** Four body references and one in ACL's `main.tex` point
+   at `sec:limitations`; for ACL they are rewritten to prose and the subsections
+   inside Limitations are starred too. For TMLR nothing changes — there the section
+   is numbered and the references are correct.
+
+Floats: TMLR is single-column so `table*`/`figure*` are downgraded (they are legal
+but can strand floats); ACL needs `table*` for the two wide tables. The architecture
+figure ships as `More(3)(1).png` and is copied to `fig_architecture.png` because
+parentheses break `\includegraphics` on most TeX installations.
+
+### Bibliography — verified, corrected, and one entry knowingly poisoned
+
+`refs.bib` went from 14 entries to 18; all 18 cited keys now resolve, 0 missing,
+0 unused. Verified correct: `jacobs1991moe` (NC 3(1):79–87), `fedus2022switch`
+(JMLR 23(120):1–39), `zoph2022stmoe`, `shazeer2017moe`, `lepikhin2021gshard`,
+`warstadt2020blimp` (TACL 8:377–392, DOI 10.1162/tacl_a_00321).
+
+**Corrected:** `bae2025mor` — author field was `{Bae, Sangmin and others}`, now the
+full eleven authors, and the venue upgraded from arXiv-only to the **NeurIPS 2025
+proceedings**. Content check passed (it genuinely is routing + recursion) but with a
+caveat now carried in §2 of the paper: **its routers select a recursion DEPTH, not a
+member of a set of independent expert FFNs**, so it must not be described as prior
+work on both axes. `banino2021pondernet` — the header's suspicion was right; it is
+the **8th ICML Workshop on AutoML (2021)**, not ICML main track.
+
+**`leong2023ewok` is deliberately left with the literal author field
+`{UNVERIFIED, Author List}`.** Web tooling was exhausted before it could be checked,
+and a plausible-looking invented author list is the exact error class that file
+exists to prevent. It typesets and BibTeX does not complain, so both
+`VERIFY_BEFORE_SUBMIT.md` files make it blocker #1 with the instruction to verify or
+delete — the EWoK result is "every arm at chance", reported as a scale limitation, so
+dropping it costs the paper nothing. `vinh2010ami` and `raposo2024mod` were not
+checked; six further entries were not re-checked.
+
+### What is NOT done
+
+- **Neither paper has ever been compiled.** No `pdflatex`/`xelatex`/`latexmk`/
+  `tectonic`/`pandoc` and no TeX distribution exists on this machine. So page count,
+  float placement and overfull boxes are **unmeasured**. For ACL this is a
+  desk-rejection risk: the body was written to TMLR's no-page-limit norm and is very
+  likely over 8 pages. `acl_submission/main.tex` carries a prioritised four-step cut
+  list in its preamble, each step a block move to an appendix rather than a rewrite,
+  with the four things that must not be cut.
+- The Responsible NLP Checklist (mandatory for ARR) is not in the folder — it goes
+  through the ARR form. The facts needed to fill it are listed in the ACL checklist.
+- `paper/more.tex` (the arithmetic NeurIPS-workshop draft) is left in place
+  untouched. It is the record of the withdrawn study and is not referenced by either
+  submission tree, so it cannot contaminate them.
+
+**Failure tracing.**
+- *A dilution/capacity claim appears in a draft* → check the arithmetic first;
+  tokens-per-parameter is matched **exactly** by construction whenever the token
+  split and the parameter split are both by $E$.
+- *`\ref` prints a plausible but wrong section number in the ACL build* → it points
+  at a starred section. Grep for `ref{sec:limitations}` and `ref{sec:honesty}`;
+  LaTeX will not warn.
+- *A venue folder's section edits vanish* → they are generated. Edit
+  `paper/common/` and re-run `paper/assemble_submissions.py`.
+- *BibTeX reports no error but a citation looks odd* → read the per-entry
+  verification comments in `refs.bib`; one entry is knowingly unverified.
+
+**Verified by.**
+- `python paper/assemble_submissions.py` → both trees OK; every `\input`, figure,
+  citation key and `\ref` resolves in-tree.
+- Citation audit → 18 cited, 18 in `refs.bib`, 0 missing, 0 unused.
+- `python code/make_paper_figures.py` → 3 figures regenerated as PDF + PNG.
+- Dilution arithmetic → tokens/param 128.5 in all three arms; applications/param
+  MoE 128, MoR 865, MoRE 894.
+- Depth-matched control → `perm_test` on MoRE adaptive vs forced-d7: gap −0.0601,
+  p 0.00794 (at floor), d −2.84.
+- LaTeX lint → 0 markdown-bold leaks, 0 stray escaped braces, 0 non-ASCII
+  characters in any section file.
