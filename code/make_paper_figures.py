@@ -131,6 +131,13 @@ def fig_depth_curve():
 
 
 # ---------------------------------------------------------------------------
+# DECILE DIRECTION, verified against the data and previously WRONG in both the
+# axis label and the prose: index 0 is the MOST FREQUENT decile (MoE loss 1.676,
+# easy) and index 9 is the RAREST (MoE loss 6.067, hard).  The label read
+# "1 = rarest", which inverted every reading of the panel, and the matching
+# sentence in 04_results.tex had the two endpoints swapped.  The gap also DIPS at
+# indices 6 and 9, so it widens but is NOT monotone -- do not call it monotone.
+#
 # Figure: loss stratified by target-token frequency decile.  Two panels --
 # absolute loss, and each arm's gap to MoE, which is where the widening shows.
 # ---------------------------------------------------------------------------
@@ -144,7 +151,7 @@ def fig_stratified():
     for arm in ("moe", "more", "mor"):
         ax.plot(dec, ba[arm]["loss_by_decile_mean"], "-o", color=C[arm],
                 lw=2, ms=3.8, label=LABEL[arm])
-    ax.set_xlabel("target-token frequency decile (1 = rarest)")
+    ax.set_xlabel("target-token frequency decile (1 = most frequent)")
     ax.set_ylabel("validation loss (nats/token)")
     ax.set_title("(a) Loss by token difficulty", loc="left")
     ax.grid(axis="y", color=GRID, lw=0.7)
@@ -162,7 +169,7 @@ def fig_stratified():
         ax.plot(dec, gap, "-o", color=C[arm], lw=2, ms=3.8,
                 label=f"{LABEL[arm]} − MoE")
     ax.axhline(0, color=INK2, lw=0.8)
-    ax.set_xlabel("target-token frequency decile (1 = rarest)")
+    ax.set_xlabel("target-token frequency decile (1 = most frequent)")
     ax.set_ylabel("loss advantage over MoE (nats)")
     ax.set_title("(b) Advantage grows with difficulty", loc="left")
     ax.grid(axis="y", color=GRID, lw=0.7)

@@ -146,10 +146,22 @@ would read as perfect allocation against a curriculum that does not exist.
 
 We built the composition of sparse expert routing and adaptive recursion as a
 single engine, held parameters and inputs fixed across its three configurations,
-and measured what the combination adds. At 5.6M parameters on WikiText-103 it does
-not add what its premise promises. Recursion alone is lowest-loss in domain;
-adding routing costs 0.12 nats and does not improve routing quality. The composed
-model's halting policy still beats a depth-matched fixed policy, so it is not
+and measured what the combination buys at each level of inference compute. At
+5.6M parameters on WikiText-103 it buys efficiency and robustness rather than
+peak quality. MoRE is the compute-efficient point of the three: $7.9\%$ better
+than MoE on validation loss at $2.19\times$ its inference FLOPs, capturing $72\%$
+of recursion's quality gain for $24\%$ of recursion's compute, which is roughly
+three times more quality per unit of compute. Out of domain it is the best arm
+outright, ahead of both components on held-out text from a different
+distribution---the one respect in which composing the mechanisms does something
+neither does alone.
+
+What it does not buy is in-domain quality. Recursion alone remains lowest-loss by
+0.1216 nats, a gap significant at our resolution floor, and adding routing does
+not improve routing quality over MoE alone either. We keep the two axes
+separate throughout: at matched parameters recursion wins, per unit of inference
+compute the composition wins, and neither statement licenses the other. The
+composed model's halting still beats a depth-matched fixed policy, so it is not
 inert---but it buys 0.06 nats where recursion alone buys 1.47, a factor of 24.
 
 The mechanism is not the obvious one. Routing does not dilute the update budget:
@@ -160,19 +172,19 @@ falsified subspace trapping three ways, finding that the recursive arms expand
 rather than collapse representational dimensionality, settle rather than
 oscillate, and update near-orthogonally rather than rescaling. What the evidence
 supports is a competition for one per-token budget: the two mechanisms cannot both
-be tuned up, and the arm that preserves specialisation saturates its depth.
+be tuned up, and the arm that preserves specialisation saturates its depth. If the
+surviving diversity account is right, the efficiency-without-peak-quality profile
+we measure is what one would expect from an architecture operating below the data
+scale at which its routing pays---which is the falsifiable prediction we leave,
+with the measurement that would refute it.
 
-The composition is not uniformly worse. It is the most robust arm out of domain,
-beating both components on held-out text from a different distribution, and it
-converts compute into quality roughly three times more efficiently than recursion
-alone. If the diversity account is right, that is what one would expect from an
-architecture operating below the data scale at which its routing pays---which is
-the falsifiable prediction we leave, with the measurement that would refute it.
-
-We report this as a negative result at this scale rather than a property of the
-idea, and we release the engine, the evaluation battery, and the forced-depth
-control---the last of which we would recommend as a standard check before any
-future model is described as allocating computation adaptively. Reporting a mean
-step count and an exit histogram does not establish that depth depends on the
-input; comparing against the best uniform policy at matched compute does, and in
-our case it is what separates a mechanism that works from one that barely moves.
+We release the engine, the evaluation battery, and the forced-depth control---and
+it is the last of these we would most like to see reused. Reporting a mean step
+count and an exit histogram, as this literature almost always does, does not
+establish that depth depends on the input: a policy that ignores its input can
+reproduce both. Scoring a learned policy against a uniform policy forced to the
+same mean depth does establish it, costs a single inference pass, and is what
+separates our two recursive arms---which are indistinguishable by
+mean-and-histogram, and differ by a factor of 24 once the comparison is made. We
+would recommend it as a routine check before any model is described as allocating
+computation adaptively.

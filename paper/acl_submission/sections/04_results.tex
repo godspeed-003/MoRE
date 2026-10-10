@@ -94,10 +94,25 @@ nats where MoRE's buys 0.06, a factor of roughly 24. The honest summary is not t
 MoRE's depth mechanism is inert; it is that adding routing left it almost entirely
 without effect.
 
-The exit statistics say why. MoR early-exits $18.8\% \pm 15.1\%$ of validation
-tokens with mean depth $6.730$ and a halt remainder of $0.175$;
-MoRE force-exits $97.3\% \pm 0.8\%$ at the ceiling with mean depth $6.955$ and
-remainder $0.655$. MoRE's halting has collapsed to ``run to budget''.
+\paragraph{The depth-matched control, as a general diagnostic.}
+We state this separately because it generalises past this architecture and is, we
+think, the most transferable thing in the paper. \textbf{A mean step count and an
+exit histogram---the two statistics this literature almost always reports---do not
+establish that depth depends on the input.} A policy that ignores its input
+entirely can reproduce any mean and, with a little variance, a plausible-looking
+histogram. The comparison that does establish input-dependence is against a
+\emph{uniform policy forced to the learned policy's own mean depth}: it holds total
+compute fixed, so the only thing left to differ is \emph{where} that compute was
+spent. It costs one inference pass per checkpoint, needs no retraining, and it is
+what separates our two arms---both of which look adaptive by mean-and-histogram,
+and only one of which is. We recommend it as a routine check before any model is
+described as allocating computation adaptively.
+
+The exit statistics say why MoRE's margin is so small. MoR early-exits
+$18.8\% \pm 15.1\%$ of validation tokens with mean depth $6.730$ and a halt
+remainder of $0.175$; MoRE force-exits $97.3\% \pm 0.8\%$ at the ceiling with mean
+depth $6.955$ and remainder $0.655$. MoRE's halting has collapsed to ``run to
+budget''.
 
 \textbf{The depth--difficulty correlation is reported next to those rates because
 it is only interpretable alongside them.} MoR's per-token depth correlates with
@@ -126,27 +141,26 @@ on the same checkpoints, and scores each against the inference FLOPs it costs.
 \centering
 \small
 \caption{Evaluation battery, five seeds. Every cell is
-\emph{score (difference vs MoE, inference FLOPs$\times$ vs MoE, difference per
-FLOPs-multiplier)}; lower is better for loss rows, higher for accuracy rows.
-``diff/$\times$'' is how much score each unit of extra compute bought, so higher is
-more efficient. \textbf{These are exploratory}: they sit outside both declared
-families, are uncorrected, and carry no significance verdict.}
+\emph{score (difference vs MoE, inference FLOPs$\times$ vs MoE, $|$difference$|$
+per FLOPs-multiplier)}. The \emph{score} is lower-better for loss rows and
+higher-better for accuracy rows; the third number is a \textbf{modulus} and is
+higher-better on \emph{every} row---it is how much quality each unit of compute
+bought. The two axes are distinct and we never trade one for the other
+rhetorically: columns 1--2 are quality at matched parameters, column 3 is quality
+per unit of inference compute. \textbf{These are exploratory}: they sit outside
+both declared families, are uncorrected, and carry no significance verdict.}
 \label{tab:evals}
 \vspace{2pt}
 \begin{tabular}{llll}
 \toprule
 Eval & MoE & MoR & MoRE \\
 \midrule
-Val loss (nats) & 3.948 (1.00$\times$) & 3.515 ($-0.433$, 9.07$\times$, 0.048) & 3.637 ($-0.311$, 2.19$\times$, \textbf{0.142}) \\
-Test loss (nats) & 3.947 (1.00$\times$) & 3.513 ($-0.435$, 9.07$\times$, 0.048) & 3.621 ($-0.326$, 2.19$\times$, \textbf{0.149}) \\
+Val loss (nats) & 3.948 (1.00$\times$) & \textbf{3.515} ($-0.433$, 9.07$\times$, 0.048) & 3.637 ($-0.311$, 2.19$\times$, \textbf{0.142}) \\
+Test loss (nats) & 3.947 (1.00$\times$) & \textbf{3.513} ($-0.435$, 9.07$\times$, 0.048) & 3.621 ($-0.326$, 2.19$\times$, \textbf{0.149}) \\
 OOD loss (nats) & 8.272 (1.00$\times$) & 7.802 ($-0.470$, 9.07$\times$, 0.052) & \textbf{7.573} ($-0.699$, 2.19$\times$, \textbf{0.319}) \\
 BLiMP (acc) & 56.63 (1.00$\times$) & \textbf{58.74} ($+2.11$, 9.07$\times$, 0.233) & 58.36 ($+1.73$, 2.19$\times$, \textbf{0.791}) \\
-EWoK (acc) & 49.62 (1.00$\times$)$^{*}$ & 50.33 ($+0.72$, 9.07$\times$, 0.079)$^{*}$ & 49.95 ($+0.33$, 2.19$\times$, 0.152)$^{*}$ \\
 \bottomrule
 \end{tabular}
-\\[3pt]
-{\footnotesize $^{*}$EWoK is within noise of the 50\% chance floor for every arm,
-so its rankings are not meaningful---a scale limitation, reported for completeness.}
 \end{table*}
 
 Three things follow.
@@ -155,17 +169,28 @@ Three things follow.
 \citep{gao2020pile} it reaches 7.573 nats against MoR's 7.802 and MoE's 8.272---a
 $0.699$-nat advantage over MoE against MoR's $0.470$. The in-domain ordering
 inverts: the composition is the \emph{worst} recursive arm in domain and the
-\emph{best} out of it. That is a real and reportable property, and it is the one
-respect in which composing the two mechanisms does something neither does alone.
+\emph{best} out of it. Put in the same terms as the in-domain comparison, MoRE
+captures $149\%$ of MoR's out-of-domain gain over MoE, against $72\%$ in domain.
+That is a real and reportable property, and it is the one respect in which
+composing the two mechanisms does something neither does alone.
 
-\textbf{It gets there far more cheaply.} MoR attains the lowest in-domain loss but
-pays $9.07\times$ MoE's inference FLOPs; MoRE pays $2.19\times$. Per unit of extra
-compute MoRE buys $0.142$ nats against MoR's $0.048$---roughly $3\times$ the
-efficiency in its gain over MoE, and $6\times$ on the OOD row. FLOPs, not
-wall-clock, is the compute measure; the throughput column is reported so the
-latency cost stays visible, and it shows MoRE no faster than MoR in wall-clock
+\textbf{It gets there far more cheaply, on a different axis.} MoR attains the
+lowest in-domain loss but pays $9.07\times$ MoE's inference FLOPs; MoRE pays
+$2.19\times$, i.e. $24\%$ of MoR's total inference compute and $15\%$ of its
+\emph{extra} compute over MoE. Per FLOPs-multiplier MoRE buys $0.142$ nats against
+MoR's $0.048$---roughly $3\times$ the quality per unit compute on validation loss,
+and $6\times$ on the out-of-domain row. \textbf{We state the two axes separately
+and do not substitute one for the other}: at matched parameters MoR is lowest-loss
+by $0.1216$ nats, which is significant at our resolution floor; per unit of
+inference compute MoRE is ahead. ``Comparable to MoR'' is therefore only ever a
+\emph{per-FLOP} statement in this paper, never an absolute-quality one.
+
+FLOPs, not wall-clock, is the compute measure; the throughput column is reported so
+the latency cost stays visible, and it shows MoRE no faster than MoR in wall-clock
 (170 items/s each) despite doing $4\times$ less arithmetic, because its per-token
-expert dispatch is latency-bound.
+expert dispatch is latency-bound. An implementation that batches expert dispatch
+would be expected to realise the FLOP advantage as wall-clock; ours does not, and
+we do not claim a speedup.
 
 \textbf{Grammatical competence is real but modest, and routing does not buy it.}
 On BLiMP \citep{warstadt2020blimp}, 67{,}000 minimal pairs, both recursive arms beat
@@ -174,46 +199,9 @@ MoE (58.74\% and 58.36\% against 56.63\%) and MoR is not distinguishable from Mo
 syntactic sensitivity at this scale; adding routing does not add more of it. The
 gains concentrate on long-distance agreement phenomena---anaphor agreement and
 determiner--noun agreement---which is where a shared iterative block would be
-expected to help. On EWoK \citep{leong2023ewok} all three arms sit at chance, which
-is a scale limitation and not a finding.
+expected to help. We also ran EWoK \citep{ivanova2024ewok}, on which all three arms
+sit within noise of the $50\%$ chance floor (49.62, 50.33, 49.95); that is a
+statement about the scale of these models, not about the architectures, so we
+exclude it from Table~\ref{tab:evals} and draw no comparison from it.
 
-\subsection{Stratified loss: the advantage concentrates on hard tokens}
-\label{sec:stratified}
-
-Fig.~\ref{fig:stratified} groups validation loss by the frequency decile of the
-\emph{target} token---difficulty being a property of what must be predicted, not of
-the input---and by position within the block.
-
-Both recursive arms improve most where prediction is hardest. The MoRE$-$MoE
-advantage grows monotonically from $-0.147$ nats on the rarest-decile tokens to
-$-0.374$ on the most frequent; MoR's from $-0.188$ to $-0.527$. Neither
-architecture's gain is a uniform shift, which is what a pure capacity effect would
-look like.
-
-\begin{figure*}[t]
-\centering
-\includegraphics[width=0.98\linewidth]{fig_stratified.pdf}
-\caption{(a) Validation loss by target-token frequency decile. (b) Each recursive
-arm's advantage over MoE, which widens as tokens get harder. Exploratory,
-uncorrected.}
-\label{fig:stratified}
-\end{figure*}
-
-\textbf{A prediction this does not support.} If recursion were doing what the
-adaptive-computation premise suggests---spending steps where context is thin---the
-recursive arms should gain most at the \emph{start} of a block. They do the
-opposite: MoRE's advantage over MoE is $-0.047$ nats in the first 8 positions and
-$-0.359$ in the last 128; MoR's goes from $-0.250$ to $-0.465$. Both recursive arms
-gain most where context is \emph{longest}. We report this because it disconfirms a
-mechanism we would otherwise have asserted, and because it is consistent with the
-capacity account in \S\ref{sec:mechanism}: a shared block iterated is accumulating
-representation, not compensating for missing context.
-
-\begin{figure*}[t]
-\centering
-\includegraphics[width=0.98\linewidth]{fig_ood.pdf}
-\caption{The ordering inverts out of domain: MoRE is worst in domain (a) and best
-on the Pile (b). Same three entities and colours in both panels. Exploratory,
-uncorrected.}
-\label{fig:ood}
-\end{figure*}
+\textbf{Both recursive arms gain most where prediction is hardest, and least where context is shortest.} Grouping validation loss by the frequency decile of the target token, the MoREhBc advantage grows from hBc0.147$ nats on the most frequent decile to hBc0.374$ on the rarest (MoR: hBc0.188$ to hBc0.527$), so neither gain is the uniform shift a pure capacity effect would produce. Grouping by position instead disconfirms the usual motivation for recursion: both arms gain most where context is \emph{longest}, not shortest. Appendix~\ref{app:stratified} gives both breakdowns.

@@ -78,15 +78,25 @@ exhaustive, hence deterministic: no sampling error, no seed, no normality
 assumption, and no threshold to choose. The superseded $k\times$std heuristic is
 not used anywhere.
 
-The \textbf{resolution floor} of this design is $2/\binom{n_a+n_b}{n_a}$ for equal
-arms. When the arms are the same size, the complement of any admissible group is
-itself admissible and swapping the groups negates the difference while preserving
-its absolute value, so extremes arrive in mirror pairs and the count at the extreme
-can never be one. At five-versus-five the floor is $2/252 = 0.00794$. \textbf{Every
-headline comparison in this paper sits exactly on that floor}, which we phrase as
-``as extreme as a five-seed design admits''---a weaker statement than significance,
-and not to be dressed up as a stronger one. Only more seeds can strengthen these
-claims; no larger effect can.
+The \textbf{resolution floor} of this design --- the smallest $p$ it can return at
+all --- is $2/\binom{n_a+n_b}{n_a}$ for equal arms, which is $2/252 = 0.00794$ at
+five-versus-five. The factor of two is there because the two-sided statistic is
+invariant under swapping the groups, so extreme regroupings arrive in mirror pairs
+and the count at the extreme can never be one.
+The argument is worth stating because the floor is a property of the design rather
+than of the data. Our statistic is $|\mathrm{mean}(a) - \mathrm{mean}(b)|$. When
+the two arms are the same size, the complement of any admissible group-$a$ subset
+is itself an admissible group-$a$ subset, and swapping the groups negates the
+difference while preserving its absolute value. Every regrouping at the observed
+extreme therefore has a partner that is equally extreme, the count can never be
+odd at the tail, and the smallest attainable fraction is $2/\binom{n_a+n_b}{n_a}$
+rather than $1/\binom{n_a+n_b}{n_a}$. When the arms differ in size the complement
+has the wrong size, is not an admissible regrouping, no mirror is forced, and
+$1/\binom{n_a+n_b}{n_a}$ becomes attainable.
+\textbf{Every headline comparison in this paper sits exactly on that floor}, which
+we phrase as ``as extreme as a five-seed design admits''---a weaker statement than
+significance, and not to be dressed up as a stronger one. Only more seeds can
+strengthen these claims; no larger effect can.
 
 Correction is Holm--Bonferroni over two \emph{pre-registered} families, declared
 before the final arm was trained: Family A (predictive quality, $m=4$, metric

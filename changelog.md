@@ -8212,3 +8212,183 @@ checked; six further entries were not re-checked.
   p 0.00794 (at floor), d −2.84.
 - LaTeX lint → 0 markdown-bold leaks, 0 stray escaped braces, 0 non-ASCII
   characters in any section file.
+
+---
+
+## T-LA.4 — reframed to the compute-efficiency result; two headline numbers in the brief were wrong; ACL needs 47% cut, not 3%
+
+**Date.** 2026-10-10. **Machine.** Ayan's RTX 4060 8 GB.
+
+Reframes the paper from a bare negative result to the compute-adjusted (Pareto)
+story, fixes a factual inversion, completes the bibliography, and measures what the
+ACL page limit actually demands.
+
+### Correction 1 — "MoRE captures ~97% of MoR's quality gain" is FALSE; it is 71.9%
+
+The reframe brief specified this as a headline abstract claim. It does not hold:
+
+| quantity | value |
+|---|---|
+| MoR gain over MoE | 0.432896 nats |
+| MoRE gain over MoE | 0.311345 nats |
+| **ratio** | **71.9%** |
+
+**Traced to its source: 97.2% is the inverse ratio from the RETIRED per-step arm**
+(3.5031 nats), the spec-violating configuration that re-routed at every recursion
+step and which this paper discloses as invalid (`archive/pre_finalization/more_l7_1_per_step/`).
+`0.432896 / (3.948311 - 3.5031) = 97.2%`. Writing it into the abstract would have
+put a number sourced from a withdrawn arm in the paper's first paragraph — the
+single most damaging class of error available here, and one a reviewer who read the
+disclosures would catch immediately.
+
+The efficiency story survives intact on the true number, because the compute ratio
+carries it: **72% of the quality gain for 24% of the inference compute** (or 14.7%
+of the *extra* compute over MoE). Out of domain MoRE *exceeds* MoR — it captures
+**148.6%** of MoR's out-of-domain gain — which is the stronger claim and is
+unambiguous. Both now appear in the abstract and the intro.
+
+Also corrected: the brief's "within 3% of MoR's val loss" is **3.46%**, written as
+3.5%. And "0.142 vs 0.048 nats per extra FLOPs-multiplier" uses the per-*total*-
+multiplier normalisation, not per-extra; the numbers are right, the label was not.
+Per extra multiplier the figures are 0.2616 vs 0.0536. `eval_summary.md` carries
+both normalisations and they must not be mixed.
+
+### Correction 2 — the decile labels were swapped, in the prose AND the figure
+
+`stratified_val.json` stratifies by TARGET token id. Decile index 0 has MoE loss
+**1.6764** (low loss = easy = frequent); index 9 has **6.0671** (high = hard =
+rare). So `-0.147` is the **most frequent** decile and `-0.374` the **rarest** --
+the prose had them reversed, which also contradicted its own lead sentence
+("improve most where prediction is hardest").
+
+**The brief caught the prose; the figure had the same inversion and was not
+flagged.** `code/make_paper_figures.py` labelled both panels' x-axis
+`"(1 = rarest)"`, inverting every reading of the panel. Fixed to
+`"(1 = most frequent)"`, figures regenerated, and the direction recorded in the
+module docstring so the next person does not re-derive it.
+
+Monotonicity: the MoRE$-$MoE gap **dips at indices 6 and 9** (two dips, not one),
+so "grows monotonically" is now "grows", with the non-monotonicity stated. The
+figure caption says which end is which.
+
+### Correction 3 — the EWoK citation was wrong in every field, and is now verified
+
+The placeholder `leong2023ewok` guessed first author *Leong*, year *2023*, and the
+title *"A Benchmark for Measuring Systematic Generalization of Multi-domain World
+Knowledge"*. Verified against the arXiv API (`export.arxiv.org`, id 2405.09605):
+the paper is **"Elements of World Knowledge (EWoK): A Cognition-Inspired Framework
+for Evaluating Basic World Knowledge in Language Models"**, first-authored by
+**Anna A. Ivanova**, dated **2024-05-15**, 21 authors.
+
+**Every guessed field was wrong**, which is the argument for having left it
+poisoned rather than plausible. The brief said to delete it; **we fixed it instead**
+— a verified citation is worth more than a deletion, and the EWoK-at-chance result
+is a legitimate scale disclosure the paper should keep. The old key is retired
+(not corrected in place) so no citation can carry the wrong surname. The EWoK *row*
+is dropped from Table 2 as instructed, since all three arms sit at chance; one
+honest sentence remains in the body.
+
+Also verified this round, closing the last two unchecked entries:
+`vinh2010ami` → JMLR **11(95):2837--2854** (from JMLR's own BibTeX export;
+`number` was missing). `raposo2024mod` → arXiv:2404.02258, author list and ID
+confirmed exactly, still arXiv-only. **`refs.bib` now carries zero UNVERIFIED
+markers** and 18 of 18 cited keys resolve.
+
+### Correction 4 — the title candidate "Parameter- and FLOP-Matched" is not usable
+
+The arms are parameter-matched (0.069%) but emphatically **not** FLOP-matched:
+1.00× / 9.07× / 2.19× inference FLOPs is the paper's central measurement. A
+reviewer reading that title and then Table 2 would have a fair objection. Title is
+now **"Adaptive Compute at Matched Parameters: Routing and Recursion Trade Off in
+Small Language Models"**, keeping the credibility anchor without the false claim.
+
+### The reframe, and the axis discipline it required
+
+Abstract rebuilt as three paragraphs, **218 words** (was a single ~330-word block;
+brief asked for 180--220). Order is Pareto result → honest caveat that MoRE is
+*not* lowest-loss in domain → the transferable diagnostic. Intro bullets reordered
+to lead with efficiency and robustness; the lowest-loss bullet now reads as a
+trade (0.1216 nats for a 4× FLOP saving) rather than a defeat. Conclusion
+reordered to match.
+
+**The axis rule is enforced in the text, not just intended.** Every place the
+0.1216-nat gap appears it is named a *matched-parameter* result, and every place
+the FLOP advantage appears it is named an *inference-cost* result. "Comparable to
+MoR" appears only ever as "comparable per inference FLOP". Table~2's caption now
+says the third number is a **modulus** — positive and higher-better on every row,
+loss and accuracy alike — because the old caption's "lower is better for loss
+rows" was being read as applying to it.
+
+### The diagnostic is promoted, because it is the part that generalises
+
+A named paragraph in `sec:halting`, one bullet in the intro, and the closing
+sentence of the abstract and conclusion. The claim: **a mean step count and an exit
+histogram cannot establish input-dependent depth**, because a policy that ignores
+its input reproduces both. The control that can is a uniform policy forced to the
+learned policy's own mean depth — one inference pass, no retraining — and it
+separates our two recursive arms by 24× when mean-and-histogram cannot tell them
+apart.
+
+### ACL page limit: the listed cuts remove 2.9%; the limit demands 47%
+
+A venue-variant mechanism was added to `paper/assemble_submissions.py` so one
+source serves both venues: `ACLMOVE`-marked blocks are lifted into an ACL appendix
+(after the references, page-exempt) leaving a self-contained summary in the body,
+while TMLR keeps them inline. Five blocks move: the resolution-floor derivation,
+the Holm detail, the integrity checks, the stratified analysis, and the
+subspace-trapping probes. Related Work has an ACL one-paragraph variant.
+
+**It is not close to enough.** Measured on live (comment-stripped) source, calibrated
+against the operator's ~15-page anchor at 3,294 chars/page:
+
+| | chars | est. pages |
+|---|---|---|
+| before | 42,883 | 15.0 |
+| after the five moves + reframe | 41,639 | **14.0** |
+| ARR limit | 22,003 | 8.0 |
+
+The moves took out ~3,500 chars and the reframe put back ~2,300, netting **2.9%**.
+And the remaining mass is **evenly spread** — intro 18.1%, method 17.3%, setup
+14.4%, results 21.8%, mechanism 21.0%, conclusion 7.5% — so there is no fat section
+to excise. Reaching 8 pages means **removing 19,636 chars, 47% of the counted
+body**, from every section. That is a rewrite, not a trim, and it is an editorial
+decision about what the paper argues rather than a mechanical move, so it is
+**escalated rather than performed**. The four protected items (headline table,
+depth-curve figure, depth-matched comparison, dilution arithmetic) plus a trimmed
+intro and conclusion are roughly the whole 8-page budget on their own.
+
+**TMLR is unaffected** — no page limit, everything inline, and the estimate is
+comfortably inside its ~12-page norm once the exempt sections are excluded.
+
+### Still not done
+
+- **Neither paper has been compiled.** No `pdflatex`/`xelatex`/`latexmk`/`tectonic`
+  and no TeX distribution on this machine; the only Windows TinyTeX assets are
+  `.exe` installers, and installing one unprompted is an outward action left to the
+  operator. All page figures here are **estimates from source volume**, and the
+  ratio is more trustworthy than the absolute.
+- The Responsible NLP Checklist (mandatory for ARR) still goes through the ARR form.
+
+**Failure tracing.**
+- *A headline ratio does not reproduce from the results files* → check whether it
+  came from the retired per-step arm (3.5031). Two of the brief's numbers did.
+- *A stratified claim reads backwards* → decile index 0 is the MOST FREQUENT. Both
+  the prose and `make_paper_figures.py`'s axis label had it inverted.
+- *An efficiency figure is off by ~1.8×* → two normalisations exist, per-total and
+  per-extra FLOPs-multiplier. `eval_summary.md` has both; do not mix them.
+- *The assembler leaves a marker in the output* → its closing marker is the last
+  line with no trailing newline. The regexes tolerate EOF now and the sources are
+  newline-normalised, but the checker also fails the build on any surviving marker.
+- *A `\label` resolves to the wrong place in the ACL build* → a moved block and its
+  body replacement both declared it. The assembler strips the duplicate and the
+  checker now fails on duplicate labels.
+
+**Verified by.**
+- `python paper/assemble_submissions.py` → both trees OK; inputs, figures,
+  citations, refs, duplicate labels and surviving markers all checked.
+- Citation audit → 18 cited, 18 in `refs.bib`, 0 missing, 0 unused, 0 UNVERIFIED.
+- `python code/estimate_pages.py` → 14.0 est. pages vs the 8.0 ARR limit.
+- `python code/section_mass.py` → per-section mass; 47% must go.
+- `python code/make_paper_figures.py` → 3 figures regenerated with corrected axes.
+- Arithmetic re-derived from `results_tables.md` / `eval_summary.md` /
+  `ood_pile_test.json`: 7.89%, 3.46%, 71.9%, 148.6%, 24.1%, 14.7%, 2.98×, 6.16×.

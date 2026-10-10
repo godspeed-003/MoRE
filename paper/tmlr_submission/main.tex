@@ -45,8 +45,8 @@
 
 \graphicspath{{fig/}}
 
-\title{Routing and Recursion Compete: A Parameter-Matched\\
-Decomposition of Conditional Computation in Small Language Models}
+\title{Adaptive Compute at Matched Parameters: Routing and\\
+Recursion Trade Off in Small Language Models}
 
 % Ignored under the anonymous (default) option; fill in for camera-ready.
 \author{\name Anonymous Author(s) \email anonymous@example.com \\
@@ -57,35 +57,29 @@ Decomposition of Conditional Computation in Small Language Models}
 \maketitle
 
 \begin{abstract}
-Conditional computation is pursued along two axes: sparse mixture-of-experts
-(MoE) chooses \emph{which} parameters process a token, and adaptive-depth
-weight-tied recursion (MoR) chooses \emph{how much} computation it receives.
-The axes are orthogonal, so composing them---routing a token to a specialised
-expert and then recursively reusing \emph{that expert's} weights for a learned
-number of steps---should inherit both benefits. We test that directly: one
-engine, three configurations, parameters matched to 0.069\% ($\approx$5.58M),
-bit-identical inputs, five seeds, exact randomisation tests with a
-pre-registered correction, on WikiText-103. The composition does not inherit
-both. Recursion alone attains the lowest validation loss (3.515 nats/token
-against the composition's 3.637 and MoE's 3.948), and adding routing does not
-improve routing quality over MoE alone. The sharpest contrast is in adaptive
-computation: measured against a \emph{depth-matched} uniform policy, recursion
-alone buys 1.47 nats while the composition buys 0.06---a factor of 24---because
-the composed model's halting collapses to running to its budget on 97\% of
-tokens. We then exclude two explanations. Capacity dilution is arithmetically
-ruled out: tokens per parameter are identical across arms by construction, and
-once recursion is counted the composed arm receives slightly \emph{more} updates
-per parameter than recursion alone. Subspace trapping is falsified three ways:
-the recursive arms expand rather than collapse representational dimensionality,
-settle rather than oscillate, and update near-orthogonally rather than
-rescaling. What the evidence supports is a competition for one per-token
-budget---tuning toward adaptive depth destroys expert differentiation, and
-preserving differentiation saturates depth. The composition is not uniformly
-worse: it is the most robust arm out of domain, beating both components on
-held-out text from a different distribution, and it converts compute into
-quality roughly three times more efficiently than recursion alone. We report
-this as a negative result at this scale, with a falsifiable prediction for the
-data scale at which it should reverse.
+Conditional computation chooses either \emph{which} parameters process a token
+---sparse mixture-of-experts (MoE)---or \emph{how much} computation it receives
+---adaptive-depth weight-tied recursion (MoR). Composing them should inherit
+both. We test whether it pays: one engine, three
+configurations, parameters matched to 0.069\% ($\approx$5.58M), bit-identical
+inputs, five seeds, exact randomisation tests under a pre-registered correction,
+on WikiText-103.
+
+The composition (MoRE) is the compute-efficient point of the three. It improves on
+MoE by $7.9\%$ validation loss at $2.19\times$ MoE's inference FLOPs, where
+recursion alone needs $9.07\times$: it captures $72\%$ of recursion's quality gain
+over MoE for $24\%$ of recursion's compute---roughly $3\times$ more quality per
+unit of compute, and $6\times$ out of domain. On held-out text from a different
+distribution it is the best of the three outright.
+
+It is not the lowest-loss arm in domain. Recursion alone leads by $0.1216$ nats, a
+gap significant at our resolution floor, and adding routing improves neither
+in-domain quality nor routing quality over MoE; we keep the quality and compute
+axes separate. We trace the deficit to a competition for one per-token budget,
+excluding two rival explanations. Most transferably: a mean step count and an exit histogram cannot
+establish input-dependent depth, since a uniform policy forced to the learned mean
+reproduces both. Scoring against that control separates our recursive arms by a
+factor of 24.
 \end{abstract}
 
 \input{sections/01_intro}

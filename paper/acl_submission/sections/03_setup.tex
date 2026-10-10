@@ -78,52 +78,17 @@ exhaustive, hence deterministic: no sampling error, no seed, no normality
 assumption, and no threshold to choose. The superseded $k\times$std heuristic is
 not used anywhere.
 
-The \textbf{resolution floor} of this design is $2/\binom{n_a+n_b}{n_a}$ for equal
-arms. When the arms are the same size, the complement of any admissible group is
-itself admissible and swapping the groups negates the difference while preserving
-its absolute value, so extremes arrive in mirror pairs and the count at the extreme
-can never be one. At five-versus-five the floor is $2/252 = 0.00794$. \textbf{Every
-headline comparison in this paper sits exactly on that floor}, which we phrase as
-``as extreme as a five-seed design admits''---a weaker statement than significance,
-and not to be dressed up as a stronger one. Only more seeds can strengthen these
-claims; no larger effect can.
+The \textbf{resolution floor} of this design --- the smallest $p$ it can return at
+all --- is $2/\binom{n_a+n_b}{n_a}$ for equal arms, which is $2/252 = 0.00794$ at
+five-versus-five. The factor of two is there because the two-sided statistic is
+invariant under swapping the groups, so extreme regroupings arrive in mirror pairs
+and the count at the extreme can never be one.
+The derivation is in Appendix~\ref{app:floor}.
+\textbf{Every headline comparison in this paper sits exactly on that floor}, which
+we phrase as ``as extreme as a five-seed design admits''---a weaker statement than
+significance, and not to be dressed up as a stronger one. Only more seeds can
+strengthen these claims; no larger effect can.
 
-Correction is Holm--Bonferroni over two \emph{pre-registered} families, declared
-before the final arm was trained: Family A (predictive quality, $m=4$, metric
-validation task loss) and Family B (adaptive depth, $m=2$, metric depth--difficulty
-correlation). The split is declared rather than chosen because the two families ask
-different questions on different quantities, and pooling them would correct the
-depth claim for tests that cannot bear on it. Holm controls the same familywise
-error rate as plain Bonferroni and is uniformly more powerful, and here the choice
-is load-bearing: plain Bonferroni over the seven comparisons would give
-$0.05/7 = 0.00714$, \emph{below} the floor of 0.00794---a design in which no effect
-of any size could be declared significant. Holm's easiest threshold at $m=4$ is
-$0.0125$, a margin of 0.0046 above the floor.
+The correction is Holm--Bonferroni over two pre-registered families (predictive quality, $m=4$; adaptive depth, $m=2$), declared before the final arm was trained. Appendix~\ref{app:stats} gives the family memberships and explains why plain Bonferroni would be unusable here.
 
-Two consequences we hold ourselves to. A declared comparison that could not be run
-still consumes its slot: dropping a failed arm must never make the survivors easier
-to call significant. And a comparison whose floor exceeds its Holm threshold is
-\emph{undecidable} and reported \texttt{N/A}, never ``not significant''---that
-phrasing would blame the data for a limit of the design.
-
-\subsection{Integrity checks}
-\label{sec:integrity}
-
-Three mechanical invariants hold across the matrix, each enforced by an automated
-check rather than by inspection. \textbf{(i) Inputs are bit-identical across arms
-for the same record}: feature ranges are identical at $E \in \{1,5,6\}$, so a
-difference between arms cannot be a difference in representation. \textbf{(ii) The
-regression/classification target is absent from the input}, and no oracle routing
-label is encoded into a feature slot. \textbf{(iii) The arms are parameter-matched
-to 0.069\%} and the seed-blind configuration is identical within each arm, so
-comparability cannot rest on a single code revision: the matrix spans four commits,
-and it is the frozen specification plus the config-equality check that holds the
-arms comparable, not one revision.
-
-One disclosure belongs with the config table. Three loss terms are structurally
-zero on language: the family-classification term because its head reads a detached
-representation so its gradient cannot reach the trunk, and the routing-supervision
-and halting-supervision terms because natural language supplies no per-token oracle
-expert and no per-token oracle depth. The first is a genuine advantage over a
-comparable synthetic study, where a family cross-entropy is often one of the larger
-terms in the objective and every specialisation claim must be caveated for it.
+\subsection{Integrity checks}\label{sec:integrity} Three mechanical invariants hold across the matrix, each enforced by an automated check rather than by inspection: inputs are bit-identical across arms for the same record; the target is absent from the input and no oracle routing label is encoded into a feature slot; and the arms are parameter-matched to 0.069\% with seed-blind configurations identical within each arm. Three loss terms are structurally zero on language, one of which strengthens the specialisation claims rather than weakening them. Appendix~\ref{app:integrity} gives each check and that disclosure in full.

@@ -123,9 +123,12 @@
   note      = {arXiv:2207.07061}
 }
 
+% VERIFIED 2026-10-10 against the arXiv API (id 2404.02258, submitted
+% 2024-04-02). Author list and ID confirmed exactly; no journal_ref, so it
+% remains arXiv-only. Title cased as arXiv cases it.
 @article{raposo2024mod,
-  title   = {Mixture-of-Depths: Dynamically Allocating Compute in
-             Transformer-Based Language Models},
+  title   = {Mixture-of-Depths: Dynamically allocating compute in
+             transformer-based language models},
   author  = {Raposo, David and Ritter, Sam and Richards, Blake
              and Lillicrap, Timothy and Humphreys, Peter Conway
              and Santoro, Adam},
@@ -162,12 +165,15 @@
   note      = {arXiv:1909.11942}
 }
 
+% VERIFIED 2026-10-10 against JMLR's own BibTeX export
+% (jmlr.org/papers/v11/vinh10a.bib). Only `number` was missing.
 @article{vinh2010ami,
   title   = {Information Theoretic Measures for Clusterings Comparison:
              Variants, Properties, Normalization and Correction for Chance},
   author  = {Vinh, Nguyen Xuan and Epps, Julien and Bailey, James},
   journal = {Journal of Machine Learning Research},
   volume  = {11},
+  number  = {95},
   pages   = {2837--2854},
   year    = {2010}
 }
@@ -217,19 +223,24 @@
   doi     = {10.1162/tacl_a_00321}
 }
 
-% !! UNVERIFIED -- DO NOT SUBMIT WITHOUT CHECKING !!
-% The author list and venue could NOT be confirmed (verification ran out of
-% budget, and a wrong author list is the error class this file exists to prevent).
-% Before submission: open the arXiv abstract page or the ACL Anthology entry and
-% replace the author field and venue outright. If it cannot be confirmed, DELETE
-% this entry and remove the EWoK citation from the text -- the EWoK result is
-% "every arm at chance", reported as a scale limitation, so the paper loses
-% nothing by dropping it. See VERIFY_BEFORE_SUBMIT.md.
-@article{leong2023ewok,
-  title   = {{EWoK}: A Benchmark for Measuring Systematic Generalization of
-             Multi-domain World Knowledge},
-  author  = {UNVERIFIED, Author List},
-  journal = {arXiv preprint arXiv:UNVERIFIED},
-  year    = {2023},
-  note    = {UNVERIFIED ENTRY -- see comment above}
+% VERIFIED 2026-10-10 against the arXiv API (export.arxiv.org, id 2405.09605).
+% THE PREVIOUS PLACEHOLDER WAS WRONG IN EVERY FIELD THAT MATTERS: it guessed
+% first author "Leong", year 2023, and the title "A Benchmark for Measuring
+% Systematic Generalization of Multi-domain World Knowledge". The real paper is
+% first-authored by Anna A. Ivanova, dated 2024-05-15, and titled as below. The
+% old key `leong2023ewok` is therefore retired rather than corrected in place --
+% keeping it would preserve a wrong surname in every citation.
+@article{ivanova2024ewok,
+  title   = {Elements of World Knowledge ({EWoK}): A Cognition-Inspired Framework
+             for Evaluating Basic World Knowledge in Language Models},
+  author  = {Ivanova, Anna A. and Sathe, Aalok and Lipkin, Benjamin
+             and Kumar, Unnathi and Radkani, Setayesh and Clark, Thomas H.
+             and Kauf, Carina and Hu, Jennifer and Pramod, R. T.
+             and Grand, Gabriel and Paulun, Vivian and Ryskina, Maria
+             and Aky{\"u}rek, Ekin and Wilcox, Ethan and Rashid, Nafisa
+             and Choshen, Leshem and Levy, Roger and Fedorenko, Evelina
+             and Tenenbaum, Joshua and Andreas, Jacob},
+  journal = {arXiv preprint arXiv:2405.09605},
+  year    = {2024}
+}
 }
