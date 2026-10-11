@@ -172,3 +172,15 @@ Thumbs.db
 # via paper/assemble_submissions.py + shutil.make_archive -- build artifacts, not
 # provenance, and 311 KB each of mostly duplicated figures.
 paper/overleaf_*.zip
+
+# T-LA.5: pdflatex build artifacts in the submission trees. Regenerable via
+# code/compile_papers.py; main.pdf is 550-640 KB and changes on every build.
+paper/*/main.pdf
+paper/*/main.aux
+paper/*/main.log
+paper/*/main.out
+paper/*/main.bbl
+paper/*/main.blg
+paper/*/main.lof
+paper/*/main.lot
+paper/*/main.toc

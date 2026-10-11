@@ -8392,3 +8392,117 @@ comfortably inside its ~12-page norm once the exempt sections are excluded.
 - `python code/make_paper_figures.py` → 3 figures regenerated with corrected axes.
 - Arithmetic re-derived from `results_tables.md` / `eval_summary.md` /
   `ood_pile_test.json`: 7.89%, 3.46%, 71.9%, 148.6%, 24.1%, 14.7%, 2.98×, 6.16×.
+
+---
+
+## T-LA.5 — TeX toolchain installed; both papers compile; ACL sits at 9 counted pages against a limit of 8
+
+**Date.** 2026-10-11. **Machine.** Ayan's RTX 4060 8 GB.
+
+The operator authorised a local TeX install so page counts could be measured
+rather than estimated. Both papers now build clean. **The source-volume estimate
+in T-LA.4 was badly wrong and is retracted below.**
+
+### The toolchain, and the two traps in standing it up
+
+TinyTeX-1 (70 MB) extracted to
+`C:\Users\Hp\AppData\Local\Temp\tinytex_dl\out\TinyTeX` — a temp directory, not a
+system install, so nothing is on `PATH` permanently and deleting the directory
+removes it. `pdflatex` reports pdfTeX 3.141592653-2.6-1.40.29 (TeX Live 2026).
+
+**Trap 1: `tlmgr install` exits 0 when it refuses to do anything.** A stock
+TinyTeX answers every install with `tlmgr itself needs to be updated` and still
+returns `rc=0`. `code/compile_papers.py` trusted the exit code and spun its
+install loop fourteen times reporting `ok` while nothing landed. Fixed two ways:
+`ensure_tlmgr()` runs `tlmgr update --self` first, and success is now defined as
+*`kpsewhich` can find the file*, never as `rc == 0`.
+
+**Trap 2: an alias table that silently blocked the whole build.** `eso-pic` was
+mapped to `oberdiek`; `oberdiek` installs fine and does not contain `eso-pic`, so
+TMLR failed with `File 'eso-pic.sty' not found` while the installer reported
+success. `eso-pic` is its own TeX Live package. TMLR would not build at all until
+this was corrected.
+
+**Trap 3: the PDFs do not state their page count in plain text.** Both compress
+the page tree into object streams, so the `/Count` regex finds nothing and
+`page_count()` returned `None` on a perfectly good PDF. The authoritative source
+is the log line `Output written on main.pdf (N pages, M bytes)`.
+
+### Measured, after four rounds of cuts
+
+| | PDF total | counted body | errors | overfull |
+|---|---|---|---|---|
+| TMLR | 17 | 12 | 0 | **0** |
+| ACL | 16 | **9** | 0 | 9 |
+
+Zero undefined references and zero undefined citations in both.
+
+**The counted-body boundary is read, not inferred.** `page_report.py` first
+derived it from the log's shipout interleaving and got 9 where
+`page_attribution.py` got 8 — an off-by-one that is the difference between
+fitting and not. Settled by planting `\label{page:limitations_start}` at the
+Limitations heading and reading the page field out of `main.aux`: **page 10, so
+the ACL body runs through page 9.** Any future page claim should come from that
+anchor, not from a log scan.
+
+### T-LA.4's "47% must go" was wrong — retracted
+
+T-LA.4 estimated the ACL body at 14 pages and concluded 47% of the counted body
+had to be removed, calling it "a rewrite, not a trim". **The real figure was 10
+pages, and is now 9.** The estimate failed because it calibrated chars-per-page
+against the whole 15-page document while roughly 6--8 of those pages are the
+page-exempt tail, so it attributed far too few characters to each counted page.
+**Source-volume estimates of page counts should not be trusted at this
+granularity; the retraction is the lesson, not the number.**
+
+### Why prose cuts stopped converting into pages
+
+Four rounds of moves took the counted body 10 → 9 → 9 → 9. Two structural reasons,
+both worth knowing before anyone tries a fifth:
+
+1. **Every moved block leaves a self-contained summary behind.** ARR reviewers are
+   under no obligation to read appendices, so each of the ten appendix pointers
+   keeps its numbers and its claim. Ten pointers are themselves most of a page;
+   moving an eleventh block buys almost nothing.
+2. **The body is float-dominated.** Four wide floats remain, and three of them are
+   protected by instruction — the headline table, the depth-curve figure, and the
+   compute-adjusted battery table, which the reframe made the headline. Wide
+   floats pin to page tops and leave whitespace that prose cuts cannot reclaim.
+
+Ten blocks now move to the ACL appendix: the resolution-floor derivation, the Holm
+detail, integrity checks, the stratified analysis, the trapping probes, the
+engine/budget-matching derivation, metric definitions, the subset sweep, the
+training protocol, and BLiMP/EWoK in full. The architecture figure was changed
+from `figure*` to plain `figure`, which costs one column instead of a third of a
+page in two-column and is full width in single-column TMLR anyway — that took the
+ACL **total** 17 → 16, but not the counted body.
+
+### Where that leaves the two venues
+
+**TMLR is in good shape and is the near-term target.** 12-page body against its
+~12-page norm, no page limit in any case, zero overfull boxes, zero undefined
+references.
+
+**ACL is one page over and the remaining page is editorial, not mechanical.** The
+levers left all cost something a reviewer would notice: shorten the appendix
+pointers further (trading the self-containment that exists because appendix
+reading is optional), demote one of the three protected floats, or cut prose from
+the mechanism section. Escalated rather than chosen.
+
+**Failure tracing.**
+- *The install loop reports `ok` repeatedly and nothing installs* →
+  `tlmgr` needs `update --self` and exits 0 regardless. Verify with `kpsewhich`.
+- *A package installs but the file is still missing* → the alias table mapped it
+  to the wrong TeX Live package. `eso-pic` is not in `oberdiek`.
+- *`page_count()` returns `None` on a valid PDF* → compressed object streams. Read
+  `Output written on` from the log.
+- *Two page measurements disagree by one* → trust the `.aux` page field from
+  `page:limitations_start`, not a log scan.
+- *Prose cuts do not reduce the page count* → check the wide-float load first.
+
+**Verified by.**
+- `code/compile_papers.py` → both venues, 0 errors, 0 undefined refs/citations.
+- `main.aux` page anchor → ACL Limitations on page 10, TMLR on page 13.
+- `main.log` → `Output written on main.pdf (16 pages)` ACL, `(17 pages)` TMLR.
+- `paper/assemble_submissions.py` → both trees self-contained; inputs, figures,
+  citations, refs, duplicate labels and surviving markers all checked.

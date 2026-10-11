@@ -17,56 +17,8 @@ beat it has learned nothing a two-column count table could not. All three arms
 beat it, by margins of $+1.037$, $+1.470$ and $+1.348$ nats for MoE, MoR and MoRE
 respectively.
 
-\subsection{Training protocol}
-\label{sec:protocol}
-
-Every canonical arm runs at seeds $\{42,43,44,45,46\}$ and is reported as
-mean$\,\pm\,$std over five runs. Training is 3 epochs of AdamW (lr $10^{-3}$,
-weight decay $10^{-4}$, gradient clipping 1.0, dropout 0.1) with
-$d_{\text{model}} = 256$, one block, 4 attention heads, $T = 7$ and batch size 48
-on a single laptop GPU. These settings were fixed once, before the comparison, and
-not swept per architecture: they are a stable operating point, and no arm was tuned
-for itself.
-
-\textbf{Three epochs is a fixed compute budget, not convergence, and we state it
-as such.} One epoch is 526{,}320 blocks $\times$ 256 tokens $= 134.7$M tokens
-against $\approx$3.4M non-embedding parameters, so the runs sit in an underfitting
-regime; the choice of 3 over 2 was made because the halting axis needs more than
-two epochs to separate the arms at all, and going to 8 epochs was rejected on cost.
-Every arm receives the identical budget, so the comparison is valid even though no
-arm is converged. The consequences are stated in the Limitations section.
-
-\subsection{Metrics}
-\label{sec:metrics}
-
-\textbf{Primary metric: validation task loss}, the final-epoch per-token
-cross-entropy in nats. We deliberately do not select on best-epoch validation loss:
-that is an order statistic whose downward bias scales with each arm's per-epoch
-validation noise, which is not matched across architectures. On all 15 cells
-\texttt{best} equals \texttt{last}---the evaluation interval is one epoch and the
-curves decrease monotonically---so \emph{no model selection occurred} on either
-split. Best-epoch values are reported alongside so the selection effect stays
-checkable.
-
-Because the router is unsupervised, expert indices carry no semantic identity, so
-raw agreement with any externally defined partition measures label permutation as
-much as partition quality. We therefore report AMI \citep{vinh2010ami},
-Hungarian-matched accuracy and cluster purity, each against a \emph{per-run
-permutation control}: the same metric computed against shuffled linguistic labels,
-averaged over 10 draws. The controlled quantity is the z-score of the real value
-against that null, not the raw value. The externally defined partition is a
-part-of-speech hypothesis about a useful expert split---a hypothesis, not a
-functional ground truth---so a router can be better for next-token prediction and
-still score low against it. We therefore never call this ``routing accuracy''
-without that qualifier.
-
-For depth we report mean steps, exit rates, halt mass, and the Spearman correlation
-between per-token depth and per-token difficulty. \textbf{The correlation is only
-interpretable when depth has variance to correlate}: on an arm whose tokens almost
-all exit at the ceiling, the correlation is computed against a near-constant and a
-value near zero is uninformative rather than negative evidence. We report the exit
-rates next to every correlation for that reason (\S\ref{sec:halting}).
-
+\subsection{Training protocol}\label{sec:protocol} Five seeds per arm, reported as mean$\,\pm\,$std, with one optimiser configuration fixed before the comparison and \emph{not} swept per architecture. \textbf{Three epochs is a compute budget, not convergence}: one epoch is 134.7M tokens against $\approx$3.4M non-embedding parameters, so no arm is converged. Every arm gets the identical budget, so the comparison holds; the consequences are in the Limitations section. Appendix~\ref{app:protocol} gives the hyperparameters.
+\subsection{Metrics}\label{sec:metrics} The primary metric is \textbf{validation task loss}, final-epoch per-token cross-entropy in nats; \texttt{best} equals \texttt{last} on all 15 cells, so \emph{no model selection occurred}. Routing is scored with permutation-invariant measures (AMI, Hungarian, purity) against a per-run shuffled-label control and reported as a z-score, since unsupervised expert indices carry no semantic identity. Depth is reported with its exit rates alongside, because a depth--difficulty correlation taken on an arm whose tokens almost all reach the ceiling is computed against a near-constant and \textbf{says nothing about allocation}. Appendix~\ref{app:metrics} defines each.
 \subsection{Statistics}
 \label{sec:stats}
 
@@ -91,4 +43,4 @@ strengthen these claims; no larger effect can.
 
 The correction is Holm--Bonferroni over two pre-registered families (predictive quality, $m=4$; adaptive depth, $m=2$), declared before the final arm was trained. Appendix~\ref{app:stats} gives the family memberships and explains why plain Bonferroni would be unusable here.
 
-\subsection{Integrity checks}\label{sec:integrity} Three mechanical invariants hold across the matrix, each enforced by an automated check rather than by inspection: inputs are bit-identical across arms for the same record; the target is absent from the input and no oracle routing label is encoded into a feature slot; and the arms are parameter-matched to 0.069\% with seed-blind configurations identical within each arm. Three loss terms are structurally zero on language, one of which strengthens the specialisation claims rather than weakening them. Appendix~\ref{app:integrity} gives each check and that disclosure in full.
+\subsection{Integrity checks}\label{sec:integrity} Three invariants hold across the matrix, each machine-checked: inputs are bit-identical across arms per record; the target is absent from the input and no oracle routing label is encoded in a feature slot; and the arms are parameter-matched to 0.069\% with seed-blind configurations identical within each arm. Three loss terms are structurally zero on language, one of which \emph{strengthens} the specialisation claims. Appendix~\ref{app:integrity} gives each in full.

@@ -93,6 +93,15 @@ APPENDIX = [
     ("integrity",   "Integrity checks and structurally-zero loss terms", "app:integrity"),
     ("stratified",  "Loss stratified by token frequency and position", "app:stratified"),
     ("trapping",    "The subspace-trapping probes", "app:trapping"),
+    # T-LA.5: the compile put the counted body at ~10 pages against a limit of
+    # 8, so three more blocks move. Chosen to leave the four protected items and
+    # the ACT equations in the body; each replacement is self-contained because
+    # ARR reviewers need not read appendices.
+    ("engine",      "Matching the parameter budget across the three arms", "app:engine"),
+    ("metrics",     "Metric definitions", "app:metrics"),
+    ("saturation",  "The subset sweep behind the depth-saturation finding", "app:saturation"),
+    ("protocol",    "Training protocol and hyperparameters", "app:protocol"),
+    ("blimp",       "BLiMP and EWoK, in full", "app:blimp"),
 ]
 
 STYLES = {

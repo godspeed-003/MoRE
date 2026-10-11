@@ -62,6 +62,7 @@ each expert's slice eventually contains enough of the shared structure for the
 re-learning penalty to amortise, so the MoR$-$MoRE gap should close with data
 scale at fixed parameters.
 
+% >>>ACLMOVE:saturation|\subsection{Depth saturation is a data-scale effect}\label{sec:saturation} \textbf{[MEASURED, four points at fixed hyperparameters.]} MoRE's halting sits at the ceiling on the full corpus (97.3\% forced-exit, mean depth 6.955 of 7), which invites the reading that the architecture cannot learn adaptive depth. A subset sweep falsifies that: at 2.5\%, 10\% and 40\% of the corpus the \emph{same} model at the \emph{same} ponder weight allocates depth adaptively---forced-exit rates near zero, mean depth between 1.9 and 2.4 inside a budget of 7---and the collapse appears only at full scale. \textbf{So the failure is a calibration finding, not an architectural one}: this ponder penalty cannot hold depth down at this corpus size. The subset axis is not cleanly monotone, so the honest phrasing is that saturation emerges somewhere between 40\% and 100\% of the data. The mechanism is consistent: the ponder term is linear in expected depth while the task gradient grows as the model fits, and once the halting sigmoid saturates its gradient vanishes \citep{graves2016act}. \citet{banino2021pondernet} is the principled fix; we did not run it. Appendix~\ref{app:saturation} gives the sweep.
 \subsection{Depth saturation is a data-scale effect, not an architectural limit}
 \label{sec:saturation}
 
@@ -102,6 +103,7 @@ replaces the linear penalty with a KL divergence against a geometric prior, whic
 keeps a gradient on the halt head near saturation, and is the principled fix; we
 did not run it, and it is named as future work rather than as a result.
 
+% <<<ACLMOVE:saturation
 \subsection{The two mechanisms compete for one budget}
 \label{sec:competition}
 

@@ -192,6 +192,7 @@ expert dispatch is latency-bound. An implementation that batches expert dispatch
 would be expected to realise the FLOP advantage as wall-clock; ours does not, and
 we do not claim a speedup.
 
+% >>>ACLMOVE:blimp|\textbf{Grammatical competence is real but modest, and routing does not buy it.} On BLiMP \citep{warstadt2020blimp} both recursive arms beat MoE (58.74\% and 58.36\% against 56.63\%) and MoR is not distinguishable from MoRE ($p = 0.71$), so recursion buys measurable syntactic sensitivity and routing adds none. On EWoK \citep{ivanova2024ewok} all three arms sit at chance---a statement about scale, not architecture. Appendix~\ref{app:blimp} reports both.
 \textbf{Grammatical competence is real but modest, and routing does not buy it.}
 On BLiMP \citep{warstadt2020blimp}, 67{,}000 minimal pairs, both recursive arms beat
 MoE (58.74\% and 58.36\% against 56.63\%) and MoR is not distinguishable from MoRE
@@ -204,6 +205,7 @@ sit within noise of the $50\%$ chance floor (49.62, 50.33, 49.95); that is a
 statement about the scale of these models, not about the architectures, so we
 exclude it from Table~\ref{tab:evals} and draw no comparison from it.
 
+% <<<ACLMOVE:blimp
 % >>>ACLMOVE:stratified|\textbf{Both recursive arms gain most where prediction is hardest, and least where context is shortest.} Grouping validation loss by the frequency decile of the target token, the MoREhBc advantage grows from hBc0.147$ nats on the most frequent decile to hBc0.374$ on the rarest (MoR: hBc0.188$ to hBc0.527$), so neither gain is the uniform shift a pure capacity effect would produce. Grouping by position instead disconfirms the usual motivation for recursion: both arms gain most where context is \emph{longest}, not shortest. Appendix~\ref{app:stratified} gives both breakdowns.
 \subsection{Stratified loss: the advantage concentrates on hard tokens}
 \label{sec:stratified}

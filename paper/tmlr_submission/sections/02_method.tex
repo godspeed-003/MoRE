@@ -38,9 +38,15 @@ There is one block, so depth is computation through time rather than a stack of
 depth-specific layers, and no capacity limit is imposed---every routed token is
 evaluated by its expert and none is dropped.
 
+% Plain `figure`, NOT `figure*`, deliberately. In ACL's two-column layout a
+% span-float of this aspect ratio (2870x1139) costs about a third of a page of
+% full page height; single-column it costs one column, which is where the last
+% page over the ARR limit came from. The assembler leaves plain `figure` alone
+% for TMLR, where the document is single-column and this is full width anyway,
+% so one source gives the right footprint in both venues.
 \begin{figure}[t]
     \centering
-    \includegraphics[width=0.86\linewidth,keepaspectratio]{fig_architecture.png}
+    \includegraphics[width=\linewidth,keepaspectratio]{fig_architecture.png}
     \caption{The MoRE block. A token is routed once to one of $E$ independent
     expert FFNs; that expert's weights are then reused for an adaptive number of
     recursion steps under ACT halting. Setting $T=1$ recovers MoE exactly and

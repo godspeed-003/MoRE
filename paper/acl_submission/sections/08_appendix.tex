@@ -158,3 +158,147 @@ the most attractive explanation and leaves the budget competition
 position than an unexplained null, because we can say which of the obvious
 mechanisms it is \emph{not}.
 
+\section{Matching the parameter budget across the three arms}
+\label{app:engine}
+
+\subsection{One engine, three modes}
+
+
+MoE, MoR and MoRE are configurations of one implementation with an explicit
+\texttt{architecture} mode, not three codebases. They share one data pipeline, one
+optimiser setup and one evaluation path, so a difference between them cannot be a
+difference in the harness. Only the fields their definitions require differ:
+$E \in \{6,1,6\}$, $T \in \{1,7,7\}$, MoR's FFN multiplier (below), and the two
+loss weights for quantities that do not exist in a given arm (no ponder cost at
+depth 1, nothing to balance with one expert).
+
+We write \textbf{MoR} for our recursion-only configuration---one shared block with
+adaptive halting---which is in the spirit of weight-tied recursive transformers
+with learned halting \citep{dehghani2019ut,bae2025mor} but is not a reproduction
+of any specific published system; all three arms are configurations of the same
+engine.
+
+\paragraph{Matching the budget.} MoR has one FFN where MoRE has six, so matching
+the per-FFN multiplier would compare 5.6M parameters against 0.9M and call the
+difference architectural. We instead equalise \emph{total} FFN hidden width,
+giving MoR's single FFN a multiplier of $24 = 4 \times 6$. The result is
+5{,}584{,}908 parameters for MoE and MoRE, identical, and 5{,}581{,}063 for MoR---a
+0.069\% deficit that is six per-expert halt heads, the router and FFN biases. That
+residual is irreducible at any integer multiplier, and it runs \emph{against} the
+headline result: the arm with slightly fewer parameters is the one that wins in
+domain.
+
+\section{Metric definitions}
+\label{app:metrics}
+
+\subsection{Metrics}
+
+
+\textbf{Primary metric: validation task loss}, the final-epoch per-token
+cross-entropy in nats. We deliberately do not select on best-epoch validation loss:
+that is an order statistic whose downward bias scales with each arm's per-epoch
+validation noise, which is not matched across architectures. On all 15 cells
+\texttt{best} equals \texttt{last}---the evaluation interval is one epoch and the
+curves decrease monotonically---so \emph{no model selection occurred} on either
+split. Best-epoch values are reported alongside so the selection effect stays
+checkable.
+
+Because the router is unsupervised, expert indices carry no semantic identity, so
+raw agreement with any externally defined partition measures label permutation as
+much as partition quality. We therefore report AMI \citep{vinh2010ami},
+Hungarian-matched accuracy and cluster purity, each against a \emph{per-run
+permutation control}: the same metric computed against shuffled linguistic labels,
+averaged over 10 draws. The controlled quantity is the z-score of the real value
+against that null, not the raw value. The externally defined partition is a
+part-of-speech hypothesis about a useful expert split---a hypothesis, not a
+functional ground truth---so a router can be better for next-token prediction and
+still score low against it. We therefore never call this ``routing accuracy''
+without that qualifier.
+
+For depth we report mean steps, exit rates, halt mass, and the Spearman correlation
+between per-token depth and per-token difficulty. \textbf{The correlation is only
+interpretable when depth has variance to correlate}: on an arm whose tokens almost
+all exit at the ceiling, the correlation is computed against a near-constant and a
+value near zero is uninformative rather than negative evidence. We report the exit
+rates next to every correlation for that reason (\S\ref{sec:halting}).
+
+\section{The subset sweep behind the depth-saturation finding}
+\label{app:saturation}
+
+\subsection{Depth saturation is a data-scale effect, not an architectural limit}
+
+
+\textbf{[MEASURED, four points at fixed hyperparameters.]} MoRE's halting sits at
+the ceiling on the full corpus (97.3\% forced-exit, mean depth 6.955 of 7). It is
+tempting to read that as the architecture being unable to learn adaptive depth. A
+subset sweep falsifies that reading.
+
+\begin{center}
+\begin{tabular}{lcc}
+\toprule
+training data & mean depth & forced-exit rate \\
+\midrule
+2.5\% of the corpus & 2.43 & $\approx 0$ \\
+10\% & 1.92 & $\approx 0$ \\
+40\% & 1.97 & $\approx 0$ \\
+100\% (canonical) & 6.96 & 0.973 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+At every reduced-data point the same model, at the same ponder weight, allocates
+depth adaptively---exit rates near zero, mean depth between 1.9 and 2.4, inside a
+budget of 7. The collapse appears only at full scale. \textbf{So the failure is a
+calibration finding, not an architectural one}: the ponder penalty that produces
+adaptive depth on a small corpus cannot hold depth down at this one.
+
+We state the limit of that claim precisely, because the sweep is exploratory
+(single seed, subset fraction below 1, and it may never be quoted as a canonical
+result). The subset axis is \emph{not} cleanly monotone---2.5\% gives 2.43 but 40\%
+gives 1.97---so the honest phrasing is that \emph{saturation emerges somewhere
+between 40\% and 100\% of the data}, not that depth is monotone in training steps.
+The mechanism is consistent: the ponder term is linear in expected depth, while the
+task gradient grows as the model fits, so the fixed penalty is outpaced. Once the
+halting sigmoid saturates, its gradient vanishes and the linear-penalty ACT scheme
+cannot recover on its own \citep{graves2016act}. \citet{banino2021pondernet}
+replaces the linear penalty with a KL divergence against a geometric prior, which
+keeps a gradient on the halt head near saturation, and is the principled fix; we
+did not run it, and it is named as future work rather than as a result.
+
+\section{Training protocol and hyperparameters}
+\label{app:protocol}
+
+\subsection{Training protocol}
+
+
+Every canonical arm runs at seeds $\{42,43,44,45,46\}$ and is reported as
+mean$\,\pm\,$std over five runs. Training is 3 epochs of AdamW (lr $10^{-3}$,
+weight decay $10^{-4}$, gradient clipping 1.0, dropout 0.1) with
+$d_{\text{model}} = 256$, one block, 4 attention heads, $T = 7$ and batch size 48
+on a single laptop GPU. These settings were fixed once, before the comparison, and
+not swept per architecture: they are a stable operating point, and no arm was tuned
+for itself.
+
+\textbf{Three epochs is a fixed compute budget, not convergence, and we state it
+as such.} One epoch is 526{,}320 blocks $\times$ 256 tokens $= 134.7$M tokens
+against $\approx$3.4M non-embedding parameters, so the runs sit in an underfitting
+regime; the choice of 3 over 2 was made because the halting axis needs more than
+two epochs to separate the arms at all, and going to 8 epochs was rejected on cost.
+Every arm receives the identical budget, so the comparison is valid even though no
+arm is converged. The consequences are stated in \S\ref{sec:limitations}.
+
+\section{BLiMP and EWoK, in full}
+\label{app:blimp}
+
+\textbf{Grammatical competence is real but modest, and routing does not buy it.}
+On BLiMP \citep{warstadt2020blimp}, 67{,}000 minimal pairs, both recursive arms beat
+MoE (58.74\% and 58.36\% against 56.63\%) and MoR is not distinguishable from MoRE
+($p = 0.71$). Every arm is above the 50\% floor, so recursion buys measurable
+syntactic sensitivity at this scale; adding routing does not add more of it. The
+gains concentrate on long-distance agreement phenomena---anaphor agreement and
+determiner--noun agreement---which is where a shared iterative block would be
+expected to help. We also ran EWoK \citep{ivanova2024ewok}, on which all three arms
+sit within noise of the $50\%$ chance floor (49.62, 50.33, 49.95); that is a
+statement about the scale of these models, not about the architectures, so we
+exclude it from Table~\ref{tab:evals} and draw no comparison from it.
+

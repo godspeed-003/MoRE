@@ -38,16 +38,22 @@ There is one block, so depth is computation through time rather than a stack of
 depth-specific layers, and no capacity limit is imposed---every routed token is
 evaluated by its expert and none is dropped.
 
-\begin{figure*}[t]
+% Plain `figure`, NOT `figure*`, deliberately. In ACL's two-column layout a
+% span-float of this aspect ratio (2870x1139) costs about a third of a page of
+% full page height; single-column it costs one column, which is where the last
+% page over the ARR limit came from. The assembler leaves plain `figure` alone
+% for TMLR, where the document is single-column and this is full width anyway,
+% so one source gives the right footprint in both venues.
+\begin{figure}[t]
     \centering
-    \includegraphics[width=0.86\linewidth,keepaspectratio]{More(3)(1).png}
+    \includegraphics[width=\linewidth,keepaspectratio]{More(3)(1).png}
     \caption{The MoRE block. A token is routed once to one of $E$ independent
     expert FFNs; that expert's weights are then reused for an adaptive number of
     recursion steps under ACT halting. Setting $T=1$ recovers MoE exactly and
     setting $E=1$ recovers MoR; the input representation is bit-identical in all
     three cases.}
     \label{fig:architecture}
-\end{figure*}
+\end{figure}
 
 \subsection{Halting and the training objective}
 \label{sec:halting-method}
@@ -118,6 +124,7 @@ zero because natural language supplies no per-token oracle expert and no per-tok
 oracle depth to supervise against. The canonical router is therefore unsupervised
 with respect to the per-token routing decision.
 
+% >>>ACLMOVE:engine|\subsection{One engine, three modes}\label{sec:engine} MoE, MoR and MoRE are configurations of one implementation with an explicit \texttt{architecture} mode, not three codebases, so a difference between arms cannot be a difference in the harness. Equalising \emph{total} FFN hidden width gives MoR's single FFN a multiplier of $24 = 4\times6$, so all three arms hold one FFN parameter budget: \textbf{5{,}584{,}908 for MoE and MoRE, identical, and 5{,}581{,}063 for MoR}---a $0.069\%$ deficit that is the router MoR does not have, and which runs \emph{against} our headline since the lighter arm wins in domain. Appendix~\ref{app:engine} derives it.
 \subsection{One engine, three modes}
 \label{sec:engine}
 
@@ -144,3 +151,4 @@ giving MoR's single FFN a multiplier of $24 = 4 \times 6$. The result is
 residual is irreducible at any integer multiplier, and it runs \emph{against} the
 headline result: the arm with slightly fewer parameters is the one that wins in
 domain.
+% <<<ACLMOVE:engine
