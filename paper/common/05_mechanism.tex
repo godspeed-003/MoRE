@@ -137,6 +137,7 @@ depth saturates.} Both mechanisms draw on the same per-token compute budget, and
 this parameter and data budget neither gets enough. (This grid is on a smaller dev
 corpus at one seed; it is a mechanism demonstration and carries that caveat.)
 
+% >>>ACLMOVE:competition2|The competition has a second face on the canonical corpus: the routing balance term is load-bearing and cannot be traded away for depth either---setting it to zero \emph{collapses} the expert load onto one expert and drives AMI to zero, so the composed arm's near-uniform per-token router distribution, coexisting with balanced load and above-chance specialisation, is not a pathology to be tuned out (we initially read it as one, and the sweep refuted us; \S\ref{sec:honesty}). Specialisation itself is real and measured against per-run permutation controls: MoRE's AMI is $0.1803 \pm 0.0246$ against a control of $0.0249$ ($z = 13.43$) and MoE's is $0.1637 \pm 0.0478$ against $0.0364$---substantial above-chance structure in both, and the two arms are not distinguishable from each other. Routing quality is therefore approximately the same with recursion as without it, which is the routing half of the interference result: recursion does not improve routing, and routing does not preserve adaptive depth, in the same architecture. Appendix~\ref{app:specialisation} gives the per-run controls in full.
 The competition has a second face on the canonical corpus, along a different axis.
 The routing balance term is load-bearing and cannot be traded away for depth
 either: setting it to zero \emph{collapses} the expert load onto a single expert
@@ -155,6 +156,7 @@ two arms are not distinguishable from each other. Routing quality is approximate
 the same with recursion as without it, which is the routing half of the
 interference result: recursion does not improve routing, and routing does not
 preserve adaptive depth, in the same architecture.
+% <<<ACLMOVE:competition2
 
 % >>>ACLMOVE:trapping|\textbf{We also tested, and falsified, the most attractive rival account.} Subspace trapping---that routing once confines a token to one expert and repeated application drives the state to a fixed point---predicts lower representational dimensionality, oscillating dynamics, and rescaling updates in the composed arm. All three predictions fail: participation ratio is \emph{higher} in the recursive arms (57.3 and 70.3 against MoE 41.5), velocity decays monotonically, and successive updates are near-orthogonal. Appendix~\ref{app:trapping} reports the three probes. Excluding it is what leaves the budget competition above as the account the data support.
 \subsection{A plausible mechanism, refuted}

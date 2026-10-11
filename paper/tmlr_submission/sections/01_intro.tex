@@ -35,50 +35,39 @@ paper.
 
 \begin{itemize}[leftmargin=1.4em,itemsep=1.5pt,topsep=2pt]
 \item \textbf{All three arms sit on the quality/compute frontier, and the
-  composition buys the most quality per unit of compute.} MoRE improves on MoE by $7.9\%$ validation loss
-  ($3.948 \rightarrow 3.637$ nats/token) at $2.19\times$ MoE's inference FLOPs,
-  where MoR needs $9.07\times$: it captures $72\%$ of MoR's quality gain over MoE
-  for $24\%$ of MoR's inference compute---$15\%$ of its \emph{extra} compute---which
-  is roughly $3\times$ more quality per unit compute, and $6\times$ out of domain.
-  Out of domain \citep{gao2020pile} the claim strengthens from a ratio to outright
-  \emph{dominance}: MoRE reaches 7.573 nats against MoR's 7.802 at a quarter of
-  the compute, so MoR is Pareto-dominated there, and MoRE captures $149\%$ of
-  MoR's out-of-domain gain over MoE. The in-domain ordering inverts, and this is
-  the one respect in which composing the mechanisms does something neither does
-  alone.
+  composition buys the most quality per unit of compute.} MoRE improves on MoE by
+  $7.9\%$ validation loss ($3.948 \rightarrow 3.637$ nats/token) at $2.19\times$
+  MoE's inference FLOPs where MoR needs $9.07\times$: $72\%$ of MoR's gain for
+  $24\%$ of its compute, roughly $3\times$ the quality per unit compute. Out of
+  domain \citep{gao2020pile} the ratio becomes outright \emph{dominance}---MoRE
+  reaches 7.573 nats against MoR's 7.802 at a quarter of the compute, so MoR is
+  Pareto-dominated---which is the one respect in which composing the mechanisms
+  does something neither does alone.
 
 \item \textbf{But recursion alone remains the lowest-loss arm in domain.} MoR
-  reaches 3.515 nats/token against MoRE's 3.637---the composition trades
-  $0.1216$ nats, significant at our resolution floor, for a $4\times$
-  inference-FLOP saving. These are two different axes and we never substitute one
-  for the other: at matched parameters MoR wins on quality; per unit of inference
-  compute MoRE wins. Adding routing does not improve on recursion alone in domain,
-  nor does it improve routing quality over MoE alone.
+  reaches 3.515 against MoRE's 3.637: the composition trades $0.1216$ nats,
+  significant at our resolution floor, for a $4\times$ inference-FLOP saving.
+  These are two axes and we never substitute one for the other. Adding routing
+  improves neither in-domain quality over MoR nor routing quality over MoE.
 
 \item \textbf{Recursion's adaptive depth is real; the composition's barely
   survives.} Against a \emph{depth-matched} uniform policy---forced to the learned
-  policy's own mean depth, so total compute is held fixed---MoR's halting buys
-  1.47 nats and MoRE's buys 0.06, a factor of 24. MoRE's halting has collapsed to
-  running to its budget on 97.3\% of tokens.
+  policy's own mean depth, so total compute is fixed---MoR's halting buys 1.47
+  nats and MoRE's 0.06, a factor of 24. MoRE's halting has collapsed to running to
+  budget on $97.3\%$ of tokens.
 
-\item \textbf{A diagnostic that generalises.} That depth-matched comparison is our
-  most transferable contribution. A mean step count and an exit histogram---what
-  this literature almost always reports---do \emph{not} establish that depth
-  depends on the input; a policy ignoring its input can reproduce both. Scoring
-  against a depth-matched uniform policy does, costs one inference pass, and is
-  what separates our two arms, which are indistinguishable by mean-and-histogram.
+\item \textbf{A diagnostic that generalises.} A mean step count and an exit
+  histogram---what this literature almost always reports---do \emph{not} establish
+  input-dependent depth, since a policy ignoring its input reproduces both.
+  Scoring against a depth-matched uniform policy does, costs one inference pass,
+  and is what separates our two arms, which are otherwise indistinguishable.
 
 \item \textbf{The two mechanisms compete for one budget, and two rival
-  explanations are excluded.} Depth and specialisation are not independent knobs
-  in MoRE the way they are in MoR and MoE separately: a sweep that recovers
-  adaptive depth by raising the ponder penalty destroys expert differentiation,
-  while the arm that preserves differentiation saturates depth. Capacity dilution
-  is ruled out by arithmetic---tokens per parameter are identical across arms by
-  construction, and once recursion is counted MoRE receives slightly \emph{more}
-  updates per parameter than MoR---and subspace trapping is falsified three ways:
-  the recursive arms expand rather than collapse representational dimensionality,
-  settle rather than oscillate, and update near-orthogonally rather than
-  rescaling.
+  explanations are excluded.} A sweep that recovers adaptive depth by raising the
+  ponder penalty destroys expert differentiation, while the arm that preserves
+  differentiation saturates depth. Capacity dilution is ruled out
+  arithmetically---tokens per parameter are identical by construction---and
+  subspace trapping is falsified three ways (\S\ref{sec:mechanism}).
 
 \end{itemize}
 

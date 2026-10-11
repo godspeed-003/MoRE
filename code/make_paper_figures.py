@@ -86,7 +86,7 @@ def fig_depth_curve():
             curve[arm].append((ba[arm]["mean_loss"], ba[arm]["std_loss"]))
     adaptive = load("stratified_val.json")["by_arm"]
 
-    fig, ax = plt.subplots(figsize=(6.4, 3.1))
+    fig, ax = plt.subplots(figsize=(6.4, 2.45))   # ACL page budget (T-LA.8)
 
     for arm in ("mor", "more"):
         mean = [v[0] for v in curve[arm]]
@@ -212,7 +212,7 @@ def fig_pareto():
     ood_m = {a: ood[a]["mean_loss"] for a in F}
     ood_s = {a: ood[a]["std_loss"] for a in F}
 
-    fig, axes = plt.subplots(1, 2, figsize=(6.6, 2.9))
+    fig, axes = plt.subplots(1, 2, figsize=(6.6, 2.30))  # ACL page budget (T-LA.8)
     for ax, vals, stds, title in [
             (axes[0], ind, ind_s, "(a) In-domain (WikiText-103 val)"),
             (axes[1], ood_m, ood_s, "(b) Out-of-domain (the Pile)")]:
