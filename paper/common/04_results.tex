@@ -17,7 +17,7 @@ final-epoch validation task loss; \emph{best} is the minimum over evaluated
 epochs and equals \emph{last} on all 15 cells, so no model selection occurred.
 $\Delta$ floor is the margin below the bigram baseline of 4.9849 nats
 (positive \emph{beats} it). FLOPs are inference FLOPs/token at each arm's
-measured mean depth, from \texttt{results/flops\_language.json}. Pairwise, on the
+measured mean depth, from the FLOP accounting described in \S\ref{sec:metrics}. Pairwise, on the
 primary metric: MoRE$-$MoE $-0.3113$ ($d\,{-}15.9$, $p\,0.0079$); MoRE$-$MoR
 $+0.1216$ ($d\,{+}4.7$, $p\,0.0079$); MoE$-$MoR $+0.4329$ ($d\,{+}14.7$,
 $p\,0.0079$). Exact two-sided randomization test, floor $p_{\min} = 0.00794$;
@@ -230,7 +230,7 @@ statement about the scale of these models, not about the architectures, so we
 exclude it from Table~\ref{tab:evals} and draw no comparison from it.
 
 % <<<ACLMOVE:blimp
-% >>>ACLMOVE:stratified|\textbf{Both recursive arms gain most where prediction is hardest, and least where context is shortest.} Grouping validation loss by the frequency decile of the target token, the MoREhBc advantage grows from hBc0.147$ nats on the most frequent decile to hBc0.374$ on the rarest (MoR: hBc0.188$ to hBc0.527$), so neither gain is the uniform shift a pure capacity effect would produce. Grouping by position instead disconfirms the usual motivation for recursion: both arms gain most where context is \emph{longest}, not shortest. Appendix~\ref{app:stratified} gives both breakdowns.
+% >>>ACLMOVE:stratified|\textbf{Both recursive arms gain most where prediction is hardest, and least where context is shortest.} Grouping validation loss by the frequency decile of the target token, the MoRE$-$MoE advantage grows from $-0.147$ nats on the most frequent decile to $-0.374$ on the rarest (MoR: $-0.188$ to $-0.527$), so neither gain is the uniform shift a pure capacity effect would produce. Grouping by position instead disconfirms the usual motivation for recursion: both arms gain most where context is \emph{longest}, not shortest. Appendix~\ref{app:stratified} gives both breakdowns.
 \subsection{Stratified loss: the advantage concentrates on hard tokens}
 \label{sec:stratified}
 

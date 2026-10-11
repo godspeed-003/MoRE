@@ -24,12 +24,16 @@ every depth and one halt head observes a coherent sequence of states. (An earlie
 configuration re-drew both per step; it is retained as a labelled ablation and
 discussed in the disclosures in the Limitations section.)
 
+% Narrow-column form: the \qquad range tail and the \left(...\right) pair put the
+% single-column version 112pt (48%) outside a 234pt column. The range moves to
+% the prose below; the mathematics is unchanged.
 \begin{equation}
-\mathbf{h}^{(t+1)} \;=\; \mathrm{LayerNorm}\!\left(
-  \mathbf{h}^{(t)} + g_{e^\star}\cdot \mathrm{FFN}_{e^\star}\!\left(\mathbf{h}^{(t)}\right)
-\right), \qquad t = 0,\dots,T-1 .
+\mathbf{h}^{(t+1)} = \mathrm{LayerNorm}\big(
+  \mathbf{h}^{(t)} + g_{e^\star}\,\mathrm{FFN}_{e^\star}(\mathbf{h}^{(t)})
+\big)
 \label{eq:block}
 \end{equation}
+for $t = 0,\dots,T-1$.
 
 The gate probability $g_{e^\star}$ multiplies the expert output, which is what
 carries task-loss gradient into the router: the discrete $\arg\max$ is not
@@ -61,16 +65,17 @@ evaluated by its expert and none is dropped.
 Halting follows ACT \citep{graves2016act} as used in the Universal Transformer,
 with one halt head per expert. Per token, at step $t$:
 
+% Narrow-column form: the three-column align with a cases block ran 55pt outside
+% a 234pt column. Two columns, shorter case labels, epsilon stated in the prose.
 \begin{align}
-p_t &= \sigma\!\left(\mathbf{w}_{e^\star}^{\!\top}\mathbf{h}^{(t)}\right),
-  & c_t &= \sum_{\tau \le t} p_\tau ,
-  \label{eq:halt-p} \\[2pt]
-\text{halt when } &\; c_t + p_t > 1 - \epsilon, & \epsilon &= 0.01,
-  \label{eq:halt-cond} \\[2pt]
-R &= 1 - c_t \ \text{(remainder)}, &
-  w_t &= \begin{cases} p_t & \text{running} \\ R & \text{at the halt step}\end{cases}
+p_t &= \sigma\big(\mathbf{w}_{e^\star}^{\!\top}\mathbf{h}^{(t)}\big),
+  \quad c_t = \textstyle\sum_{\tau \le t} p_\tau , \label{eq:halt-p} \\[2pt]
+&\text{halt when } c_t + p_t > 1 - \epsilon , \label{eq:halt-cond} \\[2pt]
+R &= 1 - c_t , \quad
+  w_t = \begin{cases} p_t & \text{running} \\ R & \text{at halt} \end{cases}
   \label{eq:halt-w}
 \end{align}
+with $\epsilon = 0.01$ and $R$ the halting remainder.
 
 and the token's output is the convex combination
 $\mathbf{o}_s = \sum_t w_t \mathbf{h}^{(t)}$, whose weights sum to exactly $1$.
@@ -100,13 +105,15 @@ and is future work (the Limitations section).
 
 The training objective is a weighted sum of terms that we report separately and
 never as a single number:
+% Narrow-column form: five terms with underbrace annotations ran 65pt outside a
+% 234pt column. Stacked, with the annotations moved into the prose below -- which
+% already names the weight on each term, so nothing is lost.
 \begin{equation}
-\mathcal{L} \;=\;
-\underbrace{\mathcal{L}_{\text{task}}}_{1.0} \;+\;
-0.001\,\mathcal{L}_{\text{bal}} \;+\;
-0.001\,\rho \;+\;
-\underbrace{0.0\cdot\mathcal{L}_{\text{fam}}}_{h\,\text{detached}} \;+\;
-\underbrace{0.0\cdot\mathcal{L}_{\text{route}}}_{\text{off}} .
+\begin{aligned}
+\mathcal{L} \;=\;& 1.0\,\mathcal{L}_{\text{task}}
+   + 0.001\,\mathcal{L}_{\text{bal}} + 0.001\,\rho \\
+  &+ 0.0\,\mathcal{L}_{\text{fam}} + 0.0\,\mathcal{L}_{\text{route}} .
+\end{aligned}
 \label{eq:loss}
 \end{equation}
 $\mathcal{L}_{\text{task}}$ is per-token cross-entropy in nats.

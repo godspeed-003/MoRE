@@ -47,7 +47,7 @@ Three mechanical invariants hold across the matrix, each enforced by an automate
 check rather than by inspection. \textbf{(i) Inputs are bit-identical across arms
 for the same record}: feature ranges are identical at $E \in \{1,5,6\}$, so a
 difference between arms cannot be a difference in representation. \textbf{(ii) The
-regression/classification target is absent from the input}, and no oracle routing
+regression or classification target is absent from the input}, and no oracle routing
 label is encoded into a feature slot. \textbf{(iii) The arms are parameter-matched
 to 0.069\%} and the seed-blind configuration is identical within each arm, so
 comparability cannot rest on a single code revision: the matrix spans four commits,
@@ -121,15 +121,18 @@ within that subspace drives the state toward a fixed point rather than refining 
 It is an appealing account and it is wrong. We tested it three ways.
 
 \begin{center}
+\small
 \begin{tabular}{lccc}
 \toprule
 probe & MoE & MoR & MoRE \\
 \midrule
-final-state participation ratio & $41.5 \pm 1.6$ & $\mathbf{70.3 \pm 5.6}$ & $57.3 \pm 2.8$ \\
-between-expert mean cosine & $0.630$ & \textsc{n/a} & $0.916$ \\
+participation ratio    & 41.5 & \textbf{70.3} & 57.3 \\
+inter-expert cosine    & 0.630 & \textsc{n/a} & 0.916 \\
 \bottomrule
 \end{tabular}
 \end{center}
+Participation ratio is the final-state value, $\pm$ 1.6, 5.6 and 2.8 across
+seeds respectively; the cosine is the mean between-expert value.
 
 \textbf{(i) Trapping predicts lower participation ratio in the composed arm;
 it is higher.} If recursion were collapsing the state onto a low-dimensional
@@ -234,13 +237,14 @@ tempting to read that as the architecture being unable to learn adaptive depth. 
 subset sweep falsifies that reading.
 
 \begin{center}
+\small
 \begin{tabular}{lcc}
 \toprule
-training data & mean depth & forced-exit rate \\
+training data & mean depth & forced exit \\
 \midrule
-2.5\% of the corpus & 2.43 & $\approx 0$ \\
-10\% & 1.92 & $\approx 0$ \\
-40\% & 1.97 & $\approx 0$ \\
+2.5\%             & 2.43 & $\approx 0$ \\
+10\%              & 1.92 & $\approx 0$ \\
+40\%              & 1.97 & $\approx 0$ \\
 100\% (canonical) & 6.96 & 0.973 \\
 \bottomrule
 \end{tabular}
@@ -270,6 +274,16 @@ did not run it, and it is named as future work rather than as a result.
 
 \subsection{Training protocol}
 
+
+% The ACL body replaced the 41-character dataset identifier with a pointer here,
+% because \texttt cannot hyphenate and the literal string ran 98pt past the
+% margin. It must therefore actually appear in the appendix. Nested inside the
+% ACLMOVE:protocol block on purpose: the assembler resolves variants BEFORE
+% extracting moves, so this lands in the ACL appendix and is absent from TMLR,
+% which states the identifier in its own Data section.
+The frozen dataset identifier is
+\texttt{lang-\allowbreak wikitext-\allowbreak 103-\allowbreak bpe8192-\allowbreak len256-\allowbreak 800d6154}, and the split is the
+corpus's own author-provided validation split.
 
 Every canonical arm runs at seeds $\{42,43,44,45,46\}$ and is reported as
 mean$\,\pm\,$std over five runs. Training is 3 epochs of AdamW (lr $10^{-3}$,

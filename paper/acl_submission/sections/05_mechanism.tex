@@ -19,12 +19,13 @@ holds $2 \cdot 24 \cdot d^2 = 3{,}145{,}728$, exactly six times as many
 (\S\ref{sec:engine}). A run sees $404.2$M tokens. So:
 
 \begin{center}
+\small
 \begin{tabular}{lccc}
 \toprule
-per FFN parameter & MoE expert & MoR block & MoRE expert \\
+per FFN parameter & MoE & MoR & MoRE \\
 \midrule
-tokens seen        & 128.5 & 128.5 & 128.5 \\
-FFN applications   & 128   & 865   & \textbf{894} \\
+tokens seen      & 128.5 & 128.5 & 128.5 \\
+FFN applications & 128   & 865   & \textbf{894} \\
 \bottomrule
 \end{tabular}
 \end{center}

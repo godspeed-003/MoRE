@@ -8611,3 +8611,118 @@ registered. Anything added to `code/make_paper_figures.py` must be added there t
 - `code/compile_papers.py` → both venues 0 errors, 0 undefined refs/citations.
 - `code/abstract_words.py` → 218 words both venues.
 - `paper/assemble_submissions.py` → both trees self-contained, 5 figures each.
+
+---
+
+## T-LA.7 — overflow audit: three equations were running off the ACL page, and a shell expansion had corrupted the source
+
+**Date.** 2026-10-11. **Machine.** Ayan's RTX 4060 8 GB. Prompted by the question
+"is any equation or anything flowing out of the body" — which turned out to be
+worth asking twice over.
+
+### The answer
+
+**TMLR: nothing. Zero overfull hbox, zero overfull vbox.**
+**ACL, before: 7 boxes over 15pt, five of them severe. After: one at 5.7pt (2% of
+a column), which is ~2mm and normal for justified two-column text.**
+
+The whole diagnosis is one sentence: every offender fit a 468pt single-column
+measure and busted a 234pt two-column one. These were venue-layout faults, not
+errors in the writing — which is why TMLR showed nothing, and why nobody reading
+the TMLR PDF would ever have found them.
+
+### Three display equations were off the page
+
+| equation | pt over | % of column |
+|---|---|---|
+| `eq:block` | 112.4 | **48%** |
+| `eq:loss` | 64.6 | 28% |
+| `eq:halt-p/cond/w` | 55.4 | 24% |
+
+`eq:block`'s trailing `\qquad t = 0,\dots,T-1` and its `\left(...\right)` pair
+pushed it nearly half a column past the margin. `eq:loss` is a five-term sum with
+`\underbrace` annotations. The halting block was a **three-column** `align`
+containing a `cases`. All three now have narrow-column ACL variants via the
+existing `ACLONLY`/`TMLRONLY` mechanism — the range moved into prose, the loss
+stacked with `aligned` and its annotations moved to the prose that already
+explained them, the align rebuilt as two columns with shorter case labels. TMLR
+keeps the wide, more readable forms.
+
+### Then the box dumps found something worse than a margin
+
+`pdflatex "\showboxbreadth=12 \showboxdepth=4 \input{main}"` dumps the contents
+of each overfull box. One dump showed prose being typeset in **math italic with
+no inter-word spaces** — `natsonthemostfrequentdecileto` — the signature of an
+unterminated math span.
+
+**Cause: a `python -c` edit had been applied through a double-quoted shell
+string, and bash expanded `$-` to its own option flags.** `MoRE$-$MoE` became
+`MoREhBc`; `$-0.147$` became `hBc0.147$`. It reached both venue trees, compiled
+with **zero errors and zero warnings**, and would have shipped as visibly broken
+output. `$-` is the dangerous case because it is a real bash variable; `$0`–`$9`
+are worse, because they expand to nothing and leave no trace at all.
+
+`code/check_latex_lint.py` now guards this: shell-expansion fingerprints,
+per-file `$` balance, markdown leakage, tabs, non-ASCII, and surviving assembler
+markers. **A first version also flagged `$` followed by a digit as a lost
+positional and produced dozens of false positives** — `$7.9\%$` is ordinary math —
+so that check was removed rather than tuned. The honest statement is that silent
+positional expansion cannot be detected after the fact, which is the argument for
+never editing `.tex` through a shell string. Write a `.py` file and run it.
+
+### The last three were tables, not prose
+
+TeX reports a centred `tabular` as "in paragraph at lines N--M", which sent the
+first pass hunting unbreakable words. They were the dilution table (72.8pt — the
+header row was almost the whole width), the subspace-probe table (98.0pt — a
+31-character row label plus three `$x \pm y$` cells, roughly 315pt against 234),
+and the subset sweep (17.4pt). Narrowed in `common/` rather than as ACL variants
+because each change improves both venues: `\small`, shorter headers, and the
+standard deviations moved out of the widest table into a following sentence — the
+cells were carrying `41.5 ± 1.6` where the comparison being made is between 41.5,
+70.3 and 57.3.
+
+### Two unbreakable tokens
+
+`\texttt` sets `\hyphenchar` to −1, so a 41-character dataset identifier cannot
+break **anywhere** and ran 98pt past the margin. ACL now carries a short phrase
+with an appendix pointer, and the literal string appears in the appendix via an
+`ACLONLY` block **nested inside** the `ACLMOVE:protocol` block — the assembler
+resolves variants before extracting moves, so it lands in the ACL appendix and is
+absent from TMLR, which states it in its own Data section. Where it does appear it
+now carries `\allowbreak` after each hyphen, which permits a break without
+inserting a hyphen character; a visible hyphen would corrupt the identifier.
+`regression/classification` became `regression or classification` in both venues —
+a slash offers TeX no break point, and it is better prose anyway.
+
+### Measured after the audit
+
+| | PDF total | counted body | errors | overfull | undefined |
+|---|---|---|---|---|---|
+| TMLR | 18 | 13 | 0 | **0** | 0 |
+| ACL | 17 | 9 | 0 | 1 (5.7pt) | 0 |
+
+Lint clean across 23 `.tex` files. Upload bundles rebuilt by
+`code/make_overleaf_zips.py`, which excludes build artifacts — once the papers
+were compiled locally, `shutil.make_archive` had been sweeping `main.pdf` and the
+aux files in, tripling the zips from ~315 KB to ~912 KB and shipping a stale PDF
+alongside the source.
+
+**Failure tracing.**
+- *Prose renders in math italic with no spaces* → an unterminated `$`. Run
+  `code/check_latex_lint.py`; if it is clean, look for a `$`-prefixed token eaten
+  by a shell.
+- *An overfull box is reported "in paragraph" but the paragraph looks fine* → it
+  is a centred `tabular` or inline math, not the words.
+- *An equation is fine in TMLR and off the page in ACL* → 468pt vs 234pt. It needs
+  a narrow-column variant, not a rewrite.
+- *A long `\texttt` identifier overflows* → typewriter does not hyphenate at all.
+  Use `\allowbreak` after each hyphen, or move it to an appendix and point at it.
+- *The Overleaf zip is suddenly three times larger* → it is carrying the compiled
+  PDF and aux files. Use `code/make_overleaf_zips.py`.
+
+**Verified by.**
+- `code/check_overflow.py` → TMLR 0 overfull; ACL one box at 5.7pt (2%).
+- `code/check_latex_lint.py` → 23 files clean.
+- `code/compile_papers.py` → both venues 0 errors, 0 undefined refs/citations.
+- `code/make_overleaf_zips.py` → 19 and 18 files, 5 figures each, no artifacts.

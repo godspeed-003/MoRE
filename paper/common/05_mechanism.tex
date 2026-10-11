@@ -19,12 +19,13 @@ holds $2 \cdot 24 \cdot d^2 = 3{,}145{,}728$, exactly six times as many
 (\S\ref{sec:engine}). A run sees $404.2$M tokens. So:
 
 \begin{center}
+\small
 \begin{tabular}{lccc}
 \toprule
-per FFN parameter & MoE expert & MoR block & MoRE expert \\
+per FFN parameter & MoE & MoR & MoRE \\
 \midrule
-tokens seen        & 128.5 & 128.5 & 128.5 \\
-FFN applications   & 128   & 865   & \textbf{894} \\
+tokens seen      & 128.5 & 128.5 & 128.5 \\
+FFN applications & 128   & 865   & \textbf{894} \\
 \bottomrule
 \end{tabular}
 \end{center}
@@ -72,13 +73,14 @@ tempting to read that as the architecture being unable to learn adaptive depth. 
 subset sweep falsifies that reading.
 
 \begin{center}
+\small
 \begin{tabular}{lcc}
 \toprule
-training data & mean depth & forced-exit rate \\
+training data & mean depth & forced exit \\
 \midrule
-2.5\% of the corpus & 2.43 & $\approx 0$ \\
-10\% & 1.92 & $\approx 0$ \\
-40\% & 1.97 & $\approx 0$ \\
+2.5\%             & 2.43 & $\approx 0$ \\
+10\%              & 1.92 & $\approx 0$ \\
+40\%              & 1.97 & $\approx 0$ \\
 100\% (canonical) & 6.96 & 0.973 \\
 \bottomrule
 \end{tabular}
@@ -165,15 +167,18 @@ within that subspace drives the state toward a fixed point rather than refining 
 It is an appealing account and it is wrong. We tested it three ways.
 
 \begin{center}
+\small
 \begin{tabular}{lccc}
 \toprule
 probe & MoE & MoR & MoRE \\
 \midrule
-final-state participation ratio & $41.5 \pm 1.6$ & $\mathbf{70.3 \pm 5.6}$ & $57.3 \pm 2.8$ \\
-between-expert mean cosine & $0.630$ & \textsc{n/a} & $0.916$ \\
+participation ratio    & 41.5 & \textbf{70.3} & 57.3 \\
+inter-expert cosine    & 0.630 & \textsc{n/a} & 0.916 \\
 \bottomrule
 \end{tabular}
 \end{center}
+Participation ratio is the final-state value, $\pm$ 1.6, 5.6 and 2.8 across
+seeds respectively; the cosine is the mean between-expert value.
 
 \textbf{(i) Trapping predicts lower participation ratio in the composed arm;
 it is higher.} If recursion were collapsing the state onto a low-dimensional

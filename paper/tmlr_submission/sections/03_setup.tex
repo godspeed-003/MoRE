@@ -6,7 +6,7 @@
 
 All arms train on WikiText-103 \citep{merity2017wikitext} with a byte-pair
 vocabulary of 8{,}192 tokens and packed sequences of length 256
-(\texttt{lang-wikitext-103-bpe8192-len256-800d6154}). We use the corpus's own
+(\texttt{lang-\allowbreak wikitext-\allowbreak 103-\allowbreak bpe8192-\allowbreak len256-\allowbreak 800d6154}). We use the corpus's own
 author-provided validation split rather than carving one out of the training
 material, which is what makes the leakage audit in \S\ref{sec:integrity}
 meaningful: no validation or test token was ever available to the trainer.
@@ -19,6 +19,7 @@ respectively.
 
 \subsection{Training protocol}
 \label{sec:protocol}
+
 
 Every canonical arm runs at seeds $\{42,43,44,45,46\}$ and is reported as
 mean$\,\pm\,$std over five runs. Training is 3 epochs of AdamW (lr $10^{-3}$,
@@ -123,7 +124,7 @@ Three mechanical invariants hold across the matrix, each enforced by an automate
 check rather than by inspection. \textbf{(i) Inputs are bit-identical across arms
 for the same record}: feature ranges are identical at $E \in \{1,5,6\}$, so a
 difference between arms cannot be a difference in representation. \textbf{(ii) The
-regression/classification target is absent from the input}, and no oracle routing
+regression or classification target is absent from the input}, and no oracle routing
 label is encoded into a feature slot. \textbf{(iii) The arms are parameter-matched
 to 0.069\%} and the seed-blind configuration is identical within each arm, so
 comparability cannot rest on a single code revision: the matrix spans four commits,

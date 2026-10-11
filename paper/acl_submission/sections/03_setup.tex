@@ -6,7 +6,10 @@
 
 All arms train on WikiText-103 \citep{merity2017wikitext} with a byte-pair
 vocabulary of 8{,}192 tokens and packed sequences of length 256
-(\texttt{lang-wikitext-103-bpe8192-len256-800d6154}). We use the corpus's own
+% The literal identifier is 41 characters of \texttt, and TeX sets
+% \hyphenchar to -1 for typewriter, so it cannot break anywhere and ran 98pt
+% past the margin. Short phrase here, literal string in the appendix.
+(identifier in Appendix~\ref{app:protocol}). We use the corpus's own
 author-provided validation split rather than carving one out of the training
 material, which is what makes the leakage audit in \S\ref{sec:integrity}
 meaningful: no validation or test token was ever available to the trainer.
