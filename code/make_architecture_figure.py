@@ -3,29 +3,32 @@
 
     python code/make_architecture_figure.py
 
-Writes fig_architecture.png into both submission trees.
+Writes paper/fig_lang/fig_architecture.png, which is the directory
+assemble_submissions.py copies figures FROM. Writing straight into the
+submission trees would be undone by the next assemble run.
 
 WHY THIS SCRIPT REPLACES THE PREVIOUS FIGURE. The hand-drawn PNG it supersedes
-depicted the architecture this study RETIRED, not the one it reports:
+(paper/fig/More(3)(1).png) depicted the architecture this study RETIRED:
 
   * it labelled the router "noisy top-K", but the canonical router is top-1 with
-    `router_noise = none` (CLAUDE.md 2);
+    router_noise = none;
   * it said "ONE expert per token PER DEPTH" and looped the halt decision back
     into the router -- that is per-step re-routing, the T-LX.12 defect. The
     canonical path routes ONCE and persists the assignment for the whole
-    trajectory, which is the specification the paper's method section states and
-    the single most load-bearing architectural claim in the paper;
-  * it omitted the gate multiply g_{e*}, which is the only path carrying task
-    gradient into the router (the argmax is not differentiated);
-  * it omitted the ACT output aggregation o = sum_t w_t h^(t), which is the only
-    path carrying task gradient into the halt head.
+    trajectory, which is the specification the method section states and the
+    single most load-bearing architectural claim in the paper;
+  * it omitted the gate multiply g_{e*}, the only path carrying task gradient
+    into the router (the argmax is not differentiated);
+  * it omitted the ACT output aggregation o = sum_t w_t h^(t), the only path
+    carrying task gradient into the halt head.
 
-A reviewer who read the figure against the method section would have found it
+A reviewer reading the figure against the method section would have found it
 contradicting the text on the paper's central claim.
 
-LAYOUT. Vertical and narrow on purpose: T-LA.5 moved this from `figure*` to a
-plain one-column `figure` to save page budget, so at ACL it renders about 3.2 in
-wide. A horizontal flow would be illegible at that width.
+COMPACT ON PURPOSE. This is a one-column float in a two-column venue, so its
+HEIGHT is what it costs. The first version of this script ran 300 pt tall in a
+655 pt column -- about 23% of a page -- while the ACL body was already over its
+limit. Five rows instead of seven, side by side wherever the flow allows.
 """
 
 from __future__ import annotations
@@ -36,12 +39,9 @@ from pathlib import Path
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt                                  # noqa: E402
-from matplotlib.patches import FancyBboxPatch, FancyArrowPatch, Polygon  # noqa: E402
+from matplotlib.patches import FancyBboxPatch, FancyArrowPatch   # noqa: E402
 
 REPO = Path(os.path.dirname(os.path.abspath(__file__))).parent
-# Written into paper/fig_lang/, which is the directory assemble_submissions.py
-# copies figures FROM. Writing straight into the submission trees would be undone
-# by the next assemble run.
 OUTS = [REPO / "paper" / "fig_lang" / "fig_architecture.png"]
 
 INK = "#1a1a1a"
@@ -51,122 +51,95 @@ SEL = "#cfcfcf"
 DIM = "#fbfbfb"
 
 
-def box(ax, x, y, w, h, text, *, fc=FILL, ec=INK, lw=1.0, fs=7.2, weight=None,
-        rounding=0.022):
+def box(ax, x, y, w, h, text, *, fc=FILL, ec=INK, lw=1.0, fs=6.4, weight=None):
     ax.add_patch(FancyBboxPatch((x - w / 2, y - h / 2), w, h,
-                                boxstyle=f"round,pad=0,rounding_size={rounding}",
+                                boxstyle="round,pad=0,rounding_size=0.02",
                                 fc=fc, ec=ec, lw=lw, zorder=2))
     ax.text(x, y, text, ha="center", va="center", fontsize=fs, color=INK,
-            zorder=3, linespacing=1.45, fontweight=weight)
+            zorder=3, linespacing=1.4, fontweight=weight)
 
 
-def arrow(ax, p, q, *, color=INK, lw=1.1, style="-|>", ls="-", rad=0.0, z=4):
-    ax.add_patch(FancyArrowPatch(p, q, arrowstyle=style, mutation_scale=9,
-                                 lw=lw, color=color, linestyle=ls, zorder=z,
-                                 shrinkA=0, shrinkB=0,
-                                 connectionstyle=f"arc3,rad={rad}"))
+def arrow(ax, p, q, *, color=INK, lw=1.0, style="-|>", z=4):
+    ax.add_patch(FancyArrowPatch(p, q, arrowstyle=style, mutation_scale=8,
+                                 lw=lw, color=color, zorder=z,
+                                 shrinkA=0, shrinkB=0))
 
 
 def main():
-    fig, ax = plt.subplots(figsize=(3.35, 4.6), dpi=400)
+    fig, ax = plt.subplots(figsize=(3.35, 2.42), dpi=400)
     ax.set_xlim(0, 100)
     ax.set_ylim(0, 100)
     ax.axis("off")
+    cx, LOOP = 50.0, 95.5
 
-    cx = 50.0                      # main spine
-    LOOP = 95.0                    # x of the single recursion return path
+    # ---- Row A: tokens -> embed, side by side ------------------------
+    box(ax, 20, 93, 30, 10, "tokens\n$B\\times S$")
+    box(ax, 67, 93, 42, 10, "embed + position\n$h^{(0)}$")
+    arrow(ax, (35.3, 93), (46.2, 93))
 
-    # ---- 1. input ----------------------------------------------------
-    box(ax, cx, 96.0, 40, 6.0, "tokens  $B\\times S$")
-    arrow(ax, (cx, 93.0), (cx, 89.8))
+    # ---- Row B: the router, OUTSIDE the recursion --------------------
+    arrow(ax, (67, 87.8), (67, 82.3))
+    box(ax, cx, 76.5, 96, 11,
+        "router, once per token\n"
+        "$g=\\mathrm{softmax}(W_r h^{(0)})$,  $e^{\\star}=\\arg\\max_e g_e$",
+        lw=1.3)
 
-    # ---- 2. embedding ------------------------------------------------
-    box(ax, cx, 86.6, 52, 6.0, "embed + position  $\\rightarrow$  $h^{(0)}$")
-    arrow(ax, (cx, 83.6), (cx, 80.2))
-
-    # ---- 3. the router, OUTSIDE the loop -----------------------------
-    box(ax, cx, 74.8, 80, 9.2,
-        "router  (once per token)\n"
-        "$g=\\mathrm{softmax}(W_r h^{(0)})$,   "
-        "$e^{\\star}=\\arg\\max_e g_e$", lw=1.3)
-    ax.text(9.0, 68.4, "top-1, no noise; $e^{\\star}$ persisted",
-            ha="left", va="center", fontsize=5.9, color=GREY)
-
-    # ---- 4. expert bank: only e* is evaluated ------------------------
+    # ---- Row C: expert bank, only e* evaluated -----------------------
     names = ["$\\mathrm{FFN}_1$", "$\\mathrm{FFN}_2$", "$e^{\\star}$",
              "$\\mathrm{FFN}_4$", "$\\cdots$", "$\\mathrm{FFN}_E$"]
-    bw, gap = 11.6, 1.5
-    total = len(names) * bw + (len(names) - 1) * gap
-    x0 = cx - total / 2 + bw / 2
-    ex_star = x0 + 2 * (bw + gap)
-    arrow(ax, (cx, 70.2), (cx, 66.6))
+    bw, gap = 14.2, 1.6
+    x0 = cx - (len(names) * bw + (len(names) - 1) * gap) / 2 + bw / 2
+    ex = x0 + 2 * (bw + gap)
+    arrow(ax, (cx, 71.0), (cx, 65.6))
     for i, nm in enumerate(names):
-        xi = x0 + i * (bw + gap)
         chosen = (i == 2)
-        box(ax, xi, 62.6, bw, 6.6, nm,
+        box(ax, x0 + i * (bw + gap), 60.0, bw, 9.0, nm,
             fc=SEL if chosen else DIM, ec=INK if chosen else GREY,
-            lw=1.5 if chosen else 0.7, fs=6.4,
+            lw=1.5 if chosen else 0.7, fs=6.2,
             weight="bold" if chosen else None)
-    # caption sits RIGHT of the descending arrow (which leaves from e*), so the
-    # two cannot collide.
-    ax.text(99.0, 56.2, "$E$ experts; only $e^{\\star}$ runs",
-            ha="right", va="center", fontsize=5.9, color=GREY)
-    arrow(ax, (ex_star, 59.3), (ex_star, 53.0), lw=1.4)
+    ax.text(99, 51.0, "top-1, no noise; $e^{\\star}$ persisted",
+            ha="right", va="center", fontsize=5.6, color=GREY)
+    arrow(ax, (ex, 55.5), (ex, 47.0), lw=1.4)
 
-    # ---- 5. the recursion block --------------------------------------
-    box(ax, cx, 43.6, 86, 17.2,
+    # ---- Row D: the recursion block ----------------------------------
+    box(ax, cx, 36.0, 96, 20,
         "$h^{(t+1)}=\\mathrm{LN}\\!\\left(h^{(t)}"
-        "+g_{e^{\\star}}\\cdot\\mathrm{FFN}_{e^{\\star}}(h^{(t)})\\right)$\n\n\n"
-        "halt head:   $p_t=\\sigma(w_{e^{\\star}}^{\\top}h^{(t)})$", lw=1.3)
-    # Weight tying stated OUTSIDE the block and left-aligned: inside it collided
-    # with the halt-head line, and centred it collided with the arrow to the
-    # halting test.
-    ax.text(4.0, 32.2, "same $e^{\\star}$ weights every step",
-            ha="left", va="center", fontsize=5.8, color=GREY, zorder=3)
+        "+g_{e^{\\star}}\\cdot\\mathrm{FFN}_{e^{\\star}}(h^{(t)})\\right)$\n\n"
+        "halt head:  $p_t=\\sigma(w_{e^{\\star}}^{\\top}h^{(t)})$", lw=1.3)
+    ax.text(2.5, 23.5, "same $e^{\\star}$ weights every step",
+            ha="left", va="center", fontsize=5.6, color=GREY)
 
     # the gate multiply: the only differentiable path into the router
-    gx = 3.0
-    arrow(ax, (cx - 40.0, 71.6), (gx, 71.6), style="-", color=GREY, lw=0.9)
-    arrow(ax, (gx, 71.6), (gx, 47.0), style="-", color=GREY, lw=0.9)
-    arrow(ax, (gx, 47.0), (cx - 43.0, 47.0), color=GREY, lw=0.9)
-    ax.text(gx + 1.2, 58.5, "$g_{e^{\\star}}$", ha="left", va="center",
-            fontsize=6.8, color=INK)
+    gx = 2.2
+    arrow(ax, (2.0, 71.0), (gx, 71.0), style="-", color=GREY, lw=0.8)
+    arrow(ax, (gx, 71.0), (gx, 36.0), style="-", color=GREY, lw=0.8)
+    arrow(ax, (gx, 36.0), (cx - 48.0, 36.0), color=GREY, lw=0.8)
+    ax.text(3.6, 54.0, "$g_{e^{\\star}}$", ha="left", va="center",
+            fontsize=6.4, color=INK)
 
-    arrow(ax, (cx, 35.0), (cx, 29.8))
+    # ---- Row E: exit test -> output, side by side --------------------
+    arrow(ax, (cx, 26.0), (cx, 19.6))
+    box(ax, 27, 12.0, 46, 13, "exit if $c_t+p_t>1-\\epsilon$\nor $t=T$", fs=6.2)
+    box(ax, 77, 12.0, 40, 13,
+        "$o=\\sum_t w_t h^{(t)}$\n$\\rightarrow$ logits", lw=1.2)
+    arrow(ax, (50.2, 12.0), (56.8, 12.0))
 
-    # ---- 6. the halting decision -------------------------------------
-    dw, dh, dy = 29.0, 7.2, 25.6
-    ax.add_patch(Polygon([[cx, dy + dh], [cx + dw, dy], [cx, dy - dh],
-                          [cx - dw, dy]], closed=True, fc=FILL, ec=INK,
-                         lw=1.0, zorder=2))
-    ax.text(cx, dy, "$c_t+p_t>1-\\epsilon$\nor  $t=T$", ha="center",
-            va="center", fontsize=6.4, color=INK, zorder=3, linespacing=1.4)
-    ax.text(cx - dw - 1.5, dy - 4.6, "yes", ha="right", va="center",
-            fontsize=6.0, color=GREY)
+    # the single recursion return path
+    arrow(ax, (27, 5.5), (27, 2.0), style="-", color=GREY, lw=0.9)
+    arrow(ax, (27, 2.0), (LOOP, 2.0), style="-", color=GREY, lw=0.9)
+    arrow(ax, (LOOP, 2.0), (LOOP, 36.0), style="-", color=GREY, lw=0.9)
+    arrow(ax, (LOOP, 36.0), (cx + 48.0, 36.0), color=GREY, lw=0.9)
+    ax.text(LOOP - 1.5, 23.5, "no: $t\\!\\leftarrow\\!t\\!+\\!1$", ha="right",
+            va="center", fontsize=5.6, color=GREY)
 
-    # ONE return path: "no" -> right -> up -> back into the block.
-    arrow(ax, (cx + dw, dy), (LOOP, dy), style="-", lw=1.0)
-    arrow(ax, (LOOP, dy), (LOOP, 43.6), style="-", lw=1.0)
-    arrow(ax, (LOOP, 43.6), (cx + 43.0, 43.6), lw=1.0)
-    ax.text(LOOP - 1.0, 33.0, "no:  $t\\!\\leftarrow\\!t\\!+\\!1$", ha="right",
-            va="center", fontsize=5.9, color=GREY)
-
-    arrow(ax, (cx, dy - dh), (cx, 14.4))
-
-    # ---- 7. output ----------------------------------------------------
-    box(ax, cx, 10.6, 72, 7.2,
-        "$o=\\sum_t w_t\\,h^{(t)}$   $\\rightarrow$   logits", lw=1.2)
-    ax.text(cx, 4.6,
-            "$T=1\\Rightarrow$ MoE      $E=1\\Rightarrow$ MoR",
-            ha="center", va="center", fontsize=6.4, color=INK)
-    ax.text(cx, 0.8, "halted states are frozen, not recomputed",
-            ha="center", va="center", fontsize=5.7, color=GREY)
+    # The T=1 / E=1 reductions are stated in the caption rather than drawn: in
+    # the compact layout the only free space left collided with the exit box.
 
     fig.subplots_adjust(left=0.004, right=0.996, top=0.998, bottom=0.002)
     for out in OUTS:
         out.parent.mkdir(parents=True, exist_ok=True)
         fig.savefig(out, dpi=400, facecolor="white")
-        print(f"wrote {out.relative_to(REPO)}  ")
+        print(f"wrote {out.relative_to(REPO)}")
     plt.close(fig)
     return 0
 
