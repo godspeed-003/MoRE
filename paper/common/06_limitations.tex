@@ -149,13 +149,13 @@ We built the composition of sparse expert routing and adaptive recursion as a
 single engine, held parameters and inputs fixed across its three configurations,
 and measured what the combination buys at each level of inference compute. At
 5.6M parameters on WikiText-103 it buys efficiency and robustness rather than
-peak quality. MoRE is the compute-efficient point of the three: $7.9\%$ better
-than MoE on validation loss at $2.19\times$ its inference FLOPs, capturing $72\%$
-of recursion's quality gain for $24\%$ of recursion's compute, which is roughly
-three times more quality per unit of compute. Out of domain it is the best arm
-outright, ahead of both components on held-out text from a different
-distribution---the one respect in which composing the mechanisms does something
-neither does alone.
+peak quality. In domain all three arms lie on the quality/compute frontier and
+MoRE buys the most quality per unit of compute: $7.9\%$ better than MoE at
+$2.19\times$ its inference FLOPs, $72\%$ of recursion's gain for $24\%$ of
+recursion's compute, about three times the quality per FLOPs-multiplier. Out of
+domain it is stronger than a ratio---MoRE \emph{dominates} recursion alone,
+reaching lower loss at a quarter of the compute, which is the one respect in which
+composing the mechanisms does something neither does alone.
 
 What it does not buy is in-domain quality. Recursion alone remains lowest-loss by
 0.1216 nats, a gap significant at our resolution floor, and adding routing does

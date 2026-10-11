@@ -8506,3 +8506,108 @@ the mechanism section. Escalated rather than chosen.
 - `main.log` → `Output written on main.pdf (16 pages)` ACL, `(17 pages)` TMLR.
 - `paper/assemble_submissions.py` → both trees self-contained; inputs, figures,
   citations, refs, duplicate labels and surviving markers all checked.
+
+---
+
+## T-LA.6 — TMLR pass: the Pareto claim was imprecise, out-of-domain was undersold, and the variance hand-wave is now a measurement
+
+**Date.** 2026-10-11. **Machine.** Ayan's RTX 4060 8 GB. First improvement pass on
+the TMLR paper now that it compiles.
+
+### The reframe's central claim was imprecise, and a reviewer checking it would be right
+
+T-LA.4 wrote "MoRE is the compute-efficient point of the three" into the abstract,
+the intro and the conclusion. Computed on (FLOPs, loss), **in domain all three
+arms are Pareto non-dominated**:
+
+| arm | FLOPs/token | val loss | dominated by |
+|---|---|---|---|
+| MoE | 1.00× | 3.9483 | none |
+| MoRE | 2.19× | 3.6370 | none |
+| MoR | 9.07× | 3.5154 | none |
+
+MoE is cheapest, MoR is best, MoRE sits between. **There is no single "efficient
+point" — the three trace a frontier**, and phrasing that implies the others are
+off it is wrong. MoRE's in-domain claim is the best quality-per-unit-compute
+*ratio* (0.1422 against MoR's 0.0477 nats per FLOPs-multiplier): a statement about
+slope, not position. Reworded in all four places.
+
+### Out of domain the claim was *undersold*, and the figure is what showed it
+
+| arm | FLOPs/token | OOD loss | dominated by |
+|---|---|---|---|
+| MoE | 1.00× | 8.2724 | none |
+| MoRE | 2.19× | **7.5732** | none |
+| MoR | 9.07× | 7.8019 | **MoRE** |
+
+**MoRE strictly dominates MoR out of domain** — lower loss at a quarter of the
+inference compute — so "the best arm out of domain" understated it. *Dominance* is
+the available word and it is now used. This was not visible in the table and was
+noticed only once the data was plotted, which is an argument for plotting the
+headline rather than tabulating it.
+
+`fig_pareto` (new, `code/make_paper_figures.py:fig_pareto`) plots loss against
+inference FLOPs on a log x-axis, two panels, five seeds with one-sd error bars.
+The in-domain panel shows the frontier with no arm dominating; the out-of-domain
+panel shows MoR sitting visibly *above* MoRE at four times the compute. Label
+placement is per-arm rather than per-rank: offsetting by rank put MoR's label on
+top of its own error bar in the out-of-domain panel.
+
+### A hand-wave converted into a measurement
+
+The results section flagged MoRE's tight seed spread and said "we do not know what
+to make of it". The spread difference is testable:
+
+- var(MoR) $= 0.001155$, var(MoRE) $= 0.000179$, **ratio 6.44×**
+- exact one-sided permutation test on the variance ratio: $p = 1/252 = 0.0040$,
+  which is that test's floor
+
+So **the difference in spread is real**, not impressionistic. The *interpretation*
+stays declined on purpose, and the paper says which reading is more parsimonious:
+a model whose halting has collapsed to a near-constant has less left to vary
+across seeds, and the runs that exist cannot separate that from genuine
+stabilisation. EXPLORATORY and uncorrected — the variance comparison is outside
+both declared families.
+
+### Measured after the pass
+
+| | PDF total | counted body | errors | overfull | undef refs | undef cites |
+|---|---|---|---|---|---|---|
+| TMLR | 18 | 13 | 0 | **0** | 0 | 0 |
+| ACL | 17 | 9 | 0 | 9 | 0 | 0 |
+
+TMLR grew one page for the new figure, to a 13-page body against its ~12-page
+norm. TMLR sets no limit and asks that length be justified by content; a figure
+that makes the headline claim legible, and that caught an understated result, is
+justified. ACL's counted body is unchanged at 9 against its hard limit of 8 — the
+Pareto figure spans both columns there and the page it would have added was
+absorbed by the architecture figure going single-column at T-LA.5.
+
+Abstract is 218 words in both venues (target 180--220), two paragraphs.
+
+**One trap worth recording.** `paper/assemble_submissions.py` copies figures from
+a fixed `FIGS` list, so a new figure that is referenced in the sources but not
+registered there is simply absent from both trees, and the only symptom is a
+missing-figure line from the self-containment check. `fig_pareto.pdf` is now
+registered. Anything added to `code/make_paper_figures.py` must be added there too.
+
+**Failure tracing.**
+- *A Pareto or efficiency claim appears in a draft* → compute dominance before
+  writing it. In domain nothing dominates; out of domain MoR is dominated. The two
+  cases need different words.
+- *A new figure does not appear in either tree* → it is not in `FIGS` in
+  `paper/assemble_submissions.py`.
+- *A figure label sits on top of an error bar* → placement is keyed per-arm in
+  `fig_pareto`, not per-rank; rank-based offsets break when the ordering flips
+  between panels.
+- *The abstract drifts over 220 words* → `python code/abstract_words.py`, which
+  strips math and macros so the count is what a human would count.
+
+**Verified by.**
+- Dominance computed for both domains from `results_tables.md` and
+  `ood_pile_test.json`; in-domain all three non-dominated, OOD MoR dominated.
+- Exact one-sided permutation test over all $\binom{10}{5}$ regroupings:
+  variance ratio 6.44, $p = 1/252$.
+- `code/compile_papers.py` → both venues 0 errors, 0 undefined refs/citations.
+- `code/abstract_words.py` → 218 words both venues.
+- `paper/assemble_submissions.py` → both trees self-contained, 5 figures each.

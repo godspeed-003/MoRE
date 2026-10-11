@@ -63,6 +63,7 @@ LIMITS_SRC = "06_limitations.tex"                   # split into limitations + c
 FIGS = [
     (os.path.join(HERE, "fig", "More(3)(1).png"), "fig_architecture.png"),
     (os.path.join(HERE, "fig_lang", "fig_depth_curve.pdf"), "fig_depth_curve.pdf"),
+    (os.path.join(HERE, "fig_lang", "fig_pareto.pdf"),      "fig_pareto.pdf"),
     (os.path.join(HERE, "fig_lang", "fig_stratified.pdf"),  "fig_stratified.pdf"),
     (os.path.join(HERE, "fig_lang", "fig_ood.pdf"),         "fig_ood.pdf"),
 ]

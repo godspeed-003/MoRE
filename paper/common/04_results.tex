@@ -39,11 +39,16 @@ Two features of the table deserve to be read together. First, MoE and MoRE are
 parameter-\emph{identical} at 5{,}584{,}908 while MoR sits $0.069\%$ lower at
 5{,}581{,}063, the residual being the router MoR does not have---and that residual
 runs \emph{against} the headline, since the arm with fewer parameters is the one
-that wins. Second, MoRE has by far the tightest seed spread (std 0.0134 against
-MoR's 0.0340), and we flag that we do not know what to make of it: it is the one
-axis on which the composition is unambiguous, and the runs that exist cannot
-separate a genuinely stabilising effect from the simpler account that a model whose
-halting has collapsed to a constant has less to vary across seeds.
+that wins. Second, MoRE has by far the tightest seed spread, and the difference is real
+rather than impressionistic: its variance is $6.4\times$ smaller than MoR's
+($0.000179$ against $0.001155$; std $0.0134$ against $0.0340$), and an exact
+one-sided permutation test on the variance ratio returns $p = 1/252 = 0.0040$,
+which is that test's floor. \textbf{What the number means is still open.} The runs
+that exist cannot separate a genuinely stabilising effect from the simpler account
+that a model whose halting has collapsed to a near-constant has less left to vary
+across seeds---and the second reading is the more parsimonious one. We report the
+measurement and decline the interpretation. (Exploratory and uncorrected: the
+variance comparison is outside both declared families.)
 
 Fig.~\ref{fig:depth-curve} and the forced-depth sweep sharpen this. Both arms scale
 with forced depth up to a point, in opposite directions:
@@ -165,14 +170,33 @@ BLiMP (acc) & 56.63 (1.00$\times$) & \textbf{58.74} ($+2.11$, 9.07$\times$, 0.23
 
 Three things follow.
 
-\textbf{MoRE is the most robust arm out of domain.} On held-out Pile blocks
-\citep{gao2020pile} it reaches 7.573 nats against MoR's 7.802 and MoE's 8.272---a
-$0.699$-nat advantage over MoE against MoR's $0.470$. The in-domain ordering
-inverts: the composition is the \emph{worst} recursive arm in domain and the
-\emph{best} out of it. Put in the same terms as the in-domain comparison, MoRE
-captures $149\%$ of MoR's out-of-domain gain over MoE, against $72\%$ in domain.
-That is a real and reportable property, and it is the one respect in which
-composing the two mechanisms does something neither does alone.
+\textbf{In domain, all three arms are on the frontier; out of domain, MoRE
+dominates.} Fig.~\ref{fig:pareto} plots loss against inference compute. In domain
+no arm Pareto-dominates another: MoE is cheapest, MoR is best, MoRE sits between
+them, so MoRE's in-domain claim is a \emph{ratio}---the most quality per unit of
+compute---and not a position the others fail to occupy. We are explicit about this
+because the weaker reading is the one a reviewer should be able to check and find
+already stated.
+
+Out of domain the relationship changes in kind rather than degree. On held-out
+Pile blocks \citep{gao2020pile} MoRE reaches 7.573 nats against MoR's 7.802 and
+MoE's 8.272, at $2.19\times$ MoE's FLOPs against MoR's $9.07\times$---so MoRE is
+both cheaper and better than MoR, and \textbf{MoR is Pareto-dominated}. Its
+advantage over MoE is $0.699$ nats against MoR's $0.470$, i.e. MoRE captures
+$149\%$ of MoR's out-of-domain gain against $72\%$ in domain. The in-domain
+ordering inverts, and this is the one respect in which composing the two
+mechanisms does something neither does alone.
+
+\begin{figure*}[t]
+\centering
+\includegraphics[width=0.98\linewidth]{fig_pareto.pdf}
+\caption{Loss against inference FLOPs per token, five seeds, error bars one
+standard deviation. (a) In domain no arm dominates another---the three trace a
+frontier, and MoRE's claim is the slope from MoE, not its position. (b) Out of
+domain MoR is \emph{dominated}: MoRE reaches lower loss at a quarter of the
+inference compute. Exploratory, uncorrected.}
+\label{fig:pareto}
+\end{figure*}
 
 \textbf{It gets there far more cheaply, on a different axis.} MoR attains the
 lowest in-domain loss but pays $9.07\times$ MoE's inference FLOPs; MoRE pays

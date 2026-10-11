@@ -190,6 +190,67 @@ def fig_stratified():
 # same colours -- the point is that the colours swap rank, not that the palette
 # changed.
 # ---------------------------------------------------------------------------
+def fig_pareto():
+    """Quality against inference compute -- the paper's headline, made visible.
+
+    WHY THIS FIGURE EXISTS. The reframe put the compute-adjusted result in the
+    abstract's first paragraph, but it was carried only by a column of
+    Table 2. A reader should be able to see the shape of the claim.
+
+    WHAT IT SHOWS, AND THE CLAIM IT CORRECTS. All three arms are Pareto
+    NON-DOMINATED on (FLOPs, loss): MoE is cheapest, MoR is best, MoRE sits
+    between them, and none dominates another. So no arm is "the"
+    compute-efficient point -- the three trace a frontier, and MoRE's claim is
+    the best quality-per-unit-compute RATIO, which is the slope of the dashed
+    line from MoE, not a position nobody else occupies. Drawing the frontier is
+    what keeps that distinction honest.
+    """
+    F = {"moe": 1.00, "mor": 9.07, "more": 2.19}
+    ind = {"moe": 3.948311, "mor": 3.515415, "more": 3.636966}
+    ind_s = {"moe": 0.024202, "mor": 0.033980, "more": 0.013387}
+    ood = load("ood_pile_test.json")["by_arm"]
+    ood_m = {a: ood[a]["mean_loss"] for a in F}
+    ood_s = {a: ood[a]["std_loss"] for a in F}
+
+    fig, axes = plt.subplots(1, 2, figsize=(6.6, 2.9))
+    for ax, vals, stds, title in [
+            (axes[0], ind, ind_s, "(a) In-domain (WikiText-103 val)"),
+            (axes[1], ood_m, ood_s, "(b) Out-of-domain (the Pile)")]:
+        order = sorted(F, key=lambda a: F[a])
+        ax.plot([F[a] for a in order], [vals[a] for a in order],
+                "--", color=GRID, lw=1.4, zorder=1)
+        for a in F:
+            ax.errorbar(F[a], vals[a], yerr=stds[a], fmt="o", color=C[a],
+                        ms=8, mec="white", mew=1.2, capsize=3,
+                        ecolor=INK2, elinewidth=0.9, zorder=3)
+            # Label placement is per-arm, not per-value: MoE and MoR sit at the
+            # x-extremes so their labels go outward (right / left) and MoRE's
+            # goes below. Offsetting by rank instead put MoR's label on top of
+            # its own error bar in the out-of-domain panel.
+            dx, dy, ha = {"moe": (11, -4, "left"),
+                          "mor": (-11, -4, "right"),
+                          "more": (0, -27, "center")}[a]
+            ax.annotate(f"{LABEL[a]}\n{vals[a]:.3f}", (F[a], vals[a]),
+                        xytext=(dx, dy), textcoords="offset points", ha=ha,
+                        fontsize=7.6, color=INK, linespacing=1.25)
+        ax.set_xscale("log")
+        ax.set_xticks([1, 2, 5, 9])
+        ax.set_xticklabels(["1x", "2x", "5x", "9x"])
+        ax.set_xlim(0.62, 17)
+        lo, hi = min(vals.values()), max(vals.values())
+        pad = (hi - lo) * 0.42
+        ax.set_ylim(lo - pad, hi + pad)
+        ax.set_xlabel("inference FLOPs per token, relative to MoE")
+        ax.set_ylabel("loss (nats/token)")
+        ax.set_title(title, loc="left")
+        ax.grid(axis="y", color=GRID, lw=0.7)
+        ax.set_axisbelow(True)
+        for s in ("top", "right"):
+            ax.spines[s].set_visible(False)
+    fig.tight_layout()
+    save(fig, "fig_pareto")
+
+
 def fig_ood():
     order = ("moe", "mor", "more")
     ind = {"moe": 3.948311, "mor": 3.515415, "more": 3.636966}
@@ -232,6 +293,7 @@ if __name__ == "__main__":
     print(f"  MoRE adaptive {c['more_adaptive']:.4f} vs best forced "
           f"{c['more_best_forced']:.4f}  -> adaptive wins by "
           f"{c['more_best_forced'] - c['more_adaptive']:.4f}")
+    fig_pareto()
     fig_stratified()
     fig_ood()
     print("done.")
