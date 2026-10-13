@@ -86,7 +86,7 @@ def fig_depth_curve():
             curve[arm].append((ba[arm]["mean_loss"], ba[arm]["std_loss"]))
     adaptive = load("stratified_val.json")["by_arm"]
 
-    fig, ax = plt.subplots(figsize=(6.4, 2.45))   # ACL page budget (T-LA.8)
+    fig, ax = plt.subplots(figsize=(6.4, 2.12))   # ACL page budget (T-LA.8, tightened T-LA.10)
 
     for arm in ("mor", "more"):
         mean = [v[0] for v in curve[arm]]
@@ -212,41 +212,59 @@ def fig_pareto():
     ood_m = {a: ood[a]["mean_loss"] for a in F}
     ood_s = {a: ood[a]["std_loss"] for a in F}
 
-    fig, axes = plt.subplots(1, 2, figsize=(6.6, 2.30))  # ACL page budget (T-LA.8)
-    for ax, vals, stds, title in [
-            (axes[0], ind, ind_s, "(a) In-domain (WikiText-103 val)"),
-            (axes[1], ood_m, ood_s, "(b) Out-of-domain (the Pile)")]:
-        order = sorted(F, key=lambda a: F[a])
-        ax.plot([F[a] for a in order], [vals[a] for a in order],
-                "--", color=GRID, lw=1.4, zorder=1)
-        for a in F:
-            ax.errorbar(F[a], vals[a], yerr=stds[a], fmt="o", color=C[a],
-                        ms=8, mec="white", mew=1.2, capsize=3,
-                        ecolor=INK2, elinewidth=0.9, zorder=3)
-            # Label placement is per-arm, not per-value: MoE and MoR sit at the
-            # x-extremes so their labels go outward (right / left) and MoRE's
-            # goes below. Offsetting by rank instead put MoR's label on top of
-            # its own error bar in the out-of-domain panel.
-            dx, dy, ha = {"moe": (11, -4, "left"),
-                          "mor": (-11, -4, "right"),
-                          "more": (0, -27, "center")}[a]
-            ax.annotate(f"{LABEL[a]}\n{vals[a]:.3f}", (F[a], vals[a]),
-                        xytext=(dx, dy), textcoords="offset points", ha=ha,
-                        fontsize=7.6, color=INK, linespacing=1.25)
-        ax.set_xscale("log")
-        ax.set_xticks([1, 2, 5, 9])
-        ax.set_xticklabels(["1x", "2x", "5x", "9x"])
-        ax.set_xlim(0.62, 17)
-        lo, hi = min(vals.values()), max(vals.values())
-        pad = (hi - lo) * 0.42
-        ax.set_ylim(lo - pad, hi + pad)
-        ax.set_xlabel("inference FLOPs per token, relative to MoE")
-        ax.set_ylabel("loss (nats/token)")
-        ax.set_title(title, loc="left")
-        ax.grid(axis="y", color=GRID, lw=0.7)
-        ax.set_axisbelow(True)
-        for s in ("top", "right"):
-            ax.spines[s].set_visible(False)
+    # ONE PANEL, ONE COLUMN, ONE SHARED SCALE (T-LA.10). This was two full-width
+    # panels. A full-width float costs twice its height in column-flow and the
+    # ACL body is over its page limit, so the two panels collapse onto one axis.
+    #
+    # The y-axis is IMPROVEMENT OVER MoE, not raw loss, and that choice is what
+    # makes the merge honest. Raw in-domain loss (3.5-3.9) and raw out-of-domain
+    # loss (7.6-8.3) are disjoint, so sharing an axis needs a twin scale -- and
+    # with two scales the two frontier lines cross at a point that means nothing,
+    # which invites exactly the misreading this figure exists to prevent.
+    # Differencing against MoE puts both domains on one real scale, starts both
+    # series at zero by construction, and shows the paper's claim directly: the
+    # slope from MoE is quality bought per unit of compute, and out of domain
+    # MoRE's point sits below MoR's at a quarter of the x-value.
+    dind = {a: ind[a] - ind["moe"] for a in F}
+    dood = {a: ood_m[a] - ood_m["moe"] for a in F}
+
+    fig, ax = plt.subplots(figsize=(3.32, 2.42))
+    order = sorted(F, key=lambda a: F[a])
+    ax.axhline(0.0, color=GRID, lw=0.8, zorder=1)
+    ax.plot([F[a] for a in order], [dind[a] for a in order], "-",
+            color=GRID, lw=1.3, zorder=1)
+    ax.plot([F[a] for a in order], [dood[a] for a in order], "--",
+            color=GRID, lw=1.3, zorder=1)
+
+    for a in F:
+        ax.errorbar(F[a], dind[a], yerr=ind_s[a], fmt="o", color=C[a], ms=6.5,
+                    mec="white", mew=1.0, capsize=2.5, ecolor=INK2,
+                    elinewidth=0.8, zorder=3)
+        ax.errorbar(F[a], dood[a], yerr=ood_s[a], fmt="s", color=C[a], ms=5.5,
+                    mec="white", mew=1.0, capsize=2.5, ecolor=INK2,
+                    elinewidth=0.8, zorder=3)
+    for a, (dx, dy, ha) in {"moe": (8, 3, "left"),
+                            "mor": (-7, 5, "right"),
+                            "more": (7, 4, "left")}.items():
+        ax.annotate(LABEL[a], (F[a], dind[a]), xytext=(dx, dy),
+                    textcoords="offset points", ha=ha, fontsize=7.0, color=INK)
+
+    ax.plot([], [], "o-", color=INK2, ms=5, lw=1.1, label="in domain")
+    ax.plot([], [], "s--", color=INK2, ms=4.5, lw=1.1, label="out of domain")
+    ax.legend(fontsize=6.6, loc="lower left", frameon=False, handlelength=1.8)
+
+    ax.set_xscale("log")
+    ax.set_xticks([1, 2, 5, 9])
+    ax.set_xticklabels(["1x", "2x", "5x", "9x"])
+    ax.set_xlim(0.62, 17)
+    ax.set_ylim(-0.82, 0.14)
+    ax.set_xlabel("inference FLOPs/token, relative to MoE", fontsize=7.5)
+    ax.set_ylabel("loss improvement over MoE (nats)", fontsize=7.5)
+    ax.tick_params(labelsize=7)
+    ax.grid(axis="y", color=GRID, lw=0.6)
+    ax.set_axisbelow(True)
+    for sp in ("top", "right"):
+        ax.spines[sp].set_visible(False)
     fig.tight_layout()
     save(fig, "fig_pareto")
 

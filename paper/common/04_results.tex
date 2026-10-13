@@ -4,34 +4,10 @@
 \subsection{Predictive quality}
 \label{sec:quality}
 
-Table~\ref{tab:main} is the headline. Recursion alone is lowest-loss. MoR beats
+Table~\ref{tab:main} collects every result. Recursion alone is lowest-loss. MoR beats
 MoE by $0.4329$ nats and beats MoRE by $0.1216$. Both recursive arms beat MoE
 decisively, and the composition lands between them---the premise that routing
 would \emph{add} to recursion in domain is not supported.
-
-\begin{table*}[t]
-\centering
-\small
-\caption{Canonical results, 5 seeds each, mean$\,\pm\,$std. Primary metric is
-final-epoch validation task loss; \emph{best} equals \emph{last} on all 15 cells,
-so no model selection occurred. $\Delta$ floor is the margin below the bigram
-baseline of 4.9849 nats (positive \emph{beats} it). FLOPs are inference
-FLOPs/token at each arm's measured mean depth (\S\ref{sec:metrics}). Pairwise on
-the primary metric, exact two-sided randomization test at the floor
-$p_{\min}=0.00794$: MoRE$-$MoE $-0.3113$ ($d\,{-}15.9$); MoRE$-$MoR $+0.1216$
-($d\,{+}4.7$); MoE$-$MoR $+0.4329$ ($d\,{+}14.7$), all $p\,0.0079$.}
-\label{tab:main}
-\vspace{2pt}
-\begin{tabular}{lrrrrrr}
-\toprule
-& Params & val task loss & PPL & $\Delta$ floor & FLOPs/tok & items/s \\
-\midrule
-MoE  & 5{,}584{,}908 & 3.9483\,$\pm$\,0.0242 & 51.9 & $+1.0366$ & 5.25\,M & 724 \\
-MoR  & 5{,}581{,}063 & \textbf{3.5154\,$\pm$\,0.0340} & \textbf{33.6} & $+1.4695$ & 47.6\,M & 170 \\
-MoRE & 5{,}584{,}908 & 3.6370\,$\pm$\,0.0134 & 38.0 & $+1.3480$ & 11.5\,M & 170 \\
-\bottomrule
-\end{tabular}
-\end{table*}
 
 Two features of the table deserve to be read together. First, MoE and MoRE are
 parameter-\emph{identical} at 5{,}584{,}908 while MoR sits $0.069\%$ lower, the
@@ -95,18 +71,16 @@ MoRE's depth mechanism is inert; it is that adding routing left it almost entire
 without effect.
 
 \paragraph{The depth-matched control, as a general diagnostic.}
-We state this separately because it generalises past this architecture and is, we
-think, the most transferable thing in the paper. \textbf{A mean step count and an
-exit histogram---the two statistics this literature almost always reports---do not
-establish that depth depends on the input.} A policy that ignores its input
-entirely can reproduce any mean and, with a little variance, a plausible-looking
-histogram. The comparison that does establish input-dependence is against a
-\emph{uniform policy forced to the learned policy's own mean depth}: it holds total
-compute fixed, so the only thing left to differ is \emph{where} that compute was
-spent. It costs one inference pass per checkpoint, needs no retraining, and it is
-what separates our two arms---both of which look adaptive by mean-and-histogram,
-and only one of which is. We recommend it as a routine check before any model is
-described as allocating computation adaptively.
+\textbf{A mean step count and an exit histogram---the two statistics this
+literature almost always reports---do not establish that depth depends on the
+input}: a policy ignoring its input reproduces any mean and, with a little
+variance, a plausible histogram. The comparison that does is against a
+\emph{uniform policy forced to the learned policy's own mean depth}, which holds
+total compute fixed so the only thing left to differ is \emph{where} it was
+spent. It costs one inference pass, needs no retraining, and separates our two
+arms---both of which look adaptive by mean-and-histogram, and only one of which
+is. We recommend it before any model is described as allocating computation
+adaptively.
 
 The exit statistics say why MoRE's margin is so small. MoR early-exits
 $18.8\% \pm 15.1\%$ of validation tokens with mean depth $6.730$ and a halt
@@ -132,21 +106,28 @@ the \emph{amount} of compute skipped is not, and costs loss.
 \subsection{Where the composition does pay: robustness and efficiency}
 \label{sec:ood}
 
-Out of domain the ordering inverts. Table~\ref{tab:evals} evaluates all three arms
-on the same checkpoints, and scores each against the inference FLOPs it costs.
+Out of domain the ordering inverts. The upper block of Table~\ref{tab:main}
+scores each arm against the inference FLOPs it costs.
 
 \begin{table*}[t]
 \centering
-\small
-\caption{Evaluation battery, five seeds. Every cell is
-\emph{score (difference vs MoE, inference FLOPs$\times$ vs MoE, $|$difference$|$
-per FLOPs-multiplier)}. The \emph{score} is lower-better for loss rows and
-higher-better for accuracy rows; the third number is a \textbf{modulus}, so it is
-higher-better on \emph{every} row---how much quality each unit of compute bought.
-Columns 1--2 are quality at matched parameters, column 3 quality per unit of
-inference compute; we never substitute one axis for the other.
-\textbf{Exploratory}: outside both declared families, uncorrected.}
-\label{tab:evals}
+\footnotesize
+\caption{All results, five seeds, mean$\,\pm\,$std. \textbf{Upper block:} every
+cell is \emph{score (difference vs MoE, inference FLOPs$\times$ vs MoE,
+$|$difference$|$ per FLOPs-multiplier)}. The \emph{score} is lower-better for
+loss rows and higher-better for accuracy; the third number is a \textbf{modulus},
+so it is higher-better on \emph{every} row---how much quality each unit of
+compute bought. Quality at matched parameters and quality per unit of compute are
+distinct axes and we never substitute one for the other. Validation loss is the
+primary metric (final-epoch; \emph{best} equals \emph{last} on all 15 cells, so no
+model selection occurred); pairwise, exact two-sided randomization test at the
+floor $p_{\min}=0.00794$: MoRE$-$MoE $-0.3113$ ($d\,{-}15.9$), MoRE$-$MoR
+$+0.1216$ ($d\,{+}4.7$), MoE$-$MoR $+0.4329$ ($d\,{+}14.7$), all $p\,0.0079$.
+\textbf{Lower block:} model and cost facts. $\Delta$ floor is the margin below the
+bigram baseline of 4.9849 nats (positive \emph{beats} it); FLOPs are inference
+FLOPs/token at each arm's measured mean depth (\S\ref{sec:metrics}). The battery
+rows are \textbf{exploratory}---outside both declared families, uncorrected.}
+\label{tab:main}
 \vspace{2pt}
 \begin{tabular}{llll}
 \toprule
@@ -156,6 +137,12 @@ Val loss (nats) & 3.948 (1.00$\times$) & \textbf{3.515} ($-0.433$, 9.07$\times$,
 Test loss (nats) & 3.947 (1.00$\times$) & \textbf{3.513} ($-0.435$, 9.07$\times$, 0.048) & 3.621 ($-0.326$, 2.19$\times$, \textbf{0.149}) \\
 OOD loss (nats) & 8.272 (1.00$\times$) & 7.802 ($-0.470$, 9.07$\times$, 0.052) & \textbf{7.573} ($-0.699$, 2.19$\times$, \textbf{0.319}) \\
 BLiMP (acc) & 56.63 (1.00$\times$) & \textbf{58.74} ($+2.11$, 9.07$\times$, 0.233) & 58.36 ($+1.73$, 2.19$\times$, \textbf{0.791}) \\
+\midrule
+Parameters & 5{,}584{,}908 & 5{,}581{,}063 & 5{,}584{,}908 \\
+Val perplexity & 51.9 & \textbf{33.6} & 38.0 \\
+$\Delta$ vs bigram floor & $+1.0366$ & $+1.4695$ & $+1.3480$ \\
+Inference FLOPs/token & \textbf{5.25\,M} & 47.6\,M & 11.5\,M \\
+Throughput (items/s) & \textbf{724} & 170 & 170 \\
 \bottomrule
 \end{tabular}
 \end{table*}
@@ -179,16 +166,18 @@ $149\%$ of MoR's out-of-domain gain against $72\%$ in domain. The in-domain
 ordering inverts, and this is the one respect in which composing the two
 mechanisms does something neither does alone.
 
-\begin{figure*}[t]
+\begin{figure}[t]
 \centering
-\includegraphics[width=0.98\linewidth]{fig_pareto.pdf}
-\caption{Loss against inference FLOPs per token, five seeds, error bars one
-standard deviation. (a) In domain no arm dominates another---the three trace a
-frontier, and MoRE's claim is the slope from MoE, not its position. (b) Out of
-domain MoR is \emph{dominated}: MoRE reaches lower loss at a quarter of the
-inference compute. Exploratory, uncorrected.}
+\includegraphics[width=\linewidth]{fig_pareto.pdf}
+\caption{Loss \emph{improvement over MoE} against inference FLOPs per token,
+five seeds, error bars one standard deviation; both domains share one scale
+because each is differenced against its own MoE baseline. In domain (solid) no
+arm dominates another---the three trace a frontier and MoRE's claim is the
+slope from MoE, not its position. Out of domain (dashed) MoR is
+\emph{dominated}: MoRE improves more, at a quarter of the inference compute.
+Exploratory, uncorrected.}
 \label{fig:pareto}
-\end{figure*}
+\end{figure}
 
 \textbf{It gets there far more cheaply, on a different axis.} MoR pays
 $9.07\times$ MoE's inference FLOPs; MoRE pays $2.19\times$---$24\%$ of MoR's total
@@ -206,7 +195,7 @@ despite $4\times$ less arithmetic, because its per-token expert dispatch is
 latency-bound. A batched-dispatch implementation would be expected to realise the
 FLOP advantage; ours does not, and we claim no speedup.
 
-% >>>ACLMOVE:blimp|\textbf{Grammatical competence is real but modest, and routing does not buy it.} On BLiMP \citep{warstadt2020blimp} both recursive arms beat MoE (58.74\% and 58.36\% against 56.63\%) and MoR is not distinguishable from MoRE ($p = 0.71$), so recursion buys measurable syntactic sensitivity and routing adds none. On EWoK \citep{ivanova2024ewok} all three arms sit at chance---a statement about scale, not architecture. Appendix~\ref{app:blimp} reports both.
+% >>>ACLMOVE:blimp|\textbf{Grammatical competence is real but modest, and routing does not buy it.} On BLiMP \citep{warstadt2020blimp} both recursive arms beat MoE (58.74\% and 58.36\% against 56.63\%) and MoR is not distinguishable from MoRE ($p = 0.71$), so recursion buys measurable syntactic sensitivity and routing adds none. Appendix~\ref{app:blimp} reports it in full, with EWoK, on which every arm sits at chance.
 \textbf{Grammatical competence is real but modest, and routing does not buy it.}
 On BLiMP \citep{warstadt2020blimp}, 67{,}000 minimal pairs, both recursive arms beat
 MoE (58.74\% and 58.36\% against 56.63\%) and MoR is not distinguishable from MoRE
@@ -217,10 +206,10 @@ determiner--noun agreement---which is where a shared iterative block would be
 expected to help. We also ran EWoK \citep{ivanova2024ewok}, on which all three arms
 sit within noise of the $50\%$ chance floor (49.62, 50.33, 49.95); that is a
 statement about the scale of these models, not about the architectures, so we
-exclude it from Table~\ref{tab:evals} and draw no comparison from it.
+exclude it from Table~\ref{tab:main} and draw no comparison from it.
 
 % <<<ACLMOVE:blimp
-% >>>ACLMOVE:stratified|\textbf{Both recursive arms gain most where prediction is hardest, and least where context is shortest.} Grouping validation loss by the frequency decile of the target token, the MoRE$-$MoE advantage grows from $-0.147$ nats on the most frequent decile to $-0.374$ on the rarest (MoR: $-0.188$ to $-0.527$), so neither gain is the uniform shift a pure capacity effect would produce. Grouping by position instead disconfirms the usual motivation for recursion: both arms gain most where context is \emph{longest}, not shortest. Appendix~\ref{app:stratified} gives both breakdowns.
+% >>>ACLMOVE:stratified|\textbf{Both recursive arms gain most where prediction is hardest, and least where context is shortest.} By target-token frequency decile the MoRE$-$MoE advantage grows from $-0.147$ nats on the most frequent to $-0.374$ on the rarest (MoR: $-0.188$ to $-0.527$), so neither gain is the uniform shift a pure capacity effect would give. By position, both arms gain most where context is \emph{longest}---disconfirming the usual motivation for recursion (Appendix~\ref{app:stratified}).
 \subsection{Stratified loss: the advantage concentrates on hard tokens}
 \label{sec:stratified}
 

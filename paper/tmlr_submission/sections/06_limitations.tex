@@ -104,39 +104,17 @@ comparisons involving the composed arm are genuinely pre-result. The MoR-versus-
 comparison was specified after its data existed, and we do not describe the
 registration as complete.
 
-\textbf{We recorded a prediction before the run and it was confirmed.} Before
-re-training the route-once arm we predicted in writing that its depth would land
-near the cap, specifically so the prediction could not be retrofitted. It came in
-at 6.955 of 7.
-
-\textbf{We published a diagnosis that was wrong, and withdrew it.} We initially
-read the composed arm's near-maximal per-token router entropy as a balance-loss
-pathology and proposed lowering the balance weight. A subsequent sweep refuted
-this: at balance weight zero the expert load \emph{collapses} onto one expert and
-specialisation goes to zero, so the prescription had the sign backwards. The
-underlying error was conflating two quantities---per-token router entropy (0.9999)
-with aggregate load entropy (0.9582)---which the tables here keep separate. The
-diagnosis is withdrawn and \S\ref{sec:competition} reports what the sweep actually
-shows.
-
-\textbf{Provenance is imperfect and we did not retrofit it.} The matrix spans four
-code revisions, all with uncommitted working-tree changes at run time;
-comparability rests on a frozen specification and a seed-blind configuration-equality
-check, not on a single revision. Ten of the fifteen cells predate the fields that
-record GPU identity and carry nulls; we did not backfill them, because a provenance
-field invented after the fact is worse than an absent one.
-
-\textbf{The matrix spans two GPUs.} Two arms were retrained on one card after the
-original checkpoints were lost; the composed arm remains on the original hardware.
-We have direct evidence this is benign rather than merely assuming it: both
-retrained arms reproduced their published means to $-0.117\sigma$ and $-0.119\sigma$
-respectively---agreement to the third decimal across arms that share no
-parameters, which is a small \emph{common-mode} offset rather than sampling noise,
-and a common-mode shift cancels in the between-arm gaps that carry every verdict
-(the MoE$-$MoR gap moved by 0.000185 nats). Per-seed values do \emph{not} reproduce
-and we do not claim they do: the seed fixes initialisation, data order and dropout,
-but not non-deterministic kernel reduction order. The reproducible quantity is the
-arm mean.
+\textbf{The matrix spans two GPUs and four code revisions.} Two arms were
+retrained on one card after the original checkpoints were lost; the composed arm
+remains on the original hardware, and comparability rests on a frozen
+specification and a seed-blind configuration-equality check rather than on a
+single revision. We have direct evidence the hardware split is benign: both
+retrained arms reproduced their published means to $-0.117\sigma$ and
+$-0.119\sigma$---agreement to the third decimal across arms sharing no
+parameters, a \emph{common-mode} offset rather than sampling noise, and one that
+cancels in the between-arm gaps carrying every verdict (the MoE$-$MoR gap moved
+by 0.000185 nats). Per-seed values do \emph{not} reproduce and we do not claim
+they do; the reproducible quantity is the arm mean.
 
 \textbf{We report no per-token depth-allocation error.} English supplies no
 ground-truth depth per token, so that metric is \texttt{N/A}---not zero. A zero

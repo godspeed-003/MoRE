@@ -168,7 +168,7 @@ zero because natural language supplies no per-token oracle expert and no per-tok
 oracle depth to supervise against. The canonical router is therefore unsupervised
 with respect to the per-token routing decision.
 
-% >>>ACLMOVE:engine|\subsection{One engine, three modes}\label{sec:engine} MoE, MoR and MoRE are configurations of one implementation with an explicit \texttt{architecture} mode, not three codebases, so a difference between arms cannot be a difference in the harness. Equalising \emph{total} FFN hidden width gives MoR's single FFN a multiplier of $24 = 4\times6$, so all three arms hold one FFN parameter budget: \textbf{5{,}584{,}908 for MoE and MoRE, identical, and 5{,}581{,}063 for MoR}---a $0.069\%$ deficit that is the router MoR does not have, and which runs \emph{against} our headline since the lighter arm wins in domain. Appendix~\ref{app:engine} derives it.
+% >>>ACLMOVE:engine|\subsection{One engine, three modes}\label{sec:engine} MoE, MoR and MoRE are configurations of one implementation with an explicit \texttt{architecture} mode, so a difference between arms cannot be a difference in the harness. Equalising \emph{total} FFN hidden width gives MoR's single FFN a multiplier of $24=4\times6$: \textbf{5{,}584{,}908 parameters for MoE and MoRE, identical, and 5{,}581{,}063 for MoR}---a $0.069\%$ deficit that is the router MoR lacks, and which runs \emph{against} our headline since the lighter arm wins in domain. Appendix~\ref{app:engine} derives it.
 \subsection{One engine, three modes}
 \label{sec:engine}
 

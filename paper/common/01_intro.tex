@@ -1,23 +1,19 @@
 \section{Introduction}
 \label{sec:intro}
 
-Conditional computation is usually motivated by the same accounting argument:
-most tokens do not need the whole model, so spend less on them. The argument is
-made in two places, and the two answer different questions. Sparse
-mixture-of-experts (MoE) layers \citep{jacobs1991moe,shazeer2017moe,fedus2022switch}
-decide \emph{which} computation module processes a token, dispatching it to one
-of several independent sub-networks. Recursive weight-tied architectures with
+Conditional computation is motivated by one accounting argument---most tokens do
+not need the whole model---made in two places that answer different questions.
+Sparse mixture-of-experts (MoE) layers
+\citep{jacobs1991moe,shazeer2017moe,fedus2022switch} decide \emph{which}
+computation module processes a token; recursive weight-tied architectures with
 learned halting \citep{graves2016act,dehghani2019ut,banino2021pondernet} decide
-\emph{how much} computation a token receives, reusing one block for a variable
-number of steps.
-
-Because the two decisions are made over different objects---which parameters
-versus how many applications of them---they are orthogonal in principle, and
-composing them is an obvious thing to try. Route a token to a specialised expert,
-then reuse \emph{that expert's} weights for as many steps as the token appears to
-need. The resulting architecture inherits an efficiency argument from each side.
-What it does not inherit is evidence: whether the composition beats either
-component at a matched budget has not, to our knowledge, been isolated.
+\emph{how much} computation it receives, reusing one block for a variable number
+of steps. The decisions are over different objects, so they are orthogonal in
+principle and composing them is an obvious thing to try: route a token to a
+specialised expert, then reuse \emph{that expert's} weights for as many steps as
+it appears to need. The composition inherits an efficiency argument from each
+side. What it does not inherit is evidence---whether it beats either component at
+a matched budget has not, to our knowledge, been isolated.
 
 We isolate it. One training engine implements three configurations differing only
 in the fields their definitions require: routing without recursion (MoE, six
@@ -25,9 +21,8 @@ experts, depth 1), recursion without routing (MoR, one shared block, depth up to
 7), and the composition (MoRE, six experts, depth up to 7). All three sit at
 $\approx$5.58M parameters, share a bit-identical input representation, and train
 on the same fixed split of WikiText-103 \citep{merity2017wikitext} with the same
-optimiser budget. Because the comparison is matched rather than merely similar, a
-difference between arms cannot be a difference in the harness, the data, or the
-parameter count.
+optimiser budget, so a difference between arms cannot be a difference in the
+harness, the data, or the parameter count.
 
 \paragraph{What we find.} The composition occupies the compute-efficient point of
 the three, and the honest accounting of what it does and does not buy is the
@@ -71,12 +66,10 @@ paper.
 
 \end{itemize}
 
-We report this as a trade-off measured at this scale rather than as a verdict on
-either mechanism in general. The paper's contribution is the decomposition:
-because MoE \emph{is} MoRE with the depth budget set to one and all three arms are
-parameter-matched from one codebase, each contrast varies one thing. The data
-scale at which the surviving account predicts the composition would overtake
-recursion alone is stated as a falsifiable claim in \S\ref{sec:limitations}.
+We report this as a trade-off measured at this scale, not a verdict on either
+mechanism in general. The contribution is the decomposition: because MoE
+\emph{is} MoRE with the depth budget set to one and all three arms are
+parameter-matched from one codebase, each contrast varies one thing.
 
 % >>>ACLONLY
 \section{Related Work}
