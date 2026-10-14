@@ -120,6 +120,8 @@ within that subspace drives the state toward a fixed point rather than refining 
 It is an appealing account and it is wrong. We tested it three ways.
 
 \begin{center}
+{\dispsize
+\setlength{\tabcolsep}{9pt}\renewcommand{\arraystretch}{1.25}
 \small
 \begin{tabular}{lccc}
 \toprule
@@ -129,6 +131,7 @@ participation ratio    & 41.5 & \textbf{70.3} & 57.3 \\
 inter-expert cosine    & 0.630 & \textsc{n/a} & 0.916 \\
 \bottomrule
 \end{tabular}
+}
 \end{center}
 Participation ratio is the final-state value, $\pm$ 1.6, 5.6 and 2.8 across
 seeds respectively; the cosine is the mean between-expert value.
@@ -236,6 +239,8 @@ tempting to read that as the architecture being unable to learn adaptive depth. 
 subset sweep falsifies that reading.
 
 \begin{center}
+{\dispsize
+\setlength{\tabcolsep}{9pt}\renewcommand{\arraystretch}{1.25}
 \small
 \begin{tabular}{lcc}
 \toprule
@@ -247,6 +252,7 @@ training data & mean depth & forced exit \\
 100\% (canonical) & 6.96 & 0.973 \\
 \bottomrule
 \end{tabular}
+}
 \end{center}
 
 At every reduced-data point the same model, at the same ponder weight, allocates

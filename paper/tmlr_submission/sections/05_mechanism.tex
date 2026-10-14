@@ -19,6 +19,8 @@ holds $2 \cdot 24 \cdot d^2 = 3{,}145{,}728$, exactly six times as many
 (\S\ref{sec:engine}). A run sees $404.2$M tokens. So:
 
 \begin{center}
+{\dispsize
+\setlength{\tabcolsep}{9pt}\renewcommand{\arraystretch}{1.25}
 \small
 \begin{tabular}{lccc}
 \toprule
@@ -28,6 +30,7 @@ tokens seen      & 128.5 & 128.5 & 128.5 \\
 FFN applications & 128   & 865   & \textbf{894} \\
 \bottomrule
 \end{tabular}
+}
 \end{center}
 
 Tokens per parameter is \emph{identical} across all three arms---the token split
@@ -76,6 +79,8 @@ and MoE separately. On the calibration grid, recovering adaptive depth by raisin
 the halting weight destroys expert differentiation:
 
 \begin{center}
+{\dispsize
+\setlength{\tabcolsep}{9pt}\renewcommand{\arraystretch}{1.25}
 \begin{tabular}{lccc}
 \toprule
 halting weight & mean depth & AMI & val loss \\
@@ -85,6 +90,7 @@ halting weight & mean depth & AMI & val loss \\
 0.500 & 1.072 & 0.0207 & 5.3306 \\
 \bottomrule
 \end{tabular}
+}
 \end{center}
 
 AMI of 0.0025 is statistically indistinguishable from the shuffled-label control.

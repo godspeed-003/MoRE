@@ -25,23 +25,27 @@ configuration re-drew both per step; it is retained as a labelled ablation and
 discussed in \S\ref{sec:honesty}.)
 
 % >>>TMLRONLY
+{\dispsize
 \begin{equation}
 \mathbf{h}^{(t+1)} \;=\; \mathrm{LayerNorm}\!\left(
   \mathbf{h}^{(t)} + g_{e^\star}\cdot \mathrm{FFN}_{e^\star}\!\left(\mathbf{h}^{(t)}\right)
 \right), \qquad t = 0,\dots,T-1 .
 \label{eq:block}
 \end{equation}
+}
 % <<<TMLRONLY
 % >>>ACLONLY
 % Narrow-column form: the \qquad range tail and the \left(...\right) pair put the
 % single-column version 112pt (48%) outside a 234pt column. The range moves to
 % the prose below; the mathematics is unchanged.
+{\dispsize
 \begin{equation}
 \mathbf{h}^{(t+1)} = \mathrm{LayerNorm}\big(
   \mathbf{h}^{(t)} + g_{e^\star}\,\mathrm{FFN}_{e^\star}(\mathbf{h}^{(t)})
 \big)
 \label{eq:block}
 \end{equation}
+}
 for $t = 0,\dots,T-1$.
 % <<<ACLONLY
 
@@ -79,6 +83,7 @@ Halting follows ACT \citep{graves2016act} as used in the Universal Transformer,
 with one halt head per expert. Per token, at step $t$:
 
 % >>>TMLRONLY
+{\dispsize
 \begin{align}
 p_t &= \sigma\!\left(\mathbf{w}_{e^\star}^{\!\top}\mathbf{h}^{(t)}\right),
   & c_t &= \sum_{\tau \le t} p_\tau ,
@@ -89,10 +94,12 @@ R &= 1 - c_t \ \text{(remainder)}, &
   w_t &= \begin{cases} p_t & \text{running} \\ R & \text{at the halt step}\end{cases}
   \label{eq:halt-w}
 \end{align}
+}
 % <<<TMLRONLY
 % >>>ACLONLY
 % Narrow-column form: the three-column align with a cases block ran 55pt outside
 % a 234pt column. Two columns, shorter case labels, epsilon stated in the prose.
+{\dispsize
 \begin{align}
 p_t &= \sigma\big(\mathbf{w}_{e^\star}^{\!\top}\mathbf{h}^{(t)}\big),
   \quad c_t = \textstyle\sum_{\tau \le t} p_\tau , \label{eq:halt-p} \\[2pt]
@@ -101,6 +108,7 @@ R &= 1 - c_t , \quad
   w_t = \begin{cases} p_t & \text{running} \\ R & \text{at halt} \end{cases}
   \label{eq:halt-w}
 \end{align}
+}
 with $\epsilon = 0.01$ and $R$ the halting remainder.
 % <<<ACLONLY
 
@@ -115,10 +123,12 @@ forced out; halted states are frozen and not recomputed, so a halted token costs
 nothing at deeper steps.
 
 Depth is trained through the expected-depth term
+{\dispsize
 \begin{equation}
 \rho \;=\; \mathbb{E}_{\text{tokens}}\big[\,N + R\,\big],
 \label{eq:ponder}
 \end{equation}
+}
 where the step count $N$ is discrete and contributes no gradient while the
 remainder $R$ does. Eq.~\ref{eq:ponder} is the ponder cost. It is worth noting
 that the gradient reaching the halt heads through $R$ is small compared with the
@@ -133,6 +143,7 @@ and is future work (\S\ref{sec:limitations}).
 The training objective is a weighted sum of terms that we report separately and
 never as a single number:
 % >>>TMLRONLY
+{\dispsize
 \begin{equation}
 \mathcal{L} \;=\;
 \underbrace{\mathcal{L}_{\text{task}}}_{1.0} \;+\;
@@ -142,11 +153,13 @@ never as a single number:
 \underbrace{0.0\cdot\mathcal{L}_{\text{route}}}_{\text{off}} .
 \label{eq:loss}
 \end{equation}
+}
 % <<<TMLRONLY
 % >>>ACLONLY
 % Narrow-column form: five terms with underbrace annotations ran 65pt outside a
 % 234pt column. Stacked, with the annotations moved into the prose below -- which
 % already names the weight on each term, so nothing is lost.
+{\dispsize
 \begin{equation}
 \begin{aligned}
 \mathcal{L} \;=\;& 1.0\,\mathcal{L}_{\text{task}}
@@ -155,6 +168,7 @@ never as a single number:
 \end{aligned}
 \label{eq:loss}
 \end{equation}
+}
 % <<<ACLONLY
 $\mathcal{L}_{\text{task}}$ is per-token cross-entropy in nats.
 $\mathcal{L}_{\text{bal}} = -H(\bar{\mathbf{g}}) + E\sum_e f_e \bar{g}_e$ combines

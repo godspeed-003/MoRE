@@ -66,11 +66,21 @@ def arrow(ax, p, q, *, color=INK, lw=1.0, style="-|>", z=4):
 
 
 def main():
+    # GEOMETRY NOTE (T-LA.16). The wide boxes used to span x = 2..98, which left
+    # no room OUTSIDE them for the two feedback paths. The gate arrow therefore
+    # ran from x=2.2 to x=2.0 -- a 0.2-unit stub pointing the wrong way -- and the
+    # recursion return ran from 95.5 to 98, i.e. outward from inside the block
+    # instead of inward to its edge. Both rendered as arrowheads pointing away
+    # from the block they feed. The router and the recursion block are now 84--88
+    # wide so the feedback lanes at x=3 and x=97 sit clear, and both arrows
+    # terminate ON the block edge pointing INTO it.
     fig, ax = plt.subplots(figsize=(3.35, 2.42), dpi=400)
     ax.set_xlim(0, 100)
     ax.set_ylim(0, 100)
     ax.axis("off")
-    cx, LOOP = 50.0, 95.5
+    cx = 50.0
+    GATE_X, LOOP_X = 3.0, 97.0          # the two feedback lanes
+    BLK_L, BLK_R = 8.0, 92.0            # recursion-block edges (width 84)
 
     # ---- Row A: tokens -> embed, side by side ------------------------
     box(ax, 20, 93, 30, 10, "tokens\n$B\\times S$")
@@ -79,7 +89,7 @@ def main():
 
     # ---- Row B: the router, OUTSIDE the recursion --------------------
     arrow(ax, (67, 87.8), (67, 82.3))
-    box(ax, cx, 76.5, 96, 11,
+    box(ax, cx, 76.5, 88, 11,
         "router, once per token\n"
         "$g=\\mathrm{softmax}(W_r h^{(0)})$,  $e^{\\star}=\\arg\\max_e g_e$",
         lw=1.3)
@@ -87,7 +97,7 @@ def main():
     # ---- Row C: expert bank, only e* evaluated -----------------------
     names = ["$\\mathrm{FFN}_1$", "$\\mathrm{FFN}_2$", "$e^{\\star}$",
              "$\\mathrm{FFN}_4$", "$\\cdots$", "$\\mathrm{FFN}_E$"]
-    bw, gap = 14.2, 1.6
+    bw, gap = 12.6, 1.5
     x0 = cx - (len(names) * bw + (len(names) - 1) * gap) / 2 + bw / 2
     ex = x0 + 2 * (bw + gap)
     arrow(ax, (cx, 71.0), (cx, 65.6))
@@ -97,24 +107,24 @@ def main():
             fc=SEL if chosen else DIM, ec=INK if chosen else GREY,
             lw=1.5 if chosen else 0.7, fs=6.2,
             weight="bold" if chosen else None)
-    ax.text(99, 51.0, "top-1, no noise; $e^{\\star}$ persisted",
+    ax.text(99, 50.5, "top-1, no noise; $e^{\\star}$ persisted",
             ha="right", va="center", fontsize=5.6, color=GREY)
     arrow(ax, (ex, 55.5), (ex, 47.0), lw=1.4)
 
     # ---- Row D: the recursion block ----------------------------------
-    box(ax, cx, 36.0, 96, 20,
+    box(ax, cx, 36.0, BLK_R - BLK_L, 20,
         "$h^{(t+1)}=\\mathrm{LN}\\!\\left(h^{(t)}"
         "+g_{e^{\\star}}\\cdot\\mathrm{FFN}_{e^{\\star}}(h^{(t)})\\right)$\n\n"
         "halt head:  $p_t=\\sigma(w_{e^{\\star}}^{\\top}h^{(t)})$", lw=1.3)
-    ax.text(2.5, 23.5, "same $e^{\\star}$ weights every step",
+    ax.text(8.5, 23.5, "same $e^{\\star}$ weights every step",
             ha="left", va="center", fontsize=5.6, color=GREY)
 
-    # the gate multiply: the only differentiable path into the router
-    gx = 2.2
-    arrow(ax, (2.0, 71.0), (gx, 71.0), style="-", color=GREY, lw=0.8)
-    arrow(ax, (gx, 71.0), (gx, 36.0), style="-", color=GREY, lw=0.8)
-    arrow(ax, (gx, 36.0), (cx - 48.0, 36.0), color=GREY, lw=0.8)
-    ax.text(3.6, 54.0, "$g_{e^{\\star}}$", ha="left", va="center",
+    # The gate multiply: router -> block, down the left lane. Only the LAST
+    # segment carries an arrowhead, and it points right, into the block edge.
+    arrow(ax, (cx - 44.0, 71.3), (GATE_X, 71.3), style="-", color=GREY, lw=0.8)
+    arrow(ax, (GATE_X, 71.3), (GATE_X, 36.0), style="-", color=GREY, lw=0.8)
+    arrow(ax, (GATE_X, 36.0), (BLK_L, 36.0), color=GREY, lw=0.8)
+    ax.text(GATE_X + 1.0, 49.0, "$g_{e^{\\star}}$", ha="left", va="center",
             fontsize=6.4, color=INK)
 
     # ---- Row E: exit test -> output, side by side --------------------
@@ -124,12 +134,13 @@ def main():
         "$o=\\sum_t w_t h^{(t)}$\n$\\rightarrow$ logits", lw=1.2)
     arrow(ax, (50.2, 12.0), (56.8, 12.0))
 
-    # the single recursion return path
+    # The recursion return: exit -> block, up the right lane. Again only the
+    # last segment has an arrowhead, pointing LEFT into the block edge.
     arrow(ax, (27, 5.5), (27, 2.0), style="-", color=GREY, lw=0.9)
-    arrow(ax, (27, 2.0), (LOOP, 2.0), style="-", color=GREY, lw=0.9)
-    arrow(ax, (LOOP, 2.0), (LOOP, 36.0), style="-", color=GREY, lw=0.9)
-    arrow(ax, (LOOP, 36.0), (cx + 48.0, 36.0), color=GREY, lw=0.9)
-    ax.text(LOOP - 1.5, 23.5, "no: $t\\!\\leftarrow\\!t\\!+\\!1$", ha="right",
+    arrow(ax, (27, 2.0), (LOOP_X, 2.0), style="-", color=GREY, lw=0.9)
+    arrow(ax, (LOOP_X, 2.0), (LOOP_X, 36.0), style="-", color=GREY, lw=0.9)
+    arrow(ax, (LOOP_X, 36.0), (BLK_R, 36.0), color=GREY, lw=0.9)
+    ax.text(LOOP_X - 1.5, 23.5, "no: $t\\!\\leftarrow\\!t\\!+\\!1$", ha="right",
             va="center", fontsize=5.6, color=GREY)
 
     # The T=1 / E=1 reductions are stated in the caption rather than drawn: in

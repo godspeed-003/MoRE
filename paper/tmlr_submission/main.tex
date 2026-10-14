@@ -20,8 +20,10 @@
 %
 %  BROADER IMPACT: conditionally required -- only if the work "carries a
 %          significant risk of harm". A 5.6M-parameter architecture study on
-%          public text does not, so the statement is omitted deliberately
-%          rather than forgotten. Revisit if the claim set changes.
+%          public text does not, so the statement is SHORT AND SAYS WHY rather
+%          than being omitted; it is present after the conclusion, alongside the
+%          Reproducibility Statement. (This comment previously said the section
+%          was omitted, which stopped being true when it was added.)
 %
 %  BEFORE SUBMITTING: read VERIFY_BEFORE_SUBMIT.md in this folder. As of
 %          T-LA.8 the bibliography carries no unverified entries and the page
@@ -53,6 +55,12 @@ Recursion Trade Off in Small Language Models}
 % Ignored under the anonymous (default) option; fill in for camera-ready.
 \author{\name Anonymous Author(s) \email anonymous@example.com \\
         \addr Anonymous Institution}
+
+% \dispsize -- the size display math and the Section-6 tables are set at.
+% Single-column TMLR leaves wide margins either side of a display, so the
+% default size reads small and wastes that space; \large uses it. ACL defines
+% this as a no-op because a two-column measure has no horizontal slack.
+\newcommand{\dispsize}{\large}
 
 \begin{document}
 

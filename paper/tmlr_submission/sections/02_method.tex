@@ -24,12 +24,14 @@ every depth and one halt head observes a coherent sequence of states. (An earlie
 configuration re-drew both per step; it is retained as a labelled ablation and
 discussed in \S\ref{sec:honesty}.)
 
+{\dispsize
 \begin{equation}
 \mathbf{h}^{(t+1)} \;=\; \mathrm{LayerNorm}\!\left(
   \mathbf{h}^{(t)} + g_{e^\star}\cdot \mathrm{FFN}_{e^\star}\!\left(\mathbf{h}^{(t)}\right)
 \right), \qquad t = 0,\dots,T-1 .
 \label{eq:block}
 \end{equation}
+}
 
 The gate probability $g_{e^\star}$ multiplies the expert output, which is what
 carries task-loss gradient into the router: the discrete $\arg\max$ is not
@@ -64,6 +66,7 @@ and all three are configurations of one engine.}
 Halting follows ACT \citep{graves2016act} as used in the Universal Transformer,
 with one halt head per expert. Per token, at step $t$:
 
+{\dispsize
 \begin{align}
 p_t &= \sigma\!\left(\mathbf{w}_{e^\star}^{\!\top}\mathbf{h}^{(t)}\right),
   & c_t &= \sum_{\tau \le t} p_\tau ,
@@ -74,6 +77,7 @@ R &= 1 - c_t \ \text{(remainder)}, &
   w_t &= \begin{cases} p_t & \text{running} \\ R & \text{at the halt step}\end{cases}
   \label{eq:halt-w}
 \end{align}
+}
 
 and the token's output is the convex combination
 $\mathbf{o}_s = \sum_t w_t \mathbf{h}^{(t)}$, whose weights sum to exactly $1$.
@@ -86,10 +90,12 @@ forced out; halted states are frozen and not recomputed, so a halted token costs
 nothing at deeper steps.
 
 Depth is trained through the expected-depth term
+{\dispsize
 \begin{equation}
 \rho \;=\; \mathbb{E}_{\text{tokens}}\big[\,N + R\,\big],
 \label{eq:ponder}
 \end{equation}
+}
 where the step count $N$ is discrete and contributes no gradient while the
 remainder $R$ does. Eq.~\ref{eq:ponder} is the ponder cost. It is worth noting
 that the gradient reaching the halt heads through $R$ is small compared with the
@@ -103,6 +109,7 @@ and is future work (\S\ref{sec:limitations}).
 
 The training objective is a weighted sum of terms that we report separately and
 never as a single number:
+{\dispsize
 \begin{equation}
 \mathcal{L} \;=\;
 \underbrace{\mathcal{L}_{\text{task}}}_{1.0} \;+\;
@@ -112,6 +119,7 @@ never as a single number:
 \underbrace{0.0\cdot\mathcal{L}_{\text{route}}}_{\text{off}} .
 \label{eq:loss}
 \end{equation}
+}
 $\mathcal{L}_{\text{task}}$ is per-token cross-entropy in nats.
 $\mathcal{L}_{\text{bal}} = -H(\bar{\mathbf{g}}) + E\sum_e f_e \bar{g}_e$ combines
 a router-entropy bonus with the Switch-style auxiliary \citep{fedus2022switch},
