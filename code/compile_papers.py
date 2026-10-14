@@ -20,10 +20,40 @@ import subprocess
 import sys
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-TT = r"C:\Users\Hp\AppData\Local\Temp\tinytex_dl\out\TinyTeX\bin\windows"
-PDFLATEX = os.path.join(TT, "pdflatex.exe")
-BIBTEX = os.path.join(TT, "bibtex.exe")
-TLMGR = os.path.join(TT, "tlmgr.bat")
+
+
+def _find_tinytex():
+    """Locate TinyTeX's bin directory on THIS machine.
+
+    The path used to be hard-coded to one author's temp directory, which meant
+    the script silently did nothing on the other machine -- exactly the
+    per-machine-path trap CLAUDE.md section 9 warns about. Resolution order:
+    an explicit override, then each user's own temp layout, then whatever is on
+    PATH. Returns "" when nothing is found, and the caller reports that rather
+    than failing on a missing .exe.
+    """
+    env = os.environ.get("MORE_TINYTEX")
+    if env and os.path.isfile(os.path.join(env, "pdflatex.exe")):
+        return env
+    cands = []
+    for base in (os.environ.get("TEMP"), os.environ.get("TMP"),
+                 r"C:\Users\Hp\AppData\Local\Temp",
+                 r"C:\Users\vedan\AppData\Local\Temp"):
+        if base:
+            cands.append(os.path.join(base, "tinytex_dl", "out",
+                                      "TinyTeX", "bin", "windows"))
+    for c in cands:
+        if os.path.isfile(os.path.join(c, "pdflatex.exe")):
+            return c
+    from shutil import which
+    p = which("pdflatex")
+    return os.path.dirname(p) if p else ""
+
+
+TT = _find_tinytex()
+PDFLATEX = os.path.join(TT, "pdflatex.exe") if TT else ""
+BIBTEX = os.path.join(TT, "bibtex.exe") if TT else ""
+TLMGR = os.path.join(TT, "tlmgr.bat") if TT else ""
 
 MAX_INSTALL_ROUNDS = 14
 

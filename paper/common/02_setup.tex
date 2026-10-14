@@ -25,7 +25,7 @@ beat it has learned nothing a two-column count table could not. All three arms
 beat it, by margins of $+1.037$, $+1.470$ and $+1.348$ nats for MoE, MoR and MoRE
 respectively.
 
-% >>>ACLMOVE:protocol|\subsection{Training protocol}\label{sec:protocol} Five seeds per arm, reported as mean$\,\pm\,$std, with one optimiser configuration fixed before the comparison and \emph{not} swept per architecture. \textbf{Three epochs is a compute budget, not convergence}: one epoch is 134.7M tokens against $\approx$3.4M non-embedding parameters, so no arm is converged. Every arm gets the identical budget, so the comparison holds; the consequences are in the Limitations section. Appendix~\ref{app:protocol} gives the hyperparameters.
+% >>>ACLMOVE:protocol|\subsection{Training protocol}\label{sec:protocol} Five seeds per arm; 3 epochs of AdamW (lr $10^{-3}$, weight decay $10^{-4}$, clip 1.0, dropout 0.1), $d_{\text{model}}=256$, one block, 4 heads, $T=7$, batch 48, on a single laptop GPU. Settings were fixed once, before the comparison, and not swept per architecture. \textbf{Three epochs is a fixed compute budget, not convergence}---every arm gets the identical budget, so the comparison is valid though no arm is converged (Appendix~\ref{app:protocol}).
 \subsection{Training protocol}
 \label{sec:protocol}
 
@@ -58,7 +58,7 @@ Every arm receives the identical budget, so the comparison is valid even though 
 arm is converged. The consequences are stated in \S\ref{sec:limitations}.
 
 % <<<ACLMOVE:protocol
-% >>>ACLMOVE:metrics|\subsection{Metrics}\label{sec:metrics} The primary metric is \textbf{validation task loss}, final-epoch per-token cross-entropy in nats; \texttt{best} equals \texttt{last} on all 15 cells, so \emph{no model selection occurred}. Routing is scored with permutation-invariant measures (AMI, Hungarian, purity) against a per-run shuffled-label control and reported as a z-score, since unsupervised expert indices carry no semantic identity. Depth is reported with its exit rates alongside, because a depth--difficulty correlation taken on an arm whose tokens almost all reach the ceiling is computed against a near-constant and \textbf{says nothing about allocation}. Appendix~\ref{app:metrics} defines each.
+% >>>ACLMOVE:metrics|\subsection{Metrics}\label{sec:metrics} The primary metric is \textbf{validation task loss}, final-epoch per-token cross-entropy in nats; \texttt{best} equals \texttt{last} on all 15 cells, so \emph{no model selection occurred}. Routing is scored with permutation-invariant measures (AMI, Hungarian, purity) against a per-run shuffled-label control and reported as a z-score. Depth is reported with its exit rates alongside: a depth--difficulty correlation on an arm whose tokens almost all reach the ceiling is taken against a near-constant and \textbf{says nothing about allocation}. Appendix~\ref{app:metrics} defines each.
 \subsection{Metrics}
 \label{sec:metrics}
 
@@ -144,7 +144,7 @@ to call significant. And a comparison whose floor exceeds its Holm threshold is
 phrasing would blame the data for a limit of the design.
 % <<<ACLMOVE:holm_detail
 
-% >>>ACLMOVE:integrity|\subsection{Integrity checks}\label{sec:integrity} Three invariants hold across the matrix, each machine-checked: inputs are bit-identical across arms per record; the target is absent from the input and no oracle routing label is encoded in a feature slot; and the arms are parameter-matched to 0.069\% with seed-blind configurations identical within each arm. Three loss terms are structurally zero on language, one of which \emph{strengthens} the specialisation claims. Appendix~\ref{app:integrity} gives each in full.
+% >>>ACLMOVE:integrity|\subsection{Integrity checks}\label{sec:integrity} Three invariants hold across the matrix, each enforced by an automated check: inputs are \textbf{bit-identical across arms} for the same record; the target is absent from the input and no oracle routing label is encoded in a feature slot; and the arms are parameter-matched to $0.069\%$ with seed-blind configurations identical within each arm, so comparability rests on a frozen specification rather than on one code revision. Appendix~\ref{app:integrity} lists them with the structurally-zero loss terms.
 \subsection{Integrity checks}
 \label{sec:integrity}
 

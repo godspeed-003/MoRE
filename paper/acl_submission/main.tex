@@ -86,26 +86,23 @@ Trade Off in Small Language Models}
 Conditional computation chooses either \emph{which} parameters process a token
 ---sparse mixture-of-experts (MoE)---or \emph{how much} computation it receives
 ---adaptive-depth weight-tied recursion (MoR). Composing them should inherit
-both. We test whether it pays: one engine, three
-configurations, parameters matched to 0.069\% ($\approx$5.58M), bit-identical
-inputs, five seeds, exact randomisation tests under a pre-registered correction,
-on WikiText-103.
+both. We test whether it pays: one engine, three configurations, parameters
+matched to 0.069\% ($\approx$5.58M), bit-identical inputs, five seeds, exact
+randomisation tests under a pre-registered correction, on WikiText-103.
 
 All three arms lie on the quality/compute frontier, and the composition (MoRE)
-buys the most quality per unit of compute. It improves on MoE by $7.9\%$
-validation loss at $2.19\times$ MoE's inference FLOPs, where recursion alone needs
-$9.07\times$: $72\%$ of recursion's quality gain for $24\%$ of its compute, or
-$3\times$ the quality per FLOPs-multiplier. Out of domain it is stronger still---it
-\emph{dominates} recursion alone, reaching lower loss at a quarter of the compute.
-
-It is not lowest-loss in domain. Recursion alone leads by $0.1216$ nats,
-significant at our resolution floor, and adding routing improves neither
-in-domain quality nor routing quality over MoE; we keep the quality and compute
-axes separate. We trace the deficit to a competition for one per-token budget,
-excluding two rival explanations. Most transferably: a mean step count and an exit histogram cannot
-establish input-dependent depth, since a uniform policy forced to the learned mean
-reproduces both. Scoring against that control separates our recursive arms by a
-factor of 24.
+buys the most quality per unit of compute: $7.9\%$ better validation loss than
+MoE at $2.19\times$ its inference FLOPs where recursion alone needs
+$9.07\times$---$72\%$ of recursion's gain for $24\%$ of its compute. Out of
+domain it \emph{dominates} recursion alone, reaching lower loss at a quarter of
+the compute. It is not lowest-loss in domain: recursion alone leads by $0.1216$
+nats, significant at our resolution floor, and routing improves neither
+in-domain quality nor routing quality over MoE, so we keep the quality and
+compute axes separate. We trace the deficit to a competition for one per-token
+budget, excluding two rival explanations. Most transferably: a mean step count
+and an exit histogram cannot establish input-dependent depth, since a uniform
+policy forced to the learned mean reproduces both---and scoring against that
+control separates our recursive arms by a factor of 24.
 \end{abstract}
 
 \input{sections/01_intro}

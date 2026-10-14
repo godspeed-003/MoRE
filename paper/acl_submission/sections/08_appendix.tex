@@ -314,5 +314,27 @@ determiner--noun agreement---which is where a shared iterative block would be
 expected to help. We also ran EWoK \citep{ivanova2024ewok}, on which all three arms
 sit within noise of the $50\%$ chance floor (49.62, 50.33, 49.95); that is a
 statement about the scale of these models, not about the architectures, so we
-exclude it from Table~\ref{tab:evals} and draw no comparison from it.
+exclude it from Table~\ref{tab:main} and draw no comparison from it.
+
+\section{Specialisation against per-run controls}
+\label{app:specialisation}
+
+The competition has a second face on the canonical corpus, along a different axis.
+The routing balance term is load-bearing and cannot be traded away for depth
+either: setting it to zero \emph{collapses} the expert load onto a single expert
+(load entropy 0.0001) and drives AMI to zero. A near-uniform per-token router
+distribution coexisting with balanced load and above-chance specialisation is
+therefore not a pathology to be tuned out---and we note that we initially read it
+as one before the sweep refuted us (\S\ref{sec:honesty}).
+
+Specialisation itself is real, and measured against per-run controls rather than
+against chance. MoRE's AMI is $0.1803 \pm 0.0246$ against a permutation control of
+$0.0249$, a controlled z of $13.43$; Hungarian-matched accuracy is $0.3592 \pm
+0.0271$ against a control of $0.2464$. MoE's AMI is $0.1637 \pm 0.0478$ against a
+control of $0.0364$ ($z = 6.82$), Hungarian $0.3616$ against $0.2966$. Both
+six-expert arms find substantial above-chance structure---and, read together, the
+two arms are not distinguishable from each other. Routing quality is approximately
+the same with recursion as without it, which is the routing half of the
+interference result: recursion does not improve routing, and routing does not
+preserve adaptive depth, in the same architecture.
 

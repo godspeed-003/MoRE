@@ -52,12 +52,16 @@ There is one block, so depth is computation through time rather than a stack of
 depth-specific layers, and no capacity limit is imposed---every routed token is
 evaluated by its expert and none is dropped.
 
-% The architecture diagram is pure TikZ and ships as a COMPLETE float --
-% figure* wrapper, caption and \label{fig:architecture} all live in
-% fig/fig_architecture.tex -- so nothing may be declared here or they are
-% defined twice. Needs \usepackage{tikz} in the preamble; the assembler
-% demotes the spanning float for single-column TMLR.
-\input{fig/fig_architecture}
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=\linewidth,keepaspectratio]{fig_architecture.png}
+    \caption{The MoRE block. A token is routed \emph{once} to one of $E$
+    independent expert FFNs; that experts weights are then reused for an
+    adaptive number of recursion steps under ACT halting. Setting $T=1$ recovers
+    MoE exactly and setting $E=1$ recovers MoR; the input representation is
+    bit-identical in all three cases.}
+    \label{fig:architecture}
+\end{figure}
 
 \subsection{Halting and the training objective}
 \label{sec:halting-method}
@@ -158,7 +162,7 @@ zero because natural language supplies no per-token oracle expert and no per-tok
 oracle depth to supervise against. The canonical router is therefore unsupervised
 with respect to the per-token routing decision.
 
-% >>>ACLMOVE:engine|\subsection{One engine, three modes}\label{sec:engine} MoE, MoR and MoRE are configurations of one implementation with an explicit \texttt{architecture} mode, not three codebases, so a difference between arms cannot be a difference in the harness. Equalising \emph{total} FFN hidden width gives MoR's single FFN a multiplier of $24 = 4\times6$, so all three arms hold one FFN parameter budget: \textbf{5{,}584{,}908 for MoE and MoRE, identical, and 5{,}581{,}063 for MoR}---a $0.069\%$ deficit that is the router MoR does not have, and which runs \emph{against} our headline since the lighter arm wins in domain. Appendix~\ref{app:engine} derives it.
+% >>>ACLMOVE:engine|\subsection{One engine, three modes}\label{sec:engine} MoE, MoR and MoRE are configurations of one implementation with an explicit \texttt{architecture} mode, so a difference between arms cannot be a difference in the harness. Equalising \emph{total} FFN hidden width gives MoR's single FFN a multiplier of $24=4\times6$: \textbf{5{,}584{,}908 parameters for MoE and MoRE, identical, and 5{,}581{,}063 for MoR}---a $0.069\%$ deficit that is the router MoR lacks, and which runs \emph{against} our headline since the lighter arm wins in domain. Appendix~\ref{app:engine} derives it.
 \subsection{One engine, three modes}
 \label{sec:engine}
 
