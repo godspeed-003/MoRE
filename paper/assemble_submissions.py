@@ -71,7 +71,7 @@ FIGS = [
     # fig_architecture.png is SUPERSEDED: it drew the retired per-step
     # architecture and contradicted the method section. Kept in fig_lang/
     # as history, never copied into a venue tree again.
-    (os.path.join(HERE, "fig_lang", "fig_architecture.tex"), "fig_architecture.tex"),
+    (os.path.join(HERE, "fig_lang", "fig_architecture.png"), "fig_architecture.png"),
     (os.path.join(HERE, "fig_lang", "fig_depth_curve.pdf"), "fig_depth_curve.pdf"),
     (os.path.join(HERE, "fig_lang", "fig_pareto.pdf"),      "fig_pareto.pdf"),
     (os.path.join(HERE, "fig_lang", "fig_stratified.pdf"),  "fig_stratified.pdf"),

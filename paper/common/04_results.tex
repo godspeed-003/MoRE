@@ -114,7 +114,8 @@ scores each arm against the inference FLOPs it costs.
 \footnotesize
 \caption{All results, five seeds, mean$\,\pm\,$std. \textbf{Upper block:} every
 cell is \emph{score (difference vs MoE, inference FLOPs$\times$ vs MoE,
-$|$difference$|$ per FLOPs-multiplier)}. The \emph{score} is lower-better for
+$|$difference$|$ per FLOPs-multiplier)}; MoE is the reference arm, so its cells carry the score
+alone. The \emph{score} is lower-better for
 loss rows and higher-better for accuracy; the third number is a \textbf{modulus},
 so it is higher-better on \emph{every} row---how much quality each unit of
 compute bought. Quality at matched parameters and quality per unit of compute are
@@ -133,10 +134,10 @@ rows are \textbf{exploratory}---outside both declared families, uncorrected.}
 \toprule
 Eval & MoE & MoR & MoRE \\
 \midrule
-Val loss (nats) & 3.948 (1.00$\times$) & \textbf{3.515} ($-0.433$, 9.07$\times$, 0.048) & 3.637 ($-0.311$, 2.19$\times$, \textbf{0.142}) \\
-Test loss (nats) & 3.947 (1.00$\times$) & \textbf{3.513} ($-0.435$, 9.07$\times$, 0.048) & 3.621 ($-0.326$, 2.19$\times$, \textbf{0.149}) \\
-OOD loss (nats) & 8.272 (1.00$\times$) & 7.802 ($-0.470$, 9.07$\times$, 0.052) & \textbf{7.573} ($-0.699$, 2.19$\times$, \textbf{0.319}) \\
-BLiMP (acc) & 56.63 (1.00$\times$) & \textbf{58.74} ($+2.11$, 9.07$\times$, 0.233) & 58.36 ($+1.73$, 2.19$\times$, \textbf{0.791}) \\
+Val loss (nats) & 3.948\,$\pm$\,0.024 & \textbf{3.515}\,$\pm$\,0.034 ($-0.433$, 9.07$\times$, 0.048) & 3.637\,$\pm$\,0.013 ($-0.311$, 2.19$\times$, \textbf{0.142}) \\
+Test loss (nats) & 3.947\,$\pm$\,0.022 & \textbf{3.513}\,$\pm$\,0.033 ($-0.435$, 9.07$\times$, 0.048) & 3.621\,$\pm$\,0.014 ($-0.326$, 2.19$\times$, \textbf{0.149}) \\
+OOD loss (nats) & 8.272\,$\pm$\,0.088 & 7.802\,$\pm$\,0.158 ($-0.470$, 9.07$\times$, 0.052) & \textbf{7.573}\,$\pm$\,0.122 ($-0.699$, 2.19$\times$, \textbf{0.319}) \\
+BLiMP (acc) & 56.63\,$\pm$\,1.37 & \textbf{58.74}\,$\pm$\,1.39 ($+2.11$, 9.07$\times$, 0.233) & 58.36\,$\pm$\,1.54 ($+1.73$, 2.19$\times$, \textbf{0.791}) \\
 \midrule
 Parameters & 5{,}584{,}908 & 5{,}581{,}063 & 5{,}584{,}908 \\
 Val perplexity & 51.9 & \textbf{33.6} & 38.0 \\

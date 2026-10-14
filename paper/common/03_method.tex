@@ -52,12 +52,25 @@ There is one block, so depth is computation through time rather than a stack of
 depth-specific layers, and no capacity limit is imposed---every routed token is
 evaluated by its expert and none is dropped.
 
-% The architecture diagram is pure TikZ and ships as a COMPLETE float:
-% fig/fig_architecture.tex supplies the figure* wrapper, the caption and
-% \label{fig:architecture}, so declaring any of them here would define
-% them twice. Requires \usepackage{tikz} (present in both preambles); the
-% assembler demotes the spanning float for single-column TMLR.
-\input{fig/fig_architecture}
+% The architecture diagram is a GENERATED PNG (code/make_architecture_figure.py),
+% not TikZ. The TikZ version positioned nodes in a 0--100 coordinate space while
+% sizing their text in points, so the text overflowed its nodes at native scale
+% and \resizebox preserved the overlap -- unreadable in single-column and
+% collapsed into fragments in two-column. TikZ overlap raises no overfull-hbox
+% warning, so the compile reported zero problems throughout. Unstarred on
+% purpose: one column in ACL, full text width in single-column TMLR.
+\begin{figure}[t]
+\centering
+\includegraphics[width=\linewidth]{fig_architecture.png}
+\caption{The MoRE block. A token is routed \emph{once} from its post-embedding
+state to one of $E$ independent expert FFNs, and \emph{that expert's}
+weights---never another's---are reused for an adaptive number of recursion steps
+under ACT halting. Only the selected expert is evaluated, and its output is
+scaled by the gate $g_{e^\star}$. Setting $T=1$ recovers MoE exactly and setting
+$E=1$ recovers MoR; the input representation is bit-identical in all three cases,
+and all three are configurations of one engine.}
+\label{fig:architecture}
+\end{figure}
 
 \subsection{Halting and the training objective}
 \label{sec:halting-method}
