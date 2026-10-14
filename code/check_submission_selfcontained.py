@@ -36,9 +36,14 @@ for f, s in tex.items():
         outside.append(f"{f}: {body[max(0, m.start()-40):m.start()+25]!r}")
 
 bib = re.findall(r"\\bibliography\{([^}]+)\}", tex["main.tex"])
-sty = re.findall(r"\\usepackage(?:\[[^\]]*\])?\{([^}]+)\}", tex["main.tex"])
-local_sty = [s for s in sum((b.split(",") for b in sty), [])
-             if os.path.exists(s.strip() + ".sty")]
+# Strip comments first: main.tex carries COMMENTED-OUT \usepackage[accepted]{tmlr}
+# and [preprint] variants for camera-ready, and counting those reported the same
+# style file four times. Dedup too -- the question is which files must ship, not
+# how many lines ask for them.
+main_body = "\n".join(l.split("%")[0] for l in tex["main.tex"].splitlines())
+sty = re.findall(r"\\usepackage(?:\[[^\]]*\])?\{([^}]+)\}", main_body)
+local_sty = sorted({s.strip() for s in sum((b.split(",") for b in sty), [])
+                    if os.path.exists(s.strip() + ".sty")})
 
 print(f"  files: main.tex + {len(tex)-1} sections, "
       f"{len(glob.glob('fig/*'))} figures")
