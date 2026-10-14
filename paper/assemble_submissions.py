@@ -65,7 +65,13 @@ FIGS = [
     # fig/More(3)(1).png, drew the RETIRED per-step architecture -- "noisy top-K",
     # "one expert per token per depth", and the halt looping back into the router --
     # which contradicted the method section on the paper's central claim.
-    (os.path.join(HERE, "fig_lang", "fig_architecture.png"), "fig_architecture.png"),
+    # T-LA.12: the diagram is pure TikZ and ships as a COMPLETE figure*
+    # float -- wrapper, caption and \label{fig:architecture} all inside the
+    # file -- so 03_method.tex only \inputs it. Needs \usepackage{tikz}.
+    # fig_architecture.png is SUPERSEDED: it drew the retired per-step
+    # architecture and contradicted the method section. Kept in fig_lang/
+    # as history, never copied into a venue tree again.
+    (os.path.join(HERE, "fig_lang", "fig_architecture.tex"), "fig_architecture.tex"),
     (os.path.join(HERE, "fig_lang", "fig_depth_curve.pdf"), "fig_depth_curve.pdf"),
     (os.path.join(HERE, "fig_lang", "fig_pareto.pdf"),      "fig_pareto.pdf"),
     (os.path.join(HERE, "fig_lang", "fig_stratified.pdf"),  "fig_stratified.pdf"),
@@ -227,7 +233,6 @@ def build(venue):
         else:
             body = unnumber_refs(body)
         # the architecture figure is renamed on copy (parentheses break TeX)
-        body = body.replace("More(3)(1).png", "fig_architecture.png")
         open(os.path.join(sec, dst), "w", encoding="utf-8", newline="\n").write(body)
 
     limits, concl = split_limitations()

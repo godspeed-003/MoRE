@@ -42,16 +42,12 @@ There is one block, so depth is computation through time rather than a stack of
 depth-specific layers, and no capacity limit is imposed---every routed token is
 evaluated by its expert and none is dropped.
 
-\begin{figure}[t]
-    \centering
-    \includegraphics[width=\linewidth,keepaspectratio]{fig_architecture.png}
-    \caption{The MoRE block. A token is routed \emph{once} to one of $E$
-    independent expert FFNs; that experts weights are then reused for an
-    adaptive number of recursion steps under ACT halting. Setting $T=1$ recovers
-    MoE exactly and setting $E=1$ recovers MoR; the input representation is
-    bit-identical in all three cases.}
-    \label{fig:architecture}
-\end{figure}
+% The architecture diagram is pure TikZ and ships as a COMPLETE float:
+% fig/fig_architecture.tex supplies the figure* wrapper, the caption and
+% \label{fig:architecture}, so declaring any of them here would define
+% them twice. Requires \usepackage{tikz} (present in both preambles); the
+% assembler demotes the spanning float for single-column TMLR.
+\input{fig/fig_architecture}
 
 \subsection{Halting and the training objective}
 \label{sec:halting-method}

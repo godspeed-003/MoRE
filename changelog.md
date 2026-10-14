@@ -8955,3 +8955,76 @@ excluded.
 - `code/check_overflow.py` → TMLR 0 overfull; ACL one box at 5.7pt.
 - `code/check_latex_lint.py` → 23 files clean.
 - `main.aux` page anchor → ACL body 8 pages, at the limit; TMLR 13.
+
+---
+
+## T-LA.12 — the architecture diagram is now pure TikZ, wired from source in both venues
+
+**Date.** 2026-10-14. **Machine.** Ayan's RTX 4060 8 GB.
+
+The figure was replaced by hand in `paper/tmlr_submission/fig/` — the PNG deleted
+and a 5,672-byte `fig_architecture.tex` dropped in, with wiring instructions in
+its own header. Adopted, after checking the thing that matters.
+
+### Correctness checked first, because that is what was wrong before
+
+The superseded `fig_architecture.png` drew the **retired per-step architecture** —
+noisy top-K, one expert per token per depth, the halt looping back into the
+router — and contradicted the method section on the paper's central claim. The
+new TikZ file carries **none** of those markers and states the opposite outright:
+routing happens **once** from the post-embedding state, the token keeps $e^\star$
+for the whole trajectory, only the selected expert is evaluated, and the same
+weights are reused at every depth. It is the correct diagram, and it is now the
+one both venues ship.
+
+Note this is a *different* file from the `fig_architecture(1).tex` draft adopted
+and then reverted at T-LA.11 — that one was an abandoned draft; this one is the
+vetted figure.
+
+### Why it could not stay where it was put
+
+`paper/tmlr_submission/fig/` is **generated**. `assemble_submissions.py` rewrites
+it from source on every run and, since T-LA.8, prunes files it did not write — so
+the next assembly would have **deleted the new figure and restored the PNG**.
+Moved to `paper/fig_lang/`, which is where the assembler reads figures from, and
+the `FIGS` entry switched from the PNG to the `.tex`.
+
+Because the figure block lives in `paper/common/03_method.tex`, **both venues get
+the corrected diagram**, which is what parity requires. The float resolves per
+venue automatically: `figure*` spanning both ACL columns, demoted to `figure` for
+single-column TMLR by the conversion added at T-LA.8b.
+
+Also removed: the `More(3)(1).png` → `fig_architecture.png` renamer in the
+assembler, now dead code. The superseded PNG stays in `paper/fig_lang/` as
+history and is never copied into a tree again.
+
+### Measured after the change
+
+| | PDF total | body | errors | overfull | undefined | bibliography |
+|---|---|---|---|---|---|---|
+| TMLR | 18 | 13 | 0 | **0** | 0 | 18/18 |
+| ACL | 16 | **8** | 0 | 1 (5.7pt) | 0 | 17/17 |
+
+ACL's total went 15 → 16 because the TikZ float spans both columns where the PNG
+had been demoted to one; **the counted body stayed at 8, still exactly at the
+limit.** Parity holds: figures 4/4 (the architecture figure is drawn, not
+included, so there are four `\includegraphics` calls now), labels 36/36, sections
+identical, 168 of 168 numeric claims shared. Lint clean across 23 `.tex` files.
+Upload bundles fell to ~103 KB, the 78 KB raster replaced by 5.7 KB of TikZ.
+
+**Failure tracing.**
+- *A figure edit disappears after a rebuild* → it was made in `paper/<venue>/fig/`,
+  which is generated and pruned. Put it in `paper/fig_lang/` and register it in
+  `FIGS`.
+- *A TikZ figure fails to compile* → `\usepackage{tikz}` must be in the preamble;
+  this file needs no `\usetikzlibrary`.
+- *The architecture diagram disagrees with the method section* → check it is the
+  TikZ one. The PNG drew the retired per-step design and must not come back.
+
+**Verified by.**
+- Content check of the TikZ source → route-once markers present, per-step markers
+  absent.
+- `code/compile_papers.py` → both venues 0 errors, 0 undefined.
+- `code/check_overflow.py` → TMLR 0 overfull; ACL one box at 5.7pt.
+- `code/check_venue_parity.py` → TMLR carries everything ACL carries.
+- `code/check_latex_lint.py` → 23 files clean.
