@@ -184,3 +184,6 @@ paper/*/main.blg
 paper/*/main.lof
 paper/*/main.lot
 paper/*/main.toc
+
+# T-LA.14: scratch dir for pdftotext page measurement (code/main_content_pages.py)
+build_tmp/

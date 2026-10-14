@@ -34,14 +34,19 @@ EXPECTED_ONLY = {
 
 
 def appendix_wrapper_titles():
-    """The ACL appendix's own section headings, read from the assembler.
+    """The appendix's own section headings, read from the assembler.
 
-    ACL lifts blocks into a page-exempt appendix and wraps each in a
-    `\\section{...}` with an `app:*` label. TMLR keeps the SAME CONTENT inline
-    under its original subsection headings, so those wrappers exist in exactly
-    one venue by construction. Counting them as "missing from TMLR" reported 23
-    phantom gaps on the first run and buried the one real finding, so they are
-    read from the single source that defines them rather than hard-coded here.
+    Both venues lift blocks into a page-exempt appendix and wrap each in a
+    `\\section{...}` with an `app:*` label. The CONTENT of those blocks is the
+    same material either way -- what differs is only whether a given block sits
+    inline or in the appendix for that venue -- so the wrappers are scaffolding
+    in both trees. Counting them reported 23 phantom gaps on the first run and
+    buried the one real finding, so they are read from the single source that
+    defines them rather than hard-coded here.
+
+    T-LA.14: this used to be stripped from ACL only, because only ACL had an
+    appendix. TMLR now has one too, which made all 11 anchors and headings show
+    up as "in TMLR only" -- the same noise, in the other direction.
     """
     p = os.path.join(REPO, "paper", "assemble_submissions.py")
     src = io.open(p, encoding="utf-8").read()
@@ -90,14 +95,15 @@ def main():
     a = facts(corpus("acl_submission"))
     app_titles, app_labels = appendix_wrapper_titles()
 
-    # strip the appendix wrapper from ACL before comparing: it is scaffolding
-    # around content TMLR holds inline, not content of its own.
-    a["labels"] -= app_labels
-    a["sections"] -= app_titles
+    # strip the appendix wrapper from BOTH venues before comparing: it is
+    # scaffolding around content the other venue holds somewhere too.
+    for side in (t, a):
+        side["labels"] -= app_labels
+        side["sections"] -= app_titles
 
     print("venue parity -- content should match, layout may differ")
-    print(f"  (ignoring {len(app_labels)} ACL appendix anchors and "
-          f"{len(app_titles)} appendix headings: scaffolding, not content)\n")
+    print(f"  (ignoring {len(app_labels)} appendix anchors and "
+          f"{len(app_titles)} appendix headings in both: scaffolding)\n")
     bad = 0
     for key in ("citations", "figures", "labels", "numbers"):
         only_t = t[key] - a[key]

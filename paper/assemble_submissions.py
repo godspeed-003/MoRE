@@ -119,6 +119,41 @@ APPENDIX = [
     ("competition2", "Specialisation against per-run controls", "app:specialisation"),
 ]
 
+# T-LA.14: TMLR MOVES A SUBSET TOO.
+#
+# TMLR has no hard page limit, but its author guide recommends 12 pages of main
+# content and the body measured ~14.4 (sections 1-8; unlike ACL, TMLR's
+# Limitations is an ordinary numbered section and counts). References and
+# appendix do not count, so the same block-move machinery closes the gap without
+# deleting a single sentence.
+#
+# The subset is chosen BY ARGUMENTATIVE LOAD, not by size, and every block's
+# one-line replacement is a SELF-CONTAINED statement of the finding with its
+# numbers -- moving a block compresses a claim and points at the detail, it does
+# not remove the claim from the body. That is what makes this lossless.
+#
+# CALIBRATION NOTE, so the next person does not repeat the estimate. Character
+# counts overestimate the page saving by ~40%: moving 8 blocks was predicted to
+# save 2.55 pages and actually saved 1.8 (14.4 -> 12.6). Headings, floats and
+# the replacement lines all take space back. Measure with
+# code/main_content_pages.py; do not trust code/measure_move_blocks.py for
+# anything but ranking.
+TMLR_APPENDIX = ["floor_proof", "holm_detail", "integrity", "metrics",
+                 "protocol", "engine", "stratified", "trapping",
+                 "competition2", "blimp", "saturation"]
+
+
+def appendix_order(venue):
+    """(id, title, label) triples for the venue's appendix, in APPENDIX order."""
+    if venue == "acl":
+        return list(APPENDIX)
+    keep = set(TMLR_APPENDIX)
+    return [row for row in APPENDIX if row[0] in keep]
+
+
+def moved_ids(venue):
+    return {row[0] for row in appendix_order(venue)}
+
 STYLES = {
     "tmlr_submission": [("tmlr", f) for f in
                         ("tmlr.sty", "tmlr.bst", "fancyhdr.sty", "math_commands.tex")],
@@ -165,39 +200,66 @@ def apply_variants(text, venue):
     return text
 
 
-def extract_moves(text, venue, collected):
-    """Resolve % >>>ACLMOVE blocks.
+def extract_moves(text, venue, collected, moved_labels):
+    """Resolve % >>>ACLMOVE blocks for the blocks THIS venue moves.
 
-    For ACL the block content is lifted into `collected` (keyed by id) and the
-    body keeps the one-line replacement. For TMLR the content stays where it is
-    and only the marker lines go.
+    A moved block's content is lifted into `collected` (keyed by id) and the body
+    keeps the one-line replacement. A block this venue does not move stays where
+    it is and only the marker lines go.
+
+    `moved_labels` accumulates every label that genuinely LEFT the body, i.e.
+    was defined in the moved copy and is NOT re-declared by the replacement.
+    Those are the labels a body \\ref must now cite as an appendix -- see
+    appendix_refs().
     """
+    want = moved_ids(venue)
     pat = re.compile(r"% >>>ACLMOVE:([A-Za-z0-9_]+)\|(.*?)\n(.*?)% <<<ACLMOVE:\1(?:\n|$)",
                      re.S)
 
     def sub(m):
         blk_id, replacement, body = m.group(1), m.group(2), m.group(3)
-        if venue != "acl":
-            return body                      # TMLR: inline, markers dropped
+        if blk_id not in want:
+            return body                      # stays inline, markers dropped
         # strip any \label the replacement itself re-declares, so the moved copy
         # does not define it a second time
         moved = body
-        for lab in re.findall(r"\\label\{([^}]+)\}", replacement):
+        kept = set(re.findall(r"\\label\{([^}]+)\}", replacement))
+        for lab in kept:
             moved = moved.replace("\\label{%s}" % lab, "")
+        moved_labels.update(set(re.findall(r"\\label\{([^}]+)\}", moved)) - kept)
         collected[blk_id] = moved
         return replacement + "\n"
 
     return pat.sub(sub, text)
 
 
-def write_appendix(sec_dir, collected):
-    """Emit the ACL appendix from the blocks lifted out of the body."""
+def appendix_refs(text, moved_labels):
+    """Cite a label that moved to the appendix AS an appendix, not as a section.
+
+    T-LA.14. `\\S\\ref{sec:stratified}` printed "\\S D.1" in the ACL build: a
+    section sign in front of an appendix number, pointing the reader at a
+    section that does not exist. LaTeX cannot warn about this -- the reference
+    resolves perfectly well, it is only the prose around it that is wrong -- so
+    it survived from T-LA.4 until the TMLR move list was being checked.
+
+    Driven by the venue's own move list rather than a hand-maintained table, so
+    adding a block to a move list cannot reintroduce it.
+    """
+    for lab in sorted(moved_labels):
+        for pat in (r"\\S~?\\ref\{%s\}", r"Section~\\ref\{%s\}",
+                    r"\\S\\ref\{%s\}"):
+            text = re.sub(pat % re.escape(lab),
+                          "Appendix~\\\\ref{%s}" % lab, text)
+    return text
+
+
+def write_appendix(sec_dir, collected, order, note):
+    """Emit a venue's appendix from the blocks lifted out of its body."""
     parts = ["% GENERATED by assemble_submissions.py -- do not edit.",
-             "% These blocks were lifted out of the body to meet ARR's 8-page",
-             "% content limit; appendices sit after the references and are exempt.",
+             "% " + note,
              ""]
     missing = []
-    for blk_id, title, label in APPENDIX:
+    for blk_id, title, label in order:
         if blk_id not in collected:
             missing.append(blk_id)
             continue
@@ -221,23 +283,28 @@ def build(venue):
     two_col = (venue == "acl_submission")
     vkey = "acl" if two_col else "tmlr"
     collected = {}
+    moved_labels = set()
 
-    # body sections
+    # body sections. Written in two passes: the first resolves the moves (which
+    # is what populates `moved_labels`), the second rewrites references to
+    # labels that left the body. A single pass cannot do it -- 05_mechanism
+    # refers to a label defined in 04_results, so the rewrite has to wait until
+    # every file has been scanned.
+    staged = []
     for src, dst in ORDER:
         body = open(os.path.join(COMMON, src), encoding="utf-8").read()
         body = apply_variants(body, vkey)
-        body = extract_moves(body, vkey, collected)
+        body = extract_moves(body, vkey, collected, moved_labels)
         if not two_col:
             # single column: avoid stranded spanning floats
             body = body.replace("{table*}", "{table}").replace("{figure*}", "{figure}")
         else:
             body = unnumber_refs(body)
-        # the architecture figure is renamed on copy (parentheses break TeX)
-        open(os.path.join(sec, dst), "w", encoding="utf-8", newline="\n").write(body)
+        staged.append((dst, body))
 
     limits, concl = split_limitations()
-    limits = extract_moves(apply_variants(limits, vkey), vkey, collected)
-    concl = extract_moves(apply_variants(concl, vkey), vkey, collected)
+    limits = extract_moves(apply_variants(limits, vkey), vkey, collected, moved_labels)
+    concl = extract_moves(apply_variants(concl, vkey), vkey, collected, moved_labels)
     if not two_col:
         limits = limits.replace("{table*}", "{table}").replace("{figure*}", "{figure}")
         concl = concl.replace("{table*}", "{table}").replace("{figure*}", "{figure}")
@@ -251,21 +318,27 @@ def build(venue):
         limits = unnumber_refs(limits)
         concl = unnumber_refs(concl)
 
-    open(os.path.join(sec, "06_limitations.tex"), "w",
-         encoding="utf-8", newline="\n").write(limits)
-    open(os.path.join(sec, "07_conclusion.tex"), "w",
-         encoding="utf-8", newline="\n").write(concl)
+    staged.append(("06_limitations.tex", limits))
+    staged.append(("07_conclusion.tex", concl))
 
-    if two_col:
-        missing = write_appendix(sec, collected)
-        if missing:
-            print(f"  WARNING appendix ids declared but not found: {missing}")
-        print(f"  acl appendix: {len(collected)} block(s) moved out of the body")
-    else:
-        # TMLR keeps everything inline; no appendix file should exist
-        stale = os.path.join(sec, "08_appendix.tex")
-        if os.path.exists(stale):
-            os.remove(stale)
+    # second pass: a label that left the body is now cited as an appendix
+    for dst, body in staged:
+        open(os.path.join(sec, dst), "w", encoding="utf-8", newline="\n").write(
+            appendix_refs(body, moved_labels))
+
+    order = appendix_order(vkey)
+    note = ("Blocks lifted out of the body to meet ARR's 8-page content limit;"
+            if two_col else
+            "Blocks lifted out of the body to hold main content near TMLR's"
+            " recommended 12 pages;")
+    missing = write_appendix(sec, collected, order, note +
+                             " appendices sit after the references and do not count.")
+    if missing:
+        print(f"  WARNING appendix ids declared but not found: {missing}")
+    print(f"  {vkey} appendix: {len(collected)} of {len(APPENDIX)} block(s) "
+          f"moved out of the body"
+          + (f"; {len(moved_labels)} label(s) re-cited as appendix"
+             if moved_labels else ""))
 
     # bibliography
     shutil.copy2(BIB, os.path.join(out, "refs.bib"))

@@ -114,29 +114,4 @@ zero because natural language supplies no per-token oracle expert and no per-tok
 oracle depth to supervise against. The canonical router is therefore unsupervised
 with respect to the per-token routing decision.
 
-\subsection{One engine, three modes}
-\label{sec:engine}
-
-MoE, MoR and MoRE are configurations of one implementation with an explicit
-\texttt{architecture} mode, not three codebases. They share one data pipeline, one
-optimiser setup and one evaluation path, so a difference between them cannot be a
-difference in the harness. Only the fields their definitions require differ:
-$E \in \{6,1,6\}$, $T \in \{1,7,7\}$, MoR's FFN multiplier (below), and the two
-loss weights for quantities that do not exist in a given arm (no ponder cost at
-depth 1, nothing to balance with one expert).
-
-We write \textbf{MoR} for our recursion-only configuration---one shared block with
-adaptive halting---which is in the spirit of weight-tied recursive transformers
-with learned halting \citep{dehghani2019ut,bae2025mor} but is not a reproduction
-of any specific published system; all three arms are configurations of the same
-engine.
-
-\paragraph{Matching the budget.} MoR has one FFN where MoRE has six, so matching
-the per-FFN multiplier would compare 5.6M parameters against 0.9M and call the
-difference architectural. We instead equalise \emph{total} FFN hidden width,
-giving MoR's single FFN a multiplier of $24 = 4 \times 6$. The result is
-5{,}584{,}908 parameters for MoE and MoRE, identical, and 5{,}581{,}063 for MoR---a
-0.069\% deficit that is six per-expert halt heads, the router and FFN biases. That
-residual is irreducible at any integer multiplier, and it runs \emph{against} the
-headline result: the arm with slightly fewer parameters is the one that wins in
-domain.
+\subsection{One engine, three modes}\label{sec:engine} MoE, MoR and MoRE are configurations of one implementation with an explicit \texttt{architecture} mode, so a difference between arms cannot be a difference in the harness. Equalising \emph{total} FFN hidden width gives MoR's single FFN a multiplier of $24=4\times6$: \textbf{5{,}584{,}908 parameters for MoE and MoRE, identical, and 5{,}581{,}063 for MoR}---a $0.069\%$ deficit that is the router MoR lacks, and which runs \emph{against} our headline since the lighter arm wins in domain. Appendix~\ref{app:engine} derives it.

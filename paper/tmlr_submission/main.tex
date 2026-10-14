@@ -178,4 +178,20 @@ copied by hand.
 \bibliographystyle{tmlr}
 \bibliography{refs}
 
+% T-LA.14. APPENDIX. TMLR sets no hard page limit but its author guide
+% recommends 12 pages of main content, and the body measured ~14.4 -- note that
+% unlike ACL, TMLR's Limitations is an ordinary numbered section and counts
+% toward that. References and appendices do not, so eight blocks of method
+% reference, statistical machinery and one auxiliary probe move here rather than
+% being cut. Nothing is deleted and no number leaves the paper.
+%
+% What deliberately STAYS in the body is what carries the argument: the
+% depth-saturation reframe, the per-run specialisation controls, and the
+% benchmark caveat. See TMLR_APPENDIX in assemble_submissions.py for the list
+% and the reasoning.
+%
+% 08_appendix.tex is GENERATED -- edit paper/common/*.tex, not the appendix.
+\appendix
+\input{sections/08_appendix}
+
 \end{document}

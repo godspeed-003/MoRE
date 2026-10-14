@@ -9079,3 +9079,134 @@ ACL has no page to spend restoring it.
 - `code/page_report.py` → ACL counted content ~8, limit 8, WITHIN.
 - `code/check_latex_lint.py` → 23 files clean.
 - `code/check_venue_parity.py` → TMLR carries everything ACL carries.
+
+---
+
+## T-LA.14 — TMLR main content 14.4 → 12.0 pages, by moving blocks to an appendix rather than cutting text
+
+**Date.** 2026-10-14. **Machine.** Ayan's RTX 4060 8 GB.
+
+TMLR's author guide recommends **12 pages of main content**; the body measured
+**14.4**. Closed by routing eleven blocks into a TMLR appendix, not by deleting
+prose. **No sentence and no number left the paper.**
+
+### The measurement was wrong in our own tooling first
+
+Every prior chat report quoted TMLR's body as "13 pages". That silently applied
+**ACL's** rule — where Limitations is a starred, page-exempt section — to TMLR,
+where Limitations is an ordinary numbered section and **counts**. TMLR main
+content runs §1 through the end of §8 Conclusion. Measured properly it was 14.4,
+exactly as the user reported, and our number was the one that was wrong.
+
+New tool `code/main_content_pages.py` measures this to a fraction of a page by
+locating the heading that *ends* main content (`Broader Impact Statement` for
+TMLR, `Limitations` for ACL) and how far down its page it sits. Two traps found
+while writing it, both now handled:
+- `pdftotext` emits a trailing form feed, so splitting on it yields one empty
+  chunk past the last page — reported a 19-page PDF as 20.
+- The running header (`Under review as submission to TMLR`) counted as content,
+  so a heading at the very top of a page read as "2% down" and an
+  exactly-12-page paper reported as `OVER by 0.0`.
+
+Xpdf's `pdftotext` 4.00 is what is installed here, **not** Poppler's:
+`-bbox-layout` does not exist and `-lineprinter` returns one character per line.
+Use `-layout`; it is reliable for single-column TMLR because line order is
+vertical order. For two-column ACL it interleaves both columns, which is why the
+ACL figure below is the weaker of the two.
+
+### What moved, and why that is lossless
+
+Each of the eleven blocks already carried a **self-contained one-line
+replacement** stating the finding with its numbers — written for ACL at T-LA.4/5/8.
+Moving a block therefore compresses a claim and points at the detail; it does not
+remove the claim from the body. That is the whole reason this is a page fix and
+not a content cut.
+
+A subset of eight was tried first, chosen by argumentative load (keeping
+`saturation`, `competition2` and `blimp` inline). It landed at **12.6** — still
+over. **Character counts overestimate the page saving by ~40%**: the eight blocks
+were predicted to save 2.55 pages and saved 1.8. Headings, floats and the
+replacement lines take space back. All eleven move, matching ACL's body
+selection, which is also what was asked for ("everything the ACL paper has, in
+TMLR format"). Rank blocks with `code/measure_move_blocks.py`; **measure** with
+`code/main_content_pages.py`.
+
+### A pre-existing ACL defect fixed on the way
+
+`\S\ref{sec:stratified}` printed **"\S D.1"** in the ACL build — a section sign
+in front of an appendix number, pointing the reader at a section that does not
+exist. It has been wrong since T-LA.4, when `stratified` first moved to ACL's
+appendix. **LaTeX cannot warn about this**: the `\ref` resolves perfectly well,
+only the prose around it is wrong, so it appears in no log and survived every
+compile.
+
+Fixed generally by `appendix_refs()` in the assembler, driven by the venue's own
+move list rather than a hand-maintained table, so adding a block to a move list
+cannot reintroduce it. Four labels are re-cited per venue. The other four
+movable blocks that define labels (`engine`, `protocol`, `metrics`, `integrity`)
+were never affected, because their replacements re-declare the label in the body
+— that is what `strip_labels` is for, and it works.
+
+### Code
+
+- `paper/assemble_submissions.py` — `TMLR_APPENDIX`, `appendix_order()`,
+  `moved_ids()`; `extract_moves()` now takes the venue's move set and
+  accumulates the labels that genuinely left the body; new `appendix_refs()`;
+  `write_appendix()` is per-venue. `build()` now writes sections in **two
+  passes** — the rewrite cannot run until every file has been scanned, because
+  `05_mechanism` refers to a label defined in `04_results`.
+- `paper/tmlr_submission/main.tex` — `\appendix` + `\input{sections/08_appendix}`
+  after the bibliography. Hand-maintained file; the appendix body is generated.
+- `code/check_move_refs.py` — new. Reads the move list from the assembler rather
+  than duplicating it, and asserts the rewrite **actually landed in the shipped
+  trees**, which is the only check that matters.
+- `code/check_venue_parity.py` — appendix scaffolding is now stripped from
+  **both** venues. Stripping it from ACL only made all 11 TMLR anchors and
+  headings show up as "in TMLR only": the same noise the function's docstring
+  warns about, in the other direction.
+- `code/main_content_pages.py`, `code/measure_move_blocks.py`,
+  `code/tmlr_length_map.py` — new measurement tools. `build_tmp/` gitignored.
+
+### Measured after
+
+| | PDF total | main content | limit | errors | overfull | undefined |
+|---|---|---|---|---|---|---|
+| TMLR | 20 | **12.0** | 12 | 0 | **0** | 0 |
+| ACL | 16 | ~8.9 | 8 | 0 | 1 (5.7pt) | 0 |
+
+TMLR's Conclusion now ends at the foot of page 12 and Broader Impact opens page
+13 — verified by extracting both pages' text, not inferred. Parity restored to
+the two intended differences (`lan2020albert`, and the wall-clock range in
+TMLR's Reproducibility Statement). Lint clean across 24 files. Bundles
+`overleaf_tmlr.zip` 107 KB / `overleaf_acl.zip` 105 KB.
+
+### OPEN, not fixed: ACL's content may be 9 pages against a limit of 8
+
+ACL's Conclusion ends ~89% down **page 9**, so content occupies nine pages. This
+repo's own history has been tracking the same quantity downward — T-LA.9 "body
+9.71 → 9.15", T-LA.10 "8.54 → 8.29" — so it has never been at 8, and
+`page_report.py` prints "~8 pages (limit 8 -> WITHIN)" because it rounds. **Two
+tools disagree (8.29 vs 8.9) and both exceed 8.**
+
+Not touched here: it is pre-existing, it is the other venue, and closing it is a
+scope decision about what leaves the ACL body. It is **not** caused by
+`appendix_refs()`, which adds ~32 characters in total. Reconcile
+`page_report.py` against `main_content_pages.py` before trusting either for a
+submission decision.
+
+**Failure tracing.**
+- *TMLR body page count disputed* → `code/main_content_pages.py`. Do not reuse
+  ACL's exemption rule; TMLR's Limitations counts.
+- *A body reference prints "§" before an appendix number* → a label left the
+  body and `appendix_refs()` did not cover it. No log will show this.
+- *Parity reports 11 appendix anchors in one venue only* → the stripping is
+  one-sided again.
+- *Page saving came in far below the character estimate* → expected, ~40% low.
+
+**Verified by.**
+- `code/main_content_pages.py` → TMLR 12.0 WITHIN; ACL 8.9 OVER (open).
+- Page-12/13 text extraction → Conclusion ends p12, Broader Impact opens p13.
+- `code/compile_papers.py` → both 0 errors, 0 undefined.
+- `code/check_move_refs.py` → rewrite verified in both shipped trees.
+- `code/check_venue_parity.py` → labels 36/36, figures 4/4, sections 33/32.
+- `code/check_latex_lint.py` → 24 files clean.
