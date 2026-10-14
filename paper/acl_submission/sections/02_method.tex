@@ -42,22 +42,12 @@ There is one block, so depth is computation through time rather than a stack of
 depth-specific layers, and no capacity limit is imposed---every routed token is
 evaluated by its expert and none is dropped.
 
-% Plain `figure`, NOT `figure*`, deliberately. In ACL's two-column layout a
-% span-float of this aspect ratio (2870x1139) costs about a third of a page of
-% full page height; single-column it costs one column, which is where the last
-% page over the ARR limit came from. The assembler leaves plain `figure` alone
-% for TMLR, where the document is single-column and this is full width anyway,
-% so one source gives the right footprint in both venues.
-\begin{figure}[t]
-    \centering
-    \includegraphics[width=\linewidth,keepaspectratio]{fig_architecture.png}
-    \caption{The MoRE block. A token is routed once to one of $E$ independent
-    expert FFNs; that expert's weights are then reused for an adaptive number of
-    recursion steps under ACT halting. Setting $T=1$ recovers MoE exactly and
-    setting $E=1$ recovers MoR; the input representation is bit-identical in all
-    three cases.}
-    \label{fig:architecture}
-\end{figure}
+% The architecture diagram is pure TikZ and ships as a COMPLETE float --
+% figure* wrapper, caption and \label{fig:architecture} all live in
+% fig/fig_architecture.tex -- so nothing may be declared here or they are
+% defined twice. Needs \usepackage{tikz} in the preamble; the assembler
+% demotes the spanning float for single-column TMLR.
+\input{fig/fig_architecture}
 
 \subsection{Halting and the training objective}
 \label{sec:halting-method}

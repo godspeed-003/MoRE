@@ -127,10 +127,28 @@ def references_page(folder, stem):
     return None
 
 
+def clean(folder, stem="main"):
+    """Remove intermediates before building.
+
+    NOT optional hygiene. A stale `main.aux` silently broke the ACL
+    bibliography: it had accumulated a SECOND `\\bibstyle` command, bibtex
+    answered `Illegal, another \\bibstyle command` and skipped the rest of it,
+    and the build then reported `Citation 'vinh2010ami' undefined` -- one missing
+    reference out of seventeen, with 0 LaTeX errors and nothing in the log that
+    pointed at the cause. Starting from clean is the only way the bibliography
+    state is trustworthy run to run.
+    """
+    for ext in (".aux", ".bbl", ".blg", ".out", ".toc", ".lof", ".lot"):
+        p = os.path.join(folder, stem + ext)
+        if os.path.exists(p):
+            os.remove(p)
+
+
 def compile_one(folder, stem="main"):
     print(f"\n{'=' * 66}\n  {os.path.basename(folder)}\n{'=' * 66}")
     tex = stem + ".tex"
     log = os.path.join(folder, stem + ".log")
+    clean(folder, stem)
 
     for rnd in range(MAX_INSTALL_ROUNDS):
         r = run([PDFLATEX, "-interaction=nonstopmode", "-halt-on-error", tex], folder)

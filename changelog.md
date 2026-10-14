@@ -8726,3 +8726,122 @@ alongside the source.
 - `code/check_latex_lint.py` → 23 files clean.
 - `code/compile_papers.py` → both venues 0 errors, 0 undefined refs/citations.
 - `code/make_overleaf_zips.py` → 19 and 18 files, 5 figures each, no artifacts.
+
+---
+
+## T-LA.8 — TMLR brought to parity with ACL and to submission readiness; a duplicate `\bibliographystyle` had been silently dropping a citation
+
+**Date.** 2026-10-14. **Machine.** Ayan's RTX 4060 8 GB.
+
+### The parity item that mattered: TMLR has no checklist, so the paper must carry it
+
+ACL discharges reproducibility through the **Responsible NLP Checklist**, a
+mandatory external form carrying seeds, compute, data and parameter counts.
+**TMLR has no equivalent form**, so for TMLR that information either lives in the
+paper or it is simply absent. A **Reproducibility Statement** was added after the
+conclusion collecting what was run (15 runs, 3 arms × 5 seeds), the data
+(WikiText-103, BPE-8192, the corpus's own author-provided validation split, the
+frozen dataset identifier), the model and optimiser, the compute (≈404M tokens
+per run, 5.7–7.9 h per recursive cell on an RTX 4060, ~60 GPU-hours for the
+matrix), the protocol and statistics, and the provenance gaps stated as they are.
+Every number already appears elsewhere in the paper; the statement collects them
+where someone intending to rerun the study will look.
+
+A short **Broader Impact Statement** was added for parity with ACL's Ethical
+Considerations. TMLR requires one only where the work "carries a significant risk
+of harm"; this does not, so the statement says why rather than being omitted, and
+names the asymmetric risk worth naming — a null at 5.6M parameters discouraging
+work that would succeed at scale.
+
+Also corrected: the TMLR preamble still told a future reader that one
+bibliography entry was "knowingly unverified and must be fixed or removed". True
+when written, false since T-LA.4. **A stale instruction in a submission file is
+worse than none, because it will be believed.**
+
+### The architecture diagram became TikZ, and the drop-in was in the wrong place
+
+`fig_architecture(1).tex` appeared on disk — 86 lines of pure TikZ, a complete
+`figure*` float with its own caption and `\label{fig:architecture}`, and wiring
+instructions in its own header — while `fig_architecture.png` had been removed
+from the same folder. Adopting it is right: a vector diagram beats a 2870×1139
+raster at print resolution.
+
+**That removal is what broke the ACL build**, and the failure was louder than its
+cause: `File 'fig_architecture.png' not found` halted the first pass, which left
+an incomplete `.aux`, which made bibtex error, which produced **41 undefined
+citations**. Two errors and 41 undefined references were one missing file.
+
+Three things the drop-in did not handle. It sat in `paper/acl_submission/fig/`, a
+**generated** folder that the next assembly would have wiped — moved to
+`paper/fig/` and registered in `FIGS`. Its filename carried `(1)` from a browser
+download, and parentheses break `\input`, which is the same trap that made the
+PNG ship renamed. And it declares its own caption and label, so the block in
+`03_method.tex` had to stop declaring them or both were defined twice.
+
+**One consequence, flagged rather than hidden:** the TikZ float is `figure*`,
+spanning both ACL columns, where T-LA.5 had deliberately demoted the architecture
+figure to a single-column `figure` to claw back a page. Spanning is correct for a
+diagram this wide — squeezed to 3.25in it would be illegible — so the page is
+given back and ACL's budget decision stands open.
+
+### A duplicate `\bibliographystyle` had been silently dropping a citation
+
+After the figure was fixed, ACL still reported `Citation 'vinh2010ami' undefined`
+— one missing reference out of eighteen, with **0 LaTeX errors**. The `.blg` gave
+it away: `Illegal, another \bibstyle command---line 1024 of file main.aux`.
+
+**`acl.sty` already issues `\bibliographystyle{acl_natbib}` at acl.sty:195**, and
+the official ACL template calls only `\bibliography` — never the style. Our
+`main.tex` declared it a second time, which put two `\bibstyle` commands in the
+aux; bibtex skipped the rest of that command and the entry it was about to write
+never reached the `.bbl`. **This has been present since T-LA.3 and cost one
+citation in every ACL build since.** Removed, with the reason recorded inline so
+nobody adds it back. TMLR is the opposite case: `tmlr.sty` does **not** set the
+style, so TMLR's `main.tex` must declare it. Both now render **18 of 18**.
+
+### Two build-hygiene fixes, both of which had already cost something
+
+**A clean build is now the default.** `compile_papers.py` removes `.aux`, `.bbl`,
+`.blg`, `.out`, `.toc`, `.lof`, `.lot` before the first pass. A stale `main.aux`
+had accumulated a second `\bibstyle` from an earlier manual `showbox` run and
+produced exactly the same silent citation loss, which sent the first diagnosis
+after a source bug that was not there yet.
+
+**The assembler now deletes generated files it did not write.** The superseded
+`fig_architecture.png` lingered in TMLR's tree after the diagram became TikZ,
+shipping 256 KB of dead weight — and the same staleness in the other direction is
+what made the ACL build fail. ACL's upload bundle fell from 340 KB to 109 KB.
+
+### Measured, clean build, both venues
+
+| | PDF total | body | errors | overfull | undefined | bibliography |
+|---|---|---|---|---|---|---|
+| TMLR | 19 | 13 | 0 | **0** | 0 | 18/18 |
+| ACL | 17 | 9 | 0 | 1 (5.7pt) | 0 | 18/18 |
+
+TMLR's body grew 13 → 13 with the two statements adding one page to the total
+(18 → 19). Lint clean across 23 `.tex` files. TMLR's
+`VERIFY_BEFORE_SUBMIT.md` rewritten to current truth: **no blockers remain**, and
+what is left is three judgement calls (the title, whether the Pareto figure's
+page is worth it, and the unused `math_commands.tex`).
+
+**Failure tracing.**
+- *Dozens of undefined citations plus a couple of errors* → look for ONE missing
+  file first. A halted first pass leaves an incomplete aux and the rest is
+  cascade.
+- *One citation undefined out of many, 0 LaTeX errors* → read the `.blg`. A
+  duplicate `\bibstyle` makes bibtex skip silently. Check whether the venue style
+  file already sets the bibliography style: `acl.sty` does, `tmlr.sty` does not.
+- *A figure or section edit vanishes* → it was made in a generated tree. Edit
+  `paper/common/` or `paper/fig/` and re-run the assembler.
+- *An upload bundle carries a file nothing references* → the assembler now prunes
+  it, but check `FIGS` is current.
+
+**Verified by.**
+- `code/compile_papers.py` (clean build) → both venues 0 errors, 0 undefined,
+  18/18 bibitems.
+- `code/check_overflow.py` → TMLR 0 overfull; ACL one box at 5.7pt (2%).
+- `code/check_latex_lint.py` → 23 files clean.
+- `paper/assemble_submissions.py` → both trees self-contained; one stale figure
+  pruned.
+- `code/make_overleaf_zips.py` → TMLR 20 files, ACL 18 files, no build artifacts.

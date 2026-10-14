@@ -63,6 +63,7 @@
 \usepackage{microtype}
 \usepackage{inconsolata}
 \usepackage{graphicx}
+\usepackage{tikz}        % architecture figure is drawn, not included
 
 % -- added: each is load-bearing for this body --
 \usepackage{amsmath}         % align/equation
@@ -137,7 +138,13 @@ for exactly that reason and states the measurement that would overturn it. The
 corpus inherits the demographic and topical biases of Wikipedia, which we did not
 measure and which bear on any downstream use of these checkpoints.
 
-\bibliographystyle{acl_natbib}
+% acl.sty ALREADY issues \bibliographystyle{acl_natbib} (acl.sty:195), and the
+% official ACL template calls only \bibliography. Declaring it again here put a
+% SECOND \bibstyle into main.aux; bibtex answered "Illegal, another \bibstyle
+% command", skipped the rest of it, and silently dropped one of seventeen
+% citations -- with 0 LaTeX errors and nothing in the .log pointing at the cause.
+% Do not add it back. (TMLR is the opposite case: tmlr.sty does NOT set it, so
+% the TMLR main.tex must declare it.)
 \bibliography{refs}
 
 % ---------------------------------------------------------------------

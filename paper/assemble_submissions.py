@@ -61,7 +61,11 @@ ORDER = [
 LIMITS_SRC = "06_limitations.tex"                   # split into limitations + conclusion
 
 FIGS = [
-    (os.path.join(HERE, "fig", "More(3)(1).png"), "fig_architecture.png"),
+    # T-LA.8b: the architecture diagram is now pure TikZ, \input as a
+    # complete figure* float. The superseded PNG stays in paper/fig/ as the
+    # original but is no longer copied -- nothing references it, and it was
+    # 256 KB of the upload bundle.
+    (os.path.join(HERE, "fig", "fig_architecture.tex"), "fig_architecture.tex"),
     (os.path.join(HERE, "fig_lang", "fig_depth_curve.pdf"), "fig_depth_curve.pdf"),
     (os.path.join(HERE, "fig_lang", "fig_pareto.pdf"),      "fig_pareto.pdf"),
     (os.path.join(HERE, "fig_lang", "fig_stratified.pdf"),  "fig_stratified.pdf"),
@@ -261,14 +265,34 @@ def build(venue):
     for sub, name in STYLES[venue]:
         shutil.copy2(os.path.join(HERE, sub, name), os.path.join(out, name))
 
-    # figures
+    # figures. A .tex figure is COPIED THROUGH THE SAME float conversion as
+    # the sections: it carries its own figure* float, and in single-column TMLR
+    # a spanning float can strand. Binary figures are copied verbatim.
     for src, dst in FIGS:
-        if os.path.exists(src):
-            shutil.copy2(src, os.path.join(fig, dst))
-        else:
+        if not os.path.exists(src):
             print(f"  WARNING missing figure: {src}")
+            continue
+        if dst.endswith(".tex") and not two_col:
+            t = open(src, encoding="utf-8").read()
+            t = t.replace("{figure*}", "{figure}").replace("{table*}", "{table}")
+            open(os.path.join(fig, dst), "w",
+                 encoding="utf-8", newline="\n").write(t)
+        else:
+            shutil.copy2(src, os.path.join(fig, dst))
 
     n = len(os.listdir(sec))
+    # Remove generated files this run did NOT write. Without this, a renamed or
+    # retired artifact lingers: the superseded fig_architecture.png stayed in
+    # TMLR's tree after the diagram became TikZ, shipping 256 KB of dead weight
+    # in the upload bundle, and the matching staleness in the other direction
+    # (a figure present in one tree and not the other) is what made the ACL
+    # build fail with "File `fig_architecture.png' not found".
+    written_figs = {dst for _src, dst in FIGS}
+    for f in sorted(os.listdir(fig)):
+        if f not in written_figs:
+            os.remove(os.path.join(fig, f))
+            print(f"  {venue}: removed stale generated figure {f}")
+
     print(f"  {venue}: {n} section files, "
           f"{len(os.listdir(fig))} figures, "
           f"{'two' if two_col else 'single'}-column floats")

@@ -1,119 +1,158 @@
 # VERIFY_BEFORE_SUBMIT.md — TMLR
 
-**Read this before uploading. Three items are blockers.** Everything here is
-something the LaTeX build will *not* warn you about.
+**Status: no blockers remain.** The paper compiles clean and every item that was
+a blocker in earlier revisions has been closed. What is left below is judgement
+calls and things the build cannot check for you.
+
+Measured on the last clean build (`python code/compile_papers.py`):
+
+| | value |
+|---|---|
+| PDF total | **19 pages** |
+| body (intro → conclusion) | **13 pages** |
+| LaTeX errors | **0** |
+| overfull boxes (content outside the text block) | **0** |
+| undefined references / citations | **0** |
+| bibliography entries rendered | **18 of 18** |
 
 ---
 
-## 1. BLOCKER — one bibliography entry is knowingly unverified
+## 1. Closed since the last revision — do not re-raise these
 
-`refs.bib` contains `leong2023ewok` with the literal author field
-`{UNVERIFIED, Author List}` and a placeholder arXiv ID. It will typeset and
-BibTeX will not complain.
+- **The bibliography is fully verified.** `refs.bib` carries **zero** unverified
+  entries. The EWoK entry was wrong in *every* guessed field and is now
+  `ivanova2024ewok`, verified against the arXiv API; `vinh2010ami` was checked
+  against JMLR's own BibTeX export; `raposo2024mod`, `bae2025mor` and
+  `banino2021pondernet` were corrected or confirmed. Per-entry verification notes
+  are comments in the file.
+- **The page count is measured, not estimated.** An earlier revision estimated
+  the body from source volume and was wrong by several pages; the figure above
+  comes from `Output written on main.pdf` plus a page anchor at the Limitations
+  heading read out of `main.aux`.
+- **Nothing runs outside the text block.** Three display equations used to
+  overflow the *ACL* column by up to 48%; TMLR's wider measure never showed it,
+  and both are clean now. Verify with `python code/check_overflow.py`.
 
-**Fix:** open the arXiv abstract page or ACL Anthology entry for the EWoK
-benchmark, and replace the author list, venue and ID outright.
+## 2. Judgement calls — yours, not blockers
 
-**Or delete it.** The EWoK result is "every arm is at chance", reported as a
-scale limitation rather than a finding, so the paper loses nothing. If you
-delete the entry, also remove the `\citep{leong2023ewok}` in
-`sections/04_results.tex` (§ "Where the composition does pay") and in
-`sections/01_intro.tex` (Related Work, evaluation-at-small-scale paragraph).
+- [ ] **Title.** Currently *"Adaptive Compute at Matched Parameters: Routing and
+      Recursion Trade Off in Small Language Models."* The earlier candidate
+      "Parameter- and FLOP-Matched" was rejected as inaccurate: the arms are
+      parameter-matched but deliberately **not** FLOP-matched, and
+      1.00×/9.07×/2.19× is the central measurement.
+- [ ] **The Pareto figure costs one page.** `fig_pareto` took the body from 12 to
+      13 pages. TMLR sets no limit and asks that length be justified by content;
+      this figure is what revealed that MoR is Pareto-*dominated* out of domain,
+      a result the table had understated. Keep it unless you disagree — but the
+      ~12-page norm is a real convention.
+- [ ] **`math_commands.tex` is shipped and never `\input`.** It comes with the
+      official TMLR template and is kept so the folder matches it. Delete it if
+      you prefer a minimal upload; nothing references it.
 
-## 2. BLOCKER — the page count has never been measured
-
-No LaTeX toolchain existed on the machine that assembled this, so **this
-document has never been compiled**. TMLR has no fixed page limit, but the
-practical norm is ~12 pages of body and "unusually long papers are likely to
-result in reviewing delays."
-
-**Compile it first** and check: page count, float placement (three figures and
-three tables), and that no table overruns the single-column width.
-
-## 3. BLOCKER — two remaining bibliography entries were never checked
-
-`vinh2010ami` and `raposo2024mod` were not verified. The values present match
-expectation (`JMLR 11:2837–2854`; `arXiv:2404.02258`) but neither was confirmed
-against a publisher record. Six further entries (`graves2016act`,
-`dehghani2019ut`, `elbayad2020depthadaptive`, `schuster2022calm`,
-`lan2020albert`, and `merity2017wikitext`/`gao2020pile` beyond their flagged
-fields) were likewise not re-checked this round.
-
-**Verified and correct:** `jacobs1991moe`, `fedus2022switch`, `zoph2022stmoe`,
-`shazeer2017moe`, `lepikhin2021gshard`, `warstadt2020blimp`.
-
-**Verified and corrected in place:** `bae2025mor` (author list was `and others`;
-now the full eleven authors, venue upgraded from arXiv to NeurIPS 2025) and
-`banino2021pondernet` (was flagged as possibly ICML main track; it is the
-**8th ICML Workshop on AutoML**).
-
----
-
-## 4. Anonymity — currently correct, do not "fix" it
+## 3. Anonymity — currently correct, do not "fix" it
 
 `\usepackage{tmlr}` with **no option** is the anonymous submission mode, and
-TMLR review is double-blind. The `\author{}` block in `main.tex` is ignored and
-replaced by "Anonymous authors / Paper under double-blind review". Leave it.
+TMLR review is double-blind. The `\author{}` block is ignored and replaced by
+"Anonymous authors / Paper under double-blind review". Leave it.
 
 - Do **not** add `[accepted]` or `[preprint]` until acceptance.
-- Supplementary material must be anonymised too.
-- A preprint may be posted at any time, but must not link back to a
-  non-anonymous version.
+- Checked and clean: no author names, no institutional strings, no repository
+  links, no acknowledgements anywhere in the source.
+- Supplementary material must be anonymised too. A preprint may be posted at any
+  time but must not link back to a non-anonymous version.
 
-## 5. Content checks the build cannot make
+## 4. Content checks the build cannot make
 
-- [ ] **Title is provisional.** Currently *"Routing and Recursion Compete: A
-      Parameter-Matched Decomposition of Conditional Computation in Small
-      Language Models."* Chosen to lead with the finding and to pre-empt the
-      scale objection in the title itself. Change it if you disagree.
 - [ ] **No arithmetic numbers anywhere.** The arithmetic study is withdrawn, and
       mixing its mean-squared-error table with this cross-entropy one is the
-      single most damaging error available in this repository. Grep the draft
-      for `0.06`, `more6`, `3,201,555`, `MSE`, `R^2`.
-- [ ] **Every number traces to a generated file.** Nothing was hand-copied: the
-      headline comes from `results/language/results_tables.md`, the battery from
-      `results/language/eval_summary.md`, the per-seed values from
-      `results/language/results.json` (`admitted_runs[]`). If a number needs
-      changing, regenerate rather than edit.
-- [ ] **`results.csv` is unusable for per-seed claims** — its architecture and
-      run-id columns are all `N/A`. Use `results.json`.
+      worst error available in this repository. Grep for `0.06`, `more6`,
+      `3,201,555`, `MSE`, `R^2`.
+- [ ] **Every number traces to a generated file.** Headline from
+      `results/language/results_tables.md`, battery from
+      `results/language/eval_summary.md`, per-seed from
+      `results/language/results.json` (`admitted_runs[]`). Nothing was
+      hand-copied. **`results.csv` is unusable for per-seed claims** — its
+      architecture and run-id columns are all `N/A`; use `results.json`.
 - [ ] **Exploratory vs confirmatory tiering is intact.** The headline table and
-      pairwise tests are confirmatory with Holm correction over pre-registered
-      families. Everything in the evaluation battery, the forced-depth sweep,
-      the stratified loss, the subspace and dynamic probes is **exploratory and
-      uncorrected**, and no significance verdict from them may appear in the
-      abstract or conclusion. Check the abstract still obeys this.
-- [ ] **Figures regenerate.** `python code/make_paper_figures.py`, then re-run
-      `python paper/assemble_submissions.py`.
+      the pairwise tests are confirmatory, Holm-corrected over two
+      pre-registered families. The evaluation battery, the forced-depth sweep,
+      the stratified loss, the subspace and dynamic probes, and the seed-variance
+      comparison are **exploratory and uncorrected** — no significance verdict
+      from any of them may appear in the abstract or conclusions. Check the
+      abstract still obeys this.
+- [ ] **The two axes stay separate.** At matched parameters MoR is lowest-loss by
+      0.1216 nats; per unit of inference compute MoRE is ahead. Neither statement
+      licenses the other, and "comparable to MoR" appears only ever as a
+      *per-FLOP* claim. A reviewer should not be able to say we switched axes to
+      tell a better story.
 
-## 6. How to rebuild this folder
+## 5. What the paper discloses, and should keep disclosing
 
-Do not edit `sections/*.tex` here — they are generated copies and will be
-overwritten. Edit `paper/common/*.tex`, then:
+These are in the Limitations section and are why the rest is credible. Do not
+trim them to save space:
+
+- A declared Family-A control (the depth-matched fixed-depth arm) was **never
+  run** and still consumes its Holm slot.
+- Fixing the architecture to route once made the headline **worse** by 0.134
+  nats; the spec-violating per-step arm is kept as a labelled ablation.
+- The pre-registration is **partial** and the registration file says so.
+- The matrix spans **two GPUs** and four dirty code revisions; ten of fifteen
+  cells carry null GPU fields that were **not** backfilled.
+- Three epochs is a **budget, not convergence**.
+- A balance-loss diagnosis was published and then **withdrawn** when a sweep
+  refuted its sign.
+
+## 6. How to rebuild
+
+Do not edit `sections/*.tex` or `fig/fig_architecture.tex` here — they are
+generated copies and will be overwritten. Edit `paper/common/*.tex` (or
+`paper/fig/`), then:
 
 ```bash
 python paper/assemble_submissions.py
 ```
 
-That rewrites both venue trees and re-runs the self-containment check (every
-`\input`, figure, citation key and `\ref` must resolve).
+Then, in order:
+
+```bash
+python code/check_latex_lint.py
+```
+
+```bash
+python code/compile_papers.py
+```
+
+```bash
+python code/check_overflow.py
+```
+
+```bash
+python code/make_overleaf_zips.py
+```
+
+The lint catches source defects that compile silently — most importantly
+shell-expansion damage, which once turned `MoRE$-$MoE` into `MoREhBc` and set a
+whole sentence in math italic with zero errors and zero warnings. **Never edit a
+`.tex` file through a shell string**; write a `.py` file and run it.
 
 ## 7. What is in this folder
 
 | file | note |
 |---|---|
-| `main.tex` | the document; preamble comments explain each option |
+| `main.tex` | the document, including the Broader Impact and Reproducibility statements |
 | `sections/01_intro.tex` | introduction + related work |
 | `sections/02_method.tex` | architecture, ACT equations, one-engine-three-modes |
 | `sections/03_setup.tex` | data, protocol, metrics, statistics, integrity |
-| `sections/04_results.tex` | headline table, depth curve, battery, strata |
+| `sections/04_results.tex` | headline table, Pareto figure, depth curve, battery, strata |
 | `sections/05_mechanism.tex` | dilution arithmetic, saturation, competition, refutation |
 | `sections/06_limitations.tex` | limitations + disclosures |
 | `sections/07_conclusion.tex` | conclusion |
-| `refs.bib` | bibliography — see §1 and §3 above |
-| `tmlr.sty`, `tmlr.bst`, `fancyhdr.sty`, `math_commands.tex` | official TMLR style files, unmodified |
-| `fig/` | four figures; the three `fig_*.pdf` are generated |
+| `refs.bib` | bibliography, 18 entries, all verified |
+| `tmlr.sty`, `tmlr.bst`, `fancyhdr.sty` | official TMLR style files, unmodified |
+| `math_commands.tex` | template file, **not used** — see §2 |
+| `fig/fig_architecture.tex` | the block diagram, pure TikZ (needs `\usepackage{tikz}`, already in the preamble) |
+| `fig/fig_*.pdf` | four generated figures, from `code/make_paper_figures.py` |
 
-`math_commands.tex` ships with the TMLR template and is **not** `\input` by this
-document. It is kept so the folder matches the official template; delete it if
-you prefer a minimal upload.
+`tmlr.sty` does **not** set the bibliography style, so `main.tex` must declare
+`\bibliographystyle{tmlr}` — unlike the ACL version, where `acl.sty` sets it and
+declaring it again silently broke bibtex.
