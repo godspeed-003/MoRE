@@ -9028,3 +9028,54 @@ Upload bundles fell to ~103 KB, the 78 KB raster replaced by 5.7 KB of TikZ.
 - `code/check_overflow.py` → TMLR 0 overfull; ACL one box at 5.7pt.
 - `code/check_venue_parity.py` → TMLR carries everything ACL carries.
 - `code/check_latex_lint.py` → 23 files clean.
+
+---
+
+## T-LA.13 — the page counter was silently returning nothing, and it guards ACL's page limit
+
+**Date.** 2026-10-14. **Machine.** Ayan's RTX 4060 8 GB. Found by a direct
+"is TMLR ready to compile?" question, which is the only reason it was caught.
+
+`compile_papers.py` printed `PDF pages : None` for both venues after T-LA.12.
+`page_count()` scanned the PDF **bytes** for `/Count N`, falling back to counting
+`/Type /Page`. Once the architecture figure became TikZ, pdflatex compressed the
+page tree into an **object stream**, so neither pattern appears as plain bytes
+and the scan found zero pages.
+
+**Why this is the dangerous shape of bug, not a cosmetic one.** The function
+returns `None` on failure, and `None` prints as a value. ACL's hard 8-page
+content limit is checked against this number, so a missing count renders as *"no
+problem found"* rather than as an error. A desk rejection for length is exactly
+the failure this check exists to prevent, and the check had stopped working while
+still reporting. Compare CLAUDE.md §4: no sentinel may be reported as a
+measurement — `None` was doing precisely that.
+
+**Fix.** Read pdflatex's own `Output written on main.pdf (N pages, ...)` line
+from the `.log` first; keep the byte scan only as a fallback. The log line is
+written by the engine, is authoritative, and is immune to PDF compression.
+`page_report.py` was already reading the logs, which is why it kept reporting 18
+and 16 correctly throughout and gave the cross-check that identified the cause.
+
+**Measured after the fix.** TMLR 18 pages, ACL 16 total with **~8 counted
+content (at the limit, WITHIN)**, both 0 errors and 0 undefined. TMLR 0 overfull;
+ACL one 5.7pt box. TMLR bibliography resolves 18/18.
+
+**A parity number corrected.** The numeric-claim count is TMLR **169** vs ACL
+168, not 168/168 as previously stated in chat. The single extra is the wall-clock
+range in TMLR's Reproducibility Statement, which has no ACL counterpart by design
+(ARR collects the same facts on the Responsible NLP Checklist). Direction is
+safe: ACL is the reference and lacks nothing. The one real remaining asymmetry is
+still `lan2020albert`, dropped by ACL's compressed related work — open, because
+ACL has no page to spend restoring it.
+
+**Failure tracing.**
+- *A page count reads `None` or is absent* → the `.log` is the source of truth;
+  do not trust a PDF-byte scan, object-stream compression defeats it.
+- *Two tools disagree about page count* → believe `page_report.py`; it has always
+  read the logs.
+
+**Verified by.**
+- `code/compile_papers.py` → 18 / 16, previously `None` / `None`.
+- `code/page_report.py` → ACL counted content ~8, limit 8, WITHIN.
+- `code/check_latex_lint.py` → 23 files clean.
+- `code/check_venue_parity.py` → TMLR carries everything ACL carries.

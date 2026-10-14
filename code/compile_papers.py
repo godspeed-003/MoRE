@@ -14,6 +14,7 @@ WHY A SCRIPT. Three reasons a bare `pdflatex` call is not enough here:
 TinyTeX is extracted under a temp directory rather than installed system-wide,
 so nothing is added to PATH permanently and removing the directory removes it.
 """
+import io
 import os
 import re
 import subprocess
@@ -132,7 +133,26 @@ def ensure_tlmgr():
 
 
 def page_count(pdf):
-    """Page total, read from the PDF itself."""
+    """Page total. Reads the .log first, the PDF bytes only as a fallback.
+
+    T-LA.12: the PDF-byte scan below returned None once the architecture figure
+    became TikZ. pdflatex compresses the page tree into an object stream, so
+    neither `/Count N` nor `/Type /Page` appears as plain bytes, and the scan
+    silently yielded no pages -- printing "PDF pages: None" rather than failing.
+    That is the dangerous shape: ACL's 8-page content limit is checked against
+    this number, so an absent count reads as "no problem found".
+
+    pdflatex's own "Output written on main.pdf (N pages, ...)" line is
+    authoritative and immune to PDF compression, so prefer it.
+    """
+    log = os.path.splitext(pdf)[0] + ".log"
+    try:
+        txt = io.open(log, encoding="utf-8", errors="replace").read()
+        m = re.findall(r"Output written on .*?\((\d+) pages?", txt)
+        if m:
+            return int(m[-1])
+    except OSError:
+        pass
     try:
         data = open(pdf, "rb").read()
     except OSError:
