@@ -9336,3 +9336,66 @@ Both figure pages inspected as images. Bundles 176 KB / 174 KB; root
 - Rasterised pages 4 (TMLR) and 3 (ACL) → figure legible, arrows correct.
 - `code/check_venue_parity.py`, `check_move_refs.py`, `check_latex_lint.py`,
   `check_submission_selfcontained.py` → all pass.
+
+---
+
+## T-LA.19 — adversarial review of the language paper against the two prior reviews
+
+**Date.** 2026-10-15. **Machine.** Ayan's RTX 4060 8 GB. Deliverables:
+[PAPER_REVIEW.md](PAPER_REVIEW.md) (findings) and
+[PAPER_MITIGATION.md](PAPER_MITIGATION.md) (problem register, options, strategy).
+
+Cross-checked against the two review sources the repo already held: **NeurIPS
+workshop reviewer 652J** (concerns 1/3/4 are quoted in the headers of
+`diag_halt_gradient.py`, `flops_accounting.py`, `eval_test_split.py`; **concern 2
+is recorded nowhere**) and `PHASE11_AUDIT.md`'s 12 required actions.
+
+**The claims survive.** Every paper number reconciles with
+`results/language/results.json` — 6.955, 6.730, 97.3 %, depth std 0.43, both
+Spearman values, the 72 %/149 % ratios, the variance ratio, the per-FLOP column.
+No forbidden sentence, no unlabelled hypothesis, no sentinel as a measurement.
+The exposure is under-documentation and three contradictions.
+
+**Findings that needed real digging.**
+
+- **`val/avg_recursion_steps` = 7.615 with `max_depth` 7.** Not a bug: it is
+  `val_exp_depth_sum / val_exp_depth_n`, i.e. *expected* depth `N + R`. Verified
+  against numbers the paper already prints — MoRE 6.955 + 0.655 = 7.610 ≈ 7.615;
+  MoR 6.730 + 0.175 = 6.905 ≈ 6.899. The `val/*` halting family is soft/expected,
+  `depth/*` and `halt/*` are realised, and they agree exactly with each other
+  (`halt/forced_exit_rate` 0.97340 == `depth_dist/step_7_pct` 97.3405). Needs a
+  footnote, not a fix.
+- **FLOPs are never derived in the paper** and `\S\ref{sec:metrics}` — the only
+  pointer — does not define them. The real method in `code/flops_accounting.py`
+  (FlopCounterMode on a real forward pass, linearity verified to 0.1 % as a hard
+  failure, evaluated at measured mean depth, attention/embeddings/LM head
+  included) is stronger than most published accounting and is entirely absent.
+- **MoR *is* the E=1 point of a matched-width expert sweep.** Verified from the
+  resolved configs: total FFN width is 24 in all three arms (MoE 6×4, MoR 1×24,
+  MoRE 6×4). So the headline MoR-vs-MoRE contrast already supplies two points on
+  the axis the dilution mechanism is about, and E ∈ {2,3} map to `ffn_mult`
+  {12,8}. The paper presents it only as an architecture comparison.
+- **§6.2 and §6.3 are in tension.** §6.2's entire content is that the ponder
+  weight calibrated on the small corpus does **not** transfer to the full corpus;
+  §6.3 explains full-corpus behaviour using a small-corpus grid over that same
+  weight. Both can hold — non-transfer of a *level* does not preclude transfer of
+  a *trade-off* — but the paper never says so.
+- **Self-contradiction on hardware.** §Setup says "a single laptop GPU";
+  Limitations say two GPUs; the TMLR Reproducibility Statement names a V100.
+- **The frozen spec contradicts the paper.** `canonical_spec_language.json` still
+  carries 5.2406 / 2.63 / 0.2907 for the (0.001, 0.001) dev point where the paper
+  and `lang_calibration_weights.json` carry 5.2352 / 2.698 / 0.2851.
+  `PAPER_GUIDE.md` flagged this and said to fix the loser; it was never fixed.
+- **Learning curves exist after all.** All 15 admitted runs carry 3-point
+  validation curves. (A first pass said they did not — that was read off one of
+  the 47 non-admitted run directories, whose `results.tsv` has a single row.)
+  Mean val loss by epoch: MoE 4.145/4.039/3.948, MoR 3.820/3.647/3.515, MoRE
+  3.942/3.813/3.637. **MoRE improves fastest at the budget cut** (+0.176 against
+  MoR's +0.132), so the arm that loses in domain is the furthest from
+  convergence. Double-edged and recommended for publication anyway.
+
+**Failure tracing.**
+- *A metric looks impossible* → check whether it is a soft/expected quantity;
+  `val/*` halting keys are `N+R`, `depth/*` are realised.
+- *A results.tsv has one row* → it is a non-admitted run. 62 directories, 15
+  admitted; join through `results.json`'s `admitted_runs`.
