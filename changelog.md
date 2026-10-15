@@ -9210,3 +9210,129 @@ submission decision.
 - `code/check_move_refs.py` → rewrite verified in both shipped trees.
 - `code/check_venue_parity.py` → labels 36/36, figures 4/4, sections 33/32.
 - `code/check_latex_lint.py` → 24 files clean.
+
+---
+
+## T-LA.18 — merge Vedant's T-LA.15/16/17; references last in TMLR; retire two of my own tools that were actively harmful
+
+**Date.** 2026-10-15. **Machine.** Ayan's RTX 4060 8 GB. Fast-forward merge of
+`70f935b..d17b035`, then four fixes on top.
+
+### First: the T-LA.12 figure adoption was wrong, and the way I verified it was the problem
+
+T-LA.15 found that the TikZ architecture figure wired in at T-LA.12 rendered
+**illegibly in both venues** — nodes positioned in a 0–100 coordinate space with
+text sized in points, so text overflowed its nodes and `\resizebox` preserved the
+overlap. In TMLR the embed box sat under the router; in ACL the picture collapsed
+into fragments over the Related Work text.
+
+**T-LA.12 verified the figure's semantics and called that verification.** The
+check performed was "does this draw route-once rather than the retired per-step
+design?" — which was the right question and got the right answer. The check *not*
+performed was "does it render?" **TikZ overlap raises no overfull-hbox warning**,
+so four consecutive compiles reported 0 errors / 0 overfull / 0 underfull while
+the paper's only diagram was unreadable, and T-LA.12 reported "all green" on that
+basis. A clean log is not evidence a figure is legible. Both figure pages are now
+rasterised and inspected by eye each cycle (`pymupdf` → `get_pixmap`), which is
+the only check that would have caught it.
+
+### `code/wire_tikz_architecture.py` was a loaded gun; archived
+
+It is the **only** thing in the repository that writes
+`\input{fig/fig_architecture}`. Running it rewrites `paper/common/03_method.tex`
+back to the reverted TikZ wiring and re-points `FIGS` at a `.tex` that no longer
+ships, failing the build with ``File `fig/fig_architecture.tex' not found``.
+
+That exact failure appeared mid-session from a stale generated `02_method.tex`
+— `\input` on line 50 under Vedant's new PNG comment, a combination that exists
+in no source file. Reassembling from `paper/common/` fixed it and the state has
+been reproducible since. **The precise trigger was not established**; the script
+is the only known mechanism that produces that content, so it moves to
+`archive/pre_finalization/retired_tools/` with a README rather than staying
+somewhere a glob or a habit could invoke it.
+
+### References now come last in TMLR, and the measurement had to follow
+
+TMLR imposes no order on back matter; the template's own example puts the
+bibliography before the appendix, so this is a deliberate choice. **ACL is
+deliberately not changed** — ARR requires appendices to follow the references, so
+the venues legitimately differ here.
+
+This changes how the paper must be measured. `measure_counted_pages.py` finds the
+end of counted body by locating the `References` heading; with the bibliography
+last, that landmark sits past the appendix and **the entire appendix counts as
+body**. It now stops at whichever of References / the appendix comes first, so
+the number is independent of back-matter order — verified by the measurement
+returning **13.43 both before and after the move**, matching T-LA.16 exactly.
+
+Two traps hit while implementing that, both of the "confidently wrong answer"
+kind `detect_venue` already warns about:
+
+1. A first attempt matched the appendix as "a single letter, whitespace, then
+   anything", meaning the `A <Title>` heading. It matched the display equation
+   `h = LayerNorm(...)` on page 3 and reported **2.50 pages**. Display math in
+   TMLR is set `\large` since T-LA.16, so it clears `HEADING_PT` and looks like a
+   heading. Now anchored on the appendix section titles read from the assembler's
+   `APPENDIX` list.
+2. Spans are one per word **and carry their own trailing spaces**, so joining
+   yields `'the   resolution   floor'`. A single-word landmark survives that; a
+   multi-word title does not, and the tool ran past the appendix to the
+   bibliography and reported **18.28 pages**. Whitespace is collapsed before
+   comparison.
+
+### `code/main_content_pages.py` retired — it was the wrong half of a disagreement
+
+T-LA.14 wrote it believing no such tool existed. One did. **Two tools measuring
+the same quantity under different rules is the defect.** Mine ended main content
+at the *Broader Impact Statement*; `measure_counted_pages.py` ends it at
+*References*, which is TMLR's real rule and includes the Broader Impact and
+Reproducibility statements. The ~1-page gap between them is exactly those two
+statements — **which is why T-LA.14 reported "12.0 pages, WITHIN" for a paper
+that was really ~13.0 and over.** It also measured two-column ACL by counting
+interleaved `pdftotext -layout` lines, which cannot separate columns: 8.6 against
+the coordinate-based 8.29. Archived alongside the other retired tool.
+
+`code/tmlr_length_map.py` (section→page map) and `code/measure_move_blocks.py`
+(block ranking) are kept: different purposes, no overlapping claim.
+
+### Measured after
+
+| | PDF | counted body | limit | errors | overfull | undefined |
+|---|---|---|---|---|---|---|
+| TMLR | 20 | **13.43** | 12 | 0 | **0** | 0 |
+| ACL | 15 | **8.29** | 8 | 0 | 2 | 0 |
+
+Parity: figures 5/5, labels 37/37, sections 33/32, 180 of 181 numbers shared —
+the two intended differences only (`lan2020albert`, and the wall-clock range in
+TMLR's Reproducibility Statement). Lint clean, 24 files. Zip-readiness passes.
+Both figure pages inspected as images. Bundles 176 KB / 174 KB; root
+`tmlr_submission.pdf` / `acl_submission.pdf` refreshed.
+
+### OPEN — both over, both deliberate-or-undecided
+
+- **TMLR 13.43 of 12.** Over by 1.43, **accepted deliberately at T-LA.16**: the
+  12-page mark is a review-speed threshold, not a limit (≤12 → ~2 weeks, >12 →
+  ~4), and the enlarged display math and Section-6 tables were judged worth ~2
+  extra weeks. Note this **reverses T-LA.14's goal**, which was driven by a
+  request to bring the paper to 12. The two decisions are in direct conflict and
+  the trade is a judgement call, not a defect.
+- **ACL 8.29 of 8.** Over by 0.29 against a *hard* limit; ACL also still carries
+  2 overfull hboxes from the wider table in two columns. Deferred at T-LA.15 as
+  "next cycle". This is the one that risks desk rejection.
+
+**Failure tracing.**
+- *Figure looks wrong in the PDF but the log is clean* → rasterise and look.
+  TikZ overlap and float collapse raise no warning.
+- *``File `fig/fig_architecture.tex' not found``* → something ran the archived
+  `wire_tikz_architecture.py`, or a stale generated section survived. Reassemble.
+- *Counted body suddenly tiny or enormous* → the landmark matched a display
+  equation (tiny) or ran past the appendix (enormous). Check `stopped at`.
+- *Two page numbers for the same paper* → they are measuring to different
+  landmarks. `measure_counted_pages.py` is authoritative.
+
+**Verified by.**
+- `code/compile_papers.py` → TMLR 20pp 0 err; ACL 15pp 0 err; no undefined.
+- `code/measure_counted_pages.py` → 13.43 / 8.29, landmark printed.
+- Rasterised pages 4 (TMLR) and 3 (ACL) → figure legible, arrows correct.
+- `code/check_venue_parity.py`, `check_move_refs.py`, `check_latex_lint.py`,
+  `check_submission_selfcontained.py` → all pass.

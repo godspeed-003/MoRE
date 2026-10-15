@@ -189,23 +189,35 @@ fact is worse than an absent one. Every table and figure in this paper is
 generated from the run outputs by scripts rather than transcribed; no number was
 copied by hand.
 
-\bibliographystyle{tmlr}
-\bibliography{refs}
-
 % T-LA.14. APPENDIX. TMLR sets no hard page limit but its author guide
 % recommends 12 pages of main content, and the body measured ~14.4 -- note that
 % unlike ACL, TMLR's Limitations is an ordinary numbered section and counts
-% toward that. References and appendices do not, so eight blocks of method
+% toward that. References and appendices do not, so eleven blocks of method
 % reference, statistical machinery and one auxiliary probe move here rather than
 % being cut. Nothing is deleted and no number leaves the paper.
 %
-% What deliberately STAYS in the body is what carries the argument: the
-% depth-saturation reframe, the per-run specialisation controls, and the
-% benchmark caveat. See TMLR_APPENDIX in assemble_submissions.py for the list
-% and the reasoning.
+% Each moved block keeps a self-contained one-line summary in the body, so a
+% move compresses a claim and points at the detail; it never removes the claim.
+% See TMLR_APPENDIX in assemble_submissions.py for the list and the reasoning.
 %
 % 08_appendix.tex is GENERATED -- edit paper/common/*.tex, not the appendix.
 \appendix
 \input{sections/08_appendix}
+
+% T-LA.18. REFERENCES LAST, after the appendix. TMLR imposes no order here and
+% the template's own example puts the bibliography before the appendix; this is
+% a deliberate choice, not the default.
+%
+% IT CHANGES HOW THE PAPER MUST BE MEASURED. measure_counted_pages.py finds the
+% end of counted body by looking for the 'References' heading, so with the
+% bibliography last that landmark would sit past the appendix and the whole
+% appendix would be counted as body. The tool now stops at whichever of
+% References / Appendix comes FIRST -- do not revert that without moving this
+% block back.
+%
+% ACL is deliberately NOT changed: ARR's template requires appendices to follow
+% the references, so the two venues legitimately differ here.
+\bibliographystyle{tmlr}
+\bibliography{refs}
 
 \end{document}

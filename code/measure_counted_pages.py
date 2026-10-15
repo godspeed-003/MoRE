@@ -39,6 +39,8 @@ FOUR TRAPS, each of which silently gives a plausible wrong answer.
 4. A NUMBERED HEADING CARRIES ITS NUMBER. The joined line is "7 Limitations",
    not "Limitations". Strip a leading number.
 """
+import io
+import os
 import re
 import sys
 
@@ -46,11 +48,42 @@ import fitz
 
 HEADING_PT = 11.5          # body text is 10.1 pt in both venues; headings are 12
 
-# venue -> (landmark heading, columns, soft limit, note)
+# venue -> (landmark headings, columns, soft limit, note)
+#
+# The measurement stops at whichever landmark appears FIRST in the document.
+#
+# T-LA.18: TMLR gained a second landmark when the bibliography moved after the
+# appendix. With only 'references' to go on, the landmark then sat past the
+# appendix and the whole appendix counted as body. Stopping at the earlier of
+# References / the appendix makes the measurement independent of back-matter
+# order.
+#
+# THE APPENDIX IS MATCHED BY ITS SECTION TITLES, not by a pattern. A first
+# attempt matched "a single letter, whitespace, then anything" -- meant to catch
+# the "A <Title>" heading the \appendix switch produces. It matched the display
+# equation "h = LayerNorm(...)" on page 3 and reported 2.50 pages: a confidently
+# wrong answer, the exact failure mode detect_venue() already warns about.
+# Display math in TMLR is set \large since T-LA.16, so it clears HEADING_PT and
+# looks like a heading. Titles come from the assembler, the one place that
+# defines them.
 RULES = {
-    "acl":  ("limitations", 2, 8,  "Limitations/Ethics/refs/appendix exempt"),
-    "tmlr": ("references",  1, 12, "Limitations counts; refs/appendix do not"),
+    "acl":  (("limitations",), 2, 8,
+             "Limitations/Ethics/refs/appendix exempt"),
+    "tmlr": (("references",), 1, 12,
+             "Limitations counts; refs/appendix do not"),
 }
+
+
+def appendix_titles() -> set:
+    """Lowercased appendix section titles, read from assemble_submissions.py."""
+    p = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                     "paper", "assemble_submissions.py")
+    try:
+        src = io.open(p, encoding="utf-8").read()
+        blk = src[src.index("APPENDIX = ["):src.index("]", src.index("APPENDIX = ["))]
+        return {t.strip().lower() for t in re.findall(r'"\s*([^"]+)"\s*,\s*"app:', blk)}
+    except (OSError, ValueError):
+        return set()
 
 
 def detect_venue(path: str) -> str:
@@ -94,7 +127,10 @@ def main() -> int:
             raise SystemExit(f"--venue must be one of {list(RULES)}")
     path = args[0] if args else "paper/acl_submission/main.pdf"
     venue = venue or detect_venue(path)
-    landmark, cols, limit, note = RULES[venue]
+    landmarks, cols, limit, note = RULES[venue]
+    stops = set(landmarks)
+    if venue == "tmlr":
+        stops |= appendix_titles()
 
     doc = fitz.open(path)
     for i, page in enumerate(doc):
@@ -105,8 +141,19 @@ def main() -> int:
                 if not big:
                     continue
                 txt = " ".join(s["text"] for s in big).strip().lower()
+                # Spans are one per word AND carry their own trailing spaces, so
+                # joining yields runs of whitespace: "the   resolution   floor".
+                # A single-word landmark ("references") survives that; a
+                # multi-word appendix title does not, and the tool silently ran
+                # past the appendix to the bibliography on page 19 and reported
+                # 18.28 pages.
+                txt = re.sub(r"\s+", " ", txt)
+                # strip a leading section number, and the letter the \appendix
+                # switch puts in front of an appendix section title
                 txt = re.sub(r"^[0-9.\s]+", "", txt).strip()
-                if txt != landmark:
+                if txt not in stops:
+                    txt = re.sub(r"^[a-z]\.?\s+", "", txt).strip()
+                if txt not in stops:
                     continue
                 frac = ln["bbox"][1] / H
                 if cols == 2:
@@ -116,14 +163,20 @@ def main() -> int:
                     pages = i + frac
                 verdict = "OK" if pages <= limit else f"OVER by {pages - limit:.2f}"
                 print(f"  venue          : {venue.upper()} ({cols}-column)")
-                print(f"  rule           : count to '{landmark.title()}'; {note}")
+                print(f"  rule           : count to "
+                      f"{' or '.join(l.title() for l in landmarks)}"
+                      f" or the appendix, whichever is first; {note}"
+                      if venue == "tmlr" else
+                      f"  rule           : count to "
+                      f"'{landmarks[0].title()}'; {note}")
+                print(f"  stopped at     : '{txt}' on page {i + 1}")
                 print(f"  COUNTED BODY   : {pages:.2f} pages  (limit {limit}) "
                       f"-> {verdict}")
                 print(f"  total PDF      : {doc.page_count} pages")
                 return 0
 
     print(f"  venue          : {venue.upper()} ({cols}-column)")
-    print(f"  '{landmark.title()}' heading NOT FOUND -- cannot measure. "
+    print(f"  none of {sorted(stops)} found -- cannot measure. "
           f"Check the heading exists and is set at >= {HEADING_PT} pt.")
     return 1
 
