@@ -28,23 +28,7 @@ account is wrong and the composition's deficit is structural. We did not run tha
 sweep, and a second model size---the single most valuable follow-up---is likewise
 unrun.
 
-\subsection{Budget, not convergence}
-
-Three epochs is a compute budget, and no arm is trained to convergence
-(\S\ref{sec:protocol}). This interacts badly with exactly the mechanism the paper
-studies: \S\ref{sec:saturation} shows depth allocation is demonstrably
-budget-dependent, so the behaviour at 10 epochs is genuinely unknown and might
-differ in the direction that matters. Every arm receives the identical budget, so
-the comparison is internally valid; the generalisation to trained-to-convergence
-models is not established.
-
-Relatedly, one hyperparameter configuration per arm was frozen from a grid run on a
-corpus roughly 60$\times$ smaller, and \S\ref{sec:saturation} demonstrates that at
-least one weight---the ponder penalty---did not transfer. We did not re-tune per
-arm, so the headline ordering could in principle be re-ordered by a per-architecture
-search. Given the gaps involved (0.12 nats between the recursive arms), we regard
-that as a real risk for the MoR--MoRE comparison and a small one for the comparisons
-against MoE.
+\subsection{Budget, not convergence}\label{sec:budget} The 3-epoch budget leaves every arm short of convergence (\S\ref{sec:protocol}), and the arms are furthest apart on that axis at the cutoff: the final-epoch drop is $0.091$ nats for MoE, $0.132$ for MoR and $0.176$ for MoRE, so \textbf{the arm that loses in domain is the one still improving fastest}. The ordering is budget-dependent in the direction this paper's mechanism predicts---a routing arm that re-learns shared structure more slowly (\S\ref{sec:dilution}) should be behind at a fixed budget and closing---and we do not extrapolate a crossing epoch, because the curves decelerate. Appendix~\ref{app:budget} gives the per-epoch curves and the rest of this section.
 
 \subsection{Statistical resolution}
 
@@ -57,6 +41,7 @@ small gap is the misreading to avoid---across our own re-exports, $d$ has moved 
 a factor of 1.5 while the underlying gap moved by less than 0.005 nats.
 
 \subsection{What was declared and not run}
+\label{sec:declared}
 
 One comparison in the pre-registered Family A, a depth-matched fixed-depth control,
 was declared before results existed and \emph{still consumes its Holm slot}: we do

@@ -92,8 +92,7 @@ on WikiText-103.
 All three arms lie on the quality/compute frontier, and the composition (MoRE)
 buys the most quality per unit of compute. It improves on MoE by $7.9\%$
 validation loss at $2.19\times$ MoE's inference FLOPs, where recursion alone needs
-$9.07\times$: $72\%$ of recursion's quality gain for $24\%$ of its compute, or
-$3\times$ the quality per FLOPs-multiplier. Out of domain it is stronger still---it
+$8.87\times$: $72\%$ of recursion's quality gain for $25\%$ of its compute. Out of domain it is stronger still---it
 \emph{dominates} recursion alone, reaching lower loss at a quarter of the compute.
 
 It is not lowest-loss in domain. Recursion alone leads by $0.1216$ nats,
@@ -139,63 +138,20 @@ inherits the demographic and topical biases of Wikipedia, which we did not
 measure and which bear on any downstream use of these checkpoints.
 
 % ---------------------------------------------------------------------
-% Reproducibility. This is the PARITY item with the ACL version: ARR has a
-% mandatory Responsible NLP Checklist that carries seeds, compute, data and
-% parameter counts, and TMLR has no equivalent form -- so the information
-% has to be here or it is absent. Every number below appears elsewhere in
-% the paper; this collects them where a reader looking to rerun the study
-% will look.
+% Reproducibility. Every fact below already appears in the body (seeds in
+% \S4, data in \S3, compute and provenance in \S7, statistics in \S4),
+% and the long-form statement pushed us past 12 pages. Replaced with a
+% one-sentence pointer. ARR has a mandatory checklist that carries the
+% same information; TMLR has no equivalent form, but TMLR's guide says
+% a Reproducibility Statement is "encouraged, but not required".
 % ---------------------------------------------------------------------
 \section*{Reproducibility Statement}
 
-\textbf{What was run.} Fifteen runs: three architectures $\times$ five seeds
-$\{42,43,44,45,46\}$, every result reported as mean $\pm$ std over the five. No
-arm was tuned for itself; one optimiser configuration was fixed before the
-comparison and shared by all three.
-
-\textbf{Data.} WikiText-103 with a byte-pair vocabulary of 8{,}192 and packed
-sequences of length 256, under the frozen identifier
-\texttt{lang-wikitext-103-bpe8192-len256-800d6154}. Evaluation uses the corpus's
-\emph{own} author-provided validation split rather than a carve-out of the
-training material, which is what makes the leakage audit meaningful: no
-validation or test token was ever visible to the trainer. Out-of-domain
-evaluation uses held-out blocks of the Pile \citep{gao2020pile}.
-
-\textbf{Model and optimiser.} $d_{\text{model}} = 256$, one shared block, four
-attention heads, maximum recursion depth $T = 7$, batch size 48, three epochs of
-AdamW at learning rate $10^{-3}$, weight decay $10^{-4}$, gradient clipping 1.0,
-dropout 0.1. Parameter counts are 5{,}584{,}908 for MoE and MoRE---identical---and
-5{,}581{,}063 for MoR, matched to 0.069\%, the residual being the router MoR does
-not have.
-
-\textbf{Compute.} Three epochs is $\approx$404M tokens per run and is a
-\emph{fixed budget rather than convergence} (\S\ref{sec:protocol}). Training ran
-on single consumer laptop GPUs; each recursive cell took 5.7--7.9 hours on an
-RTX 4060 (8\,GB), so the full matrix is on the order of 60 GPU-hours. Two arms
-were retrained on that card after the original checkpoints were lost and the
-third remains on its original V100, which the disclosures in
-\S\ref{sec:limitations} quantify: both retrained arms reproduced their published
-means to $-0.117\sigma$ and $-0.119\sigma$, a common-mode offset that cancels in
-the between-arm gaps carrying every verdict.
-
-\textbf{Protocol and statistics.} The primary metric is final-epoch validation
-task loss in nats; \texttt{best} equals \texttt{last} on all fifteen cells, so no
-model selection occurred on either split. Comparisons use an exact two-sided
-randomization test over all $\binom{10}{5} = 252$ regroupings---exhaustive, hence
-deterministic, with no sampling error and no normality assumption---corrected by
-Holm--Bonferroni over two families declared before the final arm was trained. The
-design's resolution floor is $2/252 = 0.00794$ and every headline comparison sits
-on it. Everything outside those two families is labelled exploratory and
-uncorrected, and carries no significance verdict in the abstract or conclusions.
-
-\textbf{Provenance, stated as it is.} The matrix spans four code revisions, all
-with uncommitted working-tree changes at run time; comparability rests on a frozen
-specification plus a seed-blind configuration-equality check, not on a single
-revision. Ten of the fifteen cells predate the fields recording GPU identity and
-carry nulls, which we did not backfill---a provenance field invented after the
-fact is worse than an absent one. Every table and figure in this paper is
-generated from the run outputs by scripts rather than transcribed; no number was
-copied by hand.
+All details needed to reproduce the study---seeds, data identifiers, model and
+optimiser parameters, compute budget, hardware, statistical protocol, and
+provenance caveats---appear in \S\ref{sec:engine}--\ref{sec:stats} and
+\S\ref{sec:limitations}; a frozen configuration
+specification is released with the code.
 
 % T-LA.14. APPENDIX. TMLR sets no hard page limit but its author guide
 % recommends 12 pages of main content, and the body measured ~14.4 -- note that

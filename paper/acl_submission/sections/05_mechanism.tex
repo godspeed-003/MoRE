@@ -54,17 +54,21 @@ block but has to be re-learned independently inside all six experts. Six partial
 copies of shared structure fit in the same parameter budget as one complete copy
 only by making each copy worse.
 
-This is a hypothesis, not an isolated effect, and we label it as one: separating
-it from the remaining differences needs a width sweep or a controlled
-manipulation of routing diversity, and we ran neither. It earns its place because
-it is the only account left after the arithmetic above excludes the update-count
-version, because it predicts the stratified result---MoRE's advantage over MoE
-grows with token difficulty (Appendix~\ref{sec:stratified}), which is where an
-incompletely-learned shared structure should hurt most---and because it generates
-the falsifiable scale prediction in the Limitations section: as the corpus grows,
-each expert's slice eventually contains enough of the shared structure for the
-re-learning penalty to amortise, so the MoR$-$MoRE gap should close with data
-scale at fixed parameters.
+This is a hypothesis, not an isolated effect, and we label it as one. The
+comparison it concerns is nonetheless already two points on the axis it is about.
+Because the budget equalises \emph{total} FFN width ($6 \times 4 = 1 \times 24$),
+MoR is exactly the $E{=}1$ point of a matched-width expert sweep and MoRE the
+$E{=}6$ point, and the hypothesis predicts loss rising with $E$ at fixed width. Two
+points cannot isolate it, and the $E{=}1$ endpoint differs in a second way---it has
+no router, gate or balance term---so the experiment that would is an intermediate
+point that keeps the router ($E{=}2$ at width 12, or $E{=}3$ at width 8), which we
+did not run. The account earns its place because it is the only one left once the
+arithmetic above excludes the update-count version; because it predicts the
+stratified result---MoRE's advantage over MoE grows with token difficulty
+(Appendix~\ref{sec:stratified}), where an incompletely learned shared structure should hurt
+most; because MoRE is the arm still improving fastest when the budget ends
+(\S\ref{sec:budget}), as slower re-learning would imply; and because it yields the
+falsifiable scale prediction stated in the Limitations section.
 
 \subsection{Depth saturation is a data-scale effect}\label{sec:saturation} \textbf{[MEASURED, four points at fixed hyperparameters.]} MoRE's halting sits at the ceiling on the full corpus (97.3\% forced-exit, mean depth 6.955 of 7), inviting the reading that the architecture cannot learn adaptive depth. A subset sweep falsifies it: at 2.5\%, 10\% and 40\% of the corpus the \emph{same} model at the \emph{same} ponder weight allocates depth adaptively (exit rates near zero, mean depth 1.9--2.4 of 7), and the collapse appears only at full scale. \textbf{The failure is a calibration finding, not an architectural one.} The axis is not cleanly monotone, so the honest phrasing is that saturation emerges between 40\% and 100\% of the data; the ponder term is linear in expected depth while the task gradient grows as the model fits, and once the halting sigmoid saturates its gradient vanishes \citep{graves2016act}. \citet{banino2021pondernet} is the principled fix, unrun (Appendix~\ref{app:saturation}).
 \subsection{The two mechanisms compete for one budget}
@@ -73,6 +77,14 @@ scale at fixed parameters.
 \textbf{[MEASURED on a calibration grid; the canonical-corpus form is measured on
 the balance axis.]} This is the paper's central claim, and it is the one that
 explains why the composition does not merely fail to add but subtracts.
+
+The grid below varies the same halting weight whose \emph{level}
+\S\ref{sec:saturation} shows does not transfer from the small corpus to the full
+one. We use it for a different quantity: not where depth settles at a given
+weight, but the \emph{direction} of the trade-off as the weight moves. A level can
+fail to transfer while a direction holds; whether this one does is untested on the
+full corpus, where only the balance-axis form below is measured, so this
+subsection's halting claim carries the strength of a one-seed development grid.
 
 Depth and specialisation are not independent knobs in MoRE the way they are in MoR
 and MoE separately. On the calibration grid, recovering adaptive depth by raising

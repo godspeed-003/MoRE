@@ -39,7 +39,7 @@ Measured on the last clean build (`python code/compile_papers.py`):
       Recursion Trade Off in Small Language Models."* The earlier candidate
       "Parameter- and FLOP-Matched" was rejected as inaccurate: the arms are
       parameter-matched but deliberately **not** FLOP-matched, and
-      1.00×/9.07×/2.19× is the central measurement.
+      1.00×/8.87×/2.19× is the central measurement.
 - [ ] **The Pareto figure costs one page.** `fig_pareto` took the body from 12 to
       13 pages. TMLR sets no limit and asks that length be justified by content;
       this figure is what revealed that MoR is Pareto-*dominated* out of domain,
