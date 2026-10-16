@@ -11,6 +11,178 @@ regenerates and silently overwrites).
 
 ---
 
+## UPDATE 2026-10-16 — READ FIRST. §3.1, §3.4, §3.5 and §6 below are SUPERSEDED
+
+Vedant's decisions after reading this reply, plus **two errors in the reply
+itself**, found while re-checking the points Vedant pushed back on. Sections
+below are left as written so the reasoning trail survives; where they conflict
+with this block, this block wins.
+
+### U1. TMLR goes UNDER 12 pages, with headroom (reverses §3.1)
+
+Vedant's reason: the ≤12-page track (~2-week review) is what makes a
+reject-and-resubmit cycle fast. That only works with **headroom** — a body at
+11.95 goes over on the first reviewer-requested paragraph. **Target ≈ 11.5–11.7.**
+
+Baseline, measured on the `d114337` build: **13.43** (appendix-first landmark,
+per T-LA.18). **Every pre-built lever is already pulled**: all 11 ACLMOVE blocks
+are in `TMLR_APPENDIX`. So the savings need NEW moves. Body page map (pp):
+
+| block | pp | note |
+|---|---|---|
+| Reproducibility Statement | 0.73 | restates §4 Setup + §7.6; TMLR does not require it in the body |
+| §7.6 Disclosures | 0.62 | Vedant already questioned this as "history of the study" |
+| §5.3 (incl. Table 1 + Fig 3) | 1.86 | Fig 3 (Pareto) renders 6.50 in wide |
+| §3.3 (incl. Fig 1) | 1.61 | **Fig 1 alone is 6.50 × 4.70 in = 0.43 of a page** |
+| Broader Impact | 0.23 | optional for TMLR at this risk level |
+
+Proposed moves — all to the appendix, nothing deleted:
+
+| move | est. saving |
+|---|---|
+| Reproducibility Statement → appendix (first appendix section) | −0.73 |
+| §7.6 Disclosures → 3-line body summary, full text → appendix. The summary MUST keep the integrity-critical facts: two arms retrained on a different GPU after checkpoint loss (−0.117σ / −0.119σ), four code revisions, and that `mor_vs_moe` was declared after its data existed (`confirmatory_tests.json` `_README` requires the paper to say so) | ≈ −0.50 |
+| Broader Impact → 3 sentences | ≈ −0.10 |
+| Figs 1 and 3 at ≈0.7 `\linewidth` in TMLR only (they were drawn for a 3.35-in ACL column; at full 6.5-in TMLR width their labels render at 14–15 pt against 10 pt body text). Needs a per-venue width macro, like `\dispsize`. **Vedant's call — he has expressed a preference for large visuals** | ≈ −0.25 |
+| De-duplicate §6.1's closing paragraph against §7.1 (both state the scale prediction) | ≈ −0.10 |
+| New body text from the work order (learning curves, OOD disclosure, §6.2↔§6.3 bridge, E=1 reframe, FLOPs pointer) | ≈ +0.25 |
+| **net** | **≈ 11.7** |
+
+Estimates come from the page map. **Measure each move on a real build** — float
+placement in this paper is non-monotone (shrinking a float once added 0.74 pp).
+
+### U2. NO new seeds — n=6 and n=7 both withdrawn (reverses §3.5). The "7 comparisons" premise is a MISCOUNT, and this reply endorsed it
+
+`code/confirmatory_tests.json` declares **six** tests: family A `m=4`, family B
+`m=2`. The 7 originates in `changelog.md` ~L7393, a hypothetical about a FUTURE
+revision ("the fixed-depth sweep alone is up to 7 comparisons"); the same entry
+says "The paper sits at 6 tests". It then propagated into: the
+`confirmatory_tests.json` `correction_note`, `code/seed_stats.py` docstrings
+(L63, L214), `paper/common/02_setup.tex` (holm_detail — body short form AND the
+appendix long form), `PAPER_GUIDE.md:564`, `PAPER_MITIGATION.md:227`, and §1
+row 5 / §3.5 of this file.
+
+Arithmetic with the true count:
+
+| threshold | value | floor 0.00794 clears it? |
+|---|---|---|
+| Holm step 1, family A (m=4) | 0.0125 | yes |
+| Holm step 1, family B (m=2) | 0.025 | yes |
+| plain Bonferroni, ALL SIX declared tests pooled | 0.00833 | **yes** (margin 0.0004) |
+| plain Bonferroni at m=7 (no 7th test exists) | 0.00714 | no |
+
+Recomputed here by exhaustive enumeration over all 252 regroupings:
+`more_vs_moe`, `mor_vs_moe`, `more_vs_mor` (val/task_loss) and
+`depth_more_routeonce_vs_mor` (depth/spearman_vs_model_loss) — **all p =
+0.00794**. The other two (`more_vs_depth_matched_fixed`,
+`depth_routeonce_vs_perstep`) need the forced-depth and per-step arms; the paper
+reports both at the floor; not re-derived here.
+
+**A second error in the same paper paragraph, independent of the count.** It says
+Holm is "load-bearing" by comparing plain Bonferroni at m=7 *pooled* against Holm
+at m=4 *per family*. Holm's first-step threshold at a given m EQUALS Bonferroni's
+at that m, so with every p at the floor the two give identical verdicts. The
+quantity that sets the threshold is the **family size**, not the correction
+method. A statistician reviewer will mark this; it is exactly TMLR's
+technical-correctness axis. Replacement substance for `holm_detail`:
+
+> Holm's first-step threshold equals plain Bonferroni's at the same m, so at our
+> resolution floor the two give identical verdicts; what sets the threshold is
+> the family size. Within the declared families it is 0.0125 (A) and 0.025 (B).
+> Pooling all six declared comparisons into one family gives 0.05/6 = 0.00833,
+> which the floor of 0.00794 still clears — by 0.0004. The margin is thin: a
+> seventh confirmatory comparison would put the floor above the threshold, which
+> is one more reason no comparison may be added to a family after results exist.
+
+**Do NOT edit the frozen pre-registration text.** Add a dated
+`_ERRATUM_2026_10_16` key to `confirmatory_tests.json` stating that the
+`correction_note`'s "7 comparisons" is a miscount of the declared six, with the
+table above. `families`, `family_size` and `correction` are correct and unchanged.
+Code docstrings in `seed_stats.py` are not frozen — fix them directly.
+
+### U3. OOD: §3.4's reason for re-scoring was WRONG; there is a different, stronger one
+
+§3.4 argued from sample size. Wrong: all 15 cells score the identical blocks, the
+reported ± is seed variance, and more blocks shrink only evaluation-sample noise,
+which is common to all arms and cancels in the between-arm gap. Vedant's
+objection is right on that axis — **the scoring itself was done correctly.**
+
+But the COMPOSITION of the scored set, reproduced exactly (`eval_ood.py` path:
+first 4000 non-empty documents of `NeelNanda/pile-10k`, EOT-packed, first
+1500 × 256 blocks):
+
+| Pile subset | docs | tokens | share |
+|---|---|---|---|
+| **Books3** | **1** | **223,739** | **58.3%** |
+| PubMed Central | 2 | 37,465 | 9.8% |
+| Pile-CC | 21 | 30,064 | 7.8% |
+| StackExchange | 20 | 21,308 | 5.5% |
+| FreeLaw | 2 | 20,413 | 5.3% |
+| OpenWebText2 | 23 | 19,847 | 5.2% |
+| USPTO Backgrounds | 5 | 12,160 | 3.2% |
+| Github | 7 | 10,167 | 2.6% |
+| PubMed Abstracts | 13 | 4,249 | 1.1% |
+| Wikipedia (en) | 5 | 2,263 | 0.6% |
+| NIH ExPorter / HackerNews / Enron | 3 | 2,325 | 0.6% |
+| **total** | **102** | **384,000** | |
+
+**58.3% of the OOD evaluation tokens are one book.** The abstract's "Out of
+domain it is stronger still---it dominates recursion alone" is therefore mostly a
+statement about one Books3 document, and the paper describes it as "held-out
+Pile blocks". Two more provenance defects in the same artifact:
+
+* `pile-10k` is a sample of the Pile's **train** split, and `eval_ood.py` ignores
+  `--split` for `pile` — yet `results/language/ood_pile_test.json` is labelled
+  `pile:test`. ("Held-out" is still true in the sense that matters: our models
+  never trained on any Pile text.)
+* 5 documents (0.6%) are Pile's **Wikipedia (en)** subset — in-domain by
+  construction for a WikiText-103 model.
+
+**Proposal (pending Vedant): a document-capped re-score.** ≤ 2 blocks per
+document, Wikipedia (en) excluded, 1500 blocks from ≥ 750 documents, all 15
+checkpoints, reported BESIDE the original with per-subset shares. Inference only,
+local, minutes. If the inversion holds, the paper's one "neither mechanism alone"
+claim becomes its best-supported OOD number; if it does not, the abstract's second
+paragraph changes, and Outcome-C honesty (CLAUDE.md §8) applies. Disclosing the
+composition is required either way — the dataset is public and a reviewer can
+reproduce this table in five minutes.
+
+### U4. Another artifact landmine
+
+`results/language/results.json` → `admitted_runs[*].metrics_nonscalar.
+routing_permutation_invariant.per_family` carries **arithmetic** labels
+(`E1_ADD_SUB` … `E6_SORT_STAT`) on language runs. The supports (77,954 / 83,944 /
+16,320 / 17,985 / 24,269 / 57,044; sum 277,516 ≈ the validation token count)
+are consistent with the language POS families, so this looks like a naming defect
+in the metric layer's manifest lookup rather than wrong numbers — **but the
+index → family mapping is not yet verified.** CLAUDE.md §2 requires every label to
+derive from one family manifest. Verify and fix (or document) before the artifact
+ships; it belongs in the same README note as the 7.615 (§2.2).
+
+### U5. Work order — replaces §6
+
+**Correctness** (a reviewer would mark these wrong):
+1. `holm_detail`: six not seven; family size, not Holm, sets the threshold (U2).
+   Plus the `_ERRATUM` key and the `seed_stats.py` docstrings.
+2. GPU contradiction (§1 row 1a).
+3. FLOPs definition in the appendix; §4.3 points at it (§1 row 1c).
+4. OOD: disclose source, n, document count and composition (U3); re-score if
+   approved.
+5. §6.2 ↔ §6.3 bridging sentence (§1 row 3b).
+
+**Free wins** (already measured, no compute):
+6. Per-family depth table, corrected MoR range (§2.3); shorten the ρ defence.
+7. Learning curves in §7.2, as corroboration of §6.1 (§3.3).
+8. E=1 reframe in §6.1 **with the router confound stated** (old §6 item 9).
+9. N+R footnote (§2.2) and the U4 landmine, in the artifact README.
+10. Freeze-note one-line correction (§2.1) — repo only.
+
+**Page count** (U1): the moves table, measured build by build.
+
+**Compute:** the U3 capped re-score only, if approved. No training runs.
+
+---
+
 ## 1. Verification table
 
 | # | Claim | Verdict | Evidence |
@@ -22,10 +194,10 @@ regenerates and silently overwrites).
 | 3a | MoR *is* the matched-width E=1 point of an expert-count sweep | **CONFIRMED** | resolved configs: MoE 6x4, MoR 1x24, MoRE 6x4 — total FFN width 24 in all three, both recursive arms at `max_depth` 7 |
 | 3b | §6.2 (ponder weight does not transfer) and §6.3 (explains full-corpus behaviour with a small-corpus grid over that weight) are in tension and the paper never says so | **CONFIRMED** | `05_mechanism.tex:70-112` vs `115-147` |
 | iii | All 15 admitted runs carry 3-point val curves; MoRE is improving fastest at cutoff | **CONFIRMED, numbers exact** | see §3.3 |
-| iv | OOD rests on 1500 Pile blocks and the paper never states it | **CONFIRMED** | `results/language/ood_pile_test.json: n_blocks 1500`; x256 = 384,000 tokens |
+| iv | OOD rests on 1500 Pile blocks and the paper never states it | **CONFIRMED — and 58.3% of those tokens are ONE Books3 document**, see U3 | `results/language/ood_pile_test.json: n_blocks 1500`; x256 = 384,000 tokens |
 | free | Per-family depth is the central claim shown directly | **CONFIRMED, MoR range wrong** — see §2.3 | real spreads: MoR 0.3168, MoRE 0.0090 |
-| 5 | n=6 drops the resolution floor to 0.00216 (3 cells, not 6) | **CONFIRMED** | 2/C(12,6) = 2/924 = 0.0021645; n=7 → 2/3432 = 0.00058 |
-| 5 | Plain Bonferroni at m=7 is 0.00714, below the n=5 floor of 0.00794 | **CONFIRMED and it is the sharpest argument in the brief** | 0.05/7 = 0.0071429 < 2/252 = 0.0079365 |
+| 5 | n=6 drops the resolution floor to 0.00216 (3 cells, not 6) | **CONFIRMED but MOOT** — see U2 | 2/C(12,6) = 2/924 = 0.0021645; n=7 → 2/3432 = 0.00058 |
+| 5 | Plain Bonferroni at m=7 is 0.00714, below the n=5 floor of 0.00794 | **WITHDRAWN 2026-10-16 — arithmetic true, premise false: there are SIX declared tests, not seven** | see UPDATE U2 |
 | 7 | All 15 checkpoints exist, so re-scoring is inference-only | **CONFIRMED** | 15/15 `checkpoint.pt`, 0.34 GB total |
 
 Also confirmed: nothing hard-wires 6x4 (answer to Ayan's engine question, §4.1).
@@ -125,7 +297,7 @@ short**, pointing at the table instead of carrying the whole defence.
 
 ## 3. Judgement calls — answers
 
-### 3.1 (i) TMLR page count: stay over 12
+### 3.1 (i) TMLR page count: ~~stay over 12~~ — SUPERSEDED by U1: go under 12, with headroom
 
 Measured now: **13.43 pages to References** (`code/measure_counted_pages.py`,
 which as of `d17b035` knows TMLR's rule — single-column, Limitations counts,
@@ -193,7 +365,7 @@ support for the parsimonious reading the paper already prefers for the
 variance-ratio result — a collapsing policy has less left to vary — so cite it
 there rather than leaving the hedge unsupported.
 
-### 3.4 (iv) OOD re-score: yes, do it
+### 3.4 (iv) OOD re-score — SUPERSEDED by U3: the sample-size reason below is wrong; the composition reason in U3 replaces it
 
 All 15 checkpoints are present (0.34 GB, verified), so this is inference-only and
 local — no Vast.ai, no training.
@@ -212,7 +384,7 @@ Do it, and state `n` in the paper either way. Two caveats to carry:
 `--max_blocks` already defaults to 2000, so raising it is a flag, not a code
 change.
 
-### 3.5 (5) GPU spend: 3 runs, and the reason is narrower than "more power"
+### 3.5 (5) GPU spend — SUPERSEDED by U2: no runs; the 3-run argument below rests on a miscount
 
 Agreed that documentation plus free appendix tables is the right scope, with one
 exception, and the brief has already found the argument for it — it is just
@@ -284,7 +456,7 @@ the one item in the whole brief that no amount of repo archaeology can resolve.
 
 ---
 
-## 6. Work order
+## 6. Work order — SUPERSEDED by U5
 
 Unambiguous, verified, no judgement — do these:
 
