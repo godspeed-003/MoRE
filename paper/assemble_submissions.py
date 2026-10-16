@@ -110,6 +110,10 @@ APPENDIX = [
     # ARR reviewers need not read appendices.
     ("engine",      "Matching the parameter budget across the three arms", "app:engine"),
     ("metrics",     "Metric definitions", "app:metrics"),
+    # T-LA.22. FLOPs and throughput accounting. Added because 35 reviewer 652J
+    # made an iso-FLOP control a condition of acceptance and FLOPs carry the
+    # paper's whole efficiency claim, while the body only ever pointed at it.
+    ("flops",       "Counting FLOPs, and measuring throughput", "app:flops"),
     ("saturation",  "The subset sweep behind the depth-saturation finding", "app:saturation"),
     ("protocol",    "Training protocol and hyperparameters", "app:protocol"),
     ("blimp",       "BLiMP and EWoK, in full", "app:blimp"),
@@ -117,6 +121,10 @@ APPENDIX = [
     # subsection keeps its grid and its conclusion; only the second-axis and
     # per-run-control paragraphs move, and the replacement states both.
     ("competition2", "Specialisation against per-run controls", "app:specialisation"),
+    # T-LA.22. Budget and convergence: what the arms would do with more epochs.
+    # Body keeps a two-sentence summary and the direction of the effect.
+    ("budget",      "Budget and convergence: what each arm would do with more epochs",
+     "app:budget"),
 ]
 
 # T-LA.14: TMLR MOVES A SUBSET TOO.
@@ -140,7 +148,7 @@ APPENDIX = [
 # anything but ranking.
 TMLR_APPENDIX = ["floor_proof", "holm_detail", "integrity", "metrics",
                  "protocol", "engine", "stratified", "trapping",
-                 "competition2", "blimp", "saturation"]
+                 "competition2", "blimp", "saturation", "flops", "budget"]
 
 
 def appendix_order(venue):

@@ -68,6 +68,14 @@ Recursion Trade Off in Small Language Models}
 % this as a no-op because a two-column measure has no horizontal slack.
 \newcommand{\dispsize}{\large}
 
+% \colfigwidth -- the width a figure drawn for ACL's narrow column is set at.
+% TMLR is single-column, so \linewidth is 6.5in; the architecture drawing and the
+% Pareto panel were drawn for a 3.35in measure and rendered with labels larger
+% than the body text, the architecture figure alone costing 43% of a page
+% (T-LA.22). 0.6\linewidth is close to their native scale and still legible.
+% ACL defines this as \linewidth: it is already column-width there.
+\newcommand{\colfigwidth}{0.6\linewidth}
+
 \begin{document}
 
 \maketitle

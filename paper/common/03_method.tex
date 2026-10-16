@@ -62,10 +62,12 @@ evaluated by its expert and none is dropped.
 % and \resizebox preserved the overlap -- unreadable in single-column and
 % collapsed into fragments in two-column. TikZ overlap raises no overfull-hbox
 % warning, so the compile reported zero problems throughout. Unstarred on
-% purpose: one column in ACL, full text width in single-column TMLR.
+% purpose: one column in ACL. \colfigwidth is \linewidth there and 0.6\linewidth in
+% single-column TMLR, where full width rendered this 3.35-in drawing at 6.5 in --
+% 43% of a page, with labels larger than the body text (T-LA.22).
 \begin{figure}[t]
 \centering
-\includegraphics[width=\linewidth]{fig_architecture.png}
+\includegraphics[width=\colfigwidth]{fig_architecture.png}
 \caption{The MoRE block. A token is routed \emph{once} from its post-embedding
 state to one of $E$ independent expert FFNs, and \emph{that expert's}
 weights---never another's---are reused for an adaptive number of recursion steps
@@ -86,7 +88,7 @@ with one halt head per expert. Per token, at step $t$:
 {\dispsize
 \begin{align}
 p_t &= \sigma\!\left(\mathbf{w}_{e^\star}^{\!\top}\mathbf{h}^{(t)}\right),
-  & c_t &= \sum_{\tau \le t} p_\tau ,
+  & c_t &= \sum_{\tau < t} p_\tau ,
   \label{eq:halt-p} \\[2pt]
 \text{halt when } &\; c_t + p_t > 1 - \epsilon, & \epsilon &= 0.01,
   \label{eq:halt-cond} \\[2pt]
@@ -102,7 +104,7 @@ R &= 1 - c_t \ \text{(remainder)}, &
 {\dispsize
 \begin{align}
 p_t &= \sigma\big(\mathbf{w}_{e^\star}^{\!\top}\mathbf{h}^{(t)}\big),
-  \quad c_t = \textstyle\sum_{\tau \le t} p_\tau , \label{eq:halt-p} \\[2pt]
+  \quad c_t = \textstyle\sum_{\tau < t} p_\tau , \label{eq:halt-p} \\[2pt]
 &\text{halt when } c_t + p_t > 1 - \epsilon , \label{eq:halt-cond} \\[2pt]
 R &= 1 - c_t , \quad
   w_t = \begin{cases} p_t & \text{running} \\ R & \text{at halt} \end{cases}
@@ -112,7 +114,10 @@ R &= 1 - c_t , \quad
 with $\epsilon = 0.01$ and $R$ the halting remainder.
 % <<<ACLONLY
 
-and the token's output is the convex combination
+where $c_t$ is the halting mass accumulated over the steps \emph{before} $t$
+($c_1 = 0$), so the test adds the current step's $p_t$ exactly once and the
+remainder $R$ is precisely the mass the earlier steps left unassigned. The token's
+output is the convex combination
 $\mathbf{o}_s = \sum_t w_t \mathbf{h}^{(t)}$, whose weights sum to exactly $1$.
 That sum-to-one property is the mechanism by which halting is trained: because
 $w_t$ scales how much of each step's state reaches the output, changing $p_t$

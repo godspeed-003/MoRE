@@ -16,42 +16,42 @@
       "batch": 8,
       "seq_len": 256,
       "vocab_size": 8192,
-      "source_run": "langB_MoE_seed42__1958b9a5",
-      "throughput_items_sec": 724.3697400496433
+      "source_run": "langB_MoE_seed42__51000018 (config); depth = mean of 5 admitted runs",
+      "throughput_items_sec": 326.9706568688107
     },
     {
       "arm": "mor",
       "num_experts": 1,
       "ffn_mult": 24,
       "max_depth": 7,
-      "mean_depth_measured": 6.899164255866281,
+      "mean_depth_measured": 6.729681774349084,
       "flops_depth1": 21483225088,
       "flops_per_extra_step": 12886999040.0,
-      "flops_at_mean_depth": 97505749190.15108,
-      "flops_per_token_at_mean_depth": 47610229.096753456,
+      "flops_at_mean_depth": 95321628613.54214,
+      "flops_per_token_at_mean_depth": 46543763.971456125,
       "linearity_residual": 0.0,
       "batch": 8,
       "seq_len": 256,
       "vocab_size": 8192,
-      "source_run": "langB_MoR_seed42__547e435b__r4",
-      "throughput_items_sec": 170.22763199424898
+      "source_run": "langB_MoR_seed42__c93f0fe8__r2 (config); depth = mean of 5 admitted runs",
+      "throughput_items_sec": 55.11096043464958
     },
     {
       "arm": "more",
       "num_experts": 6,
       "ffn_mult": 4,
       "max_depth": 7,
-      "mean_depth_measured": 6.94669095324833,
+      "mean_depth_measured": 6.95521625772349,
       "flops_depth1": 10751049728,
-      "flops_per_extra_step": 2154823680.0,
-      "flops_at_mean_depth": 23565120211.701275,
-      "flops_per_token_at_mean_depth": 11506406.353369763,
+      "flops_per_extra_step": 2148532224.0,
+      "flops_at_mean_depth": 23546023758.607605,
+      "flops_per_token_at_mean_depth": 11497081.91338262,
       "linearity_residual": 0.0,
       "batch": 8,
       "seq_len": 256,
       "vocab_size": 8192,
-      "source_run": "langB_MoRE_seed42__5c34c9dd",
-      "throughput_items_sec": 169.5566861997453
+      "source_run": "langB_MoRE_seed42__9cfd3f1c (config); depth = mean of 5 admitted runs",
+      "throughput_items_sec": 96.32096662517255
     }
   ]
 }

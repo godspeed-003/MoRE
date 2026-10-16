@@ -28,7 +28,9 @@ account is wrong and the composition's deficit is structural. We did not run tha
 sweep, and a second model size---the single most valuable follow-up---is likewise
 unrun.
 
+% >>>ACLMOVE:budget|\subsection{Budget, not convergence}\label{sec:budget} The 3-epoch budget leaves every arm short of convergence (\S\ref{sec:protocol}), and the arms are furthest apart on that axis at the cutoff: the final-epoch drop is $0.091$ nats for MoE, $0.132$ for MoR and $0.176$ for MoRE, so \textbf{the arm that loses in domain is the one still improving fastest}. The ordering is budget-dependent in the direction this paper's mechanism predicts---a routing arm that re-learns shared structure more slowly (\S\ref{sec:dilution}) should be behind at a fixed budget and closing---and we do not extrapolate a crossing epoch, because the curves decelerate. Appendix~\ref{app:budget} gives the per-epoch curves and the rest of this section.
 \subsection{Budget, not convergence}
+\label{sec:budget}
 
 Three epochs is a compute budget, and no arm is trained to convergence
 (\S\ref{sec:protocol}). This interacts badly with exactly the mechanism the paper
@@ -38,6 +40,43 @@ differ in the direction that matters. Every arm receives the identical budget, s
 the comparison is internally valid; the generalisation to trained-to-convergence
 models is not established.
 
+\textbf{The arms are not equally far from convergence, and the ordering tracks
+that gap.} The admitted runs log validation loss once per epoch, so the curve over
+the three epochs is available for all fifteen cells. The final-epoch drop is
+$0.091$ nats for MoE, $0.132$ for MoR and $0.176$ for MoRE: \textbf{the arm that
+loses in domain is the one still improving fastest when the budget ends.} We state
+the differential and not a crossing point---the curves decelerate, so extrapolating
+an epoch at which MoRE overtakes MoR would be inventing a number---but it makes the
+in-domain ordering explicitly budget-dependent, in the direction this paper's
+mechanism predicts: \S\ref{sec:dilution} argues a routing arm re-learns shared
+structure more slowly, which implies it should be behind at a fixed budget and
+closing.
+
+\begin{center}
+{\dispsize
+\setlength{\tabcolsep}{9pt}\renewcommand{\arraystretch}{1.25}
+\small
+\begin{tabular}{lccc}
+\toprule
+validation task loss & MoE & MoR & MoRE \\
+\midrule
+epoch 1 & 4.1453 & 3.8202 & 3.9416 \\
+epoch 2 & 4.0392 & 3.6472 & 3.8131 \\
+epoch 3 (reported) & 3.9483 & 3.5154 & 3.6370 \\
+\midrule
+final-epoch drop & $+0.0909$ & $+0.1318$ & $\mathbf{+0.1761}$ \\
+\bottomrule
+\end{tabular}
+}
+\end{center}
+
+The curves also show a second quantity moving in the same direction. MoRE's
+between-seed standard deviation tightens across the three epochs
+($0.0338 \rightarrow 0.0211 \rightarrow 0.0134$) while MoR's stays between
+$0.033$ and $0.039$. That is direct support for the parsimonious reading of the
+variance-ratio result in \S\ref{sec:quality}---a policy collapsing to a
+near-constant has less left to vary---which we otherwise report as open.
+
 Relatedly, one hyperparameter configuration per arm was frozen from a grid run on a
 corpus roughly 60$\times$ smaller, and \S\ref{sec:saturation} demonstrates that at
 least one weight---the ponder penalty---did not transfer. We did not re-tune per
@@ -45,6 +84,7 @@ arm, so the headline ordering could in principle be re-ordered by a per-architec
 search. Given the gaps involved (0.12 nats between the recursive arms), we regard
 that as a real risk for the MoR--MoRE comparison and a small one for the comparisons
 against MoE.
+% <<<ACLMOVE:budget
 
 \subsection{Statistical resolution}
 
@@ -57,6 +97,7 @@ small gap is the misreading to avoid---across our own re-exports, $d$ has moved 
 a factor of 1.5 while the underlying gap moved by less than 0.005 nats.
 
 \subsection{What was declared and not run}
+\label{sec:declared}
 
 One comparison in the pre-registered Family A, a depth-matched fixed-depth control,
 was declared before results existed and \emph{still consumes its Holm slot}: we do

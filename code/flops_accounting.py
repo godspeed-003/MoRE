@@ -189,8 +189,28 @@ def main() -> int:
     if "--batch" in argv:
         batch = int(argv[argv.index("--batch") + 1])
 
-    # One canonical run per arm supplies both the config and the measured depth,
-    # so the composed number is provenance-true rather than config-guessed.
+    # T-LA.22. THE MEASURED DEPTH IS THE MEAN OVER THE ADMITTED RUNS.
+    #
+    # This used to take ONE run per arm -- the first directory, in sort order,
+    # whose resolved_config claims canonical_lang_b -- and evaluate FLOPs at that
+    # single run's depth/mean. Two defects compounded. (a) Claiming the group is
+    # not being admitted: the exporter decides admission, and the MoR run picked
+    # (langB_MoR_seed42__547e435b__r4) was later superseded and no longer exists.
+    # (b) One seed's depth is not the arm's depth; MoR's depth/mean spreads
+    # 6.37..7.0 across seeds. MoR was costed at 6.899 where the admitted 5-seed
+    # mean is 6.730, overstating its multiplier 9.07x -> 8.87x -- on the axis the
+    # paper's efficiency claim rests on.
+    #
+    # FLOPs are linear in depth (verified below to 0.1%), so the mean of the
+    # per-seed FLOPs equals the FLOPs at the mean depth; the config is identical
+    # across an arm's seeds, so any admitted run supplies it. The admitted list
+    # comes from results/language/results.json, the exporter's own output.
+    admitted = None
+    res_p = CODE_DIR.parent / "results" / "language" / "results.json"
+    if res_p.exists():
+        res = json.loads(res_p.read_text(encoding="utf-8"))
+        admitted = {r["run_dir"] for r in res.get("admitted_runs", [])}
+    depths = {}
     picks = {}
     for d in sorted(RUNS.glob("langB_*")):
         rc_p, m_p = d / "resolved_config.json", d / "metrics.json"
@@ -200,10 +220,13 @@ def main() -> int:
         prov = rc.get("provenance", {})
         if (prov.get("experiment_group") or rc.get("experiment_group")) != "canonical_lang_b":
             continue
+        if admitted is not None and d.name not in admitted:
+            continue
         arm = rc.get("architecture") or rc["model"].get("architecture")
+        m = json.loads(m_p.read_text(encoding="utf-8"))
+        depths.setdefault(arm, []).append(float(m.get("depth/mean") or 1.0))
         if arm in picks:
             continue
-        m = json.loads(m_p.read_text(encoding="utf-8"))
         # Two throughput keys exist across the matrix: the language runs log
         # `perf/throughput_items_sec`, older cells `perf/throughput_tokens_sec`.
         # Falling back rather than reporting None keeps the comparison column
@@ -215,6 +238,11 @@ def main() -> int:
     if not picks:
         _out("[FAIL] no canonical_lang_b runs found under runs/")
         return 1
+    # Replace the single-run depth with the admitted-run mean.
+    for arm, (run_name, rc, _single, thr) in list(picks.items()):
+        ds = depths[arm]
+        picks[arm] = (f"{run_name} (config); depth = mean of {len(ds)} admitted runs",
+                      rc, sum(ds) / len(ds), thr)
 
     rows = []
     for arm in ("moe", "mor", "more"):
@@ -223,7 +251,11 @@ def main() -> int:
         run_name, rc, mean_depth, thr = picks[arm]
         r = profile_arm(arm, rc, batch, mean_depth)
         r["source_run"] = run_name
-        r["throughput_items_sec"] = thr
+        # T-LA.22: NOT a cross-arm comparison. The admitted runs trained on two
+        # GPUs (MoE/MoR on an RTX 4060, MoRE on a V100), so this logged TRAINING
+        # throughput compares cards as much as architectures. The same-card
+        # number is eval_ood.py's blocks_per_sec (every checkpoint, one GPU).
+        r["training_throughput_items_sec_UNCOMPARABLE"] = thr
         rows.append(r)
 
     _out("")
@@ -243,22 +275,17 @@ def main() -> int:
     _out("")
 
     by = {r["arm"]: r["flops_at_mean_depth"] for r in rows}
-    thr = {r["arm"]: r["throughput_items_sec"] for r in rows}
     if {"mor", "more"} <= by.keys():
-        _out(f"  MoR / MoRE  FLOPs ratio = {by['mor']/by['more']:.2f}x"
-             f"   |  throughput ratio = "
-             f"{(thr['more']/thr['mor']) if thr.get('mor') and thr.get('more') else float('nan'):.2f}x"
-             f"  (MoRE items/s over MoR items/s)")
+        _out(f"  MoR / MoRE  FLOPs ratio = {by['mor']/by['more']:.2f}x")
     if {"moe", "more"} <= by.keys():
-        _out(f"  MoRE / MoE  FLOPs ratio = {by['more']/by['moe']:.2f}x"
-             f"   |  throughput ratio = "
-             f"{(thr['moe']/thr['more']) if thr.get('moe') and thr.get('more') else float('nan'):.2f}x"
-             f"  (MoE items/s over MoRE items/s)")
+        _out(f"  MoRE / MoE  FLOPs ratio = {by['more']/by['moe']:.2f}x")
     if {"mor", "moe"} <= by.keys():
         _out(f"  MoR  / MoE  FLOPs ratio = {by['mor']/by['moe']:.2f}x")
     _out("")
-    _out("  FLOPs are analytic inference cost. They are NOT a speedup: see the")
-    _out("  throughput column, where MoR and MoRE are within 3% on the same card.")
+    _out("  FLOPs are analytic inference cost. They are NOT a speedup. Same-card")
+    _out("  throughput for every admitted checkpoint is eval_ood.py's blocks_per_sec;")
+    _out("  the admitted runs trained on two different GPUs, so their logged")
+    _out("  training throughputs are not comparable across arms.")
     _out("")
 
     if "--json" in argv:

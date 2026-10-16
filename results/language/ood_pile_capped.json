@@ -1,0 +1,311 @@
+{
+  "benchmark": "out-of-domain perplexity (pile-10k, capped 512 tok/doc)",
+  "status": "EXPLORATORY. Scored with the wikitext-103 8192-BPE tokenizer, so absolute perplexity is not comparable to published models; the cross-arm comparison is the valid one. Uncorrected.",
+  "tokenizer": "wikitext-103 bpe8192",
+  "seq_len": 256,
+  "n_blocks": 1500,
+  "source": "NeelNanda/pile-10k:train (a 10k-document sample of the Pile train split)",
+  "composition": {
+    "n_documents": 943,
+    "largest_document_share": 0.0013333333333333333,
+    "by_subset": {
+      "Pile-CC": {
+        "documents": 244,
+        "tokens": 95583,
+        "share": 0.2489140625
+      },
+      "StackExchange": {
+        "documents": 150,
+        "tokens": 67972,
+        "share": 0.17701041666666667
+      },
+      "OpenWebText2": {
+        "documents": 163,
+        "tokens": 65216,
+        "share": 0.16983333333333334
+      },
+      "PubMed Abstracts": {
+        "documents": 141,
+        "tokens": 51032,
+        "share": 0.13289583333333332
+      },
+      "Github": {
+        "documents": 90,
+        "tokens": 34264,
+        "share": 0.08922916666666666
+      },
+      "USPTO Backgrounds": {
+        "documents": 44,
+        "tokens": 19515,
+        "share": 0.0508203125
+      },
+      "PubMed Central": {
+        "documents": 28,
+        "tokens": 13137,
+        "share": 0.0342109375
+      },
+      "FreeLaw": {
+        "documents": 22,
+        "tokens": 9443,
+        "share": 0.024591145833333335
+      },
+      "NIH ExPorter": {
+        "documents": 15,
+        "tokens": 6929,
+        "share": 0.018044270833333334
+      },
+      "ArXiv": {
+        "documents": 13,
+        "tokens": 6656,
+        "share": 0.017333333333333333
+      },
+      "DM Mathematics": {
+        "documents": 11,
+        "tokens": 5632,
+        "share": 0.014666666666666666
+      },
+      "HackerNews": {
+        "documents": 7,
+        "tokens": 2883,
+        "share": 0.0075078125
+      },
+      "Enron Emails": {
+        "documents": 9,
+        "tokens": 2666,
+        "share": 0.006942708333333334
+      },
+      "OpenSubtitles": {
+        "documents": 3,
+        "tokens": 1536,
+        "share": 0.004
+      },
+      "Books3": {
+        "documents": 2,
+        "tokens": 1024,
+        "share": 0.0026666666666666666
+      },
+      "BookCorpus2": {
+        "documents": 1,
+        "tokens": 512,
+        "share": 0.0013333333333333333
+      }
+    },
+    "cap_tokens_per_doc": 512,
+    "excluded_subsets": [
+      "Wikipedia (en)"
+    ]
+  },
+  "by_arm": {
+    "moe": {
+      "n_seeds": 5,
+      "mean_loss": 7.945514638480392,
+      "std_loss": 0.06956725500831122,
+      "mean_perplexity": 2822.884852818977,
+      "blocks_per_sec_mean": 1118.6787741773283,
+      "blocks_per_sec_std": 59.94803910816032
+    },
+    "mor": {
+      "n_seeds": 5,
+      "mean_loss": 7.422656854575163,
+      "std_loss": 0.12147783983271965,
+      "mean_perplexity": 1673.4737830268084,
+      "blocks_per_sec_mean": 211.85789597499576,
+      "blocks_per_sec_std": 5.532895237691452
+    },
+    "more": {
+      "n_seeds": 5,
+      "mean_loss": 7.211522007761438,
+      "std_loss": 0.10635483272731805,
+      "mean_perplexity": 1354.9529476935113,
+      "blocks_per_sec_mean": 309.91950892278163,
+      "blocks_per_sec_std": 25.787310999237135
+    }
+  },
+  "pairwise_uncorrected": {
+    "moe_vs_mor": {
+      "gap": 0.5228577839052289,
+      "p_value": 0.007936507936507936,
+      "min_p": 0.007936507936507936,
+      "status": "UNCORRECTED -- exploratory"
+    },
+    "moe_vs_more": {
+      "gap": 0.7339926307189542,
+      "p_value": 0.007936507936507936,
+      "min_p": 0.007936507936507936,
+      "status": "UNCORRECTED -- exploratory"
+    },
+    "mor_vs_more": {
+      "gap": 0.2111348468137253,
+      "p_value": 0.023809523809523808,
+      "min_p": 0.007936507936507936,
+      "status": "UNCORRECTED -- exploratory"
+    }
+  },
+  "cells": [
+    {
+      "run": "langB_MoE_seed42__51000018",
+      "arch": "moe",
+      "seed": 42,
+      "mean_loss": 7.9377932802287585,
+      "perplexity": 2801.172280715194,
+      "n_tokens": 382500,
+      "blocks_per_sec": 1098.6673604377113,
+      "device": "NVIDIA GeForce RTX 3050 6GB Laptop GPU",
+      "batch": 32
+    },
+    {
+      "run": "langB_MoE_seed43__7d85fe81",
+      "arch": "moe",
+      "seed": 43,
+      "mean_loss": 7.91038960375817,
+      "perplexity": 2725.4521059011427,
+      "n_tokens": 382500,
+      "blocks_per_sec": 1039.9035246840995,
+      "device": "NVIDIA GeForce RTX 3050 6GB Laptop GPU",
+      "batch": 32
+    },
+    {
+      "run": "langB_MoE_seed44__c348b39a",
+      "arch": "moe",
+      "seed": 44,
+      "mean_loss": 8.05942637867647,
+      "perplexity": 3163.4749770971957,
+      "n_tokens": 382500,
+      "blocks_per_sec": 1096.8162641177937,
+      "device": "NVIDIA GeForce RTX 3050 6GB Laptop GPU",
+      "batch": 32
+    },
+    {
+      "run": "langB_MoE_seed45__64800f08",
+      "arch": "moe",
+      "seed": 45,
+      "mean_loss": 7.874176950571895,
+      "perplexity": 2628.521896317325,
+      "n_tokens": 382500,
+      "blocks_per_sec": 1176.4546253620792,
+      "device": "NVIDIA GeForce RTX 3050 6GB Laptop GPU",
+      "batch": 32
+    },
+    {
+      "run": "langB_MoE_seed46__3d9d12a9",
+      "arch": "moe",
+      "seed": 46,
+      "mean_loss": 7.945786979166667,
+      "perplexity": 2823.653743912479,
+      "n_tokens": 382500,
+      "blocks_per_sec": 1181.552096284958,
+      "device": "NVIDIA GeForce RTX 3050 6GB Laptop GPU",
+      "batch": 32
+    },
+    {
+      "run": "langB_MoR_seed42__c93f0fe8__r2",
+      "arch": "mor",
+      "seed": 42,
+      "mean_loss": 7.425638980800653,
+      "perplexity": 1678.4717416506503,
+      "n_tokens": 382500,
+      "blocks_per_sec": 220.56736248554319,
+      "device": "NVIDIA GeForce RTX 3050 6GB Laptop GPU",
+      "batch": 32
+    },
+    {
+      "run": "langB_MoR_seed43__8b54a65f",
+      "arch": "mor",
+      "seed": 43,
+      "mean_loss": 7.391023703022876,
+      "perplexity": 1621.3650599673451,
+      "n_tokens": 382500,
+      "blocks_per_sec": 205.46203281475988,
+      "device": "NVIDIA GeForce RTX 3050 6GB Laptop GPU",
+      "batch": 32
+    },
+    {
+      "run": "langB_MoR_seed44__c11db02d",
+      "arch": "mor",
+      "seed": 44,
+      "mean_loss": 7.563182220179739,
+      "perplexity": 1925.9646155095784,
+      "n_tokens": 382500,
+      "blocks_per_sec": 212.0440212435308,
+      "device": "NVIDIA GeForce RTX 3050 6GB Laptop GPU",
+      "batch": 32
+    },
+    {
+      "run": "langB_MoR_seed45__4041a890",
+      "arch": "mor",
+      "seed": 45,
+      "mean_loss": 7.240203676470588,
+      "perplexity": 1394.377943924444,
+      "n_tokens": 382500,
+      "blocks_per_sec": 209.48311340571138,
+      "device": "NVIDIA GeForce RTX 3050 6GB Laptop GPU",
+      "batch": 32
+    },
+    {
+      "run": "langB_MoR_seed46__fb91cdff",
+      "arch": "mor",
+      "seed": 46,
+      "mean_loss": 7.493235692401961,
+      "perplexity": 1795.853530570355,
+      "n_tokens": 382500,
+      "blocks_per_sec": 211.73294992543356,
+      "device": "NVIDIA GeForce RTX 3050 6GB Laptop GPU",
+      "batch": 32
+    },
+    {
+      "run": "langB_MoRE_seed42__9cfd3f1c",
+      "arch": "more",
+      "seed": 42,
+      "mean_loss": 7.110798886846405,
+      "perplexity": 1225.125892206257,
+      "n_tokens": 382500,
+      "blocks_per_sec": 348.78438874565234,
+      "device": "NVIDIA GeForce RTX 3050 6GB Laptop GPU",
+      "batch": 32
+    },
+    {
+      "run": "langB_MoRE_seed43__dbe38cbd",
+      "arch": "more",
+      "seed": 43,
+      "mean_loss": 7.380242044526144,
+      "perplexity": 1603.9779549353857,
+      "n_tokens": 382500,
+      "blocks_per_sec": 311.4078408009707,
+      "device": "NVIDIA GeForce RTX 3050 6GB Laptop GPU",
+      "batch": 32
+    },
+    {
+      "run": "langB_MoRE_seed44__16027752",
+      "arch": "more",
+      "seed": 44,
+      "mean_loss": 7.140836805555556,
+      "perplexity": 1262.4844011589933,
+      "n_tokens": 382500,
+      "blocks_per_sec": 289.18216930506327,
+      "device": "NVIDIA GeForce RTX 3050 6GB Laptop GPU",
+      "batch": 32
+    },
+    {
+      "run": "langB_MoRE_seed45__f6c47448",
+      "arch": "more",
+      "seed": 45,
+      "mean_loss": 7.184284752859477,
+      "perplexity": 1318.54581480266,
+      "n_tokens": 382500,
+      "blocks_per_sec": 283.9125120187632,
+      "device": "NVIDIA GeForce RTX 3050 6GB Laptop GPU",
+      "batch": 32
+    },
+    {
+      "run": "langB_MoRE_seed46__d069325c",
+      "arch": "more",
+      "seed": 46,
+      "mean_loss": 7.2414475490196075,
+      "perplexity": 1396.1134515232127,
+      "n_tokens": 382500,
+      "blocks_per_sec": 316.3106337434587,
+      "device": "NVIDIA GeForce RTX 3050 6GB Laptop GPU",
+      "batch": 32
+    }
+  ]
+}

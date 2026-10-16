@@ -106,8 +106,9 @@ def fig_depth_curve():
                 ms=17, mec="white", mew=1.0, zorder=5,
                 label=f"{LABEL[arm]} — learned policy")
 
-    ax.axhline(3.948311, color=INK2, ls=":", lw=1.2, zorder=2)
-    ax.text(1.02, 3.948311 + 0.035, "MoE — no recursion (1.00× FLOPs)",
+    moe_val = load("results.json")["aggregate"]["moe"]["metrics"]["val/task_loss"]["mean"]
+    ax.axhline(moe_val, color=INK2, ls=":", lw=1.2, zorder=2)
+    ax.text(1.02, moe_val + 0.035, "MoE — no recursion (1.00× FLOPs)",
             fontsize=7.4, color=INK2, va="bottom", ha="left")
 
     ax.set_xlabel("forced uniform depth")
@@ -190,6 +191,26 @@ def fig_stratified():
 # same colours -- the point is that the colours swap rank, not that the palette
 # changed.
 # ---------------------------------------------------------------------------
+def measured_inputs():
+    """FLOPs multipliers, in-domain and OOD losses -- READ, never typed in.
+
+    T-LA.22. fig_pareto and fig_ood used to carry these as literals
+    (mor 9.07, ind 3.948311, ...). When flops_accounting.py re-costed MoR at
+    the admitted 5-seed depth (9.07x -> 8.87x) the figure would have kept the
+    stale number while the text and Table 1 moved: the hand-copy failure
+    CLAUDE.md 5 forbids. OOD is the document-capped set (ood_pile_capped.json).
+    """
+    fl = json.load(open(os.path.join(REPO, "results", "flops_language.json"),
+                        encoding="utf-8"))
+    fpt = {a["arm"]: a["flops_per_token_at_mean_depth"] for a in fl["arms"]}
+    F = {a: fpt[a] / fpt["moe"] for a in fpt}
+    res = load("results.json")["aggregate"]
+    ind = {a: res[a]["metrics"]["val/task_loss"]["mean"] for a in F}
+    ind_s = {a: res[a]["metrics"]["val/task_loss"]["std"] for a in F}
+    ood = load("ood_pile_capped.json")["by_arm"]
+    return F, ind, ind_s, ood
+
+
 def fig_pareto():
     """Quality against inference compute -- the paper's headline, made visible.
 
@@ -205,10 +226,7 @@ def fig_pareto():
     line from MoE, not a position nobody else occupies. Drawing the frontier is
     what keeps that distinction honest.
     """
-    F = {"moe": 1.00, "mor": 9.07, "more": 2.19}
-    ind = {"moe": 3.948311, "mor": 3.515415, "more": 3.636966}
-    ind_s = {"moe": 0.024202, "mor": 0.033980, "more": 0.013387}
-    ood = load("ood_pile_test.json")["by_arm"]
+    F, ind, ind_s, ood = measured_inputs()
     ood_m = {a: ood[a]["mean_loss"] for a in F}
     ood_s = {a: ood[a]["std_loss"] for a in F}
 
@@ -271,10 +289,8 @@ def fig_pareto():
 
 def fig_ood():
     order = ("moe", "mor", "more")
-    ind = {"moe": 3.948311, "mor": 3.515415, "more": 3.636966}
-    ood = load("ood_pile_test.json")["by_arm"]
+    _F, ind, ind_s, ood = measured_inputs()
     ood_m = {a: ood[a]["mean_loss"] for a in order}
-    ind_s = {"moe": 0.024202, "mor": 0.033980, "more": 0.013387}
     ood_s = {a: ood[a]["std_loss"] for a in order}
 
     fig, axes = plt.subplots(1, 2, figsize=(6.6, 2.6))

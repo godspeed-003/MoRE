@@ -25,7 +25,7 @@ beat it has learned nothing a two-column count table could not. All three arms
 beat it, by margins of $+1.037$, $+1.470$ and $+1.348$ nats for MoE, MoR and MoRE
 respectively.
 
-% >>>ACLMOVE:protocol|\subsection{Training protocol}\label{sec:protocol} Five seeds per arm; 3 epochs of AdamW (lr $10^{-3}$, weight decay $10^{-4}$, clip 1.0, dropout 0.1), $d_{\text{model}}=256$, one block, 4 heads, $T=7$, batch 48, on a single laptop GPU. Settings were fixed once, before the comparison, and not swept per architecture. \textbf{Three epochs is a fixed compute budget, not convergence}---every arm gets the identical budget, so the comparison is valid though no arm is converged (Appendix~\ref{app:protocol}).
+% >>>ACLMOVE:protocol|\subsection{Training protocol}\label{sec:protocol} Five seeds per arm; 3 epochs of AdamW (lr $10^{-3}$, weight decay $10^{-4}$, clip 1.0, dropout 0.1), $d_{\text{model}}=256$, one block, 4 heads, $T=7$, batch 48, each run on a single GPU (\S\ref{sec:honesty}). Settings were fixed once, before the comparison, and not swept per architecture. \textbf{Three epochs is a fixed compute budget, not convergence}---every arm gets the identical budget, so the comparison is valid though no arm is converged (Appendix~\ref{app:protocol}).
 \subsection{Training protocol}
 \label{sec:protocol}
 
@@ -44,8 +44,10 @@ corpus's own author-provided validation split.
 Every canonical arm runs at seeds $\{42,43,44,45,46\}$ and is reported as
 mean$\,\pm\,$std over five runs. Training is 3 epochs of AdamW (lr $10^{-3}$,
 weight decay $10^{-4}$, gradient clipping 1.0, dropout 0.1) with
-$d_{\text{model}} = 256$, one block, 4 attention heads, $T = 7$ and batch size 48
-on a single laptop GPU. These settings were fixed once, before the comparison, and
+$d_{\text{model}} = 256$, one block, 4 attention heads, $T = 7$ and batch size 48,
+each run on a single GPU: an RTX 4060 laptop GPU for the two arms retrained after
+a checkpoint loss, a V100 for the composed arm (\S\ref{sec:honesty}). These
+settings were fixed once, before the comparison, and
 not swept per architecture: they are a stable operating point, and no arm was tuned
 for itself.
 
@@ -58,7 +60,7 @@ Every arm receives the identical budget, so the comparison is valid even though 
 arm is converged. The consequences are stated in \S\ref{sec:limitations}.
 
 % <<<ACLMOVE:protocol
-% >>>ACLMOVE:metrics|\subsection{Metrics}\label{sec:metrics} The primary metric is \textbf{validation task loss}, final-epoch per-token cross-entropy in nats; \texttt{best} equals \texttt{last} on all 15 cells, so \emph{no model selection occurred}. Routing is scored with permutation-invariant measures (AMI, Hungarian, purity) against a per-run shuffled-label control and reported as a z-score. Depth is reported with its exit rates alongside: a depth--difficulty correlation on an arm whose tokens almost all reach the ceiling is taken against a near-constant and \textbf{says nothing about allocation}. Appendix~\ref{app:metrics} defines each.
+% >>>ACLMOVE:metrics|\subsection{Metrics}\label{sec:metrics} The primary metric is \textbf{validation task loss}, final-epoch per-token cross-entropy in nats; \texttt{best} equals \texttt{last} on all 15 cells, so \emph{no model selection occurred}. Routing is scored with permutation-invariant measures (AMI, Hungarian, purity) against a per-run shuffled-label control and reported as a z-score. Depth is reported with its exit rates alongside: a depth--difficulty correlation on an arm whose tokens almost all reach the ceiling is taken against a near-constant and \textbf{says nothing about allocation}. Compute is inference FLOPs per token, counted on a real forward pass at each arm's measured mean depth (Appendix~\ref{app:flops}). Appendix~\ref{app:metrics} defines the rest.
 \subsection{Metrics}
 \label{sec:metrics}
 
@@ -90,7 +92,46 @@ all exit at the ceiling, the correlation is computed against a near-constant and
 value near zero is uninformative rather than negative evidence. We report the exit
 rates next to every correlation for that reason (\S\ref{sec:halting}).
 
+Compute is reported as inference FLOPs per token, counted on a real forward pass
+and evaluated at each arm's measured mean depth; Appendix~\ref{app:flops} gives the
+method and its checks. FLOPs are an analytic cost, not a runtime, so measured
+throughput is reported beside them.
+
 % <<<ACLMOVE:metrics
+% >>>ACLMOVE:flops|
+We count FLOPs rather than derive them. \texttt{torch.utils.flop\_counter} records
+every operation that executes on a real forward pass of each arm, built from its
+own resolved configuration, so the count cannot drift from the model: attention,
+the embedding and positional tables, the router, the per-expert halt heads and the
+8{,}192-way output layer are all included, and none is approximated by a formula.
+Depth is swept by forcing every token to exactly $k$ steps for $k = 1,\dots,7$.
+The recursive part of the graph is linear in $k$, so
+$\mathrm{FLOPs}(d) = \mathrm{FLOPs}(1) + (d-1)\,\Delta$, with $\Delta$ the marginal
+cost of one step; the fit is \emph{verified} against the measured $k = 7$ count, and
+a residual above $0.1\%$ is treated as a failure, because a non-linearity there
+would mean the recursion is not computing what the architecture claims. The
+residual is zero for both recursive arms.
+
+Each arm is then costed at its \emph{measured} mean depth---the mean over its five
+admitted runs of the realised number of steps per token (MoR $6.730$, MoRE
+$6.955$)---not at the depth budget, which would overstate both recursive arms by
+whatever early exit saves. Because FLOPs are linear in depth, the cost at the mean
+depth equals the mean of the per-run costs. Per token this gives
+$5.25$\,M (MoE), $46.5$\,M (MoR) and $11.5$\,M (MoRE): MoR costs $8.87\times$ MoE
+and MoRE $2.19\times$, so MoR costs $4.05\times$ MoRE. These are the FLOPs a
+halting-aware implementation would execute. Ours executes somewhat more for both
+recursive arms: the expert FFN runs only for still-active tokens, but attention is
+computed at every position for as long as any token in the batch is active, and
+its output is discarded at halted ones---a cost the engine logs rather than hides.
+Both recursive arms run most batches to the full budget, so the excess falls on
+both, and slightly more on MoR, whose mean depth is lower.
+
+Throughput is measured separately, because FLOPs are not a runtime and the two
+disagree here. The admitted runs trained on two different GPUs, so their logged
+training throughputs compare hardware as much as architectures; we therefore time
+inference for all fifteen checkpoints on one GPU (an RTX 3050 laptop GPU), on the
+identical out-of-domain blocks at batch size 32, after a warm-up batch.
+% <<<ACLMOVE:flops
 \subsection{Statistics}
 \label{sec:stats}
 
@@ -124,18 +165,22 @@ we phrase as ``as extreme as a five-seed design admits''---a weaker statement th
 significance, and not to be dressed up as a stronger one. Only more seeds can
 strengthen these claims; no larger effect can.
 
-% >>>ACLMOVE:holm_detail|The correction is Holm--Bonferroni over two pre-registered families (predictive quality, $m=4$; adaptive depth, $m=2$), declared before the final arm was trained. Appendix~\ref{app:stats} gives the family memberships and explains why plain Bonferroni would be unusable here.
+% >>>ACLMOVE:holm_detail|The correction is Holm--Bonferroni over two pre-registered families (predictive quality, $m=4$; adaptive depth, $m=2$), declared before the final arm was trained. Every headline comparison clears its threshold, and would clear plain Bonferroni even with all six declared comparisons pooled into one family ($0.05/6=0.00833$, a margin of 0.0004 over the floor); Appendix~\ref{app:stats} gives the memberships.
 Correction is Holm--Bonferroni over two \emph{pre-registered} families, declared
 before the final arm was trained: Family A (predictive quality, $m=4$, metric
 validation task loss) and Family B (adaptive depth, $m=2$, metric depth--difficulty
 correlation). The split is declared rather than chosen because the two families ask
 different questions on different quantities, and pooling them would correct the
 depth claim for tests that cannot bear on it. Holm controls the same familywise
-error rate as plain Bonferroni and is uniformly more powerful, and here the choice
-is load-bearing: plain Bonferroni over the seven comparisons would give
-$0.05/7 = 0.00714$, \emph{below} the floor of 0.00794---a design in which no effect
-of any size could be declared significant. Holm's easiest threshold at $m=4$ is
-$0.0125$, a margin of 0.0046 above the floor.
+error rate as plain Bonferroni and is uniformly more powerful, but at our
+resolution floor the two give identical verdicts: Holm's first-step threshold at a
+given $m$ \emph{is} Bonferroni's. What sets the threshold is the family size,
+$0.05/4 = 0.0125$ in Family A and $0.025$ in Family B. Even pooling all six declared
+comparisons into one family gives $0.05/6 = 0.00833$, which the floor of $0.00794$
+still clears---by $0.0004$. That margin is the binding constraint on this design: a
+seventh confirmatory comparison would put the floor above the threshold, after
+which no effect of any size could be declared significant. It is one more reason
+no comparison may be added to a family once results exist.
 
 Two consequences we hold ourselves to. A declared comparison that could not be run
 still consumes its slot: dropping a failed arm must never make the survivors easier

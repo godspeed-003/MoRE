@@ -216,6 +216,20 @@ def perplexity(run_dir, blocks, device, batch=32):
 
     L = blocks.shape[1]
     total_loss, total_tok = 0.0, 0
+    # T-LA.22. SAME-CARD INFERENCE THROUGHPUT. The admitted runs trained on two
+    # GPUs (MoE/MoR on an RTX 4060, MoRE on a V100), so the training throughput
+    # each logged is not comparable ACROSS arms. Timing this loop gives every
+    # checkpoint the identical blocks, batch and card. One warm-up batch first so
+    # CUDA initialisation is not billed to whichever arm happens to run first.
+    import time
+    _w = torch.from_numpy(blocks[:batch]).to(device)
+    _B = _w.shape[0]
+    model(_w, torch.ones(_B, L, dtype=torch.bool, device=device),
+          torch.full((_B, L), NO_FAMILY, dtype=torch.long, device=device),
+          torch.full((_B, L), -1, dtype=torch.long, device=device))
+    if device.type == "cuda":
+        torch.cuda.synchronize()
+    t0 = time.perf_counter()
     for i in range(0, blocks.shape[0], batch):
         x = torch.from_numpy(blocks[i:i + batch]).to(device)
         B = x.shape[0]
@@ -227,12 +241,19 @@ def perplexity(run_dir, blocks, device, batch=32):
                                x[:, 1:].reshape(-1), reduction="sum")
         total_loss += float(loss)
         total_tok += B * (L - 1)
+    if device.type == "cuda":
+        torch.cuda.synchronize()
+    elapsed = time.perf_counter() - t0
     mean_loss = total_loss / total_tok
     prov = rc.get("provenance", {}) or {}
     return {"run": run_dir.name, "arch": prov.get("architecture"),
             "seed": int(prov.get("seed", -1)),
             "mean_loss": mean_loss, "perplexity": float(np.exp(mean_loss)),
-            "n_tokens": total_tok}
+            "n_tokens": total_tok,
+            "blocks_per_sec": blocks.shape[0] / elapsed,
+            "device": (torch.cuda.get_device_name(device) if device.type == "cuda"
+                       else "cpu"),
+            "batch": batch}
 
 
 def main(argv=None):
@@ -285,7 +306,7 @@ def main(argv=None):
             # A few thousand blocks give a stable perplexity; the Pile's long documents
             # otherwise pack into tens of thousands and the scoring never finishes.
             blocks = blocks[: args.max_blocks]
-    print(f"device={device}  OOD={args.corpus}:{args.split}  "
+    print(f"device={device}  OOD={'pile-10k' if args.corpus == 'pile' else args.corpus + ':' + args.split}  "
           f"{blocks.shape[0]} blocks x {args.seq_len}  runs={len(runs)}", flush=True)
     print("EXPLORATORY -- uncorrected, not a declared family.\n")
 
@@ -300,9 +321,12 @@ def main(argv=None):
     for a in arms:
         sel = [c for c in cells if c["arch"] == a]
         losses = [c["mean_loss"] for c in sel]
+        thr = [c["blocks_per_sec"] for c in sel]
         agg[a] = {"n_seeds": len(sel), "mean_loss": st.mean(losses),
                   "std_loss": st.stdev(losses) if len(losses) > 1 else None,
-                  "mean_perplexity": float(np.exp(st.mean(losses)))}
+                  "mean_perplexity": float(np.exp(st.mean(losses))),
+                  "blocks_per_sec_mean": st.mean(thr),
+                  "blocks_per_sec_std": st.stdev(thr) if len(thr) > 1 else None}
 
     pairwise = {}
     for i, a in enumerate(arms):
@@ -318,7 +342,10 @@ def main(argv=None):
                                            f"ood_{args.corpus}_{args.split}.json")
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps({
-        "benchmark": f"out-of-domain perplexity ({args.corpus}:{args.split})",
+        "benchmark": ("out-of-domain perplexity (pile-10k"
+                      + (f", capped {args.cap_tokens_per_doc} tok/doc" if composition else "")
+                      + ")") if args.corpus == "pile"
+                     else f"out-of-domain perplexity ({args.corpus}:{args.split})",
         "status": "EXPLORATORY. Scored with the wikitext-103 8192-BPE tokenizer, so "
                   "absolute perplexity is not comparable to published models; the "
                   "cross-arm comparison is the valid one. Uncorrected.",
@@ -329,7 +356,7 @@ def main(argv=None):
         "by_arm": agg, "pairwise_uncorrected": pairwise, "cells": cells,
     }, indent=2) + "\n", encoding="utf-8")
 
-    print(f"\nby arm ({args.corpus}:{args.split}):")
+    print("\nby arm:")
     for a in arms:
         s = agg[a]
         sd = f" +- {s['std_loss']:.4f}" if s["std_loss"] is not None else ""

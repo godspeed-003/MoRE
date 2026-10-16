@@ -46,7 +46,12 @@ def flops_per_token():
     fpt, tp = {}, {}
     for a in d["arms"]:
         fpt[a["arm"]] = a["flops_per_token_at_mean_depth"]
-        tp[a["arm"]] = a.get("throughput_items_sec")
+    # T-LA.22: throughput comes from ONE GPU for every checkpoint (eval_ood.py's
+    # timed pass). The admitted runs trained on two different GPUs, so the
+    # training throughput they logged compares hardware as much as architectures.
+    ood = load("ood_pile_capped.json")
+    for a, v in (ood or {}).get("by_arm", {}).items():
+        tp[a] = v.get("blocks_per_sec_mean")
     base = min(fpt.values())
     ratio = {k: v / base for k, v in fpt.items()}
     return fpt, ratio, tp
@@ -89,7 +94,8 @@ def main():
     EVALS = [
         ("Val loss (nats, lower better)", "stratified_val.json", False, fmt_nats),
         ("Test loss (nats, lower better)", "stratified_test.json", False, fmt_nats),
-        ("OOD perplexity loss (nats, lower)", "ood_pile_test.json", False, fmt_nats),
+        ("OOD loss, capped Pile (nats, lower)", "ood_pile_capped.json", False, fmt_nats),
+        ("OOD loss, original Pile set (nats)", "ood_pile_test.json", False, fmt_nats),
         ("BLiMP (acc, higher better)", "blimp.json", True, fmt_pct),
         ("EWoK (acc, chance 50%)", "ewok.json", True, fmt_pct),
     ]
@@ -109,7 +115,7 @@ def main():
 
     # Compute reference block.
     lines.append("\n## Compute per arm (the bracket's basis)\n")
-    lines.append("| arm | FLOPs/token | FLOPs x vs cheapest | throughput items/s | wall-clock x slower |\n|---|---|---|---|---|")
+    lines.append("| arm | FLOPs/token | FLOPs x vs cheapest | throughput: inference blocks/s, one GPU | wall-clock x slower |\n|---|---|---|---|---|")
     base_tp = max(v for v in tp.values() if v)
     for a in ARMS:
         wc = base_tp / tp[a] if tp.get(a) else None
@@ -178,7 +184,7 @@ def main():
                          f"+{ratio[a]-ratio['moe']:.2f}x | {nats_per_x(a):.4f} |")
         lines.append("\nMoRE converts extra compute into quality far more efficiently than "
                      "MoR (higher nats-per-x): most of MoR's gain for a fraction of the "
-                     "FLOPs. MoR reaches the lowest absolute loss but pays ~9x the compute.\n")
+                     f"FLOPs. MoR reaches the lowest absolute loss but pays {ratio['mor']:.2f}x the compute.\n")
 
     out = RES / "eval_summary.md"
     out.write_text("\n".join(lines) + "\n", encoding="utf-8")
