@@ -100,6 +100,88 @@ def pack(tok, lines, seq_len):
     return arr
 
 
+# ---------------------------------------------------------------------------
+# T-LA.22  DOCUMENT-CAPPED PILE SET
+#
+# WHY. The original Pile set is the first 1500 blocks of the first 4000 packed
+# documents of NeelNanda/pile-10k. Reproduced exactly, those 384,000 tokens come
+# from 102 documents and ONE Books3 document supplies 223,739 of them (58.3%).
+# The paper's out-of-domain claim was therefore mostly a statement about one
+# book. Sample SIZE was never the problem -- every arm scores the identical
+# blocks, the reported +- is seed variance, and evaluation-sample noise cancels
+# in the paired gap. COMPOSITION was.
+#
+# THE RULE, fixed and committed before any capped number existed:
+#   * documents in pile-10k's own order (the same order the original used);
+#   * the Pile's "Wikipedia (en)" subset excluded -- WikiText-103 IS Wikipedia,
+#     so those documents are in-domain by construction;
+#   * each document contributes at most CAP tokens (EOT + its first CAP-1 tokens),
+#     CAP = 512 = two blocks' worth;
+#   * packing and block size identical to the original (EOT-joined, 256-token
+#     blocks, trailing partial dropped), first 1500 blocks scored.
+#   * the capped set is reported BESIDE the original, never instead of it, and
+#     whichever way it comes out it becomes the headline OOD number: a selection
+#     rule chosen for representativeness may not be swapped back after the fact.
+#
+# NOTE ON THE SPLIT. pile-10k is a sample of the Pile's TRAIN split, and
+# fetch_ood_lines() ignores --split for "pile". The original artifact is
+# labelled "pile:test"; that label is wrong. "Held-out" remains true in the sense
+# that matters -- no arm trained on any Pile text -- and outputs now record the
+# real source.
+# ---------------------------------------------------------------------------
+PILE_SOURCE = "NeelNanda/pile-10k:train (a 10k-document sample of the Pile train split)"
+
+
+def fetch_pile_docs():
+    """Every non-empty pile-10k document with its Pile subset name, in order."""
+    from datasets import load_dataset
+    ds = load_dataset("NeelNanda/pile-10k", split="train")
+    out = []
+    for r in ds:
+        t = r.get("text", "") or ""
+        if not t.strip():
+            continue
+        m = r.get("meta") or {}
+        out.append((t, m.get("pile_set_name", "?") if isinstance(m, dict) else "?"))
+    return out
+
+
+def pack_capped(tok, docs, seq_len, cap, exclude, max_blocks):
+    """Pack documents with a per-document token cap; return blocks + composition.
+
+    Composition is measured over the tokens that actually land in the scored
+    blocks, so it describes what was scored, not what was fetched.
+    """
+    need = max_blocks * seq_len
+    ids, contrib = [], []                       # contrib: (subset, n_tokens)
+    for text, subset in docs:
+        if subset in exclude:
+            continue
+        d = [EOT_ID] + tok.encode(text).ids
+        if cap:
+            d = d[:cap]
+        take = min(len(d), need - len(ids))
+        ids.extend(d[:take])
+        contrib.append((subset, take))
+        if len(ids) >= need:
+            break
+    n_blocks = len(ids) // seq_len
+    arr = np.asarray(ids[: n_blocks * seq_len],
+                     dtype=np.int64).reshape(n_blocks, seq_len)
+    tot = sum(n for _, n in contrib) or 1
+    by = {}
+    for sname, n in contrib:
+        b = by.setdefault(sname, {"documents": 0, "tokens": 0})
+        b["documents"] += 1
+        b["tokens"] += n
+    for b in by.values():
+        b["share"] = b["tokens"] / tot
+    comp = {"n_documents": len(contrib),
+            "largest_document_share": max(n for _, n in contrib) / tot,
+            "by_subset": dict(sorted(by.items(), key=lambda kv: -kv[1]["tokens"]))}
+    return arr, comp
+
+
 def canonical_runs(explicit, arch_filter):
     out = []
     runs = REPO / "runs"
@@ -162,8 +244,17 @@ def main(argv=None):
     ap.add_argument("--seq_len", type=int, default=256)
     ap.add_argument("--max_blocks", type=int, default=2000,
                     help="cap scored blocks (0 = all); a few thousand give stable ppl")
+    ap.add_argument("--cap_tokens_per_doc", type=int, default=0,
+                    help="T-LA.22: max tokens any one document may contribute "
+                         "(0 = uncapped, the original protocol)")
+    ap.add_argument("--exclude_subsets", default="",
+                    help="comma-separated Pile subset names to drop, e.g. "
+                         "'Wikipedia (en)'")
     ap.add_argument("--out", default=None)
     args = ap.parse_args(argv)
+    if args.corpus == "pile" and args.split != "test":
+        print("note: --split is ignored for pile; the source is always "
+              + PILE_SOURCE)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     runs = canonical_runs(args.run, args.arch)
@@ -173,12 +264,27 @@ def main(argv=None):
         return 2
 
     tok = load_tokenizer()
-    lines = fetch_ood_lines(args.corpus, args.split)
-    blocks = pack(tok, lines, args.seq_len)
-    if args.max_blocks and blocks.shape[0] > args.max_blocks:
-        # A few thousand blocks give a stable perplexity; the Pile's long documents
-        # otherwise pack into tens of thousands and the scoring never finishes.
-        blocks = blocks[: args.max_blocks]
+    composition = None
+    if args.cap_tokens_per_doc or args.exclude_subsets:
+        if args.corpus != "pile":
+            raise SystemExit("--cap_tokens_per_doc/--exclude_subsets need --corpus pile")
+        if not args.max_blocks:
+            raise SystemExit("the capped set needs a finite --max_blocks")
+        excl = {x.strip() for x in args.exclude_subsets.split(",") if x.strip()}
+        blocks, composition = pack_capped(tok, fetch_pile_docs(), args.seq_len,
+                                          args.cap_tokens_per_doc, excl,
+                                          args.max_blocks)
+        composition.update({"cap_tokens_per_doc": args.cap_tokens_per_doc,
+                            "excluded_subsets": sorted(excl)})
+        print(f"capped set: {composition['n_documents']} documents, largest "
+              f"single-document share {composition['largest_document_share']:.1%}")
+    else:
+        lines = fetch_ood_lines(args.corpus, args.split)
+        blocks = pack(tok, lines, args.seq_len)
+        if args.max_blocks and blocks.shape[0] > args.max_blocks:
+            # A few thousand blocks give a stable perplexity; the Pile's long documents
+            # otherwise pack into tens of thousands and the scoring never finishes.
+            blocks = blocks[: args.max_blocks]
     print(f"device={device}  OOD={args.corpus}:{args.split}  "
           f"{blocks.shape[0]} blocks x {args.seq_len}  runs={len(runs)}", flush=True)
     print("EXPLORATORY -- uncorrected, not a declared family.\n")
@@ -218,6 +324,8 @@ def main(argv=None):
                   "cross-arm comparison is the valid one. Uncorrected.",
         "tokenizer": "wikitext-103 bpe8192", "seq_len": args.seq_len,
         "n_blocks": int(blocks.shape[0]),
+        "source": PILE_SOURCE if args.corpus == "pile" else args.corpus,
+        "composition": composition,
         "by_arm": agg, "pairwise_uncorrected": pairwise, "cells": cells,
     }, indent=2) + "\n", encoding="utf-8")
 
