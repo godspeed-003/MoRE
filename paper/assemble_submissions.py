@@ -125,6 +125,13 @@ APPENDIX = [
     # Body keeps a two-sentence summary and the direction of the effect.
     ("budget",      "Budget and convergence: what each arm would do with more epochs",
      "app:budget"),
+    # T-LA.24. The full disclosures prose moves; the body keeps the subsection
+    # heading, its \label{sec:honesty} (four citations point at it) and a
+    # paragraph carrying every integrity-critical fact with its numbers.
+    # Moved for BOTH venues: ACL is 9.16 against a hard 8, TMLR is over the
+    # 12-page line, and this is the block the user had already questioned as
+    # "history of the study".
+    ("disclosures", "Disclosures in full", "app:disclosures"),
 ]
 
 # T-LA.14: TMLR MOVES A SUBSET TOO.
@@ -148,7 +155,8 @@ APPENDIX = [
 # anything but ranking.
 TMLR_APPENDIX = ["floor_proof", "holm_detail", "integrity", "metrics",
                  "protocol", "engine", "stratified", "trapping",
-                 "competition2", "blimp", "saturation", "flops", "budget"]
+                 "competition2", "blimp", "saturation", "flops", "budget",
+                 "disclosures"]
 
 
 def appendix_order(venue):

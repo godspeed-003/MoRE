@@ -126,9 +126,14 @@ reason and should not be compared to published WikiText-103 numbers.
 \subsection{Disclosures}
 \label{sec:honesty}
 
-Several facts about this study would count against it if a reader discovered them
-independently, so we state them.
-
+% T-LA.24. The label and the subsection heading STAY in the body: four places
+% cite \S\ref{sec:honesty} (02_setup protocol line, 02_setup GPU sentence,
+% 03_method ablation pointer, 05_mechanism trapping aside), and a label that
+% moves to the appendix would silently re-point all four. Only the prose moves.
+% The replacement keeps every integrity-critical fact at body length: the
+% specification violation, the partial pre-registration, the GPU/revision split
+% with its measured common-mode offset, and the depth-metric N/A.
+% >>>ACLMOVE:disclosures|\textbf{Disclosures.} Three facts count against this study and we state them plainly. An earlier composed arm re-routed at every step, violated the specification, and its apparent parity with MoR was an artefact---the architecturally correct arm scores $0.134$ nats \emph{worse}. The pre-registration is partial, and the MoR-versus-MoE comparison was specified after its data existed. And the matrix spans two GPUs over four code revisions; the retrained arms reproduced to $-0.117\sigma$ and $-0.119\sigma$, a common-mode offset that cancels in every between-arm gap carrying a verdict (the MoE$-$MoR gap moved by 0.000185 nats), though per-seed values do not reproduce and we do not claim they do. We likewise report no per-token depth-allocation error: English supplies no ground-truth depth, so the metric is \texttt{N/A}, not zero. Appendix~\ref{app:disclosures} gives all of it in full.
 \textbf{An earlier version of the composed arm was not the architecture we define,
 and fixing it made our headline worse.} It re-routed at every recursion step,
 letting a token traverse up to seven \emph{different} expert FFNs---a heterogeneous
@@ -160,6 +165,7 @@ they do; the reproducible quantity is the arm mean.
 \textbf{We report no per-token depth-allocation error.} English supplies no
 ground-truth depth per token, so that metric is \texttt{N/A}---not zero. A zero
 would read as perfect allocation against a curriculum that does not exist.
+% <<<ACLMOVE:disclosures
 
 \section{Conclusion}
 \label{sec:conclusion}

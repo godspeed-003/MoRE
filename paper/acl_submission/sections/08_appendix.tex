@@ -449,3 +449,38 @@ search. Given the gaps involved (0.12 nats between the recursive arms), we regar
 that as a real risk for the MoR--MoRE comparison and a small one for the comparisons
 against MoE.
 
+\section{Disclosures in full}
+\label{app:disclosures}
+
+\textbf{An earlier version of the composed arm was not the architecture we define,
+and fixing it made our headline worse.} It re-routed at every recursion step,
+letting a token traverse up to seven \emph{different} expert FFNs---a heterogeneous
+seven-layer network, not one block iterated, and strictly more expressive than the
+specification allows. That arm scored 3.5031 and was statistically indistinguishable
+from MoR. The architecturally-correct route-once arm reported here scores 3.6370,
+\textbf{0.134 nats worse}. The earlier arm's apparent parity with MoR was an
+artefact of a specification violation. We retain it unmodified as a labelled
+ablation.
+
+\textbf{The pre-registration is partial and the registration file says so itself.}
+MoE and MoR were already trained when the test families were declared, so only the
+comparisons involving the composed arm are genuinely pre-result. The MoR-versus-MoE
+comparison was specified after its data existed, and we do not describe the
+registration as complete.
+
+\textbf{The matrix spans two GPUs and four code revisions.} Two arms were
+retrained on one card after the original checkpoints were lost; the composed arm
+remains on the original hardware, and comparability rests on a frozen
+specification and a seed-blind configuration-equality check rather than on a
+single revision. We have direct evidence the hardware split is benign: both
+retrained arms reproduced their published means to $-0.117\sigma$ and
+$-0.119\sigma$---agreement to the third decimal across arms sharing no
+parameters, a \emph{common-mode} offset rather than sampling noise, and one that
+cancels in the between-arm gaps carrying every verdict (the MoE$-$MoR gap moved
+by 0.000185 nats). Per-seed values do \emph{not} reproduce and we do not claim
+they do; the reproducible quantity is the arm mean.
+
+\textbf{We report no per-token depth-allocation error.} English supplies no
+ground-truth depth per token, so that metric is \texttt{N/A}---not zero. A zero
+would read as perfect allocation against a curriculum that does not exist.
+

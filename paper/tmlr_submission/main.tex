@@ -76,6 +76,51 @@ Recursion Trade Off in Small Language Models}
 % ACL defines this as \linewidth: it is already column-width there.
 \newcommand{\colfigwidth}{0.6\linewidth}
 
+% ---------------------------------------------------------------------------
+% VENUE LAYOUT OVERRIDES (T-LA.24). tmlr.sty is left byte-identical to the
+% official template; everything that tightens the page is set here, so
+% reverting is deleting this block. These change ONLY the TMLR tree --
+% assemble_submissions.py writes main.tex per venue and never touches ACL.
+%
+% Measured motivation: the body sat at 13.67 counted pages against the 12-page
+% line at which TMLR's reviewer guide promises a ~2-week turnaround. The
+% user's decision was to reclaim the page from whitespace before cutting
+% content, so nothing below removes a sentence.
+%
+% TEXT BLOCK. 6.5in -> 6.9in wide, 9.0in -> 9.3in tall, symmetric (-0.2in on
+% both side margins, so the page stays centred). Margins go 1.0in -> 0.8in
+% horizontally and 1.25in -> 1.10in vertically. Deliberately modest: TMLR
+% specifies no margin, but a body noticeably denser than the template's stops
+% reading as a TMLR paper, and the gain is ~7% of the text area.
+%
+% PARAGRAPH SPACING. tmlr.sty sets \parskip .5pc (~6pt) with \parindent 0pt,
+% which is generous for a single-column body. 4.5pt keeps paragraphs visibly
+% separated while recovering roughly a line every three paragraphs across a
+% 12-page body.
+%
+% FLOAT PACKING. The gap the user flagged after Figure 3 is float stranding:
+% \topfraction .7 means LaTeX will not fill more than 70% of a page with a
+% top float, so a tall figure plus its caption leaves the rest of that page
+% unfilled rather than pulling the following text up. The three fractions
+% below are the standard remedy and are what actually closes that gap --
+% shrinking \parskip alone does not move it.
+% ---------------------------------------------------------------------------
+\setlength{\textwidth}{6.9in}
+\setlength{\oddsidemargin}{-0.2in}
+\setlength{\evensidemargin}{-0.2in}
+\setlength{\textheight}{9.3in}
+\addtolength{\topmargin}{-0.15in}
+
+\setlength{\parskip}{4.5pt plus 0.5pt minus 0.5pt}
+
+\renewcommand{\topfraction}{0.92}
+\renewcommand{\bottomfraction}{0.75}
+\renewcommand{\textfraction}{0.06}
+\renewcommand{\floatpagefraction}{0.78}
+\setcounter{topnumber}{3}
+\setcounter{bottomnumber}{2}
+\setcounter{totalnumber}{4}
+
 \begin{document}
 
 \maketitle
