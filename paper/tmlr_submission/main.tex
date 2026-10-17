@@ -210,23 +210,32 @@ specification is released with the code.
 % See TMLR_APPENDIX in assemble_submissions.py for the list and the reasoning.
 %
 % 08_appendix.tex is GENERATED -- edit paper/common/*.tex, not the appendix.
-\appendix
-\input{sections/08_appendix}
 
-% T-LA.18. REFERENCES LAST, after the appendix. TMLR imposes no order here and
-% the template's own example puts the bibliography before the appendix; this is
-% a deliberate choice, not the default.
+% T-LA.18, REVERSED at T-LA.25 (user decision). This block USED to sit AFTER the
+% appendix, deliberately: TMLR imposes no order here, and references-last was
+% chosen so that method reference sat adjacent to the prose that cites it. The
+% user has the references back in the template's own order -- body, Broader
+% Impact, Reproducibility, References, then the appendix sections -- which is what
+% TMLR's tmlr.sty example and most TMLR submissions do. Both orders are
+% legitimate; this one is chosen because it matches the venue template.
 %
-% IT CHANGES HOW THE PAPER MUST BE MEASURED. measure_counted_pages.py finds the
-% end of counted body by looking for the 'References' heading, so with the
-% bibliography last that landmark would sit past the appendix and the whole
-% appendix would be counted as body. The tool now stops at whichever of
-% References / Appendix comes FIRST -- do not revert that without moving this
-% block back.
+% NO TITLE. \appendix only RENUMBERS \section to A, B, C, D -- it emits no
+% "Appendix" heading, and none is added here, so the back matter runs straight
+% from the bibliography into "A <title>". Do not insert one.
 %
-% ACL is deliberately NOT changed: ARR's template requires appendices to follow
+% IT DOES NOT CHANGE HOW THE PAPER MUST BE MEASURED. measure_counted_pages.py
+% stops at whichever of References / an appendix section title appears FIRST, and
+% was written for exactly this reason (T-LA.18 added the appendix titles as
+% second landmarks when the bibliography used to come last). References now comes
+% first, which is the earlier landmark, so the count is unchanged. Verified by
+% running the tool, not by reasoning: see the T-LA.25 changelog entry.
+%
+% ACL IS DELIBERATELY NOT CHANGED: ARR's template requires appendices to follow
 % the references, so the two venues legitimately differ here.
 \bibliographystyle{tmlr}
 \bibliography{refs}
+
+\appendix
+\input{sections/08_appendix}
 
 \end{document}

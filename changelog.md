@@ -9407,14 +9407,22 @@ The exposure is under-documentation and three contradictions.
 **Starting state.** The committed `main.pdf` measured **13 main-content pages**
 (22 total) against TMLR's recommended 12.
 
-> **Two stale numbers found while measuring this. Do not reuse them.** The T-LA.14
-> calibration note in `assemble_submissions.py` and in this file quotes "13.67
-> counted pages" as the pre-move baseline, and names `code/main_content_pages.py`
-> as the tool to measure with. **`main_content_pages.py` does not exist in this
-> worktree**, and the 13.67 was never re-measured after later block moves. The real
-> figure was 13. The note's companion advice to trust `measure_move_blocks.py` only
-> for *ranking* is therefore unverified too. Either restore the counter or delete
-> both claims.
+> **A stale instruction in `assemble_submissions.py`, live right now.** The T-LA.14
+> calibration note (and four other places in this file) tells the reader to
+> "measure with `code/main_content_pages.py`" and quotes a baseline of "13.67
+> counted pages". **That tool was deliberately RETIRED** - see "main_content_pages.py
+> retired - it was the wrong half of a disagreement", further up - because it ended
+> main content at the Broader Impact Statement and so undercounted by ~1 page, and
+> because it could not separate two-column ACL layouts. It does not exist. The
+> authoritative tool is **`code/measure_counted_pages.py`**, which exists, works,
+> and counts to References.
+>
+> **Follow the retired tool's instruction and you will believe this paper is over
+> the limit when it is under it.** Measured with the authoritative tool at T-LA.24:
+> **11.64 counted pages against a limit of 12.** With the retired rule the same PDF
+> reports ~10.6, and the gap between the two numbers is roughly the Broader Impact
+> and Reproducibility statements. Either fix the four stale pointers or delete the
+> 13.67 figure; leaving them is how the next person re-derives a wrong number.
 
 **Three levers, applied in that order.**
 
@@ -9448,8 +9456,9 @@ The exposure is under-documentation and three contradictions.
 
 **Result: 13 -> 12 main-content pages (22 -> 19 total).** The body, Broader Impact
 Statement and Reproducibility Statement occupy pages 1-12 and Appendix A begins
-partway down page 12. **This is at the line, not comfortably under it** - one more
-paragraph of body text spills to 13.
+partway down page 12. **Authoritative count: `measure_counted_pages.py` reports
+11.64 counted pages against a limit of 12 -> OK.** That is ~0.36 page of headroom,
+so roughly a third of a page of body prose before the count goes over.
 
 **Scope correction (user decision).** An earlier revision of this task moved the
 block for BOTH venues, on the reasoning that ACL is also over its limit. Reverted:
@@ -9506,4 +9515,55 @@ renders and reports top-left-origin coordinates, unlike raw PDF, and is what to 
 for whitespace analysis. Body end is located with a needle taken from the last line
 of `07_conclusion.tex`; the appendix follows the body, and **neither it nor the
 references count** against the 12.
+
+
+## T-LA.25 - References before the appendix in TMLR (reverses T-LA.18)
+
+**Date.** 2026-10-17. **Machine.** Vedan's RTX 3050 6 GB.
+
+**What changed.** TMLR back matter is now body -> Broader Impact Statement ->
+Reproducibility Statement -> References -> appendix sections A, B, C, D, with
+**no 'Appendix' title** between the bibliography and section A. Verified in the
+rendered PDF: the last reference on page 13 is followed directly by
+'A The resolution floor of the randomization test'. No title, no divider.
+
+**This reverses T-LA.18, which was a deliberate decision, not an accident.** T-LA.18
+put the bibliography AFTER the appendix and recorded why: TMLR imposes no order,
+the intent was to keep method reference adjacent to the prose citing it, and
+references-last was chosen knowingly. The user has reverted to the template order
+-- which is also what TMLR's own 	mlr.sty example does. **Both orders are
+legitimate; this one is now chosen because it matches the venue template.** The
+prior reasoning is preserved above rather than deleted, because 'we tried this and
+here is why it was not the default' is the part worth keeping.
+
+**No title is added, and the reason is worth not undoing.** \appendix only
+RENUMBERS \section to A, B, C, D -- it emits no heading. Nothing in
+	mlr.sty adds one either. A future edit that inserts an explicit
+\section*{Appendix} or a \addcontentsline divider here changes the
+appearance of every TMLR build; the comment at the call site says so.
+
+**MEASUREMENT IS UNAFFECTED, and that was the thing to check before editing.**
+T-LA.18 moved the bibliography last *specifically because of the page counter*:
+measure_counted_pages.py used to stop at the 'References' heading, so a trailing
+bibliography put the landmark past the appendix and the entire appendix counted as
+body. T-LA.18 fixed that by adding the appendix section titles as a second set of
+landmarks and stopping at whichever comes first. References now comes FIRST, which
+is simply the earlier landmark again -- the counter is order-independent by
+construction. Confirmed by running it rather than by reasoning:
+
+`
+stopped at     : 'references' on page 12
+COUNTED BODY   : 11.64 pages  (limit 12) -> OK
+total PDF      : 20 pages
+`
+
+Total PDF went 19 -> 20 pages: the references now occupy their own position ahead
+of the appendix instead of being pushed after it. **Counted main content is
+unchanged at 11.64**, which is the number TMLR constrains.
+
+**ACL DELIBERATELY UNCHANGED.** ARR's template requires appendices to follow the
+references, so the two venues legitimately differ here. Do not 'fix' this by
+editing the assembler -- main.tex is hand-maintained per venue and
+ssemble_submissions.py does not regenerate it. A change to the TMLR tree must
+not be mirrored into the ACL tree.
 
