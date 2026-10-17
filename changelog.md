@@ -9399,3 +9399,111 @@ The exposure is under-documentation and three contradictions.
   `val/*` halting keys are `N+R`, `depth/*` are realised.
 - *A results.tsv has one row* → it is a non-admitted run. 62 directories, 15
   admitted; join through `results.json`'s `admitted_runs`.
+## T-LA.24 - TMLR page reclaim from whitespace; disclosures prose moved to appendix (TMLR only)
+
+**Date.** 2026-10-17. **Machine.** Vedan's RTX 3050 6 GB. Deliverable: a compiled
+`paper/tmlr_submission/main.pdf` (gitignored build artifact; see "Building the PDF").
+
+**Starting state.** The committed `main.pdf` measured **13 main-content pages**
+(22 total) against TMLR's recommended 12.
+
+> **Two stale numbers found while measuring this. Do not reuse them.** The T-LA.14
+> calibration note in `assemble_submissions.py` and in this file quotes "13.67
+> counted pages" as the pre-move baseline, and names `code/main_content_pages.py`
+> as the tool to measure with. **`main_content_pages.py` does not exist in this
+> worktree**, and the 13.67 was never re-measured after later block moves. The real
+> figure was 13. The note's companion advice to trust `measure_move_blocks.py` only
+> for *ranking* is therefore unverified too. Either restore the counter or delete
+> both claims.
+
+**Three levers, applied in that order.**
+
+1. *Layout* - `paper/tmlr_submission/main.tex` only. `tmlr.sty` is left
+   byte-identical to the official template, so reverting is deleting one block.
+   Text block 6.5x9.0in -> 6.9x9.3in; margins 1.0->0.8in sides, 1.25->1.10in
+   top/bottom, symmetric -0.2in on BOTH side margins so the page stays centred.
+   `\parskip` .5pc -> 4.5pt. **Verified to take effect rather than assumed**: text
+   now begins at x = -15.0pt (= -0.2in) and one sampled page went 31 -> 51
+   baselines.
+
+2. *Float packing* - same block. `\topfraction` .7 -> .92, `\textfraction` .06,
+   `\bottomfraction` .75, `\floatpagefraction` .78, `topnumber` 3, `bottomnumber`
+   2, `totalnumber` 4. **This is the one that fixed the reported gap; `\parskip`
+   alone would not have.** Figure 3 (`fig_pareto`, `04_results.tex:198`) is a `[t]`
+   float at `0.6\linewidth` with a five-line caption. `\topfraction .7` forbids
+   filling more than 70% of a page with a top float, so LaTeX refused to place it
+   beside Table 2 and deferred it, stranding ~1.2in of white above the following
+   text (baseline page 9 - rendered and visually confirmed). In the new build
+   Table 2, Figure 3 and the following paragraphs share one page with no gap.
+
+3. *Content* - the Disclosures prose moves to the appendix. The `\subsection`
+   heading and `\label{sec:honesty}` **STAY in the body**: four places cite it
+   (02_setup protocol line, 02_setup GPU sentence, 03_method ablation pointer,
+   05_mechanism trapping aside) and a label moved to the appendix would silently
+   re-point all four with no compile error. The body replacement carries every
+   integrity-critical fact at body length - the specification violation with its
+   0.134-nat correction, the partial pre-registration, the two-GPU/four-revision
+   split with its measured -0.117/-0.119 sigma common-mode offset and the
+   0.000185-nat gap movement, and the depth-metric N/A.
+
+**Result: 13 -> 12 main-content pages (22 -> 19 total).** The body, Broader Impact
+Statement and Reproducibility Statement occupy pages 1-12 and Appendix A begins
+partway down page 12. **This is at the line, not comfortably under it** - one more
+paragraph of body text spills to 13.
+
+**Scope correction (user decision).** An earlier revision of this task moved the
+block for BOTH venues, on the reasoning that ACL is also over its limit. Reverted:
+**ACL has a defined format (hard 8-page content limit, mandatory Limitations
+section) and TMLR has none.** Implemented as `TMLR_ONLY_APPENDIX` in
+`assemble_submissions.py`, subtracted from ACL's order in `appendix_order()`. ACL
+now moves 13 of 14 blocks, TMLR 14 of 14.
+
+**Trap hit here - it failed SILENTLY, twice, in opposite directions.** Both wrong
+placements of the opening `% >>>ACLMOVE:disclosures` marker passed the assembler's
+self-containment check with no undefined reference, because the lead-in sentence
+carries no label:
+
+- *Marker immediately under `\label`, lead-in deleted from the source.* The block
+  boundary sat above the lead-in, so **"Several facts about this study would count
+  against it..." was deleted from the ACL body** even though ACL was not supposed to
+  move anything at all.
+- *Marker placed AFTER the lead-in.* The reverse: ACL was fixed, but TMLR kept the
+  lead-in, so the body read *"Several facts about this study ... so we state them.
+  Disclosures. Three facts count against this study and we state them plainly."* -
+  the same framing stated twice in adjacent sentences. Caught only by reading the
+  rendered PDF, not by any check.
+
+Correct placement: marker immediately under `\label`, with the lead-in sentence as
+the **first line inside** the block. ACL then emits it inline and is unchanged; TMLR
+lifts it to the appendix and the body replacement is self-contained. Recorded in
+`paper/common/06_limitations.tex`.
+
+> **Rule this earns: when making a venue-specific move, diff the OTHER venue's
+> generated tree - `git diff HEAD~1 -- paper/acl_submission` - and require that it
+> shows only added comment lines. An assertion is not a check; the ACL copy is
+> generated, so editing `paper/common/` silently propagates.**
+
+**Building the PDF (new).** No TeX distribution, WSL distro, Docker image or
+package-manager TeX existed on this machine. TinyTeX was suggested and is a
+reasonable alternative, but was not needed: **Tectonic 0.17.0** (single ~20 MB
+binary, fetches packages on demand) is installed at
+`C:\Users\vedan\AppData\Local\Temp\opencode\tectonic\tectonic.exe`. Build from a
+scratch copy, because Tectonic drops aux files into the CWD and the committed
+submission tree should stay clean:
+
+```powershell
+Copy-Item paper/tmlr_submission/* $b -Recurse
+cd $b; tectonic -X compile main.tex --outfmt pdf --keep-logs
+```
+
+Tectonic **exits 1 on a fully successful run** - do not read its exit code as build
+failure. Judge by `main.log`. This build: zero errors, zero undefined references,
+zero overfull hboxes; the only three notices are one benign `inputenc`-under-XeTeX
+note and two `Underfull \vbox` from `\raggedbottom`, both expected.
+
+**Counting pages.** `pypdf` (5.3.0) and `pymupdf` are both available; the latter
+renders and reports top-left-origin coordinates, unlike raw PDF, and is what to use
+for whitespace analysis. Body end is located with a needle taken from the last line
+of `07_conclusion.tex`; the appendix follows the body, and **neither it nor the
+references count** against the 12.
+

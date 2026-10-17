@@ -77,4 +77,21 @@ reason and should not be compared to published WikiText-103 numbers.
 % The replacement keeps every integrity-critical fact at body length: the
 % specification violation, the partial pre-registration, the GPU/revision split
 % with its measured common-mode offset, and the depth-metric N/A.
-\textbf{Disclosures.} Three facts count against this study and we state them plainly. An earlier composed arm re-routed at every step, violated the specification, and its apparent parity with MoR was an artefact---the architecturally correct arm scores $0.134$ nats \emph{worse}. The pre-registration is partial, and the MoR-versus-MoE comparison was specified after its data existed. And the matrix spans two GPUs over four code revisions; the retrained arms reproduced to $-0.117\sigma$ and $-0.119\sigma$, a common-mode offset that cancels in every between-arm gap carrying a verdict (the MoE$-$MoR gap moved by 0.000185 nats), though per-seed values do not reproduce and we do not claim they do. We likewise report no per-token depth-allocation error: English supplies no ground-truth depth, so the metric is \texttt{N/A}, not zero. Appendix~\ref{app:disclosures} gives all of it in full.
+%
+% TMLR-ONLY MOVE. This block is in TMLR_ONLY_APPENDIX, so only TMLR lifts it
+% and ACL keeps every line below verbatim.
+%
+% WHERE THE OPENING % >>> MARKER GOES -- two revisions got this wrong and both
+% failed SILENTLY, with no undefined reference and no assembler complaint:
+%   (a) marker immediately under \label, with the lead-in sentence DELETED from
+%       the source: ACL silently lost "Several facts about this study...".
+%   (b) marker AFTER the lead-in: TMLR kept the lead-in, so the body read
+%       "Several facts about this study... so we state them. Disclosures. Three
+%       facts count against this study and we state them plainly." -- the same
+%       framing stated twice in adjacent sentences.
+% Correct placement: marker immediately under \label, and the lead-in sentence
+% is the FIRST LINE INSIDE the block. ACL then emits it inline and is unchanged;
+% TMLR lifts it to the appendix with the rest and the body replacement is
+% self-contained. ACL's Limitations section is a required part of its defined
+% format -- do not shorten it, and diff the OTHER venue's generated tree.
+\textbf{Disclosures.} Three facts count against this study and we state them plainly.

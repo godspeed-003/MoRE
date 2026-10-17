@@ -125,14 +125,26 @@ APPENDIX = [
     # Body keeps a two-sentence summary and the direction of the effect.
     ("budget",      "Budget and convergence: what each arm would do with more epochs",
      "app:budget"),
-    # T-LA.24. The full disclosures prose moves; the body keeps the subsection
-    # heading, its \label{sec:honesty} (four citations point at it) and a
-    # paragraph carrying every integrity-critical fact with its numbers.
-    # Moved for BOTH venues: ACL is 9.16 against a hard 8, TMLR is over the
-    # 12-page line, and this is the block the user had already questioned as
-    # "history of the study".
+    # T-LA.24. The full disclosures prose moves for TMLR ONLY; the body keeps the
+    # subsection heading, its \label{sec:honesty} (four citations point at it) and
+    # a paragraph carrying every integrity-critical fact with its numbers.
+    # TMLR is over the 12-page line and this is the block that reads as "history
+    # of the study" rather than a limitation.
+    #
+    # ACL DOES NOT MOVE IT. ACL has a defined page format (hard 8-page content
+    # limit, mandatory Limitations section, anonymity requirements) and the user
+    # keeps ACL on that format. It is listed in TMLR_ONLY_APPENDIX below, which
+    # subtracts it from ACL's order and leaves the ACMOVE marker unresolved there,
+    # so ACL's body keeps the full prose. Do not "fix" ACL's page count by
+    # reaching for this block again.
     ("disclosures", "Disclosures in full", "app:disclosures"),
 ]
+
+# Blocks the ACL assembler must NOT treat as moved, even though they appear in
+# APPENDIX so that TMLR can pick them up. These are TMLR-only page moves; ACL
+# keeps the prose in the body. The user reaffirmed on T-LA.24 that ACL follows
+# its own defined format and TMLR follows none.
+TMLR_ONLY_APPENDIX = {"disclosures"}
 
 # T-LA.14: TMLR MOVES A SUBSET TOO.
 #
@@ -162,7 +174,8 @@ TMLR_APPENDIX = ["floor_proof", "holm_detail", "integrity", "metrics",
 def appendix_order(venue):
     """(id, title, label) triples for the venue's appendix, in APPENDIX order."""
     if venue == "acl":
-        return list(APPENDIX)
+        return [row for row in APPENDIX
+                if row[0] not in TMLR_ONLY_APPENDIX]
     keep = set(TMLR_APPENDIX)
     return [row for row in APPENDIX if row[0] in keep]
 
