@@ -1,0 +1,120 @@
+\section{Introduction}
+\label{sec:intro}
+
+Conditional computation is usually motivated by the same accounting argument:
+most tokens do not need the whole model, so spend less on them. The argument is
+made in two places, and the two answer different questions. Sparse
+mixture-of-experts (MoE) layers \citep{jacobs1991moe,shazeer2017moe,fedus2022switch}
+decide \emph{which} computation module processes a token, dispatching it to one
+of several independent sub-networks. Recursive weight-tied architectures with
+learned halting \citep{graves2016act,dehghani2019ut,banino2021pondernet} decide
+\emph{how much} computation a token receives, reusing one block for a variable
+number of steps.
+
+Because the two decisions are made over different objects---which parameters
+versus how many applications of them---they are orthogonal in principle, and
+composing them is an obvious thing to try. Route a token to a specialised expert,
+then reuse \emph{that expert's} weights for as many steps as the token appears to
+need. The resulting architecture inherits an efficiency argument from each side.
+What it does not inherit is evidence: whether the composition beats either
+component at a matched budget has not, to our knowledge, been isolated.
+
+We isolate it. One training engine implements three configurations differing only
+in the fields their definitions require: routing without recursion (MoE, six
+experts, depth 1), recursion without routing (MoR, one shared block, depth up to
+7), and the composition (MoRE, six experts, depth up to 7). All three sit at
+$\approx$5.58M parameters, share a bit-identical input representation, and train
+on the same fixed split of WikiText-103 \citep{merity2017wikitext} with the same
+optimiser budget. Because the comparison is matched rather than merely similar, a
+difference between arms cannot be a difference in the harness, the data, or the
+parameter count.
+
+\paragraph{What we find.} The composition does not pay off in the way its
+premise predicts, and the reason is measurable rather than mysterious.
+
+\begin{itemize}[leftmargin=1.4em,itemsep=1.5pt,topsep=2pt]
+\item \textbf{Recursion alone predicts best in domain.} MoR reaches the lowest
+  validation loss (3.515 nats/token) against MoRE's 3.637 and MoE's 3.948. Both
+  recursive arms beat MoE; the composition lands between them.
+
+\item \textbf{Recursion is genuinely adaptive; the composition is not.} MoR's
+  learned halting policy beats \emph{every} uniform depth we can force, including
+  its own best, by 0.54 nats. MoRE's learned policy merely ties the maximum
+  forced depth, because its halting collapsed to always-run-to-budget: 97.3\% of
+  validation tokens are forced out at the depth ceiling. This is the cleanest
+  single contrast in the study, and it inverts the premise that adding routing
+  would help the model target computation more precisely.
+
+\item \textbf{Routing buys robustness, and efficiency, not in-domain quality.}
+  Out of domain the ordering inverts: MoRE attains the best out-of-domain loss on
+  the Pile \citep{gao2020pile}, ahead of MoR and well ahead of MoE. It does so at
+  2.19$\times$ MoE's inference FLOPs against MoR's 9.07$\times$, which makes its
+  gain over MoE roughly $3\times$ cheaper per nat than MoR's.
+
+\item \textbf{The two mechanisms compete for one budget.} Depth and
+  specialisation are not independent knobs in MoRE the way they are in MoR and
+  MoE separately: a calibration sweep that recovers adaptive depth by raising the
+  ponder penalty destroys expert differentiation, and the full-corpus arm that
+  preserves differentiation saturates depth instead.
+
+\item \textbf{One plausible mechanism is refuted.} The natural account---that
+  routing confines a token to one expert's subspace, trapping the recursion---is
+  falsified three ways: participation ratio is \emph{higher} in the recursive
+  arms, per-step state velocity decays smoothly rather than vibrating, and
+  successive state updates are near-orthogonal rather than rescaling.
+\end{itemize}
+
+We report this as a negative result about the composition at this scale, with the
+mechanism attached, rather than as a claim about either mechanism in general. The
+paper's contribution is the decomposition: because MoE \emph{is} MoRE with the
+depth budget set to one and all three arms are parameter-matched from one
+codebase, each contrast varies one thing. The scale at which the dilution account
+predicts the composition would begin to pay is stated as a falsifiable claim in
+the Limitations section.
+
+\section{Related Work}
+\label{sec:related}
+
+\paragraph{Sparse expert routing.}
+Conditional mixtures of local experts date to \citet{jacobs1991moe}; the
+sparsely-gated form that made them practical at scale is due to
+\citet{shazeer2017moe}, with Top-1 dispatch, load-balancing auxiliaries and the
+capacity-factor machinery developed in GShard \citep{lepikhin2021gshard}, Switch
+Transformer \citep{fedus2022switch} and ST-MoE \citep{zoph2022stmoe}. The standard
+justification is more parameters at roughly constant per-token FLOPs. That
+argument is unavailable here by construction: we pin all three arms to the same
+parameter count, so what remains of the sparsity case is a quality and robustness
+case, which \S\ref{sec:results} tests directly.
+
+\paragraph{Adaptive depth and weight-tied recursion.}
+Adaptive Computation Time \citep{graves2016act} introduced the learned per-step
+halting unit we use; Universal Transformers \citep{dehghani2019ut} applied it to
+a weight-tied transformer block, and PonderNet \citep{banino2021pondernet}
+reformulated the halting distribution to keep a gradient on the halt head near
+saturation. Early-exit variants place the decision at the layer or token level
+instead \citep{elbayad2020depthadaptive,schuster2022calm,raposo2024mod}. Weight
+tying itself is well established as a parameter-reduction device
+\citep{lan2020albert}. What this literature reports is overwhelmingly
+\emph{mean} step counts and exit-rate histograms. \S\ref{sec:halting} argues that
+neither statistic tests input-dependence, and that the comparison which does---against
+the best uniform depth at the same budget---is rarely made.
+
+\paragraph{Composing the two.}
+Recent work has begun to combine routing with recursion, most directly by using a
+router to assign per-token recursion depth \citep{bae2025mor,raposo2024mod}.
+Those systems route \emph{to depths} over shared weights. MoRE differs in that
+routing selects among genuinely independent expert FFNs and the recursion then
+reuses \emph{that expert's} weights, so the two decisions are made by different
+heads over different objects and a token keeps one expert for its whole
+trajectory. We are not aware of a matched-budget comparison of such a composition
+against each of its components, which is the gap this paper fills. We make no
+novelty claim for the combination itself.
+
+\paragraph{Evaluation at small scale.}
+Minimal-pair benchmarks \citep{warstadt2020blimp} and likelihood-based world
+knowledge probes \citep{leong2023ewok} score a \emph{relative} preference within a
+matched pair, so they degrade gracefully with model scale rather than collapsing
+to chance the way multiple-choice knowledge suites do. At 5.6M parameters they are
+the appropriate instrument; \S\ref{sec:results} reports them with the caveat that
+our vocabulary is fitted to the training corpus and absolute accuracies are
+therefore not comparable to published models.

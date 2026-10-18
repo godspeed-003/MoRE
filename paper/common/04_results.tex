@@ -142,7 +142,7 @@ scores each arm against the inference FLOPs it costs.
 \begin{table*}[t]
 \centering
 \footnotesize
-\caption{All results, five seeds, mean$\,\pm\,$std. \textbf{Upper block:} each cell is \emph{score (difference vs MoE, inference FLOPs$\times$ vs MoE, $|$difference$|$ per FLOPs-multiplier)}; MoE is the reference arm, so its cells carry the score alone. Scores are lower-better for loss and higher-better for accuracy; the third number is a \textbf{modulus}, so it is higher-better on \emph{every} row---how much quality each unit of compute bought. Quality at matched parameters and quality per unit of compute are distinct axes and we never substitute one for the other. Validation loss is the primary metric (final epoch; \emph{best} equals \emph{last} on all 15 cells, so no model selection occurred). Pairwise, exact two-sided randomization test, every comparison at the floor $p_{\min}=0.00794$: MoRE$-$MoE $-0.3113$ ($d\,{-15.9}$); MoRE$-$MoR $+0.1216$ ($d\,{+4.7}$); MoE$-$MoR $+0.4329$ ($d\,{+14.7}$). OOD is held-out Pile text: 1500 blocks from 943 documents, each contributing at most 512 tokens (\S\ref{sec:ood}). \textbf{Lower block:} $\Delta$ floor is the margin below the bigram baseline of 4.9849 nats (positive \emph{beats} it); FLOPs are inference FLOPs per token at each arm's measured mean depth (Appendix~\ref{app:flops}); throughput is inference for all fifteen checkpoints on one GPU, identical blocks and batch. The OOD, BLiMP and throughput rows are \textbf{exploratory}---outside both declared families, uncorrected.}
+\caption{All results, five seeds, mean$\,\pm\,$std. \textbf{Upper block:} each cell is \emph{score (difference vs MoE, inference FLOPs$\times$ vs MoE, $|$difference$|$ per FLOPs-multiplier)}; MoE is the reference arm, so its cells carry the score alone. Scores are lower-better for loss and higher-better for accuracy; the third number is a \textbf{modulus}, so it is higher-better on \emph{every} row---how much quality each unit of compute bought. Quality at matched parameters and per unit of compute are distinct axes. Validation loss is the primary metric (final epoch; \emph{best} equals \emph{last} on all 15 cells, so no model selection occurred). Pairwise, exact two-sided randomization test, every comparison at the floor $p_{\min}=0.00794$: MoRE$-$MoE $-0.3113$ ($d\,{-15.9}$); MoRE$-$MoR $+0.1216$ ($d\,{+4.7}$); MoE$-$MoR $+0.4329$ ($d\,{+14.7}$). OOD is held-out Pile text: 1500 blocks from 943 documents (\S\ref{sec:ood}). \textbf{Lower block:} $\Delta$ floor is the margin below the bigram baseline of 4.9849 nats (positive \emph{beats} it); FLOPs are inference FLOPs per token at each arm's measured mean depth, reported both including and excluding the shared output projection (Appendix~\ref{app:flops}); throughput is inference for all fifteen checkpoints on one GPU. The OOD, BLiMP and throughput rows are \textbf{exploratory}---outside both declared families, uncorrected.}
 \label{tab:main}
 \vspace{2pt}
 \begin{tabular}{llll}
@@ -158,11 +158,20 @@ Parameters & 5{,}584{,}908 & 5{,}581{,}063 & 5{,}584{,}908 \\
 Val perplexity & 51.8 & \textbf{33.6} & 38.0 \\
 $\Delta$ vs bigram floor & $+1.0366$ & $+1.4695$ & $+1.3480$ \\
 Inference FLOPs/token & \textbf{5.25\,M} & 46.5\,M & 11.5\,M \\
+FLOPs $\times$ MoE & $1.00\times$ & $8.87\times$ & $2.19\times$ \\
+FLOPs/token, excl.\ unembed & \textbf{1.06\,M} & 42.3\,M & 7.30\,M \\
+$\times$ MoE, excl.\ unembed & $1.00\times$ & $40.1\times$ & $6.92\times$ \\
 Throughput (blocks/s) & \textbf{1119} & 212 & 310 \\
 \bottomrule
 \end{tabular}
 \end{table*}
 % <<<GENERATED:tab_main
+
+\paragraph{Reading the two FLOPs rows.} All arms share an output projection worth
+$79.9\%$ of MoE's per-token compute; excluding it the composition looks dearer
+than MoE ($6.92\times$) and cheaper than MoR ($17\%$ of its compute, $4.2\times$
+its quality per unit compute). It wins under either accounting;
+Appendix~\ref{app:flops} derives both.
 
 Three things follow.
 
@@ -210,9 +219,10 @@ Exploratory, uncorrected.}
 
 \textbf{It gets there far more cheaply, on a different axis.} MoR pays
 $8.87\times$ MoE's inference FLOPs; MoRE pays $2.19\times$---$25\%$ of MoR's total
-inference compute and $15\%$ of its \emph{extra} compute over MoE. Per
-FLOPs-multiplier MoRE buys $0.142$ nats against MoR's $0.049$: roughly $3\times$
-the quality per unit compute on validation loss, $5.7\times$ out of domain. \textbf{We state the two axes separately
+inference compute. Excluding the output projection all three arms share, those
+become $6.92\times$ and $17\%$ (Table~\ref{tab:main}), and MoRE buys $0.045$ nats
+per FLOPs-multiplier against MoR's $0.011$: $4.2\times$ the quality per unit
+compute on validation loss, $8.1\times$ out of domain. \textbf{We state the two axes separately
 and do not substitute one for the other}: at matched parameters MoR is lowest-loss
 by $0.1216$ nats, which is significant at our resolution floor; per unit of
 inference compute MoRE is ahead. ``Comparable to MoR'' is therefore only ever a
@@ -269,11 +279,10 @@ Exploratory, uncorrected.}
 adaptive-computation premise suggests---spending steps where context is thin---the
 recursive arms should gain most at the \emph{start} of a block. They do the
 opposite: MoRE's advantage over MoE is $-0.047$ nats in the first 8 positions and
-$-0.359$ in the last 128; MoR's goes from $-0.250$ to $-0.465$. Both recursive arms
-gain most where context is \emph{longest}. We report this because it disconfirms a
-mechanism we would otherwise have asserted, and because it is consistent with the
-capacity account in \S\ref{sec:mechanism}: a shared block iterated is accumulating
-representation, not compensating for missing context.
+$-0.359$ in the last 128; MoR's from $-0.250$ to $-0.465$. Both gain most where
+context is \emph{longest}. We report this because it disconfirms a mechanism we
+would otherwise have asserted, and because it is consistent with the capacity
+account in \S\ref{sec:mechanism}.
 
 \begin{figure*}[t]
 \centering

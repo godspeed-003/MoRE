@@ -96,11 +96,10 @@ Exploratory, uncorrected.}
 adaptive-computation premise suggests---spending steps where context is thin---the
 recursive arms should gain most at the \emph{start} of a block. They do the
 opposite: MoRE's advantage over MoE is $-0.047$ nats in the first 8 positions and
-$-0.359$ in the last 128; MoR's goes from $-0.250$ to $-0.465$. Both recursive arms
-gain most where context is \emph{longest}. We report this because it disconfirms a
-mechanism we would otherwise have asserted, and because it is consistent with the
-capacity account in \S\ref{sec:mechanism}: a shared block iterated is accumulating
-representation, not compensating for missing context.
+$-0.359$ in the last 128; MoR's from $-0.250$ to $-0.465$. Both gain most where
+context is \emph{longest}. We report this because it disconfirms a mechanism we
+would otherwise have asserted, and because it is consistent with the capacity
+account in \S\ref{sec:mechanism}.
 
 \begin{figure*}[t]
 \centering
@@ -148,24 +147,42 @@ and MoR's---with no routing---is higher still at $70.3$. Recursion \emph{expands
 the effective dimensionality, and routing contracts it somewhat without collapsing
 it. The ordering refutes the prediction.
 
-\textbf{(ii) Trapping predicts oscillating or fixed-point dynamics; velocity
-decays smoothly.} Measuring the L2 norm of consecutive post-norm states across
-depth, both recursive arms decay monotonically---MoR from 11.06 at step 2 to 5.71
-at step 7, MoRE from 9.09 to 3.49---which is the signature of settling, not of
-vibrating around an attractor.
+\textbf{(ii) Trapping predicts oscillating dynamics; we observe smooth settling,
+which is consistent with \emph{both} accounts.} Measuring the L2 norm of
+consecutive post-norm states across depth, both recursive arms decay
+monotonically---MoR from 11.06 at step 2 to 5.71 at step 7, MoRE from 9.09 to
+3.49. Decay is the signature of a convergent recursion, and a fixed point is
+also what trapping would produce, so this observation discriminates between
+neither account and we do not treat it as refuting either. We report one
+asymmetry, because it runs against the flatter reading: over the last three
+transitions MoR's velocity falls only $13.6\%$ against MoRE's $26.4\%$, so MoR
+is the arm whose trajectory is closest to stationary.
 
-\textbf{(iii) Trapping predicts that successive updates rescale the state;
-they are near-orthogonal.} The mean cosine between a step's update and the state
-it updates from is negative in both arms ($-0.26$ to $-0.06$), i.e. updates push
-into new directions rather than amplifying existing ones. A rescaling collapse
-would show positive collinearity approaching $+1$.
+\textbf{(iii) Trapping predicts that successive updates rescale the state; they
+do not.} The criterion is \emph{two-sided} and we state both signs, because only
+one is usually named: the cosine between a step's update and the state it updates
+from tends to $+1$ if the state is amplified and to $-1$ if it is contracted
+toward the origin, and only $0$ marks genuinely new directions. A rescaling
+collapse is therefore a large magnitude in \emph{either} direction. Every value
+here is negative but small---at most $0.27$, about a quarter of the distance to
+pure contraction---so neither arm rescales, which is what this test had to
+establish.
+
+The arms are not equivalent, and the difference is systematic. MoRE's cosine
+\emph{decays toward orthogonality} with depth, $-0.27$ to $-0.07$, mean magnitude
+$0.065$ over the two deepest steps. MoR's does not: it holds $-0.26$ to $-0.14$
+and re-deepens at the final step to $-0.24$, mean magnitude $0.207$---$3.2\times$
+MoRE's. MoRE's recursion becomes progressively more nearly \textbf{orthogonal} as
+it deepens; MoR's continues to contract along the state. Both statistics are
+exploratory and uncorrected, so we attach no verdict and do not significance-test
+the difference; it is reported as a property of the trained models.
 
 The recursion in this architecture is dynamically healthy: it travels, it settles,
-and it adds dimensions. The failure is not a broken iterated map. That rules out
-the most attractive explanation and leaves the budget competition
-(\S\ref{sec:competition}) as the account the data supports---which is a stronger
-position than an unexplained null, because we can say which of the obvious
-mechanisms it is \emph{not}.
+and it adds dimensions. What these probes exclude is a \emph{rescaling} collapse,
+and that exclusion is two-sided and holds in both arms. They do \emph{not} exclude
+fixed-point settling, because settling is equally the signature of a healthy
+convergent recursion; separating those needs a probe this study lacks. That leaves
+the budget competition (\S\ref{sec:competition}) as the account the data supports.
 
 \section{Matching the parameter budget across the three arms}
 \label{app:engine}

@@ -134,20 +134,26 @@ configurations, parameters matched to 0.069\% ($\approx$5.58M), bit-identical
 inputs, five seeds, exact randomisation tests under a pre-registered correction,
 on WikiText-103.
 
-All three arms lie on the quality/compute frontier, and the composition (MoRE)
+All three arms sit on the quality/compute trade-off, and the composition (MoRE)
 buys the most quality per unit of compute. It improves on MoE by $7.9\%$
 validation loss at $2.19\times$ MoE's inference FLOPs, where recursion alone needs
-$8.87\times$: $72\%$ of recursion's quality gain for $25\%$ of its compute. Out of domain it is stronger still---it
-\emph{dominates} recursion alone, reaching lower loss at a quarter of the compute.
+$8.87\times$. Both ratios share an identical output projection worth $79.9\%$ of
+MoE's per-token compute; excluding it, the composition's advantage over recursion
+\emph{grows}, to $17\%$ of its compute and $4.2\times$ the quality per unit compute.
+Out of domain the composition is stronger still, reaching lower loss than recursion
+alone at under a fifth of its compute; that comparison is exploratory and carries
+no significance verdict.
 
-It is not lowest-loss in domain. Recursion alone leads by $0.1216$ nats,
-significant at our resolution floor, and adding routing improves neither
-in-domain quality nor routing quality over MoE; we keep the quality and compute
-axes separate. We trace the deficit to a competition for one per-token budget,
-excluding two rival explanations. Most transferably: a mean step count and an exit histogram cannot
-establish input-dependent depth, since a uniform policy forced to the learned mean
-reproduces both. Scoring against that control separates our recursive arms by a
-factor of 24.
+It is not lowest-loss in domain. Recursion alone leads by $0.1216$ nats, as extreme
+as a five-seed design admits and weaker than significance; we attribute it to
+recursion activating six times more feed-forward parameters per token at matched
+total parameters, which is its design rather than a confound. Adding routing
+improves neither in-domain quality nor routing quality over MoE. Most
+transferably: a mean step count and an exit histogram cannot establish
+input-dependent depth, since a uniform policy forced to the learned mean
+reproduces both. Against that control, recursion's learned policy is worth
+$1.471$ nats over a depth-matched uniform one and the composition's $0.060$; we do
+not treat that ratio as a verdict, its denominator being small.
 \end{abstract}
 
 \input{sections/01_intro}

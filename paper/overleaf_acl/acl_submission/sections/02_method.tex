@@ -1,0 +1,146 @@
+\section{The MoRE Architecture}
+\label{sec:method}
+
+\subsection{Setting and notation}
+
+The task is autoregressive language modelling on packed token sequences. Write
+$E$ for the number of experts, $T$ for the maximum recursion depth, $d$ for the
+model width, and $\mathbf{h}^{(0)}_s \in \mathbb{R}^{d}$ for the post-embedding
+state of position $s$. Unlike a synthetic benchmark, natural language supplies
+\emph{no per-token oracle}---neither an expert index nor a complexity label---so
+every structural claim below must rest on permutation-invariant statistics or on
+comparisons against a controlled alternative. This is why
+\S\ref{sec:halting} is built around a forced-depth sweep rather than around
+agreement with ground truth.
+
+\subsection{Routing}
+
+Routing happens once per token. A linear router produces
+$\mathbf{g} = \mathrm{softmax}(W_r \mathbf{h}^{(0)}_s) \in \Delta^{E-1}$, the
+token is assigned to $e^\star = \arg\max_e g_e$, and \emph{only} that expert is
+evaluated. The assignment is \emph{persisted}: a token keeps one expert for its
+whole recursion trajectory, so the block below reuses one expert's parameters at
+every depth and one halt head observes a coherent sequence of states. (An earlier
+configuration re-drew both per step; it is retained as a labelled ablation and
+discussed in the disclosures in the Limitations section.)
+
+\begin{equation}
+\mathbf{h}^{(t+1)} \;=\; \mathrm{LayerNorm}\!\left(
+  \mathbf{h}^{(t)} + g_{e^\star}\cdot \mathrm{FFN}_{e^\star}\!\left(\mathbf{h}^{(t)}\right)
+\right), \qquad t = 0,\dots,T-1 .
+\label{eq:block}
+\end{equation}
+
+The gate probability $g_{e^\star}$ multiplies the expert output, which is what
+carries task-loss gradient into the router: the discrete $\arg\max$ is not
+differentiated, but the scalar scaling the selected expert's contribution is.
+There is one block, so depth is computation through time rather than a stack of
+depth-specific layers, and no capacity limit is imposed---every routed token is
+evaluated by its expert and none is dropped.
+
+\begin{figure*}[t]
+    \centering
+    \includegraphics[width=0.86\linewidth,keepaspectratio]{fig_architecture.png}
+    \caption{The MoRE block. A token is routed once to one of $E$ independent
+    expert FFNs; that expert's weights are then reused for an adaptive number of
+    recursion steps under ACT halting. Setting $T=1$ recovers MoE exactly and
+    setting $E=1$ recovers MoR; the input representation is bit-identical in all
+    three cases.}
+    \label{fig:architecture}
+\end{figure*}
+
+\subsection{Halting and the training objective}
+\label{sec:halting-method}
+
+Halting follows ACT \citep{graves2016act} as used in the Universal Transformer,
+with one halt head per expert. Per token, at step $t$:
+
+\begin{align}
+p_t &= \sigma\!\left(\mathbf{w}_{e^\star}^{\!\top}\mathbf{h}^{(t)}\right),
+  & c_t &= \sum_{\tau \le t} p_\tau ,
+  \label{eq:halt-p} \\[2pt]
+\text{halt when } &\; c_t + p_t > 1 - \epsilon, & \epsilon &= 0.01,
+  \label{eq:halt-cond} \\[2pt]
+R &= 1 - c_t \ \text{(remainder)}, &
+  w_t &= \begin{cases} p_t & \text{running} \\ R & \text{at the halt step}\end{cases}
+  \label{eq:halt-w}
+\end{align}
+
+and the token's output is the convex combination
+$\mathbf{o}_s = \sum_t w_t \mathbf{h}^{(t)}$, whose weights sum to exactly $1$.
+That sum-to-one property is the mechanism by which halting is trained: because
+$w_t$ scales how much of each step's state reaches the output, changing $p_t$
+changes the task loss, so a differentiable path runs from $\mathcal{L}_{\text{task}}$
+into the halt parameters. The boolean comparison in
+Eq.~\ref{eq:halt-cond} decides dispatch only. Tokens still active at $t=T$ are
+forced out; halted states are frozen and not recomputed, so a halted token costs
+nothing at deeper steps.
+
+Depth is trained through the expected-depth term
+\begin{equation}
+\rho \;=\; \mathbb{E}_{\text{tokens}}\big[\,N + R\,\big],
+\label{eq:ponder}
+\end{equation}
+where the step count $N$ is discrete and contributes no gradient while the
+remainder $R$ does. Eq.~\ref{eq:ponder} is the ponder cost. It is worth noting
+that the gradient reaching the halt heads through $R$ is small compared with the
+task gradient: a direct measurement in our implementation puts the halt gradient
+at roughly $285\times$ below the task term. This ratio is the quantitative form
+of the failure analysed in \S\ref{sec:mechanism}: the ponder term is large enough
+to be optimised away but too weak to hold depth down once the task gradient
+accumulates, and once the halting sigmoid saturates the gradient through $R$
+vanishes \citep{graves2016act}. \citet{banino2021pondernet} is the principled fix
+and is future work (the Limitations section).
+
+The training objective is a weighted sum of terms that we report separately and
+never as a single number:
+\begin{equation}
+\mathcal{L} \;=\;
+\underbrace{\mathcal{L}_{\text{task}}}_{1.0} \;+\;
+0.001\,\mathcal{L}_{\text{bal}} \;+\;
+0.001\,\rho \;+\;
+\underbrace{0.0\cdot\mathcal{L}_{\text{fam}}}_{h\,\text{detached}} \;+\;
+\underbrace{0.0\cdot\mathcal{L}_{\text{route}}}_{\text{off}} .
+\label{eq:loss}
+\end{equation}
+$\mathcal{L}_{\text{task}}$ is per-token cross-entropy in nats.
+$\mathcal{L}_{\text{bal}} = -H(\bar{\mathbf{g}}) + E\sum_e f_e \bar{g}_e$ combines
+a router-entropy bonus with the Switch-style auxiliary \citep{fedus2022switch},
+where $f_e$ is the dispatched load fraction and $\bar{\mathbf{g}}$ the mean soft
+router probability; it is averaged over the depth calls actually made, so its
+magnitude does not grow with $T$. Three terms are structurally zero on language
+and the reason is not convenience. $\mathcal{L}_{\text{fam}}$ reads
+$\mathbf{h}.\mathrm{detach}()$, so its gradient cannot reach the trunk---which
+\emph{strengthens} every specialisation claim below relative to a comparable
+synthetic study, where a family cross-entropy is typically one of the larger terms
+in the objective. $\mathcal{L}_{\text{route}}$ and the halting-supervision term are
+zero because natural language supplies no per-token oracle expert and no per-token
+oracle depth to supervise against. The canonical router is therefore unsupervised
+with respect to the per-token routing decision.
+
+\subsection{One engine, three modes}
+\label{sec:engine}
+
+MoE, MoR and MoRE are configurations of one implementation with an explicit
+\texttt{architecture} mode, not three codebases. They share one data pipeline, one
+optimiser setup and one evaluation path, so a difference between them cannot be a
+difference in the harness. Only the fields their definitions require differ:
+$E \in \{6,1,6\}$, $T \in \{1,7,7\}$, MoR's FFN multiplier (below), and the two
+loss weights for quantities that do not exist in a given arm (no ponder cost at
+depth 1, nothing to balance with one expert).
+
+We write \textbf{MoR} for our recursion-only configuration---one shared block with
+adaptive halting---which is in the spirit of weight-tied recursive transformers
+with learned halting \citep{dehghani2019ut,bae2025mor} but is not a reproduction
+of any specific published system; all three arms are configurations of the same
+engine.
+
+\paragraph{Matching the budget.} MoR has one FFN where MoRE has six, so matching
+the per-FFN multiplier would compare 5.6M parameters against 0.9M and call the
+difference architectural. We instead equalise \emph{total} FFN hidden width,
+giving MoR's single FFN a multiplier of $24 = 4 \times 6$. The result is
+5{,}584{,}908 parameters for MoE and MoRE, identical, and 5{,}581{,}063 for MoR---a
+0.069\% deficit that is six per-expert halt heads, the router and FFN biases. That
+residual is irreducible at any integer multiplier, and it runs \emph{against} the
+headline result: the arm with slightly fewer parameters is the one that wins in
+domain.

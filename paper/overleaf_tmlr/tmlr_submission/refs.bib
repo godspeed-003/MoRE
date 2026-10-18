@@ -1,0 +1,235 @@
+% ===================================================================
+% refs.bib -- MoRE paper bibliography
+%
+% VERIFICATION REQUIRED BEFORE SUBMISSION.
+% rp_rules.md S12 forbids fabricated citations. Every entry below is a
+% paper that exists and that the text actually leans on, but the
+% metadata was written from memory, not copied from a publisher record.
+% Before the PDF is uploaded, each entry must be checked against its
+% arXiv abstract page or the publisher's citation export, and the
+% fields corrected in place.
+%
+% Check these first -- they are the ones a reviewer in this area will
+% notice if wrong, and the ones whose metadata I am least sure of:
+%   [1] bae2025mor  -- load-bearing. This is the closest prior work
+%       (routing + recursion) and S2/S3.4 position our contribution
+%       against it. Confirm the exact title, author list, year and
+%       arXiv number. If the paper is not what we describe, the
+%       disambiguation sentence in S3.4 and the third paragraph of S2
+%       must both be rewritten, not just the entry.
+%   [2] banino2021pondernet -- venue is a workshop, not the ICML main
+%       track. Confirm before citing it as ICML.
+%   [3] zoph2022stmoe, raposo2024mod -- arXiv-only as far as I know;
+%       confirm no later peer-reviewed version supersedes them.
+%   [4] page numbers on jacobs1991moe, fedus2022switch, vinh2010ami.
+% ===================================================================
+
+@article{jacobs1991moe,
+  title   = {Adaptive Mixtures of Local Experts},
+  author  = {Jacobs, Robert A. and Jordan, Michael I. and Nowlan, Steven J.
+             and Hinton, Geoffrey E.},
+  journal = {Neural Computation},
+  volume  = {3},
+  number  = {1},
+  pages   = {79--87},
+  year    = {1991}
+}
+
+@inproceedings{shazeer2017moe,
+  title     = {Outrageously Large Neural Networks: The Sparsely-Gated
+               Mixture-of-Experts Layer},
+  author    = {Shazeer, Noam and Mirhoseini, Azalia and Maziarz, Krzysztof
+               and Davis, Andy and Le, Quoc and Hinton, Geoffrey
+               and Dean, Jeff},
+  booktitle = {International Conference on Learning Representations (ICLR)},
+  year      = {2017},
+  note      = {arXiv:1701.06538}
+}
+
+@article{fedus2022switch,
+  title   = {Switch Transformers: Scaling to Trillion Parameter Models with
+             Simple and Efficient Sparsity},
+  author  = {Fedus, William and Zoph, Barret and Shazeer, Noam},
+  journal = {Journal of Machine Learning Research},
+  volume  = {23},
+  number  = {120},
+  pages   = {1--39},
+  year    = {2022}
+}
+
+@inproceedings{lepikhin2021gshard,
+  title     = {{GShard}: Scaling Giant Models with Conditional Computation
+               and Automatic Sharding},
+  author    = {Lepikhin, Dmitry and Lee, HyoukJoong and Xu, Yuanzhong
+               and Chen, Dehao and Firat, Orhan and Huang, Yanping
+               and Krikun, Maxim and Shazeer, Noam and Chen, Zhifeng},
+  booktitle = {International Conference on Learning Representations (ICLR)},
+  year      = {2021},
+  note      = {arXiv:2006.16668}
+}
+
+@article{zoph2022stmoe,
+  title   = {{ST-MoE}: Designing Stable and Transferable Sparse Expert Models},
+  author  = {Zoph, Barret and Bello, Irwan and Kumar, Sameer and Du, Nan
+             and Huang, Yanping and Dean, Jeff and Shazeer, Noam
+             and Fedus, William},
+  journal = {arXiv preprint arXiv:2202.08906},
+  year    = {2022}
+}
+
+@article{graves2016act,
+  title   = {Adaptive Computation Time for Recurrent Neural Networks},
+  author  = {Graves, Alex},
+  journal = {arXiv preprint arXiv:1603.08983},
+  year    = {2016}
+}
+
+@inproceedings{dehghani2019ut,
+  title     = {Universal Transformers},
+  author    = {Dehghani, Mostafa and Gouws, Stephan and Vinyals, Oriol
+               and Uszkoreit, Jakob and Kaiser, {\L}ukasz},
+  booktitle = {International Conference on Learning Representations (ICLR)},
+  year      = {2019},
+  note      = {arXiv:1807.03819}
+}
+
+% VERIFIED 2026-10-08: the arXiv comment field reads "8th ICML Workshop on
+% Automated Machine Learning (2021)". It is NOT an ICML main-track paper; the
+% header's suspicion was correct. v2, last revised 2 Sep 2021.
+@inproceedings{banino2021pondernet,
+  title     = {{PonderNet}: Learning to Ponder},
+  author    = {Banino, Andrea and Balaguer, Jan and Blundell, Charles},
+  booktitle = {8th {ICML} Workshop on Automated Machine Learning (AutoML)},
+  year      = {2021},
+  note      = {arXiv:2107.05407}
+}
+
+@inproceedings{elbayad2020depthadaptive,
+  title     = {Depth-Adaptive Transformer},
+  author    = {Elbayad, Maha and Gu, Jiatao and Grave, Edouard
+               and Auli, Michael},
+  booktitle = {International Conference on Learning Representations (ICLR)},
+  year      = {2020},
+  note      = {arXiv:1910.10073}
+}
+
+@inproceedings{schuster2022calm,
+  title     = {Confident Adaptive Language Modeling},
+  author    = {Schuster, Tal and Fisch, Adam and Gupta, Jai and Dehghani,
+               Mostafa and Bahri, Dara and Tran, Vinh Q. and Tay, Yi
+               and Metzler, Donald},
+  booktitle = {Advances in Neural Information Processing Systems (NeurIPS)},
+  year      = {2022},
+  note      = {arXiv:2207.07061}
+}
+
+@article{raposo2024mod,
+  title   = {Mixture-of-Depths: Dynamically Allocating Compute in
+             Transformer-Based Language Models},
+  author  = {Raposo, David and Ritter, Sam and Richards, Blake
+             and Lillicrap, Timothy and Humphreys, Peter Conway
+             and Santoro, Adam},
+  journal = {arXiv preprint arXiv:2404.02258},
+  year    = {2024}
+}
+
+% VERIFIED 2026-10-08: author list expanded from "and others"; venue upgraded
+% from arXiv-only to the NeurIPS 2025 proceedings. Content check PASSED -- the
+% paper is genuinely routing + recursion (shared recursive stack, per-token
+% routers assigning recursion DEPTH, recursion-wise KV caching).
+% CAVEAT CARRIED INTO THE TEXT: its routers select a DEPTH, not a member of a set
+% of independent expert FFNs -- there is no expert routing in it. Do not describe
+% it as prior work on both axes; Section 2 is worded accordingly.
+@inproceedings{bae2025mor,
+  title     = {Mixture-of-Recursions: Learning Dynamic Recursive Depths for
+               Adaptive Token-Level Computation},
+  author    = {Bae, Sangmin and Kim, Yujin and Bayat, Reza and Kim, Sungnyun
+               and Ha, Jiyoun and Schuster, Tal and Fisch, Adam
+               and Harutyunyan, Hrayr and Ji, Ziwei and Courville, Aaron
+               and Yun, Se-Young},
+  booktitle = {Advances in Neural Information Processing Systems (NeurIPS)},
+  year      = {2025},
+  note      = {arXiv:2507.10524}
+}
+
+@inproceedings{lan2020albert,
+  title     = {{ALBERT}: A Lite {BERT} for Self-Supervised Learning of
+               Language Representations},
+  author    = {Lan, Zhenzhong and Chen, Mingda and Goodman, Sebastian
+               and Gimpel, Kevin and Sharma, Piyush and Soricut, Radu},
+  booktitle = {International Conference on Learning Representations (ICLR)},
+  year      = {2020},
+  note      = {arXiv:1909.11942}
+}
+
+@article{vinh2010ami,
+  title   = {Information Theoretic Measures for Clusterings Comparison:
+             Variants, Properties, Normalization and Correction for Chance},
+  author  = {Vinh, Nguyen Xuan and Epps, Julien and Bailey, James},
+  journal = {Journal of Machine Learning Research},
+  volume  = {11},
+  pages   = {2837--2854},
+  year    = {2010}
+}
+
+% ===================================================================
+% ADDED 2026-10-08. Cited in the text; previously absent, which would
+% have failed the build. Verification status is marked PER ENTRY --
+% read it before submitting.
+% ===================================================================
+
+% PARTIALLY VERIFIED. Introduces both WikiText-2 and WikiText-103, so it is the
+% correct citation for the corpus. Confirm the ICLR year (2017) against the
+% OpenReview record.
+@inproceedings{merity2017wikitext,
+  title     = {Pointer Sentinel Mixture Models},
+  author    = {Merity, Stephen and Xiong, Caiming and Bradbury, James
+               and Socher, Richard},
+  booktitle = {International Conference on Learning Representations (ICLR)},
+  year      = {2017},
+  note      = {arXiv:1609.07843}
+}
+
+% PARTIALLY VERIFIED. NOTE THE YEAR: arXiv:2101.00027 is January 2021, though the
+% work circulated from late December 2020, which is why both years appear in the
+% literature. We cite 2021 to match the arXiv record while keeping the 2020 key
+% for stability. Confirm the subtitle wording ("Corpus" vs "Dataset").
+@article{gao2020pile,
+  title   = {The {Pile}: An 825{GB} Dataset of Diverse Text for Language Modeling},
+  author  = {Gao, Leo and Biderman, Stella and Black, Sid and Golding, Laurence
+             and Hoppe, Travis and Foster, Charles and Phang, Jason
+             and He, Horace and Thite, Anish and Nabeshima, Noa
+             and Presser, Shawn and Leahy, Connor},
+  journal = {arXiv preprint arXiv:2101.00027},
+  year    = {2021}
+}
+
+% VERIFIED 2026-10-08. TACL vol. 8, pp. 377-392, DOI 10.1162/tacl_a_00321.
+@article{warstadt2020blimp,
+  title   = {{BLiMP}: The Benchmark of Linguistic Minimal Pairs for {English}},
+  author  = {Warstadt, Alex and Parrish, Alicia and Liu, Haokun
+             and Mohananey, Anhad and Peng, Wei and Wang, Sheng-Fu
+             and Bowman, Samuel R.},
+  journal = {Transactions of the Association for Computational Linguistics},
+  volume  = {8},
+  pages   = {377--392},
+  year    = {2020},
+  doi     = {10.1162/tacl_a_00321}
+}
+
+% !! UNVERIFIED -- DO NOT SUBMIT WITHOUT CHECKING !!
+% The author list and venue could NOT be confirmed (verification ran out of
+% budget, and a wrong author list is the error class this file exists to prevent).
+% Before submission: open the arXiv abstract page or the ACL Anthology entry and
+% replace the author field and venue outright. If it cannot be confirmed, DELETE
+% this entry and remove the EWoK citation from the text -- the EWoK result is
+% "every arm at chance", reported as a scale limitation, so the paper loses
+% nothing by dropping it. See VERIFY_BEFORE_SUBMIT.md.
+@article{leong2023ewok,
+  title   = {{EWoK}: A Benchmark for Measuring Systematic Generalization of
+             Multi-domain World Knowledge},
+  author  = {UNVERIFIED, Author List},
+  journal = {arXiv preprint arXiv:UNVERIFIED},
+  year    = {2023},
+  note    = {UNVERIFIED ENTRY -- see comment above}
+}
