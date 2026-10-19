@@ -142,7 +142,7 @@ scores each arm against the inference FLOPs it costs.
 \begin{table*}[t]
 \centering
 \footnotesize
-\caption{All results, five seeds, mean$\,\pm\,$std. \textbf{Upper block:} each cell is \emph{score (difference vs MoE, inference FLOPs$\times$ vs MoE, $|$difference$|$ per FLOPs-multiplier)}; MoE is the reference arm, so its cells carry the score alone. Scores are lower-better for loss and higher-better for accuracy; the third number is a \textbf{modulus}, so it is higher-better on \emph{every} row---how much quality each unit of compute bought. Quality at matched parameters and per unit of compute are distinct axes. Validation loss is the primary metric (final epoch; \emph{best} equals \emph{last} on all 15 cells, so no model selection occurred). Pairwise, exact two-sided randomization test, every comparison at the floor $p_{\min}=0.00794$: MoRE$-$MoE $-0.3113$ ($d\,{-15.9}$); MoRE$-$MoR $+0.1216$ ($d\,{+4.7}$); MoE$-$MoR $+0.4329$ ($d\,{+14.7}$). OOD is held-out Pile text: 1500 blocks from 943 documents (\S\ref{sec:ood}). \textbf{Lower block:} $\Delta$ floor is the margin below the bigram baseline of 4.9849 nats (positive \emph{beats} it); FLOPs are inference FLOPs per token at each arm's measured mean depth, reported both including and excluding the shared output projection (Appendix~\ref{app:flops}); throughput is inference for all fifteen checkpoints on one GPU. The OOD, BLiMP and throughput rows are \textbf{exploratory}---outside both declared families, uncorrected.}
+\caption{All results, five seeds, mean$\,\pm\,$std. \textbf{Upper block:} each cell is \emph{score (difference vs MoE, inference FLOPs$\times$ vs MoE, $|$difference$|$ per FLOPs-multiplier)}; MoE is the reference arm, so its cells carry the score alone. Scores are lower-better for loss and higher-better for accuracy; the third number is a \textbf{modulus}, so it is higher-better on \emph{every} row---how much quality each unit of compute bought. That third column uses the \emph{excl.\ unembedding} accounting. Validation loss is the primary metric (final epoch; \emph{best} equals \emph{last} on all 15 cells, so no model selection occurred). Pairwise, exact two-sided randomization test, every comparison at the floor $p_{\min}=0.00794$: MoRE$-$MoE $-0.3113$ ($d\,{-15.9}$); MoRE$-$MoR $+0.1216$ ($d\,{+4.7}$); MoE$-$MoR $+0.4329$ ($d\,{+14.7}$). OOD is held-out Pile text (\S\ref{sec:ood}). \textbf{Lower block:} $\Delta$ floor is the margin below the bigram baseline of 4.9849 nats (positive \emph{beats} it); FLOPs are inference FLOPs per token at each arm's measured mean depth, reported both including and excluding the shared output projection (Appendix~\ref{app:flops}); throughput is inference for all fifteen checkpoints on one GPU. The OOD, BLiMP and throughput rows are \textbf{exploratory}---outside both declared families, uncorrected.}
 \label{tab:main}
 \vspace{2pt}
 \begin{tabular}{llll}
@@ -168,10 +168,11 @@ Throughput (blocks/s) & \textbf{1119} & 212 & 310 \\
 % <<<GENERATED:tab_main
 
 \paragraph{Reading the two FLOPs rows.} All arms share an output projection worth
-$79.9\%$ of MoE's per-token compute; excluding it the composition looks dearer
-than MoE ($6.92\times$) and cheaper than MoR ($17\%$ of its compute, $4.2\times$
-its quality per unit compute). It wins under either accounting;
-Appendix~\ref{app:flops} derives both.
+$79.9\%$ of MoE's per-token compute; excluding it the composition looks dearer than
+MoE and cheaper than MoR, and wins under either accounting. The third column of
+Table~\ref{tab:main} uses the total accounting, as that table's multipliers do; the
+per-FLOPs figures quoted here are the excluded ones. Appendix~\ref{app:flops}
+derives both.
 
 Three things follow.
 

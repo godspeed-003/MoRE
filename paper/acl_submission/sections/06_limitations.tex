@@ -4,18 +4,17 @@
 
 \subsection*{Scale, stated as a falsifiable prediction}
 
-The study operates at 5.6M parameters, $d_{\text{model}} = 256$, one block, a
-vocabulary of 8{,}192, and three epochs of WikiText-103. Sparse-MoE benefits are
-known to emerge with scale, so a reviewer can reasonably say the negative result
-may be an artefact of operating below the regime where sparsity pays. \textbf{That
-objection is correct and cannot be answered with the runs that exist.}
+The study operates below the scale at which sparse-MoE benefits are known to
+emerge, so a reviewer can reasonably say the negative result may be an artefact of
+that. \textbf{That objection is correct and cannot be answered with the runs that
+exist.}
 
 Rather than hedge it, we convert it into the paper's forward claim. The account in
 \S\ref{sec:dilution} is that routing divides the \emph{diversity} of data each
-parameter block sees, not its update budget---which the arithmetic there shows is
-matched exactly. That account predicts a specific crossover: as the corpus grows at
-fixed parameters, each expert's router-selected slice comes to contain enough of
-the distribution's shared structure that the re-learning penalty amortises, so
+parameter block sees, not its update budget---which is matched exactly. That
+account predicts a crossover: as the corpus grows at fixed parameters, each
+expert's router-selected slice comes to contain enough of the distribution's shared
+structure that the re-learning penalty amortises, so
 \textbf{the MoR$-$MoRE gap should narrow monotonically with training data and the
 ordering should eventually invert in favour of the composition}. The out-of-domain
 result (\S\ref{sec:ood}) is weak early evidence in this direction, since MoRE is
@@ -24,21 +23,20 @@ already the better arm on data it was not trained on.
 The measurement that would falsify it: hold parameters, depth budget and optimiser
 fixed; sweep training tokens over at least a decade; and report the MoR$-$MoRE gap
 as a function of tokens per expert. If the gap is flat or widening, the diversity
-account is wrong and the composition's deficit is structural. We did not run that
-sweep, and a second model size---the single most valuable follow-up---is likewise
-unrun.
+account is wrong. We did not run that sweep, and a second model size---the most
+valuable follow-up---is likewise unrun.
 
-\subsection*{Budget, not convergence}\label{sec:budget} The 3-epoch budget leaves every arm short of convergence (\S\ref{sec:protocol}), and the arms are furthest apart on that axis at the cutoff: the final-epoch drop is $0.091$ nats for MoE, $0.132$ for MoR and $0.176$ for MoRE, so \textbf{the arm that loses in domain is the one still improving fastest}. The ordering is budget-dependent in the direction this paper's mechanism predicts---a routing arm that re-learns shared structure more slowly (\S\ref{sec:dilution}) should be behind at a fixed budget and closing---and we do not extrapolate a crossing epoch, because the curves decelerate. Appendix~\ref{app:budget} gives the per-epoch curves and the rest of this section.
+\subsection*{Budget, not convergence}\label{sec:budget} The 3-epoch budget leaves every arm short of convergence (\S\ref{sec:protocol}), and the arms are furthest apart on that axis at the cutoff: the final-epoch drop is $0.091$ nats for MoE, $0.132$ for MoR and $0.176$ for MoRE, so \textbf{the arm that loses in domain is the one still improving fastest}. The ordering is therefore budget-dependent, in the direction this paper's mechanism predicts (\S\ref{sec:dilution}); we do not extrapolate a crossing epoch, because the curves decelerate. Appendix~\ref{app:budget} gives the per-epoch curves and the rest of this section.
 
 \subsection*{Statistical resolution}
 
 $n = 5$ seeds puts every headline comparison exactly on the design's resolution
 floor of $p = 0.00794$ (\S\ref{sec:stats}). ``As extreme as a five-seed design
-admits'' is the strongest statement available, and it is weaker than significance.
-No larger effect could produce a smaller $p$ here; only more seeds could. Cohen's
-$d$ values are reported alongside every gap precisely because a large $d$ on a
-small gap is the misreading to avoid---across our own re-exports, $d$ has moved by
-a factor of 1.5 while the underlying gap moved by less than 0.005 nats.
+admits'' is the strongest statement available, and it is weaker than significance:
+no larger effect could produce a smaller $p$ here, only more seeds could. Cohen's
+$d$ is reported alongside every gap because a large $d$ on a small gap is the
+misreading to avoid---across our own re-exports $d$ moved by a factor of 1.5 while
+the underlying gap moved by less than 0.005 nats.
 
 \subsection*{What was declared and not run}
 \label{sec:declared}
@@ -50,8 +48,7 @@ not delete it to loosen the thresholds on the survivors. The forced-depth sweep 
 canonical checkpoints rather than a trained control arm, so we report it as an
 exploratory mechanism result and leave the declared slot consumed and unfilled. A
 fixed-depth sweep trained from scratch, a shuffled-depth control, and a
-depth--input mutual-information analysis were all declared exploratory and are
-unrun.
+depth--input mutual-information analysis are all unrun.
 
 \subsection*{Evaluation caveats}
 
