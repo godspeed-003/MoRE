@@ -514,7 +514,7 @@ def routing_accuracy_from_confusion(confusion, num_experts: int) -> float:
 # T-L0.0: this comment used to justify the local implementations with "no
 # scipy/sklearn in this environment (checked)". That was false, or had stopped
 # being true: sklearn 1.3.2 and scipy 1.14.1 are both importable from the
-# interpreters in ENVIRONMENT.md. The real reasons the local versions stay are
+# interpreters in the environment record (removed from the tree; git history). The real reasons the local versions stay are
 # that they are exact at E<=15 and checked against brute force in
 # test_phase6_routing_metrics.py, and that the metric layer then imports nothing
 # beyond torch/numpy -- so a metrics-only environment cannot silently produce a

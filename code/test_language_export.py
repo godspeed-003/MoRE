@@ -5,7 +5,7 @@ Run with the CPU interpreter:
 
 WHY THIS FILE EXISTS, AND IT IS NOT A HYPOTHETICAL.
 
-HANDOFF.md told the operator to aggregate 39 GPU-hours of canonical language runs
+the removed the removed HANDOFF.md (git history) told the operator to aggregate 39 GPU-hours of canonical language runs
 with two commands:
 
     python code/seed_stats.py    --group canonical_lang_b

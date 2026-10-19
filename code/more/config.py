@@ -78,7 +78,7 @@ CANONICAL_TASK = TASK_ARITHMETIC
 # The three NUMBERS are `setdefault`, not assignment, and the difference matters.
 # `seq_len` is one of the protocol fields that canonical_spec_language.json holds
 # at `null` until GATE L5 freezes it FROM MEASUREMENT (plan_language.md §10.2) --
-# 6 GB of VRAM is the binding constraint on this phase (ENVIRONMENT.md §2), so the
+# 6 GB of VRAM is the binding constraint on this phase (the environment record, removed from the tree; git history), so the
 # real value comes out of T-L7.0's throughput probe. If apply_task assigned it,
 # editing config_language.json or the frozen spec would have no effect and the
 # gate's own value would be silently overwritten by a literal in this file. The

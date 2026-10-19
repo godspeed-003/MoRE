@@ -15,7 +15,7 @@ cd "D:/res/git/MoRE/.Codex/worktrees/english-language-dataset-migration-92946e/c
 
 Use the **CPU** interpreter (`C:/Users/vedan/anaconda3/python.exe`). The gate
 counts were measured on it and the gates do not need CUDA. See
-[ENVIRONMENT.md](../../../ENVIRONMENT.md).
+the environment record (removed from the tree; git history).
 
 Runtime is roughly 3–6 minutes: gates 1–4 are fast, **gate 5 launches two real
 1-epoch training runs** (T6.7c `more`, T6.7d `mor`). Run it in the background and

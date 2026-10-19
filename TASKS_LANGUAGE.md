@@ -91,7 +91,7 @@ does not exist here (T-L0.0).
   for correctness gates, CUDA interpreter for training*. A resumed session must
   not have to rediscover this. **Verify:** the file exists and a fresh reader can
   pick the right interpreter for a given task from it alone.
-  **Evidence:** [ENVIRONMENT.md](ENVIRONMENT.md), seven sections. §1 is the
+  **Evidence:** `ENVIRONMENT.md`, seven sections. §1 is the
   which-interpreter rule with a runnable command for each. §2 is the measured
   version table for both, side by side, from the probe reproduced in §6 — nothing
   in it is remembered. §3 records two findings that change later phases: the

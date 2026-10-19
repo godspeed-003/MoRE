@@ -693,7 +693,7 @@ check("TL6.10g the flattened keys include the partial and the binned cross-check
 skip("TL6.10h across-epoch trend",
      "needs a MULTI-EPOCH language run: an artifact should weaken as training equalises "
      "the row norms, a real behaviour should not. One epoch on CPU takes tens of minutes, "
-     "so this is a GPU task -- see HANDOFF.md")
+     "so this is a GPU task -- see the removed the removed HANDOFF.md (git history) (git history)")
 
 
 # ===========================================================================

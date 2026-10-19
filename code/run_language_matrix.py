@@ -5,8 +5,8 @@
     <interpreter> code/run_language_matrix.py --arch more --seed 42
     <interpreter> code/run_language_matrix.py --smoke
 
-On Ayan's machine the interpreter is
-`C:/Users/Hp/anaconda3/envs/more_env/python.exe` -- see ENVIRONMENT.md 8. That
+On the other author's machine the interpreter is
+the CUDA interpreter recorded in the environment record (removed from the tree; git history). That
 machine's Anaconda base and C:\\Python314 have no torch, so a bare `python` fails
 at `import torch` rather than falling back to CPU.
 
@@ -129,7 +129,7 @@ def preflight(verbose=True):
 
     # 1. torch, and a real device. `torch.cuda.is_available()` returning True on a
     #    driver that then cannot launch a kernel is a real failure mode
-    #    (ENVIRONMENT.md 4), so a matmul is run rather than a flag read.
+    #    (the environment record, removed from the tree; git history), so a matmul is run rather than a flag read.
     try:
         import torch
         dev_ok = torch.cuda.is_available()
@@ -143,9 +143,9 @@ def preflight(verbose=True):
             if dev_ok else "no CUDA device")
         if not dev_ok:
             problems.append(
-                "No usable CUDA device. On Ayan's machine the interpreter must be "
+                "No usable CUDA device. On the other author's machine the interpreter must be "
                 "C:/Users/Hp/anaconda3/envs/more_env/python.exe -- base and "
-                "C:\\Python314 have no torch at all (ENVIRONMENT.md 8).")
+                "C:\\Python314 have no torch at all (the environment record, removed from the tree; git history).")
         elif total < 5800:
             # A hard refusal. 5,342 MiB is the MEASURED peak of the worst arm
             # (T-L7.0, MoR at ffn_mult 24, batch 48); below ~5.8 GB total it will
@@ -156,7 +156,7 @@ def preflight(verbose=True):
                 f"lower batch_size to fit -- it is a frozen protocol field and "
                 f"changing it makes the run non-canonical. Use a larger card.")
         elif total < 7000:
-            # NOT a problem: this is Vedant's 3050, on which the whole calibration
+            # NOT a problem: this is the gate author's 3050, on which the whole calibration
             # phase ran. 5,342 of 6,143 MiB is 87% and it does complete. Say so
             # rather than blocking, but name the two consequences.
             say(True, "VRAM headroom is thin but sufficient",
@@ -165,8 +165,8 @@ def preflight(verbose=True):
                 f"{total} MiB card: the MoR arm runs at 87% of VRAM. It completes "
                 f"(the entire calibration phase ran here) but (a) nothing else may "
                 f"use the GPU during the matrix, and (b) the T-L7.0 timings say this "
-                f"is ~1.5x slower per epoch than the 8 GB 4060. Prefer Ayan's "
-                f"machine for the matrix; see ENVIRONMENT.md 8.")
+                f"is ~1.5x slower per epoch than the 8 GB 4060. Prefer the other author's "
+                f"machine for the matrix; see the environment record.")
     except Exception as e:
         say(False, "torch imports", f"{type(e).__name__}: {e}")
         problems.append(f"torch is not importable: {e}")

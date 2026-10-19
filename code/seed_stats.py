@@ -285,7 +285,7 @@ if __name__ == "__main__":
     #
     # This block exists because the alternative is WORSE THAN AN ERROR. Before it,
     # `python code/seed_stats.py --group canonical_lang_b` -- a command that was
-    # written into HANDOFF.md and printed by run_language_matrix.py -- exited 0 and
+    # written into the removed the removed HANDOFF.md (git history) (git history) and printed by run_language_matrix.py -- exited 0 and
     # printed absolutely nothing. An operator who had just spent 39 GPU-hours would
     # have read that silence as "no differences found". A non-zero exit naming the
     # right command cannot be misread.

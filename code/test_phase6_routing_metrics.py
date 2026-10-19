@@ -20,7 +20,7 @@ more/metrics.py so that the metric layer imports nothing beyond torch/numpy, and
 so that the exactness claim is testable: they are checked below against brute
 force rather than against a library. (This docstring used to say they were local
 "because neither scipy nor sklearn is installed in more_env" -- both are in fact
-importable here; see ENVIRONMENT.md. Corrected in T-L0.0.)
+importable here; see the environment record (removed from the tree; git history). Corrected in T-L0.0.)
 """
 
 import math

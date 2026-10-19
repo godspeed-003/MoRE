@@ -1218,11 +1218,11 @@ W&B metric keys must not contain `/` inside a label — use `E1_ADD_SUB`, not
 
 ## 9. Environment
 
-Full record, including how the CUDA venv was built and why: [ENVIRONMENT.md](ENVIRONMENT.md).
+Full record, including how the CUDA venv was built and why: `ENVIRONMENT.md`.
 
 ```
-C:\Users\vedan\anaconda3\python.exe                 torch 2.6.0+cpu    CPU, gates
-D:\res\git\MoRE\.venv_cuda\Scripts\python.exe       torch 2.6.0+cu126  CUDA, training
+python                 torch 2.6.0+cpu    CPU, gates
+.venv_cuda\Scripts\python.exe       torch 2.6.0+cu126  CUDA, training
 ```
 
 GPU is an **RTX 3050 6 GB Laptop** (6143 MiB, compute capability 8.6, driver
@@ -1232,7 +1232,7 @@ working directory persists between calls, so **use absolute paths**. The console
 is cp1252 — Unicode output needs a stream reconfigure or it raises
 `UnicodeEncodeError`.
 
-The `C:\Users\Hp\anaconda3\envs\more_env\python.exe` (torch 2.5.1) and RTX 4060
+The `python` (torch 2.5.1) and RTX 4060
 Laptop 8 GB documented here previously are from the machine the arithmetic POC was
 developed on; neither exists on this machine (corrected in T-L0.0). Arithmetic
 runs recorded in `runs/` and `README.md` were produced on that machine and are
@@ -1241,15 +1241,15 @@ not re-run.
 Quick checks, cheapest first:
 
 ```bash
-"C:/Users/vedan/anaconda3/python.exe" code/smoke_test.py
+"python" code/smoke_test.py
 ```
 
 ```bash
-"C:/Users/vedan/anaconda3/python.exe" code/verify_pipeline.py
+"python" code/verify_pipeline.py
 ```
 
 ```bash
-"C:/Users/vedan/anaconda3/python.exe" code/audit_leakage.py
+"python" code/audit_leakage.py
 ```
 
 Expected: `ALL TESTS PASSED`, `35/35 checks passed`, `Gate 1: 8/8 checks passed`.
@@ -1258,7 +1258,7 @@ Expected: `ALL TESTS PASSED`, `35/35 checks passed`, `Gate 1: 8/8 checks passed`
 correctness purposes, and its output is the only gate result worth quoting:
 
 ```bash
-"C:/Users/vedan/anaconda3/python.exe" code/run_correctness_suite.py
+"python" code/run_correctness_suite.py
 ```
 
 Expected: `TOTAL 350 350 0 0` and `CORRECTNESS SUITE: ALL GATES PASS`. It takes

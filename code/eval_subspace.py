@@ -30,7 +30,7 @@ WHAT IS MEASURED (on the final hidden state `h`, the input to `lm_head`)
 This is a FINAL-STATE confinement probe, which is tractable with a single hook on
 `lm_head`'s input. The stronger DYNAMIC form -- how little the representation moves
 from recursion step t to t+1 -- needs per-step capture across the shrinking active
-set and is left as the post-ACL follow-up (POST_ACL_TODO.md); state that limitation
+set and is left as the post-ACL follow-up (the removed the removed POST_ACL_TODO.md (git history), git history); state that limitation
 rather than implying this measures the across-depth trajectory directly.
 
 EXPLORATORY, like every eval outside the two declared families. Reported with the

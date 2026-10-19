@@ -21,39 +21,36 @@ Two Python interpreters, deliberately:
 | **CPU** — a plain Conda/system Python with `torch` CPU | every `test_*.py`, `run_correctness_suite.py` | the correctness gates must not depend on a GPU being present or on which GPU it is |
 | **CUDA** — a venv with `torch==2.6.0+cu126` | training, timing, the seed matrix | the only place a run's numbers come from |
 
-`ENVIRONMENT.md` records the exact versions this was developed against.
+The exact versions this was developed against are recorded in `requirements.txt`
+and, historically, in `ENVIRONMENT.md` (removed from the working tree; recoverable
+from git history with `git log --all -- ENVIRONMENT.md`).
 
-### If you are Ayan, you already have both, in one interpreter
+### If you already have one interpreter with both, skip sections 2 and 3
 
-```text
-C:/Users/Hp/anaconda3/envs/more_env/python.exe      torch 2.5.1 + CUDA
-```
+A single interpreter that has CUDA torch **and** everything in `requirements.txt`
+serves both roles.
 
-That environment has CUDA torch **and** everything the gates need, so it serves both
-roles and you can **skip sections 2 and 3 entirely**. Two things follow from it:
-
-- **Use the full path.** That machine's Anaconda base and `C:\Python314` have no
-  `torch` at all, so a bare `python` fails at `import torch` rather than quietly
-  falling back to CPU — which is the good direction, but only if you notice.
-- **It is torch 2.5.1, not 2.6.0.** The `TOTAL 356 356 0 0` gate baseline was
-  established on 2.6.0. A different count on 2.5.1 is **not automatically a
-  regression** — diagnose it as a version difference before treating it as a code
-  defect, and record which one it was. Anything else and you will "fix" a working
-  codebase to match a number from a different torch.
-
-`ENVIRONMENT.md` §8 documents that machine specifically; §1–7 describe the 3050 the
-calibration ran on.
+- **Use the full path to it.** A bare `python` that resolves to a different
+  environment fails at `import torch` rather than quietly falling back to CPU --
+  which is the good direction, but only if you notice.
+- **Check the torch version against the gate baseline.** The
+  `TOTAL 356 356 0 0` gate baseline was established on torch 2.6.0. A different
+  count on another version is **not automatically a regression** -- diagnose it as
+  a version difference before treating it as a code defect, and record which one
+  it was. Anything else and you will "fix" a working codebase to match a number
+  from a different torch.
 
 ---
 
-## 1. Clone the branch
+## 1. Clone the repository
 
 ```bash
-git clone https://github.com/godspeed-003/MoRE.git
+git clone <the-anonymised-artifact-url>
 ```
 
 ```bash
 cd MoRE && git checkout claude/english-language-dataset-migration-92946e
+```
 ```
 
 ## 2. CPU interpreter (the gates)
@@ -288,7 +285,7 @@ absent from the results table.
 
 | symptom | cause |
 |---|---|
-| `ModuleNotFoundError: No module named 'torch'` on Ayan's machine | the bare `python` was used; only `C:/Users/Hp/anaconda3/envs/more_env/python.exe` has torch (§0) |
+| `ModuleNotFoundError: No module named 'torch'` on Ayan's machine | the bare `python` was used; only `python` has torch (§0) |
 | `config.json not found` | `train.py` was run from the repo root instead of inside `code/` — or just use `run_language_matrix.py`, which resolves the path itself |
 | `torch.cuda.is_available()` is `False` in `.venv_cuda` | the `--ignore-installed torch` step was skipped |
 | the guard says `experiment_group=exploratory` on a run you meant to be canonical | `--experiment_group canonical_lang_b` was omitted; this fails **quietly** and the run is then absent from the results table |

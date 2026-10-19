@@ -13,7 +13,7 @@ cd "D:/res/git/MoRE/.Codex/worktrees/english-language-dataset-migration-92946e/c
 
 Use the **CUDA** interpreter for anything trained or timed
 (`D:/res/git/MoRE/.venv_cuda/Scripts/python.exe`). The CPU interpreter runs the
-gates. RTX 3050 **6 GB** — see [ENVIRONMENT.md](../../../ENVIRONMENT.md).
+gates. RTX 3050 **6 GB** — see the environment record (removed from the tree; git history).
 
 Add `WANDB_MODE=disabled` for smoke and diagnostic runs so they never reach the
 dashboard:

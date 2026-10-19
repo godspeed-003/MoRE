@@ -217,8 +217,8 @@ interpretation everywhere.
 
 - **Two machines, two authors.** Interpreter paths are per-machine and are NOT
   interchangeable; check which machine you are on before quoting a path or a
-  timing. Full record in [ENVIRONMENT.md](ENVIRONMENT.md), handoff procedure in
-  [HANDOFF.md](HANDOFF.md).
+  timing. Full record in `ENVIRONMENT.md`, handoff procedure in
+  `HANDOFF.md`.
 
   **Vedant's machine — RTX 3050 6 GB Laptop.** The gate, calibration and
   development machine. Windows user `vedan` (Windows spells it that way; the

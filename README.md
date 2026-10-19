@@ -43,7 +43,7 @@ all 15 published arithmetic `config_hash` values, and therefore every canonical 
 identity, unchanged by the language work.
 
 The language quickstart is §6; the corpus is §3b. If you are here to *run* the
-language matrix, read [SETUP.md](SETUP.md) then [HANDOFF.md](HANDOFF.md) instead —
+language matrix, read [SETUP.md](SETUP.md) then `HANDOFF.md` instead —
 they are written for that job and this file is not.
 
 
@@ -429,7 +429,7 @@ and spending it would change every canonical run's identity.
 | `code/canonical_spec_language.json` | the same guard for `task = language` — separate file, separate group `canonical_lang_b` |
 | `data/` | `more6-v1` as three frozen files plus `dataset_meta.json` (split hashes, counts, leakage audit) and the generator |
 | `data/lang/<corpus>/` | the language corpora as frozen `.npy` arrays plus their own `dataset_meta.json`; `wikitext-103` is canonical, `wikitext-2` is dev-only |
-| [SETUP.md](SETUP.md) / [HANDOFF.md](HANDOFF.md) | clone-to-first-run setup, and the operating instructions for whoever drives the language matrix |
+| [SETUP.md](SETUP.md) / `HANDOFF.md` | clone-to-first-run setup, and the operating instructions for whoever drives the language matrix |
 | `results/` | `results.md` (the narrative) plus machine-generated `results.csv` / `.json` / `results_tables.md`, `depth_null_model.json`, `bench_capacity.log` |
 | `results/language/` | the same artifacts for the language task, written only by `export_results.py --task language` |
 | `runs/<experiment_id>/` | per-run outputs only — config, resolved config, metrics, TSV, held-out depth sidecar; checkpoints and stdout are untracked |
@@ -454,16 +454,16 @@ from a clean clone without training anything.
 
 Environment — two interpreters, because the correctness gates and the training runs
 have different needs. Anaconda base does not have torch; see
-[ENVIRONMENT.md](ENVIRONMENT.md) for how both were built and what is pinned.
+`ENVIRONMENT.md` for how both were built and what is pinned.
 
 ```bash
 # correctness gates (CPU is enough, and it is what the gate counts were measured on)
-C:/Users/vedan/anaconda3/python.exe code/run_correctness_suite.py
+python code/run_correctness_suite.py
 ```
 
 ```bash
 # training (CUDA)
-D:/res/git/MoRE/.venv_cuda/Scripts/python.exe code/train.py --architecture more --seed 42
+.venv_cuda/Scripts/python.exe code/train.py --architecture more --seed 42
 ```
 
 Train one architecture at one seed, from `code/`:
@@ -520,7 +520,7 @@ its corpus built once, and then uses the same `train.py` with `--task language`.
 ~135 M tokens and takes a while; the dev corpus is minutes.
 
 ```bash
-C:/Users/vedan/anaconda3/python.exe data/lang/build_language_dataset.py --corpus wikitext-103
+python data/lang/build_language_dataset.py --corpus wikitext-103
 ```
 
 Four manifest stages follow, in this order, each appending to the same
@@ -529,19 +529,19 @@ re-derivable, and because `dataset_version` depends on the split arrays alone �
 re-running any of these does **not** change any run's identity:
 
 ```bash
-C:/Users/vedan/anaconda3/python.exe data/lang/build_family_lookup.py --corpus wikitext-103
+python data/lang/build_family_lookup.py --corpus wikitext-103
 ```
 
 ```bash
-C:/Users/vedan/anaconda3/python.exe data/lang/build_baseline_floors.py --corpus wikitext-103
+python data/lang/build_baseline_floors.py --corpus wikitext-103
 ```
 
 ```bash
-C:/Users/vedan/anaconda3/python.exe data/lang/build_shuffled_control.py --corpus wikitext-103
+python data/lang/build_shuffled_control.py --corpus wikitext-103
 ```
 
 ```bash
-C:/Users/vedan/anaconda3/python.exe data/lang/build_block_topics.py --corpus wikitext-103
+python data/lang/build_block_topics.py --corpus wikitext-103
 ```
 
 **Step 2 — check the machine before spending a GPU-hour.** This refuses rather than
@@ -550,7 +550,7 @@ frozen config is accepted by the proxy guard on all three arms, settles W&B and 
 disk headroom. Fifteen seconds.
 
 ```bash
-D:/res/git/MoRE/.venv_cuda/Scripts/python.exe code/run_language_matrix.py --preflight
+.venv_cuda/Scripts/python.exe code/run_language_matrix.py --preflight
 ```
 
 **Step 3 — one short run to prove the pipeline end to end.** Runs on the dev corpus,
@@ -558,7 +558,7 @@ so it *cannot* contaminate the canonical matrix — `wikitext-2` carries its own
 `dataset_version` and the exporter refuses to mix versions.
 
 ```bash
-D:/res/git/MoRE/.venv_cuda/Scripts/python.exe code/run_language_matrix.py --smoke
+.venv_cuda/Scripts/python.exe code/run_language_matrix.py --smoke
 ```
 
 It takes about eight minutes and it is a **plumbing check, not a quality check**: one
@@ -573,7 +573,7 @@ anything already finished, and treats a directory with a checkpoint but no
 `metrics.json` as interrupted rather than complete.
 
 ```bash
-D:/res/git/MoRE/.venv_cuda/Scripts/python.exe code/run_language_matrix.py --arch more --seed 42
+.venv_cuda/Scripts/python.exe code/run_language_matrix.py --arch more --seed 42
 ```
 
 Equivalently, directly — and note `--config`, because `--task language` against the
@@ -594,7 +594,7 @@ arithmetic matrix**, which is 15 rows of mean squared error under a heading that
 like your result.
 
 ```bash
-D:/res/git/MoRE/.venv_cuda/Scripts/python.exe code/export_results.py --task language
+.venv_cuda/Scripts/python.exe code/export_results.py --task language
 ```
 
 Never compute a mean ± std by hand. The `±` is a **sample** (n−1) standard deviation
@@ -606,7 +606,7 @@ The language suites are **not** part of the 356-check correctness gate — that 
 the published arithmetic result and must not move. Run them separately:
 
 ```bash
-C:/Users/vedan/anaconda3/python.exe code/test_language_data.py
+python code/test_language_data.py
 ```
 
 ---
