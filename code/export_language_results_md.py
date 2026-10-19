@@ -360,6 +360,13 @@ def build() -> str:
     A("at 3 epochs and no arm is converged -- every arm gets the identical budget, so the")
     A("comparison is valid even though none of them is trained to convergence.")
     A("")
+    A("**Held-out test split.** Each admitted run also carries a")
+    A("`test_split_metrics.json` sidecar with its test-split loss, its routing accuracy")
+    A("and its mean depth, produced by `code/eval_test_split.py --group canonical_lang_b`")
+    A("and re-verifying split disjointness on every invocation. Routing accuracy is")
+    A("`N/A` for MoR, which has no router. The sidecars reproduce the paper's test-loss")
+    A("row exactly.")
+    A("")
 
     # 7. routing
     A("## 7. Expert routing analysis")
