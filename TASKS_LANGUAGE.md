@@ -3755,3 +3755,85 @@ reasoning for keeping these fields out of `updated_rules.md` §9:
 
   `PAPER_REVISION.md` §2.5 (seed argument, resolution correction), §6 (GPU split),
   §7 (venue). Full record: `changelog.md` T-LX.17.
+
+## T-LA.27 - DEFERRED: the parameter-matched MoR and its canonical companion (TMLR submission scope)
+
+**Date.** 2026-10-20. **Machine.** Vedant's RTX 3050 6 GB. **Status.** NOT RUN, on
+purpose. This entry exists so the decision is recorded rather than lost, and so
+the next person does not re-derive it.
+
+### The question
+
+The external review raised the sharpest methodological objection to the paper's
+headline: **at equal total parameters, MoR activates 6x more feed-forward
+parameters per token** (3,145,728 against 524,288, from one 24-wide block against
+one of six 4-wide experts), so MoR's in-domain advantage may be purchased with
+compute rather than earned by the architecture. The paper already answers most of
+this in \S\ref{sec:dilution} --- the applications-per-parameter table, the
+arithmetic, and the statement that the recursive multiplicity is the entire source
+of MoRE's advantage over MoE --- and it now states the MoR-MoR gap as a
+compute-purchased result in the abstract.
+
+**What remains open is one control**: a MoR narrowed to the same *active* width at
+the same depth, which would separate the composition from sparse activation
+alone. Without it, the paper does not claim the composition beats sparsity, and
+S\ref{sec:declared} says so.
+
+### Why it was deferred rather than run
+
+The submission is the priority, and the paper's claim is now scoped to what the
+evidence supports. The arithmetic study already ran this probe's nearest
+equivalent, and its answer is cautionary: `t10i_mor_ffn_mult_4_proxy` (arithmetic,
+one seed) scored **0.0733** against MoRE's **0.0632** --- the narrowed single
+block was far worse, on a task that is capacity-bound. So the language version is
+a genuinely open question, but not one the submission needs answered, and it is
+not a one-line change: a MoR at `ffn_mult = 4` holds one sixth of MoRE's TOTAL
+parameters, so the arm trades the width question for a capacity question, and
+which of the two dominates is itself unknown at this scale.
+
+**A fixed-depth-TRAINED language control was considered and rejected.** The
+learned arm already halts at the ceiling for 97.3% of tokens (mean depth 6.96 of
+T=7), so training at fixed depth 7 is nearly the same training run; and the
+arithmetic study already ran the 5-seed version of that control in the regime
+where it was meaningful (learned depth 2.13), where fixed depth fit **better**
+(gap -0.00030, p = 0.0476, direction only, failing Bonferroni). Running the
+language version would cost 3.5 h per seed to confirm what the data already says.
+
+### The design, when it is run
+
+Both arms on ONE card, because the canonical MoE/MoR ran on a 4060 and MoRE on a
+V100, and comparing an arm trained here against one trained there confounds the
+width change with the hardware. The companion is the same configuration on the
+same card, so the only thing that differs is the variable under test. It also
+doubles as a per-machine control, which the Disclosures currently has for two
+arms only.
+
+| arm | model block | cost per seed, 3 epochs, 3050 6 GB |
+|---|---|---|
+| MoR, narrowed | `architecture: mor`, `ffn_mult: 4`, `max_depth: 7` | ~1.0 h (the FFN is 6x narrower; per-token cost falls ~3.2x) |
+| MoR, canonical companion | `architecture: mor`, `ffn_mult: 24`, `max_depth: 7` | ~3.1 h (the T-L7.0 measured rate on this card) |
+
+**1 seed of both: ~4.1 h. 3 seeds of both: ~12.3 h.** On a rented V100 roughly
+3-4x faster.
+
+**A per-arm canonical companion is NOT needed for the MoRE arm** --- the
+comparison of interest is MoRE against MoR-narrowed, and MoRE's own canonical
+numbers are already on record. It IS needed for the MoR pair, because the
+comparison of interest there is narrowed against canonical MoR.
+
+### How to build the config
+
+The arithmetic run `t10i_mor_ffn_mult_4_proxy` is the template. An explicit
+`model.ffn_mult` in the config overrides the architecture variant, and
+`resolve_variant` LABELS the deviation rather than dropping it. **Do not add a
+fourth entry to `code/canonical_spec_language.json`** --- that file is frozen, the
+proxy guard refuses a canonical claim from the run, and the run must be stamped
+`exploratory`, which it is automatically when `--experiment_group` is not passed.
+
+### Where to look
+
+`paper/common/05_mechanism.tex` \S\ref{sec:dilution} (the active-parameter
+arithmetic), `paper/common/06_limitations.tex` (the scoping paragraph),
+`runs/t10i_mor_ffn_mult_4_proxy_seed42__f2e3e60d` (the arithmetic template),
+`code/canonical_spec_language.json` (`architecture_variants.mor.ffn_mult = 24`),
+`results/language/results.json` (the admitted cells the companion must match).

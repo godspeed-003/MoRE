@@ -15,13 +15,13 @@ residual being the router MoR does not have---and that residual runs
 \emph{against} the headline, since the arm with fewer parameters is the one that
 wins. Second, MoRE's seed spread is $6.4\times$ tighter than MoR's in variance
 (std $0.0134$ against $0.0340$; exact one-sided permutation test on the variance
-ratio $p = 1/252$, that test's floor). \textbf{What the number means is still
-open}: these runs cannot separate a genuinely stabilising effect from the simpler
+ratio $p = 1/252$, that test's floor). \textbf{What that means is still open}:
+these runs cannot separate a genuinely stabilising effect from the simpler
 account that a model whose halting has collapsed to a near-constant has less left
-to vary, and the second reading is the more parsimonious. MoRE's spread also
-tightens across the three epochs ($0.034 \rightarrow 0.021 \rightarrow 0.013$)
-while MoR's stays between $0.033$ and $0.039$, which fits it. We report the
-measurement and decline the interpretation. (Exploratory and uncorrected.)
+to vary, and the second reading is the more parsimonious---MoRE's spread does
+tighten across the three epochs ($0.034 \rightarrow 0.021 \rightarrow 0.013$)
+while MoR's does not. We report the measurement and decline the interpretation.
+(Exploratory and uncorrected.)
 
 Fig.~\ref{fig:depth-curve} and the forced-depth sweep sharpen this. Both arms scale
 with forced depth up to a point, in opposite directions:
@@ -142,7 +142,7 @@ scores each arm against the inference FLOPs it costs.
 \begin{table}[t]
 \centering
 \footnotesize
-\caption{All results, five seeds, mean$\,\pm\,$std. \textbf{Upper block:} each cell is \emph{score (difference vs MoE, inference FLOPs$\times$ vs MoE, $|$difference$|$ per FLOPs-multiplier)}; MoE is the reference arm, so its cells carry the score alone. Scores are lower-better for loss and higher-better for accuracy; the third number is a \textbf{modulus}, so it is higher-better on \emph{every} row---how much quality each unit of compute bought. That third column uses the \emph{excl.\ unembedding} accounting. Validation loss is the primary metric (final epoch; \emph{best} equals \emph{last} on all 15 cells, so no model selection occurred). Pairwise, exact two-sided randomization test, every comparison at the floor $p_{\min}=0.00794$: MoRE$-$MoE $-0.3113$ ($d\,{-15.9}$); MoRE$-$MoR $+0.1216$ ($d\,{+4.7}$); MoE$-$MoR $+0.4329$ ($d\,{+14.7}$). OOD is held-out Pile text (\S\ref{sec:ood}). \textbf{Lower block:} $\Delta$ floor is the margin below the bigram baseline of 4.9849 nats (positive \emph{beats} it); FLOPs are inference FLOPs per token at each arm's measured mean depth, reported both including and excluding the shared output projection (Appendix~\ref{app:flops}); throughput is inference for all fifteen checkpoints on one GPU. The OOD, BLiMP and throughput rows are \textbf{exploratory}---outside both declared families, uncorrected.}
+\caption{All results, five seeds, mean$\,\pm\,$std. \textbf{Upper block:} each cell is \emph{score (difference vs MoE, inference FLOPs$\times$ vs MoE, $|$difference$|$ per FLOPs-multiplier)}; MoE is the reference arm, so its cells carry the score alone. The third number is a \textbf{modulus}: how much quality each unit of compute bought, under the \emph{excl.\ unembedding} accounting. Lower-better for loss, higher-better for accuracy. Validation loss is the primary metric (final epoch; \emph{best} equals \emph{last} on all 15 cells, so no model selection occurred). Pairwise, exact two-sided randomization test, every comparison at the floor $p_{\min}=0.00794$: MoRE$-$MoE $-0.3113$ ($d\,{-15.9}$); MoRE$-$MoR $+0.1216$ ($d\,{+4.7}$); MoE$-$MoR $+0.4329$ ($d\,{+14.7}$). OOD is held-out Pile text (\S\ref{sec:ood}). \textbf{Lower block:} $\Delta$ floor is the margin below the bigram baseline of 4.9849 nats (positive \emph{beats} it); FLOPs are inference FLOPs per token at each arm's measured mean depth, reported both including and excluding the shared output projection (Appendix~\ref{app:flops}); throughput is inference for all fifteen checkpoints on one GPU. The OOD, BLiMP and throughput rows are \textbf{exploratory}---outside both declared families, uncorrected.}
 \label{tab:main}
 \vspace{2pt}
 \begin{tabular}{llll}

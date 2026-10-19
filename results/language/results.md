@@ -338,7 +338,8 @@ Each is a claim a reader might make from this data that the data does NOT licens
    at the ceiling (section 8).
 2. **That MoRE beats MoR.** It does not, in domain (section 5).
 3. **That the composition adds something beyond sparse activation.** Untested: the
-   parameter-matched MoR was never run (section 9).
+   parameter-matched MoR was never run (section 9). The paper states this in its
+   own Limitations rather than leaving it to a reader to notice.
 4. **That ACT's learned policy is what makes recursion work.** Untested: the
    depth-matched-TRAINED control was never run (section 9).
 5. **That the out-of-domain ordering is a robustness result.** It is exploratory,

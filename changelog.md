@@ -9674,3 +9674,57 @@ specs' values are byte-identical to HEAD; the language suites all pass (export
 80, seed_stats 38, routing_metrics 68, lang_heads 47, spec_freeze 64,
 causality 22, families 114, task_axis 79, route_persistence 37, gate_l6_l7 28);
 and the generator round-trips.
+
+## T-LA.27 - scope the composition claim, and DEFER the parameter-matched MoR
+
+**Date.** 2026-10-20. **Machine.** Vedant's RTX 3050 6 GB. **Not run, on purpose.**
+
+### The decision
+
+The external review's sharpest methodological objection is that at equal total
+parameters **MoR activates 6x more feed-forward parameters per token** (3,145,728
+against 524,288), so its in-domain advantage may be purchased with compute rather
+than earned by the architecture. The paper already answers most of this in
+\S\ref{sec:dilution} --- the applications-per-parameter table, the arithmetic, and
+the statement that the recursive multiplicity is the entire source of MoRE's
+advantage over MoE --- and the abstract now attributes the MoR-MoR gap to the same
+thing.
+
+**What was missing was the scoping statement**, and that is now in the paper:
+S\ref{sec:declared} carries a run-in paragraph saying that the control separating
+the composition from sparse activation alone **was not run**, and that the paper
+**does not claim the composition beats sparsity on this evidence**. That is the
+honest limit, stated where a reviewer will look, and it costs four lines.
+
+The arm itself is DEFERRED to a later date, recorded in full in
+\TASKS_LANGUAGE.md\ T-LA.27: a MoR narrowed to the same active width at the
+same depth, plus a canonical MoR companion on the SAME card, 1 seed ~4.1 h or
+3 seeds ~12.3 h on this 3050. The arithmetic study already ran the nearest
+equivalent (\	10i_mor_ffn_mult_4_proxy\, one seed) and it scored 0.0733 against
+MoRE's 0.0632 --- the narrowed single block was far worse, on a capacity-bound
+task. So the question is genuinely open, and it is not one the submission needs
+answered.
+
+**A fixed-depth-TRAINED language control was considered and REJECTED.** The
+learned arm already halts at the ceiling for 97.3% of tokens, so training at fixed
+depth 7 is nearly the same training run; and the arithmetic study already ran the
+5-seed version in the regime where it was meaningful (learned depth 2.13), where
+fixed depth fit BETTER. Running the language version would cost 3.5 h per seed to
+confirm what the data already says.
+
+### Also here
+
+- The active-width disclosure was first written as a full subsection with the
+  6x arithmetic. That was REDUNDANT: section 6.1 already carries the arithmetic
+  and the applications-per-parameter table, and the page count said so. It is now
+  a four-line run-in paragraph that only says what section 6.1 does not.
+- Layout: text block 9.3in -> 9.4in tall, \parskip 4.5pt -> 4.2pt. The added
+  disclosure needed about ten lines and the body was 6pt short of fitting the
+  References heading and its first entry on page 12, so the space came from the
+  layout rather than from cutting content.
+- Table 2's caption was 1,404 characters, thirteen typeset lines, which is a
+  readability problem in its own right. Trimmed; the pairwise d-values were
+  restored once the page budget allowed.
+- Counted body **11.64 pages** against the limit of 12, References on page 12, build
+  clean (no errors, no undefined references, no overfull boxes), total PDF 20
+  pages.
