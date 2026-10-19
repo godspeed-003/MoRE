@@ -196,6 +196,36 @@ data/lang/**/*_text.txt
 data/lang/**/*.bin
 data/lang/_hf_cache/
 
+# --- Secrets and local agent state ------------------------------------------
+# `.env` holds a live HuggingFace access token; `.claude/settings.json` holds a
+# live Anthropic auth token AND a third-party relay base URL. Both are
+# UNTRACKED but were NOT IGNORED, which means `git add -A`, a `git status -u`
+# sweep, or a zip of the working tree would have shipped them to a reviewer.
+#
+# These are ignored, not deleted: the local machine still needs them. The
+# tokens must be ROTATED regardless of the ignore rule -- a token that has
+# been in a working tree is a token to replace, not a token to hide.
+.env
+.env.*
+!.env.example
+.claude/settings.json
+.claude/settings.local.json
+
+# Third-party review correspondence. The raw file is the co-author's agent's
+# message; the adjudicated form with verdicts and evidence is
+# PAPER_AGENT_REVIEW_48.md, which IS tracked.
+agent-review
+
+# --- Stale build artefacts at the repository root ---------------------------
+# These are older copies of the two submission PDFs. The live ones are
+# paper/<venue>_submission/main.pdf, which the .gitignore rules further down
+# already exclude as regenerable build output. The root copies were four days
+# stale and were a trap: a reviewer opening "tmlr_submission.pdf" would have
+# read the pre-T-LA.25 layout, with references after the appendix and the
+# superseded FLOPs ratios.
+/acl_submission.pdf
+/tmlr_submission.pdf
+
 # --- Editor / OS ------------------------------------------------------------
 .DS_Store
 Thumbs.db
