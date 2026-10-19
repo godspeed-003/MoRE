@@ -1,7 +1,7 @@
 """test_lang_recursion.py - GATE L3 / GATE L4 for the language path (T-L6.4).
 
 Run:
-    C:/Users/vedan/anaconda3/python.exe code/test_lang_recursion.py
+    python code/test_lang_recursion.py
 
 Attention (T-L4.0) is the change most likely to break the two invariants that took
 longest to get right in the arithmetic POC, because it is the first sublayer whose

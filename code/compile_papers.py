@@ -37,9 +37,8 @@ def _find_tinytex():
     if env and os.path.isfile(os.path.join(env, "pdflatex.exe")):
         return env
     cands = []
-    for base in (os.environ.get("TEMP"), os.environ.get("TMP"),
-                 r"C:\Users\Hp\AppData\Local\Temp",
-                 r"C:\Users\vedan\AppData\Local\Temp"):
+    user_temp = os.path.join(os.path.expanduser("~"), "AppData", "Local", "Temp")
+    for base in (os.environ.get("TEMP"), os.environ.get("TMP"), user_temp):
         if base:
             cands.append(os.path.join(base, "tinytex_dl", "out",
                                       "TinyTeX", "bin", "windows"))

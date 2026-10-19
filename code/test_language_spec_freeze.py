@@ -1,7 +1,7 @@
 """test_language_spec_freeze.py - T-L7.1 / T-L7.1a verification.
 
 Run:
-    C:/Users/vedan/anaconda3/python.exe code/test_language_spec_freeze.py
+    python code/test_language_spec_freeze.py
 
 TWO THINGS ARE UNDER TEST, and they are in one file because they fail together.
 

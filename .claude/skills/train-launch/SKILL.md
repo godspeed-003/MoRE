@@ -8,7 +8,7 @@ description: Launch a MoRE training run correctly and read its per-run outputs â
 ## The command
 
 ```bash
-cd "D:/res/git/MoRE/.claude/worktrees/english-language-dataset-migration-92946e/code" && "D:/res/git/MoRE/.venv_cuda/Scripts/python.exe" train.py --architecture more --seed 42 --run_name phaseB_more
+cd "code" && "D:/res/git/MoRE/.venv_cuda/Scripts/python.exe" train.py --architecture more --seed 42 --run_name phaseB_more
 ```
 
 Use the **CUDA** interpreter for anything trained or timed
@@ -19,7 +19,7 @@ Add `WANDB_MODE=disabled` for smoke and diagnostic runs so they never reach the
 dashboard:
 
 ```bash
-cd "D:/res/git/MoRE/.claude/worktrees/english-language-dataset-migration-92946e/code" && WANDB_MODE=disabled "D:/res/git/MoRE/.venv_cuda/Scripts/python.exe" train.py --architecture mor --epochs 1 --seed 44 --run_name t_diag
+cd "code" && WANDB_MODE=disabled "D:/res/git/MoRE/.venv_cuda/Scripts/python.exe" train.py --architecture mor --epochs 1 --seed 44 --run_name t_diag
 ```
 
 Run it in the **background** and read the output file â€” a canonical arm is tens of

@@ -1,7 +1,7 @@
 """test_language_gate_l6_l7.py - T-L7.2 (GATE L6) and T-L7.3 (input parity).
 
 Run with the CPU interpreter:
-    C:/Users/vedan/anaconda3/python.exe code/test_language_gate_l6_l7.py
+    python code/test_language_gate_l6_l7.py
 
 TWO THINGS ARE CHECKED HERE AND THEY ARE DIFFERENT KINDS OF CLAIM.
 

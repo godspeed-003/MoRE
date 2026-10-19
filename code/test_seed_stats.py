@@ -2,7 +2,7 @@
 """test_seed_stats.py - T-LX.18 verification of the statistics layer.
 
 Run:
-    C:/Users/vedan/anaconda3/python.exe code/test_seed_stats.py
+    python code/test_seed_stats.py
 
 WHAT IS UNDER TEST, AND WHY IT IS NOT COSMETIC.
 

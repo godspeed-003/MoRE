@@ -1,7 +1,7 @@
 """derive_lang_ffn_mult.py - T-L6.3: the parameter-matched MoR width for language.
 
 Run:
-    C:/Users/vedan/anaconda3/python.exe code/derive_lang_ffn_mult.py
+    python code/derive_lang_ffn_mult.py
 
 WHY THIS CANNOT BE COPIED FROM ARITHMETIC. `config.CANONICAL_FFN_MULT` is
 `{moe: 4, mor: 24, more: 4}`, and 24 was solved for the ARITHMETIC model: MoR runs one

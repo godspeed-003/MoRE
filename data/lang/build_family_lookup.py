@@ -1,10 +1,10 @@
 """build_family_lookup.py - T-L3.1: freeze `token_family[V]` from majority POS.
 
 Run (dev corpus, ~2 min):
-    C:/Users/vedan/anaconda3/python.exe data/lang/build_family_lookup.py --corpus wikitext-2
+    python data/lang/build_family_lookup.py --corpus wikitext-2
 
 Run (canonical corpus; use --workers, the tagger is pure Python):
-    C:/Users/vedan/anaconda3/python.exe data/lang/build_family_lookup.py --corpus wikitext-103
+    python data/lang/build_family_lookup.py --corpus wikitext-103
 
 Produces `data/lang/<corpus>/token_family.npy` -- an `int8` array of length V --
 and appends the statistics behind every decision to `dataset_meta.json`.

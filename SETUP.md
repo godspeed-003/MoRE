@@ -1,8 +1,8 @@
 # SETUP.md — building the environment for a MoRE **language** run
 
-Written for the machine that will actually run the canonical matrix (Ayan's RTX 4060
-Laptop, 8 GB). Everything here has been executed on a 3050 6 GB; the only expected
-difference is more VRAM headroom, which buys speed rather than a different protocol —
+Written for the machine that will actually run the canonical matrix (an 8 GB card).
+Everything here has been executed on a 6 GB card; the only expected difference is
+more VRAM headroom, which buys speed rather than a different protocol —
 the protocol is **frozen** as of T-L7.1 and `batch_size 48` is one of the frozen
 fields, not a value to re-pick for your card.
 
@@ -285,7 +285,7 @@ absent from the results table.
 
 | symptom | cause |
 |---|---|
-| `ModuleNotFoundError: No module named 'torch'` on Ayan's machine | the bare `python` was used; only `python` has torch (§0) |
+| `ModuleNotFoundError: No module named 'torch'` on the CUDA machine | the bare `python` was used; only `python` has torch (§0) |
 | `config.json not found` | `train.py` was run from the repo root instead of inside `code/` — or just use `run_language_matrix.py`, which resolves the path itself |
 | `torch.cuda.is_available()` is `False` in `.venv_cuda` | the `--ignore-installed torch` step was skipped |
 | the guard says `experiment_group=exploratory` on a run you meant to be canonical | `--experiment_group canonical_lang_b` was omitted; this fails **quietly** and the run is then absent from the results table |

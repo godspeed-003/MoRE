@@ -199,7 +199,7 @@ def evaluate(run_dir: Path, device: torch.device,
         if not p.exists():
             raise FileNotFoundError(
                 f"missing {p.name} in {run_dir.name}. The 15 canonical "
-                f"phase_b cells were produced on Ayan's machine and "
+                f"phase_b cells were produced on the other author's machine and "
                 f"`runs/**/checkpoint.pt` is gitignored (.gitignore:21), so the "
                 f"checkpoint is not in this worktree -- fetch it from that "
                 f"machine rather than retraining, which would produce a "

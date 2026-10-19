@@ -1,7 +1,7 @@
 """build_baseline_floors.py - T-L2.5: the numbers a language loss must beat.
 
 Run:
-    C:/Users/vedan/anaconda3/python.exe data/lang/build_baseline_floors.py --corpus wikitext-2
+    python data/lang/build_baseline_floors.py --corpus wikitext-2
 
 Writes `uniform_ce`, `unigram_ce`, `bigram_ce` and `primary_metric_floor` into
 `dataset_meta.json`, all in nats per token, all fitted on TRAIN and evaluated on

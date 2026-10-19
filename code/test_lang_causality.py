@@ -1,7 +1,7 @@
 """test_lang_causality.py - GATE L1: causality, leakage, freezing and the waste.
 
 Run:
-    C:/Users/vedan/anaconda3/python.exe code/test_lang_causality.py
+    python code/test_lang_causality.py
 
 Scope: T-L4.0 .. T-L4.4 (`plan_language.md` §6). Kept out of
 `run_correctness_suite.py` for the same reason as the other language suites --

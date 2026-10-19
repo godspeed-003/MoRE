@@ -1,7 +1,7 @@
 """test_language_export.py - T-L10.0. The language results/aggregation path.
 
 Run with the CPU interpreter:
-    C:/Users/vedan/anaconda3/python.exe code/test_language_export.py
+    python code/test_language_export.py
 
 WHY THIS FILE EXISTS, AND IT IS NOT A HYPOTHETICAL.
 

@@ -2,7 +2,7 @@
 PRE-FINALIZATION SWEEP DRIVER -- NOT RUNNABLE, RETAINED AS HISTORY.
 
 Every path below points at the machine the arithmetic POC was developed on
-(`C:\\Users\\Hp\\Desktop\\Waste\\MoRE`), which does not exist here, and the outputs it
+(`<repo>`), which does not exist here, and the outputs it
 writes -- a global `results.tsv` and a sweep CSV -- are now PROHIBITED by
 CLAUDE.md §5 and actively refused by code/more/run_context.py. It is kept because
 CLAUDE.md §6 says archive, never delete, evidence: it records how the pre-audit

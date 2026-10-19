@@ -71,7 +71,7 @@ message is where you compress; the files are where you do not.
 Stage specific files, never `git add .`:
 
 ```bash
-cd "D:/res/git/MoRE/.claude/worktrees/english-language-dataset-migration-92946e" && git add TASKS_LANGUAGE.md changelog.md <the files the task touched> && git status --short
+cd "." && git add TASKS_LANGUAGE.md changelog.md <the files the task touched> && git status --short
 ```
 
 Commit message: `<task id>: <what changed>`, then a body naming the verification.

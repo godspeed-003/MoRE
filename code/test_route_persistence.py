@@ -2,7 +2,7 @@
 """test_route_persistence.py - T-LX.12 verification.
 
 Run:
-    C:/Users/vedan/anaconda3/python.exe code/test_route_persistence.py
+    python code/test_route_persistence.py
 
 WHAT IS UNDER TEST. `MoREWrapper.forward` used to call `self.moe_block(...)` inside
 the depth loop unconditionally, so a token's expert was re-chosen by `argmax` at

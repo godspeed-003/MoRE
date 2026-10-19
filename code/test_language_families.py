@@ -1,7 +1,7 @@
 """test_language_families.py - Phase L-3 verification for the POS family manifest.
 
 Run:
-    C:/Users/vedan/anaconda3/python.exe code/test_language_families.py
+    python code/test_language_families.py
 
 Scope: T-L3.0 .. T-L3.3 (`plan_language.md` §4). Kept out of
 `run_correctness_suite.py` for the same reason as `test_language_data.py` and

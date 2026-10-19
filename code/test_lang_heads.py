@@ -1,7 +1,7 @@
 """test_lang_heads.py - Phase L-5 verification for the heads and the language loss.
 
 Run:
-    C:/Users/vedan/anaconda3/python.exe code/test_lang_heads.py
+    python code/test_lang_heads.py
 
 Scope: T-L5.0 .. T-L5.4 (`plan_language.md` §7). Kept out of
 `run_correctness_suite.py` for the same reason as the other language suites --

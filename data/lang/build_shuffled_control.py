@@ -1,7 +1,7 @@
 """build_shuffled_control.py - T-L3.3 / ablation G: the null the POS number needs.
 
 Run:
-    C:/Users/vedan/anaconda3/python.exe data/lang/build_shuffled_control.py --corpus wikitext-103
+    python data/lang/build_shuffled_control.py --corpus wikitext-103
 
 Writes `data/lang/<corpus>/token_family_shuffled.npy` -- an `int8` array of shape
 `(n_draws, V)` -- and its marginal statistics into `dataset_meta.json`.

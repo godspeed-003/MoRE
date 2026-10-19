@@ -55,7 +55,7 @@ import torch
 
 # Resolved from this file so the diagnostic runs from any checkout or worktree.
 # Hard-coding one machine's path is what made the first version of this script
-# unrunnable on Ayan's machine (CLAUDE.md 9: interpreter and repo paths are
+# unrunnable on the other author's machine (CLAUDE.md 9: interpreter and repo paths are
 # per-machine and are NOT interchangeable).
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO / "code"))

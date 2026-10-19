@@ -1,0 +1,30 @@
+{
+  "run": "langB_MoR_seed46__fb91cdff",
+  "task": "language",
+  "architecture": "mor",
+  "seed": 46,
+  "experiment_group": "canonical_lang_b",
+  "test_split": {
+    "source": "wikitext-103:test"
+  },
+  "n_test_items": 1256,
+  "test/task_loss": 3.5090747957776305,
+  "test/routing_accuracy": "N/A",
+  "test/confusion_diagonal_fraction": "N/A",
+  "test/depth_mean": 6.8287283539012735,
+  "test/early_exit_rate": 0.1111757314888535,
+  "test/forced_exit_rate": 0.8888242685111465,
+  "test/exit_histogram": {
+    "step_1": 0,
+    "step_2": 1352,
+    "step_3": 550,
+    "step_4": 1815,
+    "step_5": 8635,
+    "step_6": 23395,
+    "step_7": 285789
+  },
+  "device": "cpu",
+  "torch": "2.6.0+cpu",
+  "published_val_task_loss": 3.5153753796561817,
+  "val_minus_test": 0.006300583878551258
+}

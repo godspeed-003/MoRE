@@ -10,10 +10,10 @@ description: Run the MoRE correctness suite (Gate L0) or one individual gate, in
 Full suite — this is **Gate L0**, the regression fence for the language migration:
 
 ```bash
-cd "D:/res/git/MoRE/.Codex/worktrees/english-language-dataset-migration-92946e/code" && "C:/Users/vedan/anaconda3/python.exe" run_correctness_suite.py
+cd "D:/res/git/MoRE/.Codex/worktrees/english-language-dataset-migration-92946e/code" && "python" run_correctness_suite.py
 ```
 
-Use the **CPU** interpreter (`C:/Users/vedan/anaconda3/python.exe`). The gate
+Use the **CPU** interpreter (`python`). The gate
 counts were measured on it and the gates do not need CUDA. See
 the environment record (removed from the tree; git history).
 
@@ -24,7 +24,7 @@ do other work while it goes.
 One gate at a time, when iterating on a specific area:
 
 ```bash
-cd "D:/res/git/MoRE/.Codex/worktrees/english-language-dataset-migration-92946e/code" && "C:/Users/vedan/anaconda3/python.exe" test_phase6_provenance.py
+cd "D:/res/git/MoRE/.Codex/worktrees/english-language-dataset-migration-92946e/code" && "python" test_phase6_provenance.py
 ```
 
 Each suite file is standalone and exits non-zero on any `[FAIL]`.

@@ -1,7 +1,7 @@
 """test_language_task_axis.py - T-L1.0..T-L1.3 verification for the `task` axis.
 
 Run:
-    C:/Users/vedan/anaconda3/python.exe code/test_language_task_axis.py
+    python code/test_language_task_axis.py
 
 WHY THIS IS NOT IN `run_correctness_suite.py:GATES` (yet). Gate L0
 (plan_language.md §11) asserts the arithmetic suite still prints

@@ -1,7 +1,7 @@
 """test_language_data.py - Phase L-2 verification for the language data pipeline.
 
 Run:
-    C:/Users/vedan/anaconda3/python.exe code/test_language_data.py
+    python code/test_language_data.py
 
 Scope: T-L2.0 .. T-L2.7 (`plan_language.md` §3). Kept out of
 `run_correctness_suite.py` for the same reason as `test_language_task_axis.py` --

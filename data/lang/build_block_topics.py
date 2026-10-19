@@ -1,7 +1,7 @@
 """build_block_topics.py - T-L6.5: an INDUCED topic partition, as a second axis.
 
 Run:
-    C:/Users/vedan/anaconda3/python.exe data/lang/build_block_topics.py --corpus wikitext-2
+    python data/lang/build_block_topics.py --corpus wikitext-2
 
 Writes `data/lang/<corpus>/block_topic_<split>.npy` -- one `int8` topic id per stored
 block -- and the cluster statistics into `dataset_meta.json`.

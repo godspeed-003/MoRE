@@ -1,7 +1,7 @@
 """build_depth_deciles.py - T-L2.6: the frequency-decile table, built and UNUSED.
 
 Run:
-    C:/Users/vedan/anaconda3/python.exe data/lang/build_depth_deciles.py --corpus wikitext-2
+    python data/lang/build_depth_deciles.py --corpus wikitext-2
 
 Writes `data/lang/<corpus>/token_decile.npy` -- an `int8` array of length V giving
 each vocabulary id a train-frequency decile 0..9 -- and the statistics behind it to
