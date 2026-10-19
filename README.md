@@ -13,34 +13,51 @@ composes two mechanisms that are normally studied separately:
 The research question is whether the *composition* buys anything that neither
 component gives alone.
 
-> ### Headline finding: it did not.
+> ### The finding
 >
-> On this task at this scale, MoRE is statistically indistinguishable from MoE and
-> significantly worse than MoR. The halting mechanism is mechanically real —
-> differentiable, gradient-carrying, early-exiting on 99.97% of tokens — and its
-> *behaviour* is beaten by a policy that ignores its input and emits a constant.
-> This is [CLAUDE.md](CLAUDE.md) §8 **Outcome C**, and it is the result, not a
-> setback. Full evidence and limitations: **[results/results.md](results/results.md)**.
+> On WikiText-103 at 5.6 M parameters, **MoRE is the most compute-efficient of the
+> three arms and the least accurate.** Recursion alone (MoR) reaches the lowest
+> validation loss, $3.5154 \pm 0.0340$ nats/token, and the composition (MoRE)
+> reaches $3.6370 \pm 0.0134$, against MoE's $3.9483 \pm 0.0242$ --- all three
+> gaps at the exact randomisation test's resolution floor of $p = 0.00794$. But
+> MoRE buys $72\%$ of recursion's quality gain for $25\%$ of its inference
+> compute, and the best quality-per-FLOPs of any arm on every metric.
+>
+> **What we could not show.** The recursion budget saturates at this scale: mean
+> depth is $6.96$ of $T=7$ for MoRE and $6.73$ for MoR, with $97.3\%$ and $81.2\%$
+> of tokens halting at the ceiling. The architecture supports adaptive depth; these
+> runs cannot demonstrate that it is used. Whether that is a property of the
+> architecture or of the scale is not established here.
+>
+> Full evidence, and the limits on every claim above:
+> **[results/language/results.md](results/language/results.md)**.
 
-### Two tasks, and this page is mostly about the first one
+### Two tasks, and this page is about the second one
 
-The repository now runs the same engine on two tasks, selected by one field:
+The repository runs the same engine on two tasks, selected by one field:
 
 | `task` | data | target | status |
 | :--- | :--- | :--- | :--- |
-| `arithmetic` (default) | synthetic `more6-v1`, 70,000 programs | one regressed scalar, **mean squared error** | complete — the Outcome C above |
-| `language` | WikiText-103, BPE-8192, packed to 256 tokens | next token, **per-token cross-entropy in nats** | protocol frozen; canonical matrix pending |
+| `language` | WikiText-103, BPE-8192, packed to 256 tokens | next token, **per-token cross-entropy in nats** | **canonical matrix complete** (15 runs, 5 seeds x 3 arms) --- **this is the submitted paper** |
+| `arithmetic` (default) | synthetic `more6-v1`, 70,000 programs | one regressed scalar, **mean squared error** | complete --- the predecessor study, retained as history |
 
-**The headline finding above is the arithmetic result and says nothing about
-language.** The two primary metrics are an MSE and a cross-entropy; they may never
-appear in one table ([CLAUDE.md](CLAUDE.md) §6) and the exporter refuses to combine
-them. Whether an Outcome C on a 70,000-program synthetic regression predicts anything
-about a 135 M-token language model is exactly the open question, and the reason the
-language study exists rather than being inferred.
+**The arithmetic phase is finished and is the reason the language study exists.**
+It produced an Outcome C: on that synthetic task MoRE was indistinguishable from
+MoE and significantly worse than MoR, while the halting mechanism was mechanically
+real but beaten in *behaviour* by a policy that ignores its input. Whether that
+result on a 70,000-program synthetic regression predicts anything about a
+135 M-token language model was the open question, and the reason the language
+matrix was run rather than the arithmetic result being generalised. The arithmetic
+code, data and results are kept because they are the provenance of that decision
+and because the 356-check correctness gate measures the arithmetic engine, which
+the language task reuses unchanged.
 
-Absence of a `task` key **means arithmetic**. That is not laziness: it is what keeps
-all 15 published arithmetic `config_hash` values, and therefore every canonical run's
-identity, unchanged by the language work.
+**The two primary metrics are an MSE and a cross-entropy; they may never appear
+in one table** ([CLAUDE.md](CLAUDE.md) 6) and the exporter refuses to combine them.
+Absence of a `task` key **means arithmetic**: that is what keeps all 15 published
+arithmetic `config_hash` values, and therefore every canonical run's identity,
+unchanged by the language work.
+
 
 The language quickstart is §6; the corpus is §3b. If you are here to *run* the
 language matrix, read [SETUP.md](SETUP.md) then `HANDOFF.md` instead —

@@ -299,8 +299,19 @@ def evaluate(run_dir: Path, device: torch.device,
 
             # engine.py:1072 -- the authoritative token set, used for BOTH the
             # scalar accuracy and the confusion matrix so guard 4 is meaningful.
+            # E == 1 means the arm has NO ROUTER (MoR: one shared block, no set
+            # of experts to route between), so routing accuracy and the confusion
+            # diagonal are structurally N/A, never zero. CLAUDE.md 4 already
+            # requires exactly this for load entropy at E = 1.
+            #
+            # The confusion matrix is sized by num_experts, but the ORACLE label
+            # is the 6-class family / POS partition in BOTH tasks. Indexing a
+            # 1x1 matrix with oracle classes 1..5 raises IndexError, which is
+            # what an E = 1 arm hits -- the script crashed on every MoR run in
+            # both tasks, and had done so since the language port. Guarding on
+            # E > 1 both removes the crash and produces the correct answer.
             valid = flat_mask & (flat_oracle >= 0) & (flat_route >= 0)
-            if valid.any():
+            if E > 1 and valid.any():
                 o = flat_oracle[valid].long().cpu()
                 r = flat_route[valid].long().cpu()
                 route_hit += float((o == r).sum())

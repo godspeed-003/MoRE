@@ -106,7 +106,31 @@ archive/
 # which lives in the INVALIDATED.md notices, not in the weights. The files
 # remain on disk.
 *.pt
-!runs/langB_*/checkpoint.pt
+#
+# The 15 ADMITTED canonical language checkpoints are the exception, and they
+# are listed ONE BY ONE rather than by glob. A glob (`!runs/langB_*/`) was
+# tried first and it was wrong: it matched every exploratory and interrupted
+# langB_* run, not just the admitted cells, and pulled 49 extra checkpoints
+# totalling 1,045 MB of weights into the repository -- none of them citable,
+# several of them from runs that never finished. The admitted set is exactly
+# the 15 cells in results/language/results.json, and naming them explicitly
+# makes a new run's checkpoint stay ignored until someone decides it is
+# canonical.
+!runs/langB_MoE_seed42__51000018/checkpoint.pt
+!runs/langB_MoE_seed43__7d85fe81/checkpoint.pt
+!runs/langB_MoE_seed44__c348b39a/checkpoint.pt
+!runs/langB_MoE_seed45__64800f08/checkpoint.pt
+!runs/langB_MoE_seed46__3d9d12a9/checkpoint.pt
+!runs/langB_MoRE_seed42__9cfd3f1c/checkpoint.pt
+!runs/langB_MoRE_seed43__dbe38cbd/checkpoint.pt
+!runs/langB_MoRE_seed44__16027752/checkpoint.pt
+!runs/langB_MoRE_seed45__f6c47448/checkpoint.pt
+!runs/langB_MoRE_seed46__d069325c/checkpoint.pt
+!runs/langB_MoR_seed42__c93f0fe8__r2/checkpoint.pt
+!runs/langB_MoR_seed43__8b54a65f/checkpoint.pt
+!runs/langB_MoR_seed44__c11db02d/checkpoint.pt
+!runs/langB_MoR_seed45__4041a890/checkpoint.pt
+!runs/langB_MoR_seed46__fb91cdff/checkpoint.pt
 
 # --- Global output filenames that Phase 0 abolished -------------------------
 # Listed so a stray legacy write is never committed by accident.
