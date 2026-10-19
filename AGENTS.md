@@ -256,7 +256,7 @@ interpretation everywhere.
   Do **not** create parallel `run_moe.py` / `run_mor.py` implementations.
 - Exploratory sweep drivers live in `automated/` and must never launch canonical
   runs. `archive/` holds invalidated history; re-stamp it with
-  `python archive/mark_invalidated.py`.
+  `python code/mark_invalidated.py`.
 
 ---
 

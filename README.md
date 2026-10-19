@@ -434,15 +434,19 @@ and spending it would change every canonical run's identity.
 | `results/language/` | the same artifacts for the language task, written only by `export_results.py --task language` |
 | `runs/<experiment_id>/` | per-run outputs only — config, resolved config, metrics, TSV, held-out depth sidecar; checkpoints and stdout are untracked |
 | `automated/` | exploratory sweep drivers and ablation results; these may never launch canonical runs |
-| `archive/` | invalidated history, retained as evidence and never deleted |
+| `archive/` | invalidated history. **Not tracked in git** — it is declared void by `AGENTS.md`, it carries author identity in its raw W&B payloads, and it is ~232 MB of superseded checkpoints. Retained on disk as evidence; `code/mark_invalidated.py` stamps it. |
 
 There is deliberately no `moe/` or `mor/` folder: one training system with an explicit
 `--architecture {moe,mor,more}` mode, per [plan.md](plan.md) §9.
 
-Checkpoints are deliberately not in version control (`.gitignore`): the citable record
+Checkpoints are generally not in version control (`.gitignore`): the citable record
 of a run is its provenance and metric files, and a checkpoint is regenerable from its
-own recorded config. The two under `archive/pre_finalization/` are the exception, kept
-as evidence of the pre-audit state.
+own recorded config. **The exception is the canonical language matrix** — the 15
+`runs/langB_*/checkpoint.pt` files (5 seeds × MoE/MoR/MoRE) are force-added, because
+every checkpoint-based evaluation (held-out test split, OOD, BLiMP, EWoK,
+difficulty-stratified loss, the dynamic and subspace probes) depends on those weights
+and re-training them costs GPU-hours. Those 15 are what a reviewer can re-evaluate
+from a clean clone without training anything.
 
 ---
 

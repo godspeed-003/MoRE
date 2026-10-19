@@ -12,7 +12,6 @@ venv/
 # nothing scientific is lost by not tracking these.
 wandb/
 code/wandb/
-!archive/**/wandb_runs_*/
 
 # --- Per-run output directories (plan.md 2.2) -------------------------------
 # runs/<experiment_id>/ IS the canonical record, so the small provenance and
@@ -58,22 +57,56 @@ runs/_*.log
 # Anything worth keeping belongs in runs/<experiment_id>/stdout.log.
 /*.log
 
-# --- Model checkpoints outside the archive ----------------------------------
-# The two checkpoints under archive/pre_finalization/ are tracked as evidence of
-# the pre-audit state and are unaffected by this rule.
+# --- Invalidated history: NOT tracked ---------------------------------------
+# `archive/` holds every artifact the project has declared INVALIDATED: the
+# pre-finalization sweep, undeclared-group runs, crashed runs, 1-epoch smoke
+# runs and the superseded dataset snapshots. AGENTS.md and CLAUDE.md say so
+# explicitly, and the exporter refuses them on provenance grounds, so nothing
+# citable lives here.
 #
-# T11.5: the exception is scoped to `pre_finalization` deliberately. It used to
-# read `!archive/**/*.pt`, which was correct when those two files were the only
-# archived checkpoints -- but `archive/t9_1_undeclared_group_runs/` and
-# `archive/t10_smoke_1epoch/` later added 11 more, ~155 MB, and the blanket
-# exception would have committed all of them. Those runs are INVALIDATED; the
-# evidence a future reader needs is their `config.json`,
-# `resolved_config.json`, `metrics.json`, `results.tsv` and
-# `INVALIDATED.md` -- all still tracked. A checkpoint of an invalidated run is
-# not citable and is regenerable from its own recorded config, so it is weight,
-# not evidence. The files remain on disk; only tracking is declined.
+# It is untracked for three reasons, in order of weight:
+#
+#   1. IDENTITY. The raw W&B run payloads under
+#      archive/pre_finalization/wandb_runs_*/ carry two author email
+#      addresses, two W&B entity names that embed an institution, a machine
+#      hostname and the GitHub account that owns this repository -- 168 tracked
+#      files in all. An anonymized review copy must contain none of it, and
+#      scrubbing that many machine-written payloads is far more error-prone
+#      than not shipping them. Dropping the tree removes the largest identity
+#      surface in the repository in a single move.
+#   2. SIZE. ~232 MB, of which ~215 MB is checkpoints and the two superseded
+#      dataset snapshots. None of it is needed to reproduce any result.
+#   3. SIGNAL. 4,016 files of voided history beside the live tree is noise, and
+#      a reviewer asking "how do I reproduce this" should not have to navigate
+#      it.
+#
+# This is NOT a deletion. The directory and every file in it remain on disk
+# (CLAUDE.md 6, "archive, never delete, evidence"), and the retained tree is
+# still the authoritative record of what was invalidated and why -- see the
+# INVALIDATED.md notices it carries and the `code/mark_invalidated.py` tool
+# that stamps them. Only TRACKING is declined, exactly as for invalidated
+# checkpoints below.
+#
+# The stamping tool used to live at archive/mark_invalidated.py and is now at
+# code/mark_invalidated.py, because a tool a fresh clone needs must not live
+# inside an untracked tree. It still targets archive/ by default and still
+# refuses to run when that directory is absent.
+archive/
+
+# --- Model checkpoints outside runs/ ----------------------------------------
+# Checkpoints are excluded everywhere except the canonical language matrix,
+# which force-adds them (see the runs/ rules above) because they are the
+# evidence every checkpoint-based evaluation depends on.
+#
+# T11.5: the exception that once allowed `!archive/pre_finalization/**/*.pt`
+# is GONE. Those checkpoints were tracked as evidence of the pre-audit state,
+# but they are not tracked now, for the identity reason above -- that payload
+# carries author email addresses, W&B entity names and a machine hostname. The
+# evidence a reader needs from that tree is that it was invalidated and why,
+# which lives in the INVALIDATED.md notices, not in the weights. The files
+# remain on disk.
 *.pt
-!archive/pre_finalization/**/*.pt
+!runs/langB_*/checkpoint.pt
 
 # --- Global output filenames that Phase 0 abolished -------------------------
 # Listed so a stray legacy write is never committed by accident.
