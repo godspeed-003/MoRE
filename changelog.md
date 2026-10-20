@@ -9802,3 +9802,82 @@ append the file; never pass a multi-line string through `python -c` under
 PowerShell. Also: a command that mixes an append and a commit will commit
 without the append if the append fails silently -- run them separately.
 
+## T-OD.1 - repository cleanup on main: old results, sweep drivers, non-canonical runs
+
+**Date.** 2026-10-21. **Machine.** Vedant's RTX 3050 6 GB.
+
+### The decision
+
+User request: with the TMLR submission now on `main`, remove what the opdiff
+redo will not use. Removed — all recoverable from `f75c4f7`:
+
+- **190 of 205 `runs/` directories** (3 MB): every arithmetic-phase run, the
+  56 `langB` retrain/variant dirs, timing runs. KEPT the 15 admitted
+  `canonical_lang_b` cells (320 MB) — they are the paper's evidence, listed
+  one by one in `.gitignore`, each verified to carry `checkpoint.pt` +
+  `metrics.json` + `resolved_config.json` before anything was deleted.
+- **`automated/`** — arithmetic-era sweep/ablation drivers.
+- **Arithmetic result tables**: `results/results.{csv,json,md}`,
+  `results_aggregate.csv`, `results_tables.md`, `bench_capacity.log`,
+  `depth_null_model.json`. `results/language/*` and `results/flops_language.json`
+  (the paper's numbers) were never touched.
+- README's repo-layout table and the two dead links it implied
+  (`results/results.md`, `automated/act_decision.py` in ARCHITECTURE.md) now
+  say "removed 2026-10, git history" instead of 404-ing.
+
+### What the gate refused to let go — three dependencies a grep for "old" misses
+
+Deleting run dirs and data files broke the correctness suite twice. Both
+failures were REAL; both were fixed by restoring the dependency, never by
+touching the gate (`plan.md` §20):
+
+1. **`data/dummy-train.jsonl`** — `test_phase6_provenance.py` launches a real
+   1-epoch smoke run through the CLI, which loads `../data/dummy-train.jsonl`.
+   Absent ⇒ smoke exits non-zero ⇒ 6 provenance checks fail, surfacing as an
+  unrelated-looking "missing field" message. All six `data/*.jsonl` restored.
+2. **`runs/phase4_*`** (3 dirs × 4 files) — `test_phase4_balance.py:555` reads
+   a real MoRE run artifact for G3.1 (`train/balance_to_task_ratio < 1.0`), and
+   G3.2–G3.4 live in its `else` branch: with the artifact gone the suite
+   **reported 353 checks instead of 356** without a single skip line. If a
+   future cleanup run ever shows TOTAL ≠ 356, suspect a missing run artifact
+   before suspecting the gate.
+3. **`plan.md` + `results_exp.md`** were over-deleted by me as stale
+   arithmetic-era docs — but `AGENTS.md` names plan.md authoritative (§
+   authority table) and results_exp.md a keep-file (§10). Both restored. The
+   keep-set for a cleanup is defined by AGENTS.md, not by grepping for the
+   word "arithmetic".
+
+`archive/` needed no action: already untracked-and-absent on disk at `f75c4f7`.
+
+### Verify
+
+`python code/run_correctness_suite.py` after the restores: TOTAL **356/356**,
+all five gates PASS (19/31/27/129/150), 2026-10-21. The two intermediate
+failing runs (352 with the missing jsonl; 353+G3.1 with the missing phase4
+artifact) are reported above rather than hidden behind the green one.
+
+## T-OD.2 - opdiff_v2 dataset: generator committed, data generated
+
+**Date.** 2026-10-21. **Machine.** Vedant's RTX 3050 6 GB.
+
+### The decision
+
+`make_opdiff_dataset_v2.py` (repo root) is committed; it writes `opdiff_v2/`
+(full) and `opdiff_v2_smoke/` (512/128 rows per group), both gitignored in the
+same commit. Contract (docstring + `save`/`meta` at lines 163–195): rows are
+16 packed examples × 19 tokens = **304** uint8 tokens; loss mask
+`t % 19 >= 10` with targets `x[:,1:]`, i.e. the dataset supplies `mask[1:]`;
+the expert group lives in `{split}_group.npy` and **never** in an input
+feature; OOD split = F3/F6/F12; `diff` is a nominal placeholder to be
+overwritten after dense-baseline calibration.
+
+**Vocab is 43** (18 fixed tokens + 25 op tokens), not the 40 quoted in the
+pre-session plan sketch — `config_opdiff.json` must take `vocab_size` from
+`meta.json`, not from the sketch.
+
+### Verify
+
+Full generation: train 364,000 / val 7,000 / test 7,000 / ood 3,000 rows,
+110,656,000 train tokens, vocab 43, 113 MB, ~13 s. Smoke subset: 3,584 /
+896 / 896 / 384 rows, 1.7 MB. Both directories absent from `git status`.
+

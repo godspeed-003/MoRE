@@ -119,7 +119,7 @@ of architectural quality.
 curriculum and hand-assigned expert families; one scalar regression objective, one
 split, and a single shared hyperparameter setting that was **not** swept per
 architecture. These bound the *conclusion*; they are not offered as reasons MoRE
-deserved better. [results/results.md](results/results.md) §19 states what would change
+deserved better. results/results.md (removed 2026-10, git history) §19 states what would change
 the verdict.
 
 ---
@@ -444,14 +444,13 @@ and spending it would change every canonical run's identity.
 | `code/more/` | the implementation (`config`, `families`, `data`, `model`, `metrics`, `engine`, `run_context`) |
 | `code/canonical_spec.json` | the single frozen definition of "canonical"; the guard refuses any run that deviates |
 | `code/canonical_spec_language.json` | the same guard for `task = language` — separate file, separate group `canonical_lang_b` |
-| `data/` | `more6-v1` as three frozen files plus `dataset_meta.json` (split hashes, counts, leakage audit) and the generator |
+| `data/` | the arithmetic dataset the engine's default config points at (`train`/`val`/`test.jsonl`, used by the correctness suite's smoke runs) plus the `dummy-*.jsonl` fixtures and `dataset_meta.json` |
 | `data/lang/<corpus>/` | the language corpora as frozen `.npy` arrays plus their own `dataset_meta.json`; `wikitext-103` is canonical, `wikitext-2` is dev-only |
-| [SETUP.md](SETUP.md) / `HANDOFF.md` | clone-to-first-run setup, and the operating instructions for whoever drives the language matrix |
-| `results/` | `results.md` (the narrative) plus machine-generated `results.csv` / `.json` / `results_tables.md`, `depth_null_model.json`, `bench_capacity.log` |
+| [SETUP.md](SETUP.md) | clone-to-first-run setup for a MoRE **language** run |
+| `results/flops_language.json` | the FLOPs accounting read by the paper's efficiency table |
 | `results/language/` | the same artifacts for the language task, written only by `export_results.py --task language` |
 | `runs/<experiment_id>/` | per-run outputs only — config, resolved config, metrics, TSV, held-out depth sidecar; checkpoints and stdout are untracked |
-| `automated/` | exploratory sweep drivers and ablation results; these may never launch canonical runs |
-| `archive/` | invalidated history. **Not tracked in git** — it is declared void by `AGENTS.md`, it carries author identity in its raw W&B payloads, and it is ~232 MB of superseded checkpoints. Retained on disk as evidence; `code/mark_invalidated.py` stamps it. |
+| `make_opdiff_dataset_v2.py` | generator for the opdiff_v2 arithmetic dataset (7 pure expert groups, 304-token rows); writes `opdiff_v2/` + `opdiff_v2_smoke/`, both gitignored |
 
 There is deliberately no `moe/` or `mor/` folder: one training system with an explicit
 `--architecture {moe,mor,more}` mode, per [plan.md](plan.md) §9.

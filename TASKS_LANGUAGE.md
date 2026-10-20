@@ -3837,3 +3837,34 @@ arithmetic), `paper/common/06_limitations.tex` (the scoping paragraph),
 `runs/t10i_mor_ffn_mult_4_proxy_seed42__f2e3e60d` (the arithmetic template),
 `code/canonical_spec_language.json` (`architecture_variants.mor.ffn_mult = 24`),
 `results/language/results.json` (the admitted cells the companion must match).
+
+## T-LA.28 - remove §7.4 "What was declared and not run" (user request)
+
+**Date.** 2026-10-21. **Machine.** Vedant's RTX 3050 6 GB. **Status.** DONE,
+both venues reassembled, pushed.
+
+The subsection and its `\label{sec:declared}` are deleted from
+`paper/common/06_limitations.tex`; the three unrun exploratory controls it
+listed (fixed-depth sweep from scratch, shuffled-depth control,
+depth–input mutual information) went with it — they remain recorded in
+`results/language/results.md` ("What this study does NOT establish") and in
+this file, so nothing measured is lost. ONE sentence survives: the unrun
+depth-matched control still consumes its **Holm slot**, relocated into
+"Statistical resolution", because the body states a Holm family size and an
+unexplained empty slot would read as an inconsistency rather than honesty;
+`Appendix~\ref{app:stats}` already carries the full rule. The single forward
+reference in `04_results.tex` was reworded to drop the dead label.
+
+### Verify
+
+- `python -I paper/assemble_submissions.py`: tmlr_submission OK; inputs,
+  figures, citations, refs resolve.
+- Tectonic build: no errors, no undefined refs, no overfull boxes. Body
+  **11.58** pages (limit 12), 20 total. PDF text: heading absent, old
+  forward-ref phrasing absent, relocated sentence present.
+
+Known pre-existing and NOT from this change: `acl_submission` reports undefined
+`\ref{app:disclosures}` — the disclosures appendix is TMLR-only while ACL keeps
+the citing prose; proven on an unmodified tree, and `assemble_submissions.py`
+forbids the fix by moving the block back. Full record: `changelog.md` T-LA.28;
+commits `2a31b36` + `f75c4f7` (now on `main`).

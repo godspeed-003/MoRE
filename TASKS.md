@@ -1858,6 +1858,110 @@ the headline table. Aggregate: `automated/phase10_ablations_result.json`.
 
 ---
 
+## Op-difficulty redo — `opdiff_v2` (user-approved plan of 2026-10-21)
+
+New experimental phase, user-directed: redo the arithmetic experiment on `main`
+with the op-difficulty dataset, tested code first, then a 15-run matrix handed to
+the co-author's agent. Not part of `plan.md` §0–11. Companion paper task:
+`TASKS_LANGUAGE.md` T-LA.28 (§7.4 removal).
+
+- [x] **T-OD.0 Fast-forward `main` to the english tip.** The whole submission
+  branch (paper + language code) becomes the base the redo builds on, so there
+  is one tree instead of two.
+  **Verify:** merge-base of `main` and `f75c4f7` is an exact ancestor; after ff,
+  `git rev-parse main origin/main` are equal and the tree is clean.
+  **Evidence:** `main` = `origin/main` = `f75c4f7`, pushed 2026-10-21. Checkout
+  conflict was the differing untracked `AGENTS.md` (moved aside to `%TEMP%\
+  MoRE_AGENTS.md.on-disk-variant`; the main-tracked copy stays) and an empty
+  `english/` dir (removed).
+
+- [x] **T-OD.1 Repository cleanup — old results, `archive/`, `automated/`.**
+  User request: remove what the redo will not use. Removed 190 of 205 `runs/`
+  dirs (arithmetic runs + `langB` retrains/variants, 3 MB), all of
+  `automated/`, the arithmetic result tables (`results/results.*`,
+  `results_aggregate.csv`, `results_tables.md`, `bench_capacity.log`,
+  `depth_null_model.json`), and the old arithmetic dataset… no: the six
+  `data/*.jsonl` files were RESTORED once the gate proved they are live (see
+  Evidence). README's layout table and two dead links now describe what exists.
+  **Verify:** `python code/run_correctness_suite.py` → TOTAL **356/356**, all
+  gates PASS, after the cleanup.
+  **Evidence:** 2026-10-21 green run = 19/31/27/129/150. Two real failures were
+  reported and fixed by restoring dependencies, never by touching the gate:
+  (1) `data/dummy-train.jsonl` — `test_phase6_provenance.py` launches a real
+  smoke run that loads it (6 provenance fails without it); (2)
+  `runs/phase4_*` ×3 — `test_phase4_balance.py:555` needs a real MoRE
+  `balance_to_task_ratio` artifact for G3.1, and G3.2–G3.4 sit in its `else`
+  branch, so the suite silently reported 353 checks instead of 356. Also
+  restored `plan.md` + `results_exp.md`, over-deleted as stale: `AGENTS.md`
+  names plan.md authoritative (authority table) and results_exp.md a keep-file
+  (§10). Kept throughout: the 15 admitted `langB_*` cells (320 MB, verified
+  checkpoint.pt + metrics.json + resolved_config.json), `results/language/*`,
+  `results/flops_language.json`, `data/lang/`, `data/ewok/`.
+
+- [x] **T-OD.2 Generate the `opdiff_v2` dataset + smoke subset.**
+  `python make_opdiff_dataset_v2.py --out opdiff_v2` and `--out
+  opdiff_v2_smoke --train_rows_per_group 512 --eval_rows_per_group 128`.
+  Contract: 16×19 = 304-token uint8 rows; loss where `t % 19 >= 10`, targets
+  `x[:,1:]` so the dataset supplies `mask[1:]`; expert group in
+  `{split}_group.npy` only — never an input feature; OOD = F3/F6/F12; `diff`
+  nominal until dense-baseline calibration.
+  **Verify:** `meta.json` rows/tokens/vocab match the spec; both dirs absent
+  from `git status` (gitignored); generator tracked.
+  **Evidence:** train 364,000 / val 7,000 / test 7,000 / ood 3,000 rows;
+  110,656,000 train tokens; **vocab 43** (18 fixed + 25 ops — NOT the 40 in the
+  pre-session sketch; `config_opdiff.json` must take 43 from `meta.json`);
+  113 MB + 1.7 MB smoke, ~13 s generation. `.gitignore` gained
+  `opdiff_v2/` + `opdiff_v2_smoke/`.
+
+- [~] **T-OD.3 Port the language pipeline to a third explicit `opdiff` task.**
+  New `code/more/opdiff_data.py` (7-tuple, position-derived loss mask, group
+  labels for diagnostics only), `code/more/opdiff_families.py` (7-group
+  manifest — frozen `families.py` must NOT be edited), `code/config_opdiff.json`
+  (num_experts 7 from the opdiff manifest, vocab 43, seq_len 304),
+  `TASK_OPDIFF` wired through `model.py` / `config.py` / `cli.py` / `engine.py`
+  / `run_context.py` (masked CE at engine.py:718 and the val loop; the ~20
+  `_task == TASK_LANGUAGE` sites that mean "LM-style" join one shared branch),
+  `code/run_opdiff_matrix.py` (preflight, skip-completed,
+  stop-at-first-failure, exploratory stamping), `code/test_opdiff_*.py`.
+  **Do NOT overload `arithmetic`** — that moves arithmetic behavior under the
+  356-check gate — and no arithmetic/language resolved config may change a byte.
+  **Verify:** new `test_opdiff_*` green AND suite still 356/356 AND
+  `test_language_task_axis.py` green (it iterates `TASKS`, so a third task must
+  satisfy its pair loop) AND an arithmetic + a language config re-resolve to
+  their pre-port `config_hash`.
+  **Evidence:** — recon done: `apply_architecture` stamps `num_experts` from the
+  arithmetic manifest (config.py:857/874), so opdiff's E=7 needs a task-aware
+  repair in `apply_task`; run-name/family-cls/persistence/spec maps in
+  config.py:425/453/538 and run_context.py:93 all key on task; engine has 20
+  language-conditional sites. Code not yet written.
+
+- [ ] **T-OD.4 Smoke-test all three architectures on `opdiff_v2_smoke`** with
+  the SAME code files the full runs will use: loss falls; routing metrics sane
+  at E=7 (confusion ↔ routing accuracy agreement, Hungarian, AMI, H/log(E));
+  per-run dir layout; runs stamped exploratory (no canonical claim); suite
+  356/356 + `test_opdiff_*` green after the port.
+  **Verify:** one smoke run per architecture (moe/mor/more) on the 3050, every
+  check above observed in its `metrics.json` / run dir.
+
+- [ ] **T-OD.5 Measure tokens/s → epochs × seeds budget → USER APPROVAL.**
+  Approval gate: no full-matrix launch on the co-author's card until the
+  wall-clock × 15 (+ pilot) budget has been presented and approved in chat.
+  **Verify:** measured tokens/s per architecture from the smoke runs; budget
+  presented; explicit user approval recorded.
+
+- [ ] **T-OD.6 Write `HANDOFF.md` on `main` for the co-author's coding agent —
+  autonomous execution, no co-author checkups.** It must carry: which machine
+  and interpreter (`ENVIRONMENT.md`), dataset presence-check + regeneration
+  command, exact preflight, pilot (3 archs × seed42) with its acceptance
+  checks, then the remaining 10 runs, aggregation + what to report back, the
+  stop-at-first-failure protocol with verbatim output, and the never-change
+  list (frozen specs, seeds, config identity). Every command in it must have
+  been executed at least once on the smoke path before it is written.
+  **Verify:** handoff exists on `main`; each command in it has run once here;
+  T-OD.5 approval precedes any launch it instructs.
+
+---
+
 ## Standing constraints (apply to every task above)
 
 - Primary metric is **validation task loss**, never `total_loss`.

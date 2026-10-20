@@ -600,7 +600,7 @@ MoE (`max_depth = 1` makes targets of 2–4 unreachable, so the term is a perman
 irreducible loss with an unsatisfiable gradient).
 
 **The decision: canonical halting is `pure_act`.** Settled by a controlled
-experiment, [automated/act_decision.py](automated/act_decision.py), whose decision
+experiment, `automated/act_decision.py` (removed 2026-10, git history), whose decision
 rule is written into the top of the driver *before* the runs. Matched protocol —
 `architecture=more`, 20 epochs, `blocks=1`, `batch_size=768`, seeds 42/43/44,
 identical lr / d_model / weight decay / balance weights; the **only** difference is
