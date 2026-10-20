@@ -1929,9 +1929,12 @@ the co-author's agent. Not part of `plan.md` §0–11. Companion paper task:
   `test_language_task_axis.py` green (it iterates `TASKS`, so a third task must
   satisfy its pair loop) AND an arithmetic + a language config re-resolve to
   their pre-port `config_hash`.
-  **Evidence:** 2026-10-21 green. `code/test_opdiff_task_axis.py` **54 passed,
+  **Evidence:** 2026-10-21 green. `code/test_opdiff_task_axis.py` **56 passed,
   0 failed, 0 skipped** (new file; the gate's file lists are fixed, so the 356
-  did not move). `code/run_correctness_suite.py` → TOTAL **356/356**, gates
+  did not move). The suite proves the loss assembly by construction — logits
+  that are perfect at the scored positions and wrong elsewhere give a masked
+  loss of exactly 0.00e+00 over 144 scored positions, and the UNMASKED version
+  of the same quantity is 20.99, so a wrong mask or a wrong shift cannot pass. `code/run_correctness_suite.py` → TOTAL **356/356**, gates
   19/31/27/129/150. `code/test_language_task_axis.py` → 79 passed, 0 failed
   (1 skip; the `phaseB_*` hash check cannot be EVALUATED after the T-OD.1
   cleanup deleted those run dirs, so it now skips with the reason and a new

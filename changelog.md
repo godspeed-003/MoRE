@@ -9984,6 +9984,19 @@ pass in `engine.py` plus its own metric keys), and it is NOT done here rather
 than half-done. Recorded so that nobody reads "the OOD split exists" as "the
 OOD split was measured".
 
+### The loss assembly, proved by construction
+
+The masked cross-entropy is the one place where a plausible-looking error
+changes the number without changing any shape: scoring the OPERAND positions
+instead of the answer positions still produces a finite loss, still falls
+during training, and still looks like a language model being trained. So the
+suite builds logits that are **perfect at the scored positions and wrong
+everywhere else**, and asserts that the loss is ~0 (measured: exactly 0.00e+00
+over 144 scored positions — 16 examples × 9 answer+EOS positions, shifted by
+one) while the **unmasked** version of the same quantity is large (20.99).
+If the mask or the shift were wrong, the wrong positions would enter the
+average and the second number would collapse toward the first.
+
 ### Two pre-existing defects found on the way, also fixed
 
 - **`test_language_task_axis.py:TL1.0g` could not be EVALUATED** after the
@@ -10022,10 +10035,11 @@ OOD split was measured".
 
 ### Verify
 
-- `python code/test_opdiff_task_axis.py` → **54 passed, 0 failed, 0 skipped**,
+- `python code/test_opdiff_task_axis.py` → **56 passed, 0 failed, 0 skipped**,
   including the manifest-versus-generator cross-check, the 7-tuple semantics,
   the two refusals, the square confusion, the empty-curriculum guards, the
-  0.117 % parameter budget, and the pre/post config-hash comparison.
+  0.117 % parameter budget, the pre/post config-hash comparison, and the
+  loss-assembly proof below.
 - `python code/run_correctness_suite.py` → TOTAL **356/356**, all five gates
   PASS (19/31/27/129/150). The arithmetic total did not move, because the new
   suite is a separate file and the gate's file lists are fixed.

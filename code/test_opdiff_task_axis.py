@@ -101,6 +101,13 @@ def raises(fn, exc=ValueError, needle=""):
     return False, "did not raise"
 
 
+def _dataset_root_for_test():
+    """The CONFIGURED opdiff dataset root, resolved. Raises if it is absent."""
+    from more.config import load_config
+    _root = load_config(os.path.join(CODE, "config_opdiff.json"))["data"]["opdiff_root"]
+    return resolve_opdiff_root(_root)
+
+
 # ===========================================================================
 print("\n--- T-OD.3.1  the manifest agrees with the GENERATOR")
 # ===========================================================================
@@ -538,6 +545,62 @@ _hl_ar = halting_supervision_loss(_ed, torch.tensor([0, 5, 15, 15]), _m,
 check("OD.5h the ARITHMETIC path is unchanged: a non-empty table still "
       "supervises",
       float(_hl_ar) > 0.0, f"value={float(_hl_ar):.4f}")
+
+# THE LOSS ASSEMBLY, PROVED BY CONSTRUCTION. The masked cross-entropy is the
+# one place where a plausible-looking error changes the number without
+# changing any shape: scoring the OPERAND positions instead of the answer
+# positions still produces a finite loss, still falls during training, and
+# still looks like a language model being trained.
+#
+# The test builds logits that are PERFECT at the scored positions and wrong
+# everywhere else, and asserts that the loss is ~0. If the mask or the shift
+# were wrong, the wrong positions would enter the average and the loss would
+# be large -- so this discriminates the right wiring from every nearby wrong
+# wiring.
+_mask_np = None
+try:
+    _ds2 = MoREOpdiffDataset("val", root=_dataset_root_for_test())
+    _mask_np = np.asarray(_ds2.loss_mask, dtype=bool)
+except Exception as _e:                                  # noqa: BLE001
+    skip("OD.5i the opdiff loss is scored on the answer positions only",
+         f"the opdiff dataset is not available here: {_e}")
+
+if _mask_np is not None:
+    _B, _S, _V = 2, int(_mask_np.shape[0]), 43
+    _m1 = _mask_np[1:]                                   # the shift the engine uses
+    _fake_targets = np.zeros((_B, _S), dtype=np.int64)
+    _fake_logits = np.full((_B, _S, _V), -20.0, dtype=np.float32)
+    for _b in range(_B):
+        for _t in range(1, _S):
+            _fake_targets[_b, _t] = (_t * 7 + _b) % _V
+            if _m1[_t - 1]:
+                # this target position IS scored -> predict it correctly
+                _fake_logits[_b, _t - 1, _fake_targets[_b, _t]] = 20.0
+            else:
+                # not scored -> predict it WRONG, so that an unmasked loss
+                # would show it
+                _fake_logits[_b, _t - 1, (_fake_targets[_b, _t] + 1) % _V] = 20.0
+    _loss = torch.nn.functional.cross_entropy(
+        torch.from_numpy(_fake_logits)[:, :-1, :][:, torch.from_numpy(_m1), :].reshape(-1, _V),
+        torch.from_numpy(_fake_targets)[:, 1:][:, torch.from_numpy(_m1)].reshape(-1),
+    )
+    check("OD.5i the opdiff loss is scored on the ANSWER positions only -- a "
+          "perfect prediction at those positions gives ~0",
+          float(_loss) < 1e-3 and int(_m1.sum()) == 144,
+          f"loss={float(_loss):.2e} over {int(_m1.sum())} scored positions "
+          f"(16 examples x 9 answer+EOS positions, shifted by one)")
+
+    # The same logits, scored on EVERY position, must be large: that is the
+    # number the mask exists to avoid, and it is what an unmasked (or
+    # wrongly-masked) loss would report.
+    _loss_all = torch.nn.functional.cross_entropy(
+        torch.from_numpy(_fake_logits)[:, :-1, :].reshape(-1, _V),
+        torch.from_numpy(_fake_targets)[:, 1:].reshape(-1),
+    )
+    check("OD.5j ... and the UNMASKED version of the same quantity is large, so "
+          "the mask is doing the work",
+          float(_loss_all) > 1.0,
+          f"unmasked loss={float(_loss_all):.2f} vs masked {float(_loss):.2e}")
 
 
 # ===========================================================================
