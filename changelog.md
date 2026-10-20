@@ -9728,3 +9728,77 @@ confirm what the data already says.
 - Counted body **11.64 pages** against the limit of 12, References on page 12, build
   clean (no errors, no undefined references, no overfull boxes), total PDF 20
   pages.
+
+## T-LA.28 - remove the "What was declared and not run" subsection (user request)
+
+**Date.** 2026-10-21. **Machine.** Vedant's RTX 3050 6 GB.
+
+### The decision
+
+The user judged subsection 7.4 ("What was declared and not run") unnecessary and
+had it removed. Three edits, all in `paper/common/`, both venues reassembled:
+
+- `06_limitations.tex`: the subsection and its `\label{sec:declared}` are
+  deleted. What it carried that CANNOT be dropped is the disclosure that the
+  pre-registered-but-unrun depth-matched control **still consumes its Holm
+  slot** -- without that sentence the body states a Holm family size with no
+  explanation of the empty slot, which reads as an unexplained inconsistency
+  rather than as honesty. ONE sentence of it moves into 'Statistical
+  resolution', pointing at `Appendix~\ref{app:stats}`, which already states the
+  rule in full ("A declared comparison that could not be run still consumes its
+  slot: dropping a failed arm must never make the survivors easier to call
+  significant").
+- `06_limitations.tex`: the three unrun exploratory controls (fixed-depth sweep
+  trained from scratch, shuffled-depth control, depth--input mutual information)
+  go with the subsection. They are recorded in `results/language/results.md`
+  ("What this study does NOT establish") and in `TASKS_LANGUAGE.md`, so nothing
+  that was measured is lost -- only a body-listing of things we did not do.
+- `04_results.tex`: the one forward reference to the deleted label is reworded
+  ("that control is unrun (`\S\ref{sec:declared}`)" -> "that control is
+  unrun"). No other `\ref{sec:declared}` exists in `paper/common/`.
+
+### Verify
+
+- `python -I paper/assemble_submissions.py`: tmlr_submission OK, all inputs,
+  figures, citations and refs resolve.
+- Tectonic build: no errors, no undefined references, no overfull boxes.
+  Counted body **11.58** pages (limit 12), references on page 12, 20 total.
+- PDF text check: the subsection heading is absent, the old forward-ref phrasing
+  is absent, the relocated one-sentence disclosure IS present in Statistical
+  resolution, and the appendix's full Holm statement is still there.
+
+### Trap worth recording: a PRE-EXISTING ACL warning, not caused by this change
+
+`assemble_submissions.py` reports `acl_submission: undefined \ref:
+app:disclosures`. **It is not from this edit.** Proven by `git stash` /
+re-assemble / `git stash pop`: the unmodified tree reports the identical
+warning. Cause: `disclosures` is in `TMLR_ONLY_APPENDIX`, so ACL keeps the prose
+in its BODY and does not create the appendix section, while the body paragraph
+still ends with `Appendix~\ref{app:disclosures}`. ACL's own PDF builds; the
+reference resolves to nothing because for ACL that appendix does not exist. It
+is an ACL-venue defect to fix before any ACL submission, and it is flagged here
+so the next person does not "fix" it by deleting the TMLR block move (which the
+assembler comment at `assemble_submissions.py:134-139` explicitly forbids --
+ACL follows its own format).
+
+### Trap: git stash + an assembler that rewrites tracked files
+
+`paper/*_submission/sections/*.tex` are TRACKED generated files. A `git stash`
+followed by re-running the assembler rewrites them from the stashed (common/)
+state, so `git stash pop` then aborts with "local changes would be overwritten
+by merge". Recovery: `git checkout -- paper/acl_submission/sections
+paper/tmlr_submission/sections` to discard the assembler's output, then pop.
+The stash entry is KEPT on abort, so nothing is lost -- but do not delete it
+before popping.
+
+### Trap: PowerShell mangles a Python triple-quoted string passed via -c
+
+This entry was first attempted as `python -c "entry = ''' ... '''"` and
+PowerShell split it across lines, so Python raised `SyntaxError: unterminated
+triple-quoted string literal` and the entry was never written -- while the
+`git commit`/`git push` that followed in the SAME command DID run. The paper
+change landed without its changelog entry. Write long entries to a temp file and
+append the file; never pass a multi-line string through `python -c` under
+PowerShell. Also: a command that mixes an append and a commit will commit
+without the append if the append fails silently -- run them separately.
+
