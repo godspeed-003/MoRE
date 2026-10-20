@@ -25,7 +25,7 @@ Files written to --out (all .npy, mmap-friendly):
   {split}_sub.npy                 (rows,) int16   op token for E7/OOD rows, -1 otherwise
   meta.json
 """
-import argparse, json, os
+import argparse, hashlib, json, os
 import numpy as np
 
 SEP, EOS, HEX0, OP0 = 0, 1, 2, 18
@@ -160,9 +160,47 @@ def make_split(rng, rows_per_group, forbid, ood=False):
     p = rng.permutation(len(X))
     return (X[p], G[p], D[p], S[p]), {k: np.concatenate(v) for k, v in used.items()}
 
+def _sha(a):
+    """SHA-256 of an array's bytes, in the order it is written to disk."""
+    return hashlib.sha256(np.ascontiguousarray(a).tobytes()).hexdigest()
+
+
 def save(out, name, arrs):
+    """Write the four arrays of one split and return their content hashes.
+
+    T-OD.3: the CONTENT hashes are what make `dataset_version` a statement
+    about the bytes rather than about the configuration. `meta.json` before
+    this was entirely parameter-derived -- the same row counts, the same mask,
+    the same token table for any seed -- so hashing it identified the
+    GENERATOR CALL, not the DATA, and two generations that differ in every
+    sampled row would have carried the same version string. The hashes below
+    are of the arrays as written, so they change with the data and only with
+    the data.
+    """
+    digests = {}
     for suffix, a in zip(["x", "group", "diff", "sub"], arrs):
         np.save(os.path.join(out, f"{name}_{suffix}.npy"), a)
+        digests[suffix] = _sha(a)
+    return digests
+
+
+def dataset_version(all_digests, rows, train_rows_per_group, eval_rows_per_group, seed):
+    """One string identifying THIS generation: content hashes + the call that made it.
+
+    The configuration is folded in as well as the content, because the content
+    hashes alone would not distinguish two generations that happened to
+    produce identical bytes -- which is a real possibility for a small
+    evaluation split and would otherwise be reported as the same dataset.
+    """
+    h = hashlib.sha256()
+    for split in sorted(all_digests):
+        for suffix in sorted(all_digests[split]):
+            h.update(f"{split}:{suffix}:{all_digests[split][suffix]}".encode())
+    h.update(f"rows={rows}".encode())
+    h.update(f"train_rows_per_group={train_rows_per_group}".encode())
+    h.update(f"eval_rows_per_group={eval_rows_per_group}".encode())
+    h.update(f"seed={seed}".encode())
+    return f"opdiff-v2-{h.hexdigest()[:12]}"
 
 def main():
     ap = argparse.ArgumentParser()
@@ -179,18 +217,29 @@ def main():
     forbid = {k: np.concatenate([used_tr[k], used_va[k]]) for k in used_tr}
     te, _ = make_split(rng, a.eval_rows_per_group, forbid)
     oo, _ = make_split(rng, a.eval_rows_per_group, {}, ood=True)
+    digests = {}
     for n, s in [("train", tr), ("val", va), ("test", te), ("ood", oo)]:
-        save(a.out, n, s)
+        digests[n] = save(a.out, n, s)
 
     mask = ((np.arange(ROW_LEN) % EX_LEN) >= 10).astype(np.uint8)   # token positions to compute loss on
+    rows = dict(train=len(tr[0]), val=len(va[0]), test=len(te[0]), ood=len(oo[0]))
     meta = dict(
         vocab_size=OP0 + len(ALL_OPS), row_len=ROW_LEN, example_len=EX_LEN, examples_per_row=EX_PER_ROW,
         tokens=dict(SEP=SEP, EOS=EOS, hex0=HEX0, op0=OP0), op_tokens=TOK,
         groups={f"E{g}": v for g, v in GROUPS.items()}, ood_ops=list(OOD_OPS),
         loss_mask_note="mask[t]=1 where t%19>=10 (answer digits + EOS); targets are x[:,1:], use mask[1:]",
         loss_mask=mask.tolist(),
-        rows=dict(train=len(tr[0]), val=len(va[0]), test=len(te[0]), ood=len(oo[0])),
-        train_tokens=int(len(tr[0]) * ROW_LEN))
+        rows=rows,
+        train_tokens=int(len(tr[0]) * ROW_LEN),
+        # T-OD.3: the CONTENT identity of this generation. See save()'s docstring
+        # for why meta.json alone was not enough: it is entirely
+        # parameter-derived, so hashing it identified the generator CALL and
+        # not the DATA.
+        content_sha256=digests,
+        dataset_version=dataset_version(digests, rows, a.train_rows_per_group,
+                                        a.eval_rows_per_group, a.seed),
+        generator_args=dict(train_rows_per_group=a.train_rows_per_group,
+                            eval_rows_per_group=a.eval_rows_per_group, seed=a.seed))
     json.dump(meta, open(os.path.join(a.out, "meta.json"), "w"), indent=1)
     print(meta["rows"], "vocab", meta["vocab_size"], "train tokens", meta["train_tokens"])
 

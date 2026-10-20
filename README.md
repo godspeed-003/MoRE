@@ -444,6 +444,10 @@ and spending it would change every canonical run's identity.
 | `code/more/` | the implementation (`config`, `families`, `data`, `model`, `metrics`, `engine`, `run_context`) |
 | `code/canonical_spec.json` | the single frozen definition of "canonical"; the guard refuses any run that deviates |
 | `code/canonical_spec_language.json` | the same guard for `task = language` — separate file, separate group `canonical_lang_b` |
+| `code/canonical_spec_opdiff.json` | the same guard for `task = opdiff` — **deliberately unfrozen** (every enforced field null), so the guard refuses an opdiff canonical claim and every opdiff run is `exploratory` |
+| `code/config_opdiff.json` | the defaults file for `task = opdiff`; the `config.json` / `config_language.json` counterpart |
+| `code/run_opdiff_matrix.py` | the opdiff matrix driver: preflight, pilot, skip-completed, stop-at-first-failure |
+| `code/summarize_opdiff_matrix.py` | the only aggregation command for the opdiff task; refuses to mix dataset versions or config hashes |
 | `data/` | the arithmetic dataset the engine's default config points at (`train`/`val`/`test.jsonl`, used by the correctness suite's smoke runs) plus the `dummy-*.jsonl` fixtures and `dataset_meta.json` |
 | `data/lang/<corpus>/` | the language corpora as frozen `.npy` arrays plus their own `dataset_meta.json`; `wikitext-103` is canonical, `wikitext-2` is dev-only |
 | [SETUP.md](SETUP.md) | clone-to-first-run setup for a MoRE **language** run |
@@ -451,6 +455,7 @@ and spending it would change every canonical run's identity.
 | `results/language/` | the same artifacts for the language task, written only by `export_results.py --task language` |
 | `runs/<experiment_id>/` | per-run outputs only — config, resolved config, metrics, TSV, held-out depth sidecar; checkpoints and stdout are untracked |
 | `make_opdiff_dataset_v2.py` | generator for the opdiff_v2 arithmetic dataset (7 pure expert groups, 304-token rows); writes `opdiff_v2/` + `opdiff_v2_smoke/`, both gitignored |
+| [HANDOFF.md](HANDOFF.md) | the opdiff matrix brief for the co-author's agent: machine, dataset, preflight, pilot, acceptance checks, aggregation, never-change list |
 
 There is deliberately no `moe/` or `mor/` folder: one training system with an explicit
 `--architecture {moe,mor,more}` mode, per [plan.md](plan.md) §9.

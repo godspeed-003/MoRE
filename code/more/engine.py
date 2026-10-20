@@ -25,6 +25,15 @@ import matplotlib.pyplot as plt
 from .families import expert_labels, ALL_OP_NAMES, NUM_OP_TYPES, NUM_EXPERTS_CANONICAL
 from .data import MoREDataset
 from .lang_data import MoRELanguageDataset, LANG_ROOT
+# T-OD.3. The opdiff dataset and its manifest. Imported unconditionally, the
+# way `lang_data` is: the modules are pure-python/numpy and cost nothing at
+# import, and a task-conditional import inside `train()` would be a second
+# place to forget the wiring.
+from .opdiff_data import MoREOpdiffDataset
+from .opdiff_families import (ALL_OP_NAMES as OPDIFF_OP_NAMES,
+                              NUM_OP_TYPES as OPDIFF_NUM_OP_TYPES,
+                              NUM_FAMILIES as OPDIFF_NUM_FAMILIES,
+                              op_target_depth_table as opdiff_target_depth_table)
 from .model import MoEBlock, MoREWrapper, MoREModel
 from .metrics import (compute_expert_load_entropy,
                       expert_load_entropy_from_counts,
@@ -56,7 +65,7 @@ from .model import (CAPACITY_POLICY, CANONICAL_ROUTING_MODE,
 from .metrics import halting_supervision_loss, depth_allocation_error
 from .families import op_target_depth_table
 from .config import (resolve_halting_mode, CANONICAL_FAMILY_CLS_WEIGHT,
-                     resolve_task, TASK_LANGUAGE)
+                     resolve_task, TASK_LANGUAGE, TASK_OPDIFF, LM_TASKS)
 # T-L3.2: the confusion diagonal is published under a task-dependent NAME. One
 # helper, so the log dict, the console line, the results.tsv header and the
 # metrics.json "N/A" contract cannot disagree about what it is called.
@@ -174,6 +183,34 @@ def train(cfg: dict, run_epochs: int | None = None, ctx: "RunContext | None" = N
         print(f"[Dataset] floor = {train_ds.primary_metric_floor} nats/token "
               f"(bigram, T-L2.5) | train_split_version = "
               f"{train_ds.train_split_version}")
+    elif _task_early == TASK_OPDIFF:
+        # T-OD.3. The opdiff dataset. Its own split files -- there is no
+        # jsonl, no corpus and no random-split fallback, because the generator
+        # already wrote a val split and carving one out of train would destroy
+        # the one property that makes the split meaningful.
+        train_ds = MoREOpdiffDataset("train", root=dc.get("opdiff_root"))
+        if int(train_ds.seq_len) != int(dc.get("seq_len", train_ds.seq_len)):
+            # A mismatch is a real defect rather than something to coerce: the
+            # rows on disk ARE `train_ds.seq_len` long, and a config asking for
+            # a different length is asking for a dataset that was not
+            # generated. Regenerating is a deliberate act.
+            raise ValueError(
+                f"data.seq_len = {dc.get('seq_len')} but the opdiff dataset at "
+                f"{train_ds.root} was generated at row_len = {train_ds.seq_len} "
+                f"({train_ds.dataset_version}). Regenerate the dataset or drop "
+                "the override -- silently using the stored length would make "
+                "the resolved config disagree with the data it describes."
+            )
+        if int(train_ds.vocab_size) != int(dc.get("vocab_size", train_ds.vocab_size)):
+            raise ValueError(
+                f"data.vocab_size = {dc.get('vocab_size')} but the opdiff "
+                f"dataset has V = {train_ds.vocab_size}. The tied LM head is "
+                f"[V, d_model], so this is not a cosmetic disagreement."
+            )
+        print(f"[Dataset] {train_ds}")
+        print(f"[Dataset] opdiff_root = {train_ds.root} | dataset_version = "
+              f"{train_ds.dataset_version} | train_split_version = "
+              f"{train_ds.train_split_version}")
     else:
         train_ds = MoREDataset(
             jsonl_path=dc.get("train_path", dc.get("jsonl_path")),
@@ -206,6 +243,15 @@ def train(cfg: dict, run_epochs: int | None = None, ctx: "RunContext | None" = N
         # validation set out of TRAIN and quietly destroy the one property that makes
         # the leakage audit meaningful.
         val_ds  = MoRELanguageDataset(dc.get("corpus", "wikitext-103"), "val")
+        n_train = len(train_ds)
+        n_val   = len(val_ds)
+        print(f"[Dataset] {val_ds}")
+    elif _task_early == TASK_OPDIFF:
+        # The generator writes its own val split, and -- like the language
+        # corpus -- there is no random-split fallback: carving a validation
+        # set out of TRAIN would quietly destroy the property that makes the
+        # split meaningful.
+        val_ds  = MoREOpdiffDataset("val", root=dc.get("opdiff_root"))
         n_train = len(train_ds)
         n_val   = len(val_ds)
         print(f"[Dataset] {val_ds}")
@@ -296,16 +342,17 @@ def train(cfg: dict, run_epochs: int | None = None, ctx: "RunContext | None" = N
         # num_experts made every MoR run die on a CUDA device-side assert
         # ('t >= 0 && t < n_classes') in the first batch. Passed explicitly rather
         # than left to the default so the coupling cannot silently return.
-        num_families=NUM_EXPERTS_CANONICAL,
+        num_families=(OPDIFF_NUM_FAMILIES if _task_early == TASK_OPDIFF
+                      else NUM_EXPERTS_CANONICAL),
         # T-L4.0 / T-L5.0. Attention and the token embedding are constructed only when
         # the task asks for them, so an arithmetic state_dict stays bit-identical.
         # `max_seq_len` sizes the positional table and MUST be the packed length the
         # corpus was built at -- the mismatch guard above is what makes that true.
         attention=bool(mc.get("attention", False)),
         n_heads=int(mc.get("n_heads", 4)),
-        max_seq_len=(int(dc["seq_len"]) if _task_early == TASK_LANGUAGE else None),
+        max_seq_len=(int(dc["seq_len"]) if _task_early in LM_TASKS else None),
         task=_task_early,
-        vocab_size=(int(dc["vocab_size"]) if _task_early == TASK_LANGUAGE else None),
+        vocab_size=(int(dc["vocab_size"]) if _task_early in LM_TASKS else None),
     ).to(device)
 
     total_params = sum(p.numel() for p in model.parameters())
@@ -358,7 +405,39 @@ def train(cfg: dict, run_epochs: int | None = None, ctx: "RunContext | None" = N
             "would be recorded as supervised while training unsupervised. Set a "
             "non-zero loss_weights.halting_supervision, or disable the flag."
         )
-    _target_depth_table = op_target_depth_table()
+    # T-OD.3. The depth CURRICULUM is the task's, not the arithmetic one.
+    # `op_target_depth_table()` is arithmetic's 16-entry table and the language
+    # task's own table is empty; binding arithmetic's table for every task was
+    # harmless only because language's `step_ops` are all -1, so nothing ever
+    # indexed it. opdiff HAS a valid operation axis (0..24), so binding the
+    # arithmetic table here would have indexed entries 16..24 -- out of range
+    # for a 16-entry table, and semantically wrong if they had been in range
+    # (F1..F12 supervised against arithmetic's op depths). The task's own
+    # table is bound instead: arithmetic's (16 entries), language's (empty) or
+    # opdiff's (empty), and the empty ones make the depth-allocation metrics
+    # report N/A rather than a number nobody measured.
+    if _task_early == TASK_OPDIFF:
+        _target_depth_table = opdiff_target_depth_table()
+    elif _task_early == TASK_LANGUAGE:
+        from .lang_families import op_target_depth_table as _lang_target_depth_table
+        _target_depth_table = _lang_target_depth_table()
+    else:
+        _target_depth_table = op_target_depth_table()
+    # T-OD.3. And a task with NO curriculum cannot be run with halting
+    # supervision: the term would be computed against an empty table, would
+    # contribute exactly zero, and the run would be recorded as
+    # 'supervised_curriculum' while supervising nothing. The config layer
+    # refuses the flag on opdiff; this refuses it at run time, where the table
+    # is actually known, so no path can reach it.
+    if halting_supervision_enabled and not _target_depth_table:
+        raise ValueError(
+            f"halting supervision is enabled on task={_task_early!r}, but that task "
+            "has NO depth curriculum: the target table is empty by "
+            "construction. The curriculum term would be computed against "
+            "nothing, contribute exactly zero, and label the run "
+            "'supervised_curriculum' while supervising nothing. Run the task "
+            "in pure ACT."
+        )
     # T8.2: derived by the ONE helper the Gate 0 guard also calls, so "which
     # halting objective ran" cannot mean one thing to the guard and another to
     # provenance. See more/config.py:resolve_halting_mode.
@@ -371,16 +450,36 @@ def train(cfg: dict, run_epochs: int | None = None, ctx: "RunContext | None" = N
     _agree_key = routing_agreement_key(_task)
     # T-L6.8: the label manifest follows the task. `expert_labels` from `.families`
     # names the arithmetic op families; a language run must name POS families.
+    # T-OD.3: and an opdiff run must name its seven EXPERT GROUPS.
     if _task == TASK_LANGUAGE:
         from .lang_families import expert_labels as _expert_labels
+    elif _task == TASK_OPDIFF:
+        from .opdiff_families import expert_labels as _expert_labels
     else:
         _expert_labels = expert_labels
+    # T-OD.3. The OPERATION AXIS follows the task too: arithmetic and language
+    # have their own (16 arithmetic ops, none on language), and opdiff has 25.
+    # The per-operation depth breakdown is indexed by this list, so a task
+    # whose axis width disagreed with its tensor width would either raise
+    # IndexError mid-validation or -- worse -- attribute a measured depth to
+    # the wrong operation.
+    if _task == TASK_OPDIFF:
+        _OP_AXIS_NAMES, _OP_AXIS_N = OPDIFF_OP_NAMES, OPDIFF_NUM_OP_TYPES
+    else:
+        _OP_AXIS_NAMES, _OP_AXIS_N = ALL_OP_NAMES, NUM_OP_TYPES
     # T-L5.1: the trivial-baseline floor for THIS corpus, read from the dataset
     # manifest rather than from a config literal, so a run cannot quote a floor
     # measured on a different corpus. None when the dataset does not supply one --
     # reported as an absent key rather than as 0.0.
     _floor = None
     _tok_family = _log_freq = _surprisal = None
+    # T-OD.3. The corpus POS-partition load entropy is LANGUAGE-ONLY -- it is a
+    # property of the POS partition on a WikiText corpus, and there is no
+    # analogue of it on opdiff. It is INITIALISED here rather than only inside
+    # the language block, because the perplexity block below is now reached by
+    # both LM tasks and an unbound name in it would be a NameError on every
+    # opdiff run.
+    _pos_entropy = None
     _NUM_LANG_FAMILIES, _LANG_FAMILY_LABELS = 0, []
     if _task == TASK_LANGUAGE:
         # Unwrapped, because `random_split` returns a `Subset` and the attribute
@@ -433,6 +532,32 @@ def train(cfg: dict, run_epochs: int | None = None, ctx: "RunContext | None" = N
         print(f"[Train] task={_task}: the confusion diagonal is published as "
               f"{_agree_key}")
         print(f"[Train] {routing_agreement_caption(_task)}")
+    # T-OD.3. THE OPDIFF LOSS MASK, read from the dataset's own manifest and
+    # SHIFTED BY ONE, because the targets are `x[:, 1:]` and the mask is
+    # indexed by the position whose value is predicted.
+    #
+    # It is read, not recomputed. The mask is a property of the generated
+    # dataset -- the generator decides which positions are scored -- and a
+    # second implementation of the rule in the engine would be a rule that can
+    # drift from the data, silently changing WHAT IS BEING TRAINED ON. The
+    # arithmetic and language tasks have no such mask (every position is
+    # scored), so this is the only place a mask exists.
+    _opdiff_loss_mask1 = None
+    if _task_early == TASK_OPDIFF:
+        _ds_m = getattr(train_loader, "dataset", None)
+        for _ in range(4):
+            if _ds_m is None or hasattr(_ds_m, "loss_mask"):
+                break
+            _ds_m = getattr(_ds_m, "dataset", None)
+        if _ds_m is None or not hasattr(_ds_m, "loss_mask"):
+            raise ValueError(
+                "the opdiff dataset does not expose its loss mask, so the "
+                "positions to score are unknown. That is a build defect, not a "
+                "config error: the mask comes from meta.json and the loss "
+                "cannot be computed without it."
+            )
+        _mask_np = np.asarray(_ds_m.loss_mask, dtype=bool)[1:]
+        _opdiff_loss_mask1 = torch.from_numpy(_mask_np).to(device)
     target_halt_weight = lw["halting"]
     print(f"[Train] halting: ponder_weight={target_halt_weight}, "
           f"supervision={'ON' if halting_supervision_enabled else 'OFF (pure ACT)'}"
@@ -632,7 +757,16 @@ def train(cfg: dict, run_epochs: int | None = None, ctx: "RunContext | None" = N
         # T-LX.8: tokens per batch ITEM. 1 on arithmetic (an item IS a record, so
         # the accumulator keeps its published records/s meaning byte-for-byte);
         # `data.seq_len` on language, where an item is a packed block.
-        _tokens_per_item = (int(dc["seq_len"]) if _task == TASK_LANGUAGE else 1)
+        # T-LX.8. tokens per batch ITEM. 1 on arithmetic (an item IS a record, so
+        # the accumulator keeps its published records/s meaning byte-for-byte);
+        # `data.seq_len` on the LM tasks, where an item is a packed block.
+        #
+        # T-OD.3: opdiff is LM-shaped, so it gets the same treatment with its
+        # OWN sequence length (304, not 256). Getting this wrong is not a label
+        # bug: it understates the opdiff token rate by 304x, and the token rate
+        # is what a matrix budget is costed from. The language matrix was
+        # costed at 15 DAYS once because of exactly this (T-LX.8).
+        _tokens_per_item = (int(dc["seq_len"]) if _task in LM_TASKS else 1)
         depth_hist       = torch.zeros(mc["max_depth"])
 
         # --- Shannon entropy tracking (activated) -----------------------
@@ -720,6 +854,26 @@ def train(cfg: dict, run_epochs: int | None = None, ctx: "RunContext | None" = N
                 task_loss = F.cross_entropy(
                     reg_out[:, :-1, :].reshape(-1, _V),
                     x[:, 1:].reshape(-1),
+                )
+            elif _task == TASK_OPDIFF:
+                # T-OD.3. THE MASKED CROSS-ENTROPY. Same shift as language
+                # (`logits[:, :-1]` predicts `x[:, 1:]`) and one extra
+                # restriction: only the positions the generator marked as
+                # scored contribute. The mask is `meta.json:loss_mask` shifted
+                # by one, because the mask is indexed by the position whose
+                # VALUE is predicted.
+                #
+                # WHY IT MATTERS HERE AND NOT ON LANGUAGE: an opdiff row
+                # contains 16 examples, and each example's tokens are not
+                # interchangeable -- the operation token, the operands and the
+                # answer are different kinds of position, and scoring the
+                # operands would ask the model to predict the question it was
+                # just given. The generator's mask is the author's statement
+                # of what the task is; the loss follows it.
+                _V = reg_out.shape[-1]
+                task_loss = F.cross_entropy(
+                    reg_out[:, :-1, :][:, _opdiff_loss_mask1, :].reshape(-1, _V),
+                    x[:, 1:][:, _opdiff_loss_mask1].reshape(-1),
                 )
             else:
                 task_loss = F.mse_loss(reg_out.squeeze(-1), target)
@@ -936,8 +1090,8 @@ def train(cfg: dict, run_epochs: int | None = None, ctx: "RunContext | None" = N
             confusion = torch.zeros(
                 _F, _E, dtype=torch.float64
             )
-            op_depth_sum   = torch.zeros(NUM_OP_TYPES, dtype=torch.float64)
-            op_depth_count = torch.zeros(NUM_OP_TYPES, dtype=torch.float64)
+            op_depth_sum   = torch.zeros(_OP_AXIS_N, dtype=torch.float64)
+            op_depth_count = torch.zeros(_OP_AXIS_N, dtype=torch.float64)
             # Per-family depth is indexed by the oracle family too, and it is a
             # metric MoR genuinely has (MoR allocates depth; it just does not
             # route). It must therefore be _F wide, not _E.
@@ -996,7 +1150,14 @@ def train(cfg: dict, run_epochs: int | None = None, ctx: "RunContext | None" = N
                             x_v[:, 1:].reshape(-1),
                         )
                         if _task == TASK_LANGUAGE
-                        else F.mse_loss(reg_v.squeeze(-1), tgt_v)
+                        else (
+                            F.cross_entropy(
+                                reg_v[:, :-1, :][:, _opdiff_loss_mask1, :].reshape(-1, reg_v.shape[-1]),
+                                x_v[:, 1:][:, _opdiff_loss_mask1].reshape(-1),
+                            )
+                            if _task == TASK_OPDIFF
+                            else F.mse_loss(reg_v.squeeze(-1), tgt_v)
+                        )
                     )
                     val_total += l_v.item() * x_v.shape[0]
                     val_n     += x_v.shape[0]
@@ -1109,17 +1270,18 @@ def train(cfg: dict, run_epochs: int | None = None, ctx: "RunContext | None" = N
                 val_depth_log["val/depth_allocation_error_rel"] = (
                     val_depth_rel_err / val_depth_err_n
                 )
-            # T-L6.0: on LANGUAGE these two keys are structurally undefined, not
-            # merely unmeasured. There is no per-token ground-truth depth for English
-            # (`plan_language.md` §5.1), `lang_families.op_target_depth_table()` is
-            # empty by construction, so `val_depth_err_n` is 0 and the branch above
-            # never fires. Writing "N/A" makes the absence a STATEMENT rather than a
-            # gap: an exporter joining arithmetic and language rows on a common column
-            # set has to decide what a missing column means, and the whole point of
-            # "N/A" is that it never has to. A 0.0 or -1 here would read as perfect
-            # allocation against a curriculum that does not exist -- the single most
-            # misleading number this migration could produce.
-            if _task == TASK_LANGUAGE:
+            # T-L6.0: on the LM TASKS these two keys are structurally undefined,
+            # not merely unmeasured. There is no per-token ground-truth depth
+            # for English (`plan_language.md` §5.1) and none for opdiff (whose
+            # curriculum table is empty by construction), so `val_depth_err_n`
+            # is 0 and the branch above never fires. Writing "N/A" makes the
+            # absence a STATEMENT rather than a gap: an exporter joining
+            # arithmetic and language rows on a common column set has to decide
+            # what a missing column means, and the whole point of "N/A" is
+            # that it never has to. A 0.0 or -1 here would read as perfect
+            # allocation against a curriculum that does not exist -- the single
+            # most misleading number this migration could produce.
+            if _task in LM_TASKS:
                 val_depth_log["val/depth_allocation_error_abs"] = "N/A"
                 val_depth_log["val/depth_allocation_error_rel"] = "N/A"
             if val_exp_depth_n > 0:
@@ -1232,11 +1394,20 @@ def train(cfg: dict, run_epochs: int | None = None, ctx: "RunContext | None" = N
             # scores 0.0 there. Computed once here, from the same matrix, and
             # passed down so W&B, metrics.json and the console line cannot report
             # three different numbers.
+            # T-OD.3. The label manifest follows the task, and the DEFAULT is
+            # the arithmetic one, so arithmetic and language keep publishing
+            # exactly what they published before. That is deliberate for
+            # language: the language runs on disk carry the arithmetic
+            # E1..E6 labels in their per-family routing keys, and re-labelling
+            # them now would make the published language table disagree with a
+            # re-run of the same config. opdiff is a NEW task with no
+            # published cells, so it names its own seven groups.
+            _fam_labels = (_expert_labels(_E) if _task == TASK_OPDIFF else None)
             pim = permutation_invariant_routing_metrics(
-                confusion, mc["num_experts"]
+                confusion, mc["num_experts"], family_labels=_fam_labels
             )
             op_avg_depth: dict[str, float] = {}
-            for i, name in enumerate(ALL_OP_NAMES):
+            for i, name in enumerate(_OP_AXIS_NAMES):
                 if op_depth_count[i] > 0:
                     op_avg_depth[name] = (
                         op_depth_sum[i] / op_depth_count[i]
@@ -1269,6 +1440,7 @@ def train(cfg: dict, run_epochs: int | None = None, ctx: "RunContext | None" = N
                 mc["num_experts"],
                 pim=pim,
                 task=_task,
+                family_labels=_fam_labels,
             )
 
         # ---- Expert metrics (no grad) ----------------------------------
@@ -1350,7 +1522,7 @@ def train(cfg: dict, run_epochs: int | None = None, ctx: "RunContext | None" = N
             # cannot have created that decodability. On arithmetic the same
             # CE IS in the objective at weight 0.5, so the two are published
             # under different names to keep the distinction visible.
-            ("probe/family_ce" if _task == TASK_LANGUAGE
+            ("probe/family_ce" if _task in LM_TASKS
              else "train/step_cls_ce"): epoch_probe_ce / n_batches,
             "train/avg_recursion_steps": (
                 avg_depth.item() if avg_depth is not None else float("nan")
@@ -1519,10 +1691,17 @@ def train(cfg: dict, run_epochs: int | None = None, ctx: "RunContext | None" = N
             # T-L5.1 / T-L5.4: perplexity is a MONOTONE TRANSFORM of the loss and
             # carries no extra information, so it is reported and never optimised
             # and never used for checkpoint selection -- the verdict is always
-            # taken on nats. Emitted only on language, because exp() of an
+            # taken on nats. Emitted only on the LM tasks, because exp() of an
             # arithmetic MSE is not a perplexity and a column that silently meant
             # two things would be worse than a missing one.
-            if _task == TASK_LANGUAGE and math.isfinite(val_loss):
+            #
+            # T-OD.3: on opdiff this is a perplexity over the ANSWER tokens
+            # only (the generator's masked positions), not over the whole row,
+            # and it is therefore NOT comparable with the language figure, which
+            # is over every token. Both are nats/token over the positions their
+            # own task scores; the denominator differs and the column must be
+            # read within a task.
+            if _task in LM_TASKS and math.isfinite(val_loss):
                 log_dict["val/perplexity"] = math.exp(val_loss)
                 log_dict["val/bits_per_token"] = val_loss / math.log(2)
                 # The distance from the trivial floor, which is the only form in
@@ -1585,7 +1764,7 @@ def train(cfg: dict, run_epochs: int | None = None, ctx: "RunContext | None" = N
         # (CLAUDE.md §4).
         _ppl_str = (
             f"{math.exp(val_loss):.4f}"
-            if (_task == TASK_LANGUAGE and not math.isnan(val_loss))
+            if (_task in LM_TASKS and not math.isnan(val_loss))
             else "N/A"
         )
         _below_str = (

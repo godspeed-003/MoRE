@@ -233,7 +233,15 @@ print("\n=== T-L7.3: input parity across MoE / MoR / MoRE " + "=" * 30)
 # ===========================================================================
 
 corpus = load_config(LANG_CONFIG)["data"]["corpus"]
-built = os.path.exists(os.path.join(LANG_ROOT, corpus, "dataset_meta.json"))
+# The guard has to ask for the PACKED BLOCKS, not just the manifest. The
+# manifest is written by the fetch/tokenize stage, so a machine that ran
+# `build_language_dataset.py --stage fetch` and then stopped has a manifest
+# and no `train.npy` -- and the block below indexes the dataset, which reads
+# the packed array. With the manifest-only guard the suite raised
+# FileNotFoundError: 'data/lang/wikitext-103/train.npy' and took the whole
+# file down, including the checks that need no corpus at all.
+built = (os.path.exists(os.path.join(LANG_ROOT, corpus, "dataset_meta.json"))
+         and os.path.exists(os.path.join(LANG_ROOT, corpus, "train.npy")))
 
 if not built:
     skip("T-L7.3 input parity",

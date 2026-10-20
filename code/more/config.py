@@ -17,7 +17,7 @@ from .model import (CANONICAL_ROUTING_MODE, DENSE_ABLATION_ROUTING_MODE,
                     ROUTER_NOISE_ANNEAL_STEPS_DEFAULT,
                     ROUTING_PERSISTENCE_MODES, ROUTING_PERSISTENCE_LEGACY,
                     ROUTING_PERSISTENCE_PER_TOKEN,
-                    TASK_ARITHMETIC, TASK_LANGUAGE)
+                    TASK_ARITHMETIC, TASK_LANGUAGE, TASK_OPDIFF, LM_TASKS)
 from .families import NUM_EXPERTS_CANONICAL
 
 # The canonical expert count, E1..E6; the E7 catch-all is removed
@@ -26,6 +26,33 @@ from .families import NUM_EXPERTS_CANONICAL
 # -- T5.1: a second copy of the number is how `num_experts` and the family
 # label list drift apart in the first place.
 CANONICAL_NUM_EXPERTS = NUM_EXPERTS_CANONICAL
+
+# T-OD.3. The canonical expert count is TASK-DEPENDENT, and opdiff is the
+# first task whose router width is not six.
+#
+# WHY SEVEN. The opdiff generator partitions its rows into seven expert
+# groups (E1..E7), and the confusion matrix's row axis IS that partition. A
+# six-expert router on a seven-group dataset could not be scored against the
+# oracle at all: the metric layer returns an all-None "empty" report for a
+# non-square matrix, so every permutation-invariant routing number --
+# Hungarian accuracy, AMI, purity, matched macro recall -- would be N/A on
+# exactly the task where "does the router discover the operation families" is
+# the question. Seven keeps the matrix square for the MoE and MoRE arms.
+#
+# WHAT IT COSTS. A different router width is a different study's width, so an
+# opdiff number is comparable to the opdiff MoE/MoR arms and NOT to the
+# arithmetic table. That is why opdiff runs are stamped
+# `experiment_group=exploratory` and carry their own run-name prefix: they
+# are a new study, not a second arm of the published one.
+#
+# MoR stays at ONE expert on every task: it makes no routing decision, so its
+# confusion matrix is 7x1 and its routing metrics are N/A by construction --
+# the same contract arithmetic and language have.
+CANONICAL_NUM_EXPERTS_BY_TASK = {
+    TASK_ARITHMETIC: CANONICAL_NUM_EXPERTS,
+    TASK_LANGUAGE:   CANONICAL_NUM_EXPERTS,
+    TASK_OPDIFF:     7,
+}
 
 
 # ---------------------------------------------------------------------------
@@ -62,7 +89,7 @@ CANONICAL_NUM_EXPERTS = NUM_EXPERTS_CANONICAL
 # had to move to the lower layer or be duplicated. They are re-exported from this
 # module unchanged, so every existing `from .config import TASK_LANGUAGE` still
 # resolves and no call site moved.
-TASKS = (TASK_ARITHMETIC, TASK_LANGUAGE)
+TASKS = (TASK_ARITHMETIC, TASK_LANGUAGE, TASK_OPDIFF)
 
 # The task whose absence is assumed. See resolve_task() for why absence -- rather
 # than an injected default key -- is what "default arithmetic" means here.
@@ -367,6 +394,8 @@ def load_config_defaults(cfg: dict | None = None) -> dict:
     # config in the repository.
     if resolve_task(cfg) == TASK_LANGUAGE:
         _apply_language_block(cfg, declared_family_cls=_user_family_cls)
+    elif resolve_task(cfg) == TASK_OPDIFF:
+        _apply_opdiff_block(cfg, declared_family_cls=_user_family_cls)
 
     return cfg
 
@@ -421,9 +450,17 @@ CANONICAL_RUN_PREFIX = "phaseB"
 # by a glob, and the two studies are two studies (plan_language.md T-L10.2: not
 # merged, not averaged, not a trend across two points).
 CANONICAL_RUN_PREFIX_LANGUAGE = "langB"
+# T-OD.3. The opdiff study's run-name prefix. A THIRD prefix, for the same
+# reason the language study got its own: the prefix is the first thing sorted
+# in a `runs/` listing and the first thing a reader sees in a table, and
+# `opdiffB_MoRE_seed42` must never be mistaken for one of the fifteen
+# published `phaseB_*` runs or for a `langB_*` run. Three studies, three
+# prefixes, no possibility of a glob or a sorted listing mixing them.
+CANONICAL_RUN_PREFIX_OPDIFF = "opdiffB"
 RUN_PREFIX_BY_TASK = {
     TASK_ARITHMETIC: CANONICAL_RUN_PREFIX,
     TASK_LANGUAGE:   CANONICAL_RUN_PREFIX_LANGUAGE,
+    TASK_OPDIFF:     CANONICAL_RUN_PREFIX_OPDIFF,
 }
 
 # T6.7 (updated_rules.md 9). `variant` is a required provenance field and must
@@ -455,6 +492,13 @@ CANONICAL_FAMILY_CLS_WEIGHT_BY_TASK = {
     # head reads h.detach(), so the weight cannot change what the trunk learns, and
     # a packed LM sequence has no whole-sequence family label for the term to use.
     TASK_LANGUAGE:   0.0,
+    # T-OD.3. Same reasoning for opdiff, and for a second reason on top: the
+    # opdiff rows DO carry a whole-row group label, so a non-zero weight would
+    # not be inert-but-harmless -- it would be a real supervision signal on the
+    # oracle partition, which is exactly the confound the opdiff study exists
+    # to avoid. The family probe stays DETACHED (model.py), so the group stays
+    # a diagnostic and the routing metrics measure emergent structure.
+    TASK_OPDIFF:     0.0,
 }
 
 # T10.C. Canonical recursive-block count. Frozen at 1 in canonical_spec.json's
@@ -500,6 +544,36 @@ CANONICAL_FFN_MULT = {"moe": 4, "mor": 24, "more": 4}
 # seq_len decision and this one are independent and may be made in either order.
 CANONICAL_FFN_MULT_LANGUAGE = {"moe": 4, "mor": 24, "more": 4}
 
+# T-OD.3. The opdiff arms' budget-matched widths, BY THE SAME RULE as the two
+# studies above: MoE/MoRE get 7 experts at mult 4, and MoR's single FFN is
+# given the TOTAL hidden width of those seven experts -- 7 x 4 = 28. The rule
+# is the same one arithmetic (6 x 4 = 24) and language (6 x 4 = 24) use, and
+# for the same reason: without it, "MoRE beats MoR" is confounded with
+# capacity, because MoRE would carry seven expert stacks and MoR one.
+#
+# The claim is CHECKED rather than asserted: `test_opdiff_task_axis.py` builds
+# both arms and requires the non-embedding parameter gap to stay inside 5%
+# (T9.2's bound). The embedding and attention stacks are identical across the
+# arms -- a 43-token vocabulary instead of 8192, so the shared part is small --
+# and the criterion is the non-embedding count, which is the count that is
+# actually about the expert stack.
+CANONICAL_FFN_MULT_OPDIFF = {"moe": 4, "mor": 28, "more": 4}
+
+# ONE accessor for all three tasks, so `apply_architecture` (which stamps the
+# value) and `resolve_variant` (which labels a deviation from it) cannot
+# disagree -- the T5.4 trap.
+CANONICAL_FFN_MULT_BY_TASK = {
+    TASK_ARITHMETIC: CANONICAL_FFN_MULT,
+    TASK_LANGUAGE:   CANONICAL_FFN_MULT_LANGUAGE,
+    TASK_OPDIFF:     CANONICAL_FFN_MULT_OPDIFF,
+}
+
+
+def canonical_ffn_mult(task: str, arch: str) -> int | None:
+    """The canonical `model.ffn_mult` for one (task, architecture), or None."""
+    table = CANONICAL_FFN_MULT_BY_TASK.get(str(task).lower(), CANONICAL_FFN_MULT)
+    return table.get(str(arch).lower())
+
 # T-LX.12. Canonical route persistence, keyed by (task, architecture). ONE routing
 # decision per token per forward is what CLAUDE.md §1 defines MoRE to be -- "a token
 # is routed to a specialized expert, and THAT EXPERT'S weights are recursively
@@ -536,6 +610,15 @@ CANONICAL_FFN_MULT_LANGUAGE = {"moe": 4, "mor": 24, "more": 4}
 # matrix, which is a named, deferred task and not a silent config change.
 CANONICAL_ROUTING_PERSISTENCE = {
     (TASK_LANGUAGE, "more"): ROUTING_PERSISTENCE_PER_TOKEN,
+    # T-OD.3. The opdiff MoRE arm routes PER TOKEN, for the same reason the
+    # language one does (CLAUDE.md 1: a token is routed to a specialized
+    # expert, and THAT expert's weights are recursively reused). The per-step
+    # variant re-runs the router at every recursion step, which T-LX.11
+    # measured to be a different architecture. The axis is inert for MoE
+    # (max_depth 1) and for MoR (num_experts 1), which is why only the MoRE
+    # arm carries the key -- and the key's ABSENCE elsewhere is what keeps
+    # every other run's config_hash byte-identical.
+    (TASK_OPDIFF, "more"):   ROUTING_PERSISTENCE_PER_TOKEN,
 }
 
 
@@ -718,10 +801,15 @@ def resolve_variant(cfg: dict) -> str:
     # gets a label rather than being refused silently.
     arch = str((cfg.get("provenance", {}) or {}).get("architecture")
                or cfg.get("architecture") or "").lower()
-    if arch in CANONICAL_FFN_MULT:
-        want_fm = CANONICAL_FFN_MULT[arch]
+    # T-OD.3: judged against the canonical width FOR THIS TASK, because the
+    # budget is a function of the expert count and opdiff runs seven experts
+    # (MoR at 28, not 24). A shared table would label a budget-matched opdiff
+    # MoR as a deviation, and -- worse -- would fail to label an opdiff MoR
+    # left at 24, which is 14% short of the stack it is compared against.
+    want_fm = canonical_ffn_mult(task, arch)
+    if want_fm is not None:
         got_fm = int(mc.get("ffn_mult", 4))
-        if want_fm is not None and got_fm != want_fm:
+        if got_fm != want_fm:
             tags.append(f"ffn_mult_{got_fm}")
 
     # T-LX.12. Route persistence, judged against the run's OWN (task, architecture)
@@ -853,8 +941,19 @@ def apply_architecture(cfg: dict, architecture: str) -> dict:
     lw = cfg.setdefault("loss_weights", {})
     canonical_depth = mc.get("max_depth", mc.get("max_steps", 7))
 
+    # T-OD.3. The task decides the expert COUNT, because the task decides the
+    # ORACLE LABEL SPACE the confusion matrix is scored against: opdiff's
+    # partition is seven groups, so a six-expert router could not be scored
+    # against it at all (the metric layer returns an all-None report for a
+    # non-square matrix). `resolve_task` is the SAME helper the rest of the
+    # config layer uses, so "which task is this" has one answer; absence means
+    # arithmetic, and an arithmetic config resolves byte-identically to what it
+    # resolved to before this axis existed.
+    _task = resolve_task(cfg)
+    _E = CANONICAL_NUM_EXPERTS_BY_TASK.get(_task, CANONICAL_NUM_EXPERTS)
+
     if arch == "moe":
-        mc["num_experts"] = CANONICAL_NUM_EXPERTS
+        mc["num_experts"] = _E
         mc["max_depth"] = 1
         mc["adaptive_halting"] = False
         lw["halting"] = 0.0          # no ponder cost when there is no recursion
@@ -871,7 +970,7 @@ def apply_architecture(cfg: dict, architecture: str) -> dict:
         lw["routing_balance"] = 0.0  # nothing to balance with a single expert
         lw["step_routing"] = 0.0     # no routing target with a single expert
     else:  # more
-        mc["num_experts"] = CANONICAL_NUM_EXPERTS
+        mc["num_experts"] = _E
         mc["max_depth"] = canonical_depth
         mc["adaptive_halting"] = True
 
@@ -888,7 +987,13 @@ def apply_architecture(cfg: dict, architecture: str) -> dict:
     # produces a budget-matched model; an explicit `--ffn_mult 4` still wins,
     # because resolve_overrides runs after this and produces the labelled
     # `ffn_mult_4` small-baseline ablation (resolve_variant).
-    _canonical_fm = CANONICAL_FFN_MULT.get(arch)
+    #
+    # T-OD.3: task-aware, because the budget is a function of the expert COUNT
+    # and opdiff runs seven experts (7 x 4 = 28 hidden width for MoR's single
+    # FFN). A shared table would stamp arithmetic's 24 on an opdiff MoR run and
+    # leave it 14% short of the stack it is being compared against -- the exact
+    # confound the budget rule exists to remove.
+    _canonical_fm = canonical_ffn_mult(_task, arch)
     if _canonical_fm is not None:
         mc["ffn_mult"] = _canonical_fm
 
@@ -1044,6 +1149,233 @@ def _apply_language_block(cfg: dict, declared_family_cls=None) -> dict:
     return cfg
 
 
+# ---------------------------------------------------------------------------
+# T-OD.3. The opdiff task block
+# ---------------------------------------------------------------------------
+
+# The opdiff shape. The SEQUENCE LENGTH and the VOCABULARY are the two numbers
+# the dataset fixes, and both are MEASURED from `opdiff_v2/meta.json`:
+# row_len 304 (16 examples x 19 tokens) and vocab 43 (18 fixed tokens + 25
+# operation tokens). They are `setdefault`ed here so a config file, the frozen
+# spec and the CLI can all win -- and the engine REFUSES a run whose
+# data.seq_len / data.vocab_size disagree with the dataset on disk, so a
+# mismatch here is caught before the first batch rather than after the
+# checkpoint is written.
+OPDIFF_SEQ_LEN_DEFAULT    = 304
+OPDIFF_VOCAB_SIZE_DEFAULT = 43
+OPDIFF_N_HEADS_DEFAULT    = 4      # same as language, at d_model 256
+OPDIFF_ROOT_DEFAULT       = "opdiff_v2"
+
+
+def _apply_opdiff_block(cfg: dict, declared_family_cls=None) -> dict:
+    """
+    Stamp the opdiff task's shape fields, in place, and refuse the two
+    combinations that cannot mean anything. ONE implementation, two callers:
+    `load_config_defaults` (a config file that declares `task: "opdiff"`) and
+    `apply_task` (a `--task opdiff` on the CLI). A second copy of this rule is
+    how the two entry points come to disagree -- the T5.4 trap.
+
+    `declared_family_cls` is the value the INCOMING config declared, or None if
+    it declared nothing. It cannot be read off `cfg` here, because the shared
+    defaults have already filled in the arithmetic 0.5.
+    """
+    mc = cfg.setdefault("model", {})
+    lw = cfg.setdefault("loss_weights", {})
+    dc = cfg.setdefault("data", {})
+
+    # 1. THE FAMILY WEIGHT IS 0.0, AND A DECLARED NON-ZERO IS REFUSED.
+    #
+    # The opdiff family head is a DETACHED probe, exactly as on language
+    # (model.py: `family_probe(h.detach())`), so its gradient cannot reach the
+    # trunk and its weight cannot change what is learned. On opdiff there is
+    # an EXTRA reason to refuse rather than merely to inert: an opdiff row
+    # DOES carry a whole-row group label, so a non-zero weight here would not
+    # be a no-op -- it would be a real supervision signal on the oracle
+    # partition, which is the one confound this study exists to avoid. The
+    # group must stay a diagnostic.
+    #
+    # The distinction between "declared" and "filled in" is the point, and it
+    # is why the shared default is snapshotted before any setdefault runs
+    # (config.py:171): silently rewriting a declared 0.5 to 0.0 would run
+    # something the config did not ask for, and raising on an undeclared 0.5
+    # would make `--task opdiff` alone impossible.
+    if declared_family_cls is not None and float(declared_family_cls) != 0.0:
+        raise ValueError(
+            f"loss_weights.family_cls = {declared_family_cls!r} with "
+            f"task = {TASK_OPDIFF!r}. On opdiff the family head is a DETACHED "
+            "probe: it reads h.detach(), so its gradient never reaches the "
+            "trunk and its weight cannot change what is learned. Worse, an "
+            "opdiff row DOES carry a whole-row group label, so a non-zero "
+            "weight would be a live supervision signal on the oracle partition "
+            "-- the exact confound the opdiff study exists to measure without. "
+            "Set loss_weights.family_cls to 0.0 (or drop the key and let the "
+            "opdiff block set it), or use the labelled oracle_routing "
+            "ablation (loss_weights.step_routing) if you want the router "
+            "trained against the group."
+        )
+    lw["family_cls"] = 0.0
+
+    # 2. ATTENTION IS DEFINITIONAL. An opdiff row is 16 packed examples; a
+    # model that cannot see the other examples in its row cannot answer a
+    # question about them, and the row's own structure (the operands of the
+    # next example) is exactly the context a transformer uses. `attention=False`
+    # would not be a weaker opdiff model, it would be a different task.
+    mc["attention"] = True
+
+    # 3. NO DEPTH CURRICULUM, SO NO HALTING SUPERVISION.
+    #
+    # `opdiff_families.op_target_depth_table()` returns `[]` and that is a
+    # decision, not an omission: the generator's `{split}_diff.npy` is a
+    # NOMINAL difficulty placeholder pending dense-baseline calibration, not a
+    # curriculum. Supervising depth against a target invented here would fit
+    # the model to a target rather than measure it. The refusal is at the
+    # CONFIG layer, where the field name is known, and the engine refuses it
+    # again at run time (the CLI applies `--halting_supervision` AFTER this
+    # block runs, so a config-level refusal alone would not catch it).
+    if bool(mc.get("halting_supervision", False)) or \
+            float(lw.get("halting_supervision", 0.0) or 0.0) != 0.0:
+        raise ValueError(
+            f"halting supervision is not available on task={TASK_OPDIFF!r}. "
+            "opdiff has NO depth curriculum: `opdiff_families."
+            "op_target_depth_table()` is empty by construction, because the "
+            "generator's nominal difficulty is a placeholder awaiting "
+            "dense-baseline calibration and not a depth target. Enabling the "
+            "term would supervise depth against nothing and label the run "
+            "'supervised_curriculum' while supervising nothing. Run the task "
+            "in pure ACT, which is the mode the opdiff study is defined in."
+        )
+    mc["halting_supervision"] = False
+    lw["halting_supervision"] = 0.0
+
+    # 4. THE SHAPE, `setdefault`ed so the config file, the frozen spec and the
+    # CLI all win over these defaults.
+    dc.setdefault("seq_len", OPDIFF_SEQ_LEN_DEFAULT)
+    dc.setdefault("vocab_size", OPDIFF_VOCAB_SIZE_DEFAULT)
+    # WHICH dataset. Relative to the REPO ROOT (see opdiff_data.resolve_
+    # opdiff_root), so the same config file means the same thing on two
+    # different machines and no machine-specific path enters the config_hash.
+    dc.setdefault("opdiff_root", OPDIFF_ROOT_DEFAULT)
+    mc.setdefault("n_heads", OPDIFF_N_HEADS_DEFAULT)
+    mc.setdefault("tie_lm_head", True)
+
+    # Caught here rather than inside nn.MultiheadAttention, which raises the
+    # same constraint much later and with no mention of which config field is
+    # wrong.
+    d_model = int(mc.get("d_model", 256))
+    n_heads = int(mc["n_heads"])
+    if n_heads < 1 or d_model % n_heads != 0:
+        raise ValueError(
+            f"model.n_heads = {n_heads} does not divide model.d_model = {d_model}. "
+            "Causal self-attention splits d_model into n_heads equal head "
+            f"dimensions. Canonical is n_heads = {OPDIFF_N_HEADS_DEFAULT} at "
+            "d_model = 256, identical across MoE, MoR and MoRE -- attention "
+            "hyperparameters are part of the frozen protocol and are not tuned "
+            "per architecture."
+        )
+
+    # OWED TO L-4, recorded rather than half-done, exactly as on language: the
+    # shared defaults still fill in `model.max_steps`, `model.step_feat_dim`,
+    # `data.max_val` and `data.pad_value`, which are arithmetic concepts. An
+    # opdiff row has no step count (that is the point of the format: there is
+    # no chain of thought) and no numeric feature block, so the engine never
+    # reads them on this task. Removing them from the shared defaults belongs
+    # with the engine/model migration that stops reading them; removing them
+    # only for opdiff would make a resolved opdiff config honest about four
+    # keys while the code still expects them, which trades a cosmetic
+    # inaccuracy for a KeyError.
+
+    # 5. THE EXPERT COUNT AND THE FFN WIDTH, REPAIRED FOR THE CLI PATH.
+    #
+    # `apply_architecture` is task-aware, so on the config-file path (where the
+    # task is already in the config) it stamps 7 experts and the matched FFN
+    # width by itself. On the CLI path the order is the other way round --
+    # `apply_architecture` runs BEFORE `apply_task` -- so it stamped the
+    # ARITHMETIC values (6 experts, MoR at 24) and this block has to put the
+    # opdiff ones back. Both paths therefore end at the same numbers, which is
+    # what makes `apply_task` and `apply_architecture` commute (the T-L1.0u
+    # property) on this task as well.
+    arch = str(cfg.get("architecture") or "").lower()
+    if arch in ARCHITECTURES:
+        mc["num_experts"] = (1 if arch == "mor"
+                             else CANONICAL_NUM_EXPERTS_BY_TASK[TASK_OPDIFF])
+        _fm = canonical_ffn_mult(TASK_OPDIFF, arch)
+        if _fm is not None:
+            mc["ffn_mult"] = _fm
+
+    # 6. RUN-NAME REPAIR. cli.py runs apply_architecture BEFORE apply_task, so
+    # a `--task opdiff` run has already had `phaseB_<Arch>` stamped in as the
+    # default name by the time this runs. Replace it -- but ONLY when it is
+    # still exactly that stamped default, character for character. Anything
+    # else is a name someone chose (a config file, a diagnostic label) and
+    # overwriting it would rename a run its author had already named, which is
+    # how a dense-routing ablation loses the label enforce_routing_mode
+    # requires.
+    log = cfg.setdefault("logging", {})
+    if arch in ARCHITECTURES:
+        stamped_arith = canonical_run_name(arch, None, TASK_ARITHMETIC)
+        if log.get("run_name") in (None, stamped_arith):
+            log["run_name"] = canonical_run_name(arch, None, TASK_OPDIFF)
+
+    # 7. Route persistence: stamped here as well as in `apply_architecture`
+    # because the two entry points settle `architecture` and `task` in opposite
+    # orders -- see `stamp_routing_persistence`. Idempotent, so paying for it
+    # twice costs nothing.
+    stamp_routing_persistence(cfg)
+
+    # 8. LAST, because it reads dc["opdiff_root"], which the setdefault above
+    # is what settles for a config-file run. cli.py calls it a SECOND time
+    # after the `--opdiff_root` override lands -- see the function's own
+    # docstring for why once is not enough.
+    stamp_opdiff_dataset_versions(cfg)
+    return cfg
+
+
+def stamp_opdiff_dataset_versions(cfg: dict) -> dict:
+    """Write the DATASET's own version strings into `cfg["data"]`, in place.
+
+    T-OD.3. The opdiff counterpart of `stamp_language_dataset_versions`, and
+    it exists for the same reason: the version strings have to reach
+    `cfg["data"]` BEFORE `RunContext.create` runs, because
+    `assert_not_silent_proxy` reads them off the config and `config_hash`
+    covers the `data` block. The dataset object knows the right answer, but it
+    is constructed inside `engine.train()` -- after the guard has already made
+    its decision -- so the attributes were never the thing the run recorded.
+
+    OVERWRITES rather than `setdefault`, exactly as the language stamper does.
+    The value being replaced is not a protocol choice a config file might
+    legitimately make: it is a MEASUREMENT of the bytes on disk, derived by
+    the generator from the SHA-256 of every array it wrote. A config that
+    declared a different one would be declaring that the data is something it
+    is not, and the correct response is to record what was actually read.
+
+    DELIBERATELY NON-FATAL when the dataset is absent, and this is the
+    load-bearing choice. The opdiff dataset is NOT tracked in git (113 MB),
+    so a fresh clone -- the co-author's machine included -- has no dataset
+    until the generator has been run. Raising here would make `--task opdiff`
+    unusable before the build, and defaulting to a guess would put an
+    unmeasured string into provenance. So a missing dataset yields `None`,
+    which the proxy guard already refuses a canonical claim on -- and
+    `MoREOpdiffDataset` raises the real, actionable error with the build
+    command in it when the run actually reaches for the data.
+
+    CALLED TWICE, deliberately: cli.py applies `--opdiff_root` AFTER
+    `apply_task`, so a run pointed at the smoke subset would otherwise record
+    the full dataset's version while reading the smoke one -- a subtler
+    instance of the same defect the language stamper was written for.
+    Idempotent, so the second call is free when no override was given.
+    """
+    dc = cfg.setdefault("data", {})
+    from .opdiff_data import opdiff_versions
+    dsv, tsv = opdiff_versions(dc.get("opdiff_root", OPDIFF_ROOT_DEFAULT))
+    # None means the dataset is not built on this machine. Leaving the
+    # arithmetic string in place would be worse than a null: the proxy guard
+    # REFUSES a canonical claim with no dataset_version, and silently accepts
+    # a wrong one.
+    dc["dataset_version"] = dsv
+    dc["train_split_version"] = tsv
+    return cfg
+
+
 def stamp_language_dataset_versions(cfg: dict) -> dict:
     """Write the CORPUS's own version strings into `cfg["data"]`, in place.
 
@@ -1118,7 +1450,9 @@ def apply_task(cfg: dict, task: str) -> dict:
     # indistinguishable from the arithmetic default and must be treated as
     # undeclared. cli.py's --family_cls block does the refusing for an explicit
     # flag, where the declaration is unambiguous (T-L1.2).
-    return _apply_language_block(cfg, declared_family_cls=None)
+    if t == TASK_LANGUAGE:
+        return _apply_language_block(cfg, declared_family_cls=None)
+    return _apply_opdiff_block(cfg, declared_family_cls=None)
 
 
 # ---------------------------------------------------------------------------

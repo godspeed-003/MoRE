@@ -57,7 +57,8 @@ from .config import resolve_halting_mode, resolve_variant, CANONICAL_VARIANT
 # CANONICAL_TASK for a config with no `task` key, which is what keeps every
 # arithmetic run -- and every archived resolved config -- resolving exactly as
 # before (T-L1.0).
-from .config import resolve_task, CANONICAL_TASK, TASK_ARITHMETIC, TASK_LANGUAGE
+from .config import (resolve_task, CANONICAL_TASK, TASK_ARITHMETIC,
+                     TASK_LANGUAGE, TASK_OPDIFF)
 
 
 # --------------------------------------------------------------------------- #
@@ -89,13 +90,32 @@ CANONICAL_GROUP = "canonical_phase_b"
 CANONICAL_SPEC_PATH_LANGUAGE = os.path.join(_CODE_DIR, "canonical_spec_language.json")
 CANONICAL_GROUP_LANGUAGE = "canonical_lang_b"
 
+# T-OD.3. The opdiff spec and group. A THIRD pair, for the same reason the
+# language one exists: 'canonical_phase_b' is the exact string the exporter
+# admits into the headline arithmetic table, and an opdiff run's primary metric
+# is a masked per-token cross-entropy over answer digits -- a different
+# quantity from an arithmetic MSE. So an opdiff run may never claim either of
+# the other two groups.
+#
+# THE SPEC IS DELIBERATELY UNFROZEN. Every field in it is `null`, which is what
+# makes the guard REFUSE an opdiff canonical claim rather than admit it. That
+# is the intended direction of failure: the opdiff study is new, its protocol
+# has not been frozen from measurement, and the only honest thing a run can
+# say about itself until it is, is 'exploratory'. A run that claims
+# 'canonical_opdiff_b' gets the gate's complaint -- "the canonical spec has
+# unfrozen fields" -- with the file name in it.
+CANONICAL_SPEC_PATH_OPDIFF = os.path.join(_CODE_DIR, "canonical_spec_opdiff.json")
+CANONICAL_GROUP_OPDIFF = "canonical_opdiff_b"
+
 CANONICAL_SPEC_PATH_BY_TASK = {
     TASK_ARITHMETIC: CANONICAL_SPEC_PATH,
     TASK_LANGUAGE:   CANONICAL_SPEC_PATH_LANGUAGE,
+    TASK_OPDIFF:     CANONICAL_SPEC_PATH_OPDIFF,
 }
 CANONICAL_GROUP_BY_TASK = {
     TASK_ARITHMETIC: CANONICAL_GROUP,
     TASK_LANGUAGE:   CANONICAL_GROUP_LANGUAGE,
+    TASK_OPDIFF:     CANONICAL_GROUP_OPDIFF,
 }
 # Every string that means "this is a headline run" on SOME task. Used only to
 # tell a cross-task claim (refuse) from an exploratory label (allow).

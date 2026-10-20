@@ -9881,3 +9881,256 @@ Full generation: train 364,000 / val 7,000 / test 7,000 / ood 3,000 rows,
 110,656,000 train tokens, vocab 43, 113 MB, ~13 s. Smoke subset: 3,584 /
 896 / 896 / 384 rows, 1.7 MB. Both directories absent from `git status`.
 
+## T-OD.3 - the `opdiff` task: a third axis, ported from the language pipeline
+
+**Date.** 2026-10-21. **Machine.** Vedant's RTX 3050 6 GB.
+
+### What
+
+`task = opdiff` now exists as a first-class axis beside `arithmetic` and
+`language`: the same engine, the same training loop, the same metric layer,
+with a different dataset (rows of 16 packed 19-token arithmetic examples, 25
+operations, seven expert groups), a different input adapter (token ids, not
+numeric step features), a different output head (a tied 43-way LM head, not a
+regression scalar) and a different task loss (a masked cross-entropy over the
+generator's scored positions, not an MSE).
+
+**The two new modules.** `code/more/opdiff_families.py` is the manifest (seven
+group labels, the 25 operations in TOKEN order, the operation→group map, an
+EMPTY depth-curriculum table) and `code/more/opdiff_data.py` is the dataset
+(the engine's 7-tuple, the loss mask read from the manifest, the per-token
+operation derived from the operation token the model is shown, the row's oracle
+group at every position).
+
+**Seven files wired.** `model.py` (TASK_OPDIFF + `LM_TASKS`, so the ~20
+"is this an LM-shaped task" sites share one branch instead of twenty copies of
+`task == TASK_LANGUAGE`), `config.py` (the task block, the task-dependent
+expert count and FFN width, the run-name prefix, the persistence entry, the
+version stamper), `cli.py` (`--opdiff_root` and the refusals), `engine.py` (the
+dataset dispatch, the masked loss, the op axis, the label manifest), `metrics.py`
+(the agreement key, the caption, the label threading, the empty-curriculum
+guards), `run_context.py` (the spec and group maps), plus
+`code/canonical_spec_opdiff.json` — **deliberately unfrozen**, every enforced
+field null, so the Gate 0 guard REFUSES an opdiff run that claims
+`canonical_opdiff_b`. That refusal is the intended direction of failure: the
+protocol has not been ratified from measurement, so every opdiff run is
+`exploratory` and no number may head a table labelled canonical.
+
+### The design decisions, and what each one costs
+
+- **Seven experts for MoE/MoRE, one for MoR.** The oracle partition is seven
+  groups, and the confusion matrix is 7×7 for the routed arms — SQUARE, which
+  is the precondition for the Hungarian / AMI / purity report to exist at all
+  (`metrics.permutation_invariant_routing_metrics` returns an all-None "empty"
+  report for a non-square matrix, so a six-expert opdiff run would have
+  reported N/A everywhere and looked like "the router did not specialise").
+  The cost is stated rather than hidden: a different router width is a
+  different study's width, so every opdiff number is compared against opdiff's
+  own MoE/MoR arms and never against the arithmetic table.
+- **MoR at `ffn_mult = 28` (= 7 × 4).** The same budget rule arithmetic (24 =
+  4×6) and language (24) use, applied to seven experts. Measured on the real
+  models: MoR 3,943,944 vs MoRE 3,948,558 non-embedding parameters, a gap of
+  **0.117 %** against T9.2's 5 % bound.
+- **`family_cls` forced to 0.0, halting supervision refused.** The group probe
+  is detached (`model.py`: `family_probe(h.detach())`), so the weight cannot
+  change what the trunk learns — and on opdiff the row DOES carry a whole-row
+  group label, so a non-zero weight would be a LIVE supervision signal on the
+  oracle partition, which is the one confound this study exists to exclude.
+  There is no depth curriculum, so there is nothing to supervise.
+- **`step_routing` is declared 0.0, not forced.** Unlike `family_cls`, a
+  non-zero value is well defined (the row group IS an oracle expert) and is
+  the labelled `oracle_routing` ablation, exactly as on language. Forcing it
+  would have made a legitimate ablation unrunnable.
+
+### Four latent defects the port surfaced, all fixed here
+
+1. **The depth curriculum table was bound from the arithmetic task for every
+   task.** `engine.py` called `op_target_depth_table()` (the arithmetic
+   16-entry table) unconditionally, which was harmless on language because
+   language's `step_ops` are all -1 and nothing ever indexed it. opdiff has a
+   VALID 25-wide operation axis, so the same line would have indexed entries
+   16..24 — `IndexError` on a 16-entry table, and semantically wrong (F1..F12
+   supervised against arithmetic's op depths) if they had been in range. Fixed
+   by binding the TASK's table (arithmetic's, language's empty one, or
+   opdiff's empty one), plus empty-table guards in
+   `metrics.halting_supervision_loss` and `metrics.depth_allocation_error`
+   (which now return an exact zero and `(None, None)` respectively), plus an
+   engine refusal when the flag is on and the table is empty.
+2. **The per-operation depth tensors were sized `NUM_OP_TYPES` = 16.** opdiff's
+   axis is 25 wide, so `op_depth_sum[op_id]` raised at op id 16. Fixed with a
+   task-conditional axis (`_OP_AXIS_NAMES` / `_OP_AXIS_N` in `engine.py`).
+3. **`perf/throughput_tokens_sec` counted items, not tokens, on opdiff.** The
+   T-LX.8 fix (`_tokens_per_item`) was still keyed on `task == TASK_LANGUAGE`,
+   so an opdiff run reported 399 "tok/s" instead of 121,000. This is the SAME
+   defect that once cost the language matrix a 15-day cost estimate, and the
+   token rate is exactly what a matrix budget is costed from. Fixed to
+   `task in LM_TASKS`.
+4. **The dataset identity was parameter-derived.** `meta.json` was entirely a
+   function of the generator's arguments, so two generations that sampled
+   completely different rows carried the SAME version string. The generator now
+   writes a SHA-256 per array and a `dataset_version` over them
+   (`opdiff-v2-<hash>`); `opdiff_data.opdiff_versions` reads it, with a weaker
+   fallback fingerprint for a dataset generated before the change.
+
+### Known gap, stated rather than quietly dropped
+
+The generator writes a **fourth split, `ood`** (3,000 rows of F3/F6/F12 —
+iteration counts never seen in training), and the port does **not** evaluate it:
+the engine's validation pass reads `train`/`val` only, and the matrix protocol
+(T-OD.5) is a train/val comparison of the three arms. The split is on disk and
+the dataset contract is intact, but nothing in this phase measures the model on
+it. An OOD evaluation would be a separate piece of work (a second validation
+pass in `engine.py` plus its own metric keys), and it is NOT done here rather
+than half-done. Recorded so that nobody reads "the OOD split exists" as "the
+OOD split was measured".
+
+### Two pre-existing defects found on the way, also fixed
+
+- **`test_language_task_axis.py:TL1.0g` could not be EVALUATED** after the
+  T-OD.1 cleanup deleted the 190 arithmetic run directories: it required at
+  least one `phaseB_*` run on disk, so it failed on the ABSENCE of evidence
+  rather than on a broken property. It now SKIPS with the reason, and a new
+  check (TL1.0g3) asserts the same invariant against the evidence that still
+  exists — the 15 published language cells, which re-hash and match.
+- **`test_language_families.py` crashed** on a machine without the packed
+  WikiText corpora (`FileNotFoundError: data/lang/wikitext-2/train.npy`),
+  taking the whole file down including checks that had nothing to do with the
+  corpus. The file already had a `skip()` helper for artifacts that are not
+  built here; the corpus loop now uses it.
+
+### Failure tracing
+
+- Loss wrong for opdiff only → `code/more/engine.py`, the epoch loop's
+  `if _task == TASK_LANGUAGE / elif _task == TASK_OPDIFF` branch, and the
+  matching branch in the validation loop. The mask comes from
+  `meta.json:loss_mask` shifted by one (targets are `x[:, 1:]`); it is READ,
+  never recomputed.
+- Routing metrics N/A for opdiff → `code/more/metrics.py`,
+  `permutation_invariant_routing_metrics`: the report is empty for a
+  non-square matrix, so this is a WIDTH problem (7 vs 6 experts), not a metric
+  problem.
+- A routing number where it should be N/A, or an N/A where it should be a
+  number → `code/more/engine.py`, the `_E`/`_F` axes and the
+  `permutation_invariant_routing_metrics` call's `family_labels` argument.
+- The run named `phaseB_*` on an opdiff run, or the expert count wrong →
+  `code/more/config.py`, `_apply_opdiff_block` and
+  `CANONICAL_NUM_EXPERTS_BY_TASK`.
+- The dataset version wrong or missing → `code/more/opdiff_data.py`,
+  `opdiff_versions`; the generator is `make_opdiff_dataset_v2.py`.
+- A config that refuses to load → `code/more/config.py`, `_apply_opdiff_block`
+  (the two refusals) and `code/more/cli.py` (the flag refusals).
+
+### Verify
+
+- `python code/test_opdiff_task_axis.py` → **54 passed, 0 failed, 0 skipped**,
+  including the manifest-versus-generator cross-check, the 7-tuple semantics,
+  the two refusals, the square confusion, the empty-curriculum guards, the
+  0.117 % parameter budget, and the pre/post config-hash comparison.
+- `python code/run_correctness_suite.py` → TOTAL **356/356**, all five gates
+  PASS (19/31/27/129/150). The arithmetic total did not move, because the new
+  suite is a separate file and the gate's file lists are fixed.
+- `python code/test_language_task_axis.py` → 79 passed, 0 failed (one skip).
+- `python code/test_language_families.py` → 43 passed, 0 failed, 5 skipped.
+- **The arithmetic and language resolved-config hashes are byte-identical to
+  a pre-port tree of `code/more`**: `config.json` raw + moe/mor/more and
+  `config_language.json` raw + moe/mor/more, all seven pairs equal. Verified
+  mechanically (the pre-port tree is extracted from git, the config files are
+  read from their canonical location so the data paths resolve identically,
+  and the two resolutions are compared) — and re-checked inside the test
+  suite as OD.7a/OD.7b, so it cannot rot.
+
+## T-OD.4 - smoke test of all three architectures on the opdiff subset
+
+**Date.** 2026-10-21. **Machine.** Vedant's RTX 3050 6 GB.
+
+### What
+
+One 3-epoch run per architecture on `opdiff_v2_smoke` (3,584 train rows, 896
+val rows — 1 % of the data), with the SAME code files the full runs will use:
+`code/train.py --config code/config_opdiff.json --task opdiff
+--opdiff_root opdiff_v2_smoke --epochs 3 --seed 42`.
+
+### The measurements
+
+| arm | items/s | tokens/s | val/task_loss 1 ep → 3 ep | depth | agreement | Hungarian | AMI | peak VRAM |
+|---|---|---|---|---|---|---|---|---|
+| MoE | 498.4 | 151,504 | 1.4261 → 1.3327 | N/A | 0.1532 | 0.2241 | 0.0738 | 0.59 GiB |
+| MoR | 52.4 | 15,930 | 1.4129 → 1.3254 | 4.17 | N/A | N/A | N/A | **5.49 GiB** |
+| MoRE | 95.3 | 28,957 | 1.3853 → 1.3087 | 5.43 | 0.1544 | 0.1846 | 0.0140 | 2.10 GiB |
+
+- **The loss falls on all three arms** over 3 epochs, and MoRE has the lowest
+  validation loss of the three. On 1 % of the data at one seed this is NOT a
+  result — it is a check that the objective is wired to the right thing.
+- **The routing numbers are defined for the routed arms and N/A for MoR**,
+  which is the contract, not a gap: MoR makes no routing decision.
+- **The per-operation depth table has 22 rows** (the 22 operations that occur
+  in train/val; the three OOD operations are absent, correctly) and the
+  per-group table has 7.
+- **The confusion matrix is square** for MoE/MoRE, so the Hungarian / AMI /
+  purity report is defined.
+- **Every run is stamped `exploratory`** and its run directory is
+  `opdiffB_<Arch>_seed42__<hash>` with the full artifact set (config.json,
+  resolved_config.json, metrics.json, results.tsv, checkpoint.pt).
+
+### Two facts that decide where the matrix runs
+
+- **MoR's peak is 5,491 MiB — 91 % of this 6 GB card.** The language
+  calibration found that above ~87 % the epoch time goes UP rather than the
+  run failing, so the matrix belongs on the 8 GB card (69 % there). The
+  preflight now says this with the measured number.
+- **MoR is 9.5× slower per token than MoE** (15,930 vs 151,504 tok/s),
+  because MoR evaluates one dense FFN of width 28 for every token while MoE
+  evaluates one expert of width 4. Extrapolated to the full dataset at 3
+  epochs × 5 seeds: **≈ 49 h on the 3050, ≈ 33 h on the 4060** (the latter
+  from the language calibration's measured ~1.5× factor, and the pilot's
+  measured epoch time replaces it).
+
+### Verify
+
+- Three runs, exit code 0 each, artifacts present in each run directory.
+- `python code/test_opdiff_task_axis.py` → 54/54 green AFTER the port.
+- `python code/run_correctness_suite.py` → 356/356 after the port.
+- The two 1-epoch smoke runs from the first pass were DELETED, not kept: they
+  carried the pre-fix throughput metric (399 "tok/s" instead of 121,000), and
+  a run directory holding a known-wrong number is worse than no run directory.
+  The 3-epoch runs were re-launched with an explicit `--run_name
+  opdiffB_smoke_<Arch>_seed42`, because the default name
+  (`opdiffB_<Arch>_seed<S>__<hash>`) is indistinguishable from a matrix cell
+  and a smoke run that looks like a matrix cell ends up in a table.
+
+## T-OD.5 - the budget, measured (the APPROVAL is still pending)
+
+**Date.** 2026-10-21. **Machine.** Vedant's RTX 3050 6 GB.
+
+**Measured**, from the T-OD.4 smoke runs: 498.4 / 52.4 / 95.3 items/s for
+MoE / MoR / MoRE at batch 48 (the token rate is the measurement; the epoch
+times are the extrapolation from it, and the pilot replaces them with its own
+measurement).
+
+**Budget at 3 epochs × 5 seeds** (seeds 42–46, the frozen seed set): MoE
+3.1 h, MoR 29.5 h, MoRE 16.2 h — **≈ 49 h on the 6 GB gate card, ≈ 33 h on
+the co-author's 8 GB card**. The pilot (3 arms × seed 42) is 9.8 h of that
+and is NOT extra work: it is the matrix's seed-42 cells.
+
+**The approval gate is NOT satisfied.** No full-matrix launch may happen until
+the user approves this budget in chat, and the approval is recorded as a tick
+on T-OD.5 in `TASKS.md`. `HANDOFF.md` §4/§5 instructs the co-author's agent
+to run the pilot and then stop if the box is unticked.
+
+## T-OD.6 - HANDOFF.md for the co-author's agent
+
+**Date.** 2026-10-21.
+
+`HANDOFF.md` (repo root) is the co-author's agent's brief: the machine and
+interpreter, the dataset check/regeneration/verification, the preflight, the
+pilot with its seven acceptance checks, the remaining ten cells, the
+aggregation command and the exact quantities to report back, the
+stop-at-first-failure protocol, the never-change list, the already-measured
+numbers so they are not re-measured, and what the study may and may not
+claim.
+
+Every command in it has been executed at least once on the smoke path, except
+the two that launch the matrix itself (`--pilot` and `--all`), which are
+covered by `--dry-run` plus the three direct smoke runs.
+
+

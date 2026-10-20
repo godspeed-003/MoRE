@@ -18,7 +18,8 @@ from .config import (load_config, apply_architecture, apply_task,
                      enforce_routing_mode, stamp_seed_into_run_name,
                      resolve_task, ARCHITECTURES, TASKS, TASK_ARITHMETIC,
                      LANGUAGE_CORPORA, stamp_language_dataset_versions,
-                     TASK_LANGUAGE)
+                     TASK_LANGUAGE, TASK_OPDIFF, LM_TASKS,
+                     stamp_opdiff_dataset_versions)
 from .engine import train
 from .run_context import RunContext, resolve_overrides, ProxyGuardError
 
@@ -159,6 +160,17 @@ def build_parser(default_architecture: str | None = None) -> argparse.ArgumentPa
              "Changing this invalidates the tokenized dataset, so it must match "
              "the dataset manifest -- Gate L2 checks that it does.",
     )
+    p.add_argument(
+        "--opdiff_root", type=str, default=None,
+        help="Which opdiff dataset directory to read, opdiff only. A path "
+             "relative to the REPO ROOT (the default 'opdiff_v2'), or an "
+             "absolute path. The smoke subset is 'opdiff_v2_smoke'. The "
+             "override is applied AFTER the task block, so the dataset version "
+             "strings are RE-STAMPED from the directory actually read -- a run "
+             "pointed at the smoke subset must not record the full dataset's "
+             "id. The resolved config keeps the path as given, so no "
+             "machine-specific absolute path enters the config_hash.",
+    )
     return p
 
 
@@ -198,6 +210,24 @@ def main(argv=None, default_architecture: str | None = None) -> int:
         # is unreachable by construction, so supervising it would inject a
         # permanent irreducible loss. Refuse rather than silently ignore.
         if args.halting_supervision:
+            if task == TASK_OPDIFF:
+                # T-OD.3. The config block refuses a DECLARED halting
+                # supervision on opdiff, but the CLI flag lands AFTER that
+                # block, so the refusal has to be repeated here -- otherwise
+                # the flag would sneak past the one place that knows the task
+                # has no depth curriculum.
+                raise ValueError(
+                    "--halting_supervision is not available on "
+                    f"--task {TASK_OPDIFF}. The opdiff task has NO depth "
+                    "curriculum: `opdiff_families.op_target_depth_table()` is "
+                    "empty by construction, because the generator's nominal "
+                    "difficulty is a placeholder awaiting dense-baseline "
+                    "calibration and not a depth target. Supervising against "
+                    "nothing would label the run 'supervised_curriculum' while "
+                    "supervising nothing, which is the labelling defect this "
+                    "repository treats as a correctness bug. Run opdiff in "
+                    "pure ACT, which is the mode the study is defined in."
+                )
             if raw_cfg["model"]["max_depth"] <= 1:
                 raise ValueError(
                     "--halting_supervision requires max_depth > 1. "
@@ -301,6 +331,28 @@ def main(argv=None, default_architecture: str | None = None) -> int:
                     "exist, and a packed LM sequence has no whole-sequence family "
                     "label for one to use. Drop the flag, or pass 0.0."
                 )
+            if task == TASK_OPDIFF and args.family_cls != 0.0:
+                # T-OD.3. The same discipline as the language refusal above, with
+                # one difference that makes it STRONGER here: an opdiff row DOES
+                # carry a whole-row group label, so a non-zero weight would not
+                # be an inert-but-harmless term -- it would be a LIVE
+                # supervision signal on the oracle partition, which is the one
+                # confound the opdiff study exists to measure without. The
+                # labelled alternative is `--step_routing`, which trains the
+                # router against the group and is stamped `oracle_routing`.
+                raise ValueError(
+                    f"--family_cls {args.family_cls} with --task {TASK_OPDIFF}. "
+                    "On opdiff the family head is a DETACHED probe: it reads "
+                    "h.detach(), so its gradient reaches only its own Linear and "
+                    "its weight cannot change what the trunk learns. An opdiff "
+                    "row also carries a whole-row GROUP label, so a non-zero "
+                    "weight would put the oracle partition directly into the "
+                    "trunk's objective -- exactly the confound the opdiff study "
+                    "is designed to exclude. Drop the flag, or pass 0.0. If you "
+                    "want the router trained against the group, use "
+                    "--step_routing, which is labelled `oracle_routing` and may "
+                    "never share a table with an unsupervised run."
+                )
             raw_cfg["loss_weights"]["family_cls"] = args.family_cls
 
         # T8.3 / T9.2 parameter-budget override. apply_architecture has just
@@ -322,21 +374,38 @@ def main(argv=None, default_architecture: str | None = None) -> int:
         # [max_steps, step_feat_dim] numeric feature block -- so accepting the flag
         # would write a field into the resolved config, and therefore into the
         # config_hash and the provenance record, that describes nothing the run did.
-        for _flag, _val, _section, _key in (
-            ("--seq_len",    args.seq_len,    "data", "seq_len"),
-            ("--vocab_size", args.vocab_size, "data", "vocab_size"),
-            ("--corpus",     args.corpus,     "data", "corpus"),
+        #
+        # T-OD.3: `--seq_len` and `--vocab_size` are now accepted on BOTH LM
+        # tasks, because opdiff has the same SHAPE (token ids in, vocabulary
+        # logits out) with different numbers (304 and 43). The engine refuses a
+        # value that disagrees with the dataset on disk, so the override is a
+        # calibration tool and not a way to run on data that does not exist.
+        # `--corpus` stays LANGUAGE-ONLY: opdiff reads its own generated arrays
+        # under `data.opdiff_root` and has no corpus to select.
+        for _flag, _val, _section, _key, _tasks in (
+            ("--seq_len",    args.seq_len,    "data", "seq_len",    LM_TASKS),
+            ("--vocab_size", args.vocab_size, "data", "vocab_size", LM_TASKS),
+            ("--corpus",     args.corpus,     "data", "corpus",     (TASK_LANGUAGE,)),
         ):
             if _val is None:
                 continue
-            if task != TASK_LANGUAGE:
+            if task not in _tasks:
+                if task == TASK_ARITHMETIC:
+                    raise ValueError(
+                        f"{_flag} requires --task {TASK_LANGUAGE}, but this run is "
+                        f"task={task!r}. The arithmetic task has no packed sequence "
+                        "length and no token vocabulary -- its input is a numeric "
+                        "[max_steps, step_feat_dim] feature block -- so this value "
+                        "would enter the resolved config, the config_hash and the "
+                        "provenance record while describing nothing the run did."
+                    )
                 raise ValueError(
                     f"{_flag} requires --task {TASK_LANGUAGE}, but this run is "
-                    f"task={task!r}. The arithmetic task has no packed sequence "
-                    "length and no token vocabulary -- its input is a numeric "
-                    "[max_steps, step_feat_dim] feature block -- so this value "
-                    "would enter the resolved config, the config_hash and the "
-                    "provenance record while describing nothing the run did."
+                    f"task={task!r}. The opdiff task reads its own generated "
+                    "arrays under data.opdiff_root, not a text corpus: there is "
+                    "no corpus to select, and writing one into the resolved "
+                    "config would enter the config_hash and the provenance "
+                    "record while describing nothing the run did."
                 )
             # `--corpus` is a name, not a size, so the positivity check is guarded on
             # the type. `argparse` already restricted it to LANGUAGE_CORPORA, so there
@@ -344,6 +413,22 @@ def main(argv=None, default_architecture: str | None = None) -> int:
             if isinstance(_val, int) and _val < 1:
                 raise ValueError(f"{_flag} must be >= 1, got {_val}.")
             raw_cfg[_section][_key] = _val
+
+        # T-OD.3. The opdiff dataset override. REFUSED on every other task,
+        # because `data.opdiff_root` describes a dataset that only the opdiff
+        # task reads: writing it into an arithmetic or language run's resolved
+        # config would put a field into the config_hash and the provenance
+        # record that describes nothing the run did.
+        if args.opdiff_root is not None:
+            if task != TASK_OPDIFF:
+                raise ValueError(
+                    f"--opdiff_root requires --task {TASK_OPDIFF}, but this run is "
+                    f"task={task!r}. The opdiff dataset is a set of generated "
+                    "token arrays with their own loss mask and their own oracle "
+                    "group labels; no other task reads it, so recording its path "
+                    "here would describe nothing this run did."
+                )
+            raw_cfg["data"]["opdiff_root"] = args.opdiff_root
 
         if args.vocab_size is not None:
             # The tokenized .npy arrays are uint16 (plan_language.md §3), so ids
@@ -366,6 +451,13 @@ def main(argv=None, default_architecture: str | None = None) -> int:
         # Idempotent, so it costs nothing when no --corpus was given.
         if task == TASK_LANGUAGE:
             stamp_language_dataset_versions(raw_cfg)
+        # T-OD.3. The same re-stamp for the opdiff dataset, and it is needed for
+        # the same reason: `--opdiff_root` was applied ABOVE, after
+        # `apply_task` ran. Without it a run pointed at the smoke subset would
+        # record the FULL dataset's version while reading the smoke one -- the
+        # same class of defect T-L7.1a fixed for the corpus.
+        elif task == TASK_OPDIFF:
+            stamp_opdiff_dataset_versions(raw_cfg)
 
         resolved = resolve_overrides(
             raw_cfg,

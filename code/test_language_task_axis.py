@@ -48,6 +48,12 @@ from more.config import (load_config_defaults, load_config, apply_architecture,
                          CANONICAL_RUN_PREFIX_LANGUAGE,
                          LANGUAGE_N_HEADS_DEFAULT, LANGUAGE_SEQ_LEN_DEFAULT,
                          LANGUAGE_VOCAB_SIZE_DEFAULT, ARCHITECTURES)
+# T-OD.3. The opdiff task is now a third member of `TASKS`, so the loops
+# below that iterate TASKS have to know what opdiff's shape IS rather than
+# assuming the arithmetic/language pair. `TASK_OPDIFF` is imported here for
+# exactly that reason; the language-specific assertions stay language-
+# specific, and the task-agnostic ones are now three-way.
+from more.config import TASK_OPDIFF, LM_TASKS
 from more.run_context import config_hash, canonical_json
 
 try:
@@ -64,6 +70,19 @@ PASS, FAIL = [], []
 def check(name, ok, detail=""):
     (PASS if ok else FAIL).append(name)
     print(f"  [{'PASS' if ok else 'FAIL'}] {name}" + (f"  -- {detail}" if detail else ""))
+
+
+def skip(name, why=""):
+    """A check that could not be EVALUATED, reported as neither pass nor fail.
+
+    The distinction matters. A check whose evidence was deliberately removed
+    (T-OD.1 deleted the arithmetic run directories) cannot PASS -- there is
+    nothing to assert over -- and it must not FAIL either, because a failure
+    says "a property is broken" when the truth is "there is nothing to look
+    at". Counting it in either bucket would put a false statement in the
+    summary line, which is exactly what CLAUDE.md 4 forbids.
+    """
+    print(f"  [SKIP] {name}" + (f"  -- {why}" if why else ""))
 
 
 def _raises_valueerror(fn, needle=""):
@@ -190,12 +209,44 @@ seeded = [d for d in run_dirs if "seedNA" not in os.path.basename(d)]
 unseeded = [d for d in run_dirs if "seedNA" in os.path.basename(d)]
 
 ok, mismatched, unhashed = _rehash(seeded)
-check("TL1.0g every SEEDED phaseB run's recorded config_hash is still "
+if not seeded:
+    # T-OD.1 (the user-approved cleanup) DELETED the 190 arithmetic run
+    # directories, so this check has no evidence left to assert over. It must
+    # not PASS vacuously -- "0 runs matched" is not a pass -- and it must not
+    # FAIL either, because the failure would say "a published run's hash
+    # moved" when the truth is "the published runs are no longer on this
+    # machine". So it is reported as skipped, and the LIVE evidence -- the 15
+    # published language cells, which are still on disk -- is checked in
+    # TL1.0g3 below. The arithmetic hashes are re-derived from source in
+    # T-OD.3's own verification (a pre-port tree vs the ported tree, same
+    # config files, same absolute paths) and the result is recorded in the
+    # changelog.
+    skip("TL1.0g every SEEDED phaseB run's recorded config_hash is still "
+         "re-derivable from its own resolved config",
+         "no phaseB_* run directories on this machine: they were deleted by "
+         "the T-OD.1 cleanup, so the check has no evidence to assert over")
+else:
+    check("TL1.0g every SEEDED phaseB run's recorded config_hash is still "
+          "re-derivable from its own resolved config",
+          len(ok) > 0 and not mismatched,
+          f"{len(ok)} runs re-hashed and matched, {unhashed} without a recorded "
+          f"hash, {len(mismatched)} mismatched"
+          + (f": {mismatched[:3]}" if mismatched else ""))
+
+# TL1.0g3. THE LIVE EVIDENCE for the same invariant. The 15 published
+# language cells ARE still on disk, and their recorded config_hash must still
+# re-derive from their own resolved config. This is the check that would catch
+# a config-layer change moving a published run's identity -- which is exactly
+# what the opdiff port had to avoid -- and it is checked on every run of this
+# suite.
+_lang_dirs = sorted(glob.glob(os.path.join(REPO, "runs", "langB_*")))
+_lok, _lbad, _lunhashed = _rehash(_lang_dirs)
+check("TL1.0g3 every published LANGUAGE run's recorded config_hash is still "
       "re-derivable from its own resolved config",
-      len(ok) > 0 and not mismatched,
-      f"{len(ok)} runs re-hashed and matched, {unhashed} without a recorded "
-      f"hash, {len(mismatched)} mismatched"
-      + (f": {mismatched[:3]}" if mismatched else ""))
+      len(_lok) > 0 and not _lbad,
+      f"{len(_lok)} runs re-hashed and matched, {_lunhashed} without a recorded "
+      f"hash, {len(_lbad)} mismatched"
+      + (f": {_lbad[:3]}" if _lbad else ""))
 
 # TL1.0g2. The three unseeded runs record a hash computed when config_hash
 # excluded `provenance` ONLY; `logging` was added to the exclusion set later, and
@@ -345,35 +396,47 @@ check("TL1.0t n_heads that does not divide d_model raises in the config layer",
 print("\n--- T-L1.0  the task axis is orthogonal to the architecture axis")
 # ===========================================================================
 
-# All six (task, architecture) pairs must resolve, and `architecture` must stamp
-# exactly what it stamped before on both tasks: the two axes answer different
+# All (task, architecture) pairs must resolve, and `architecture` must stamp
+# exactly what it stamped before on every task: the two axes answer different
 # questions (which module / how much depth vs which data and objective) and a
 # cross-term here would mean one had leaked into the other.
-ARCH_EXPECT = {"moe": (6, 1, False), "mor": (1, None, True), "more": (6, None, True)}
+#
+# T-OD.3. The expert count is TASK-DEPENDENT, because the oracle label space
+# is: arithmetic and language have six families each, opdiff has seven expert
+# groups. A single table would either fail the opdiff arms (6 != 7) or
+# silently let them run at six experts, which is the width whose confusion
+# matrix cannot be scored against a seven-group oracle at all.
+ARCH_EXPECT = {
+    TASK_ARITHMETIC: {"moe": (6, 1, False), "mor": (1, None, True), "more": (6, None, True)},
+    TASK_LANGUAGE:   {"moe": (6, 1, False), "mor": (1, None, True), "more": (6, None, True)},
+    TASK_OPDIFF:     {"moe": (7, 1, False), "mor": (1, None, True), "more": (7, None, True)},
+}
 ok_pairs, bad = 0, []
 for t in TASKS:
     for a in ARCHITECTURES:
         cfg = load_config_defaults({"task": t} if t != TASK_ARITHMETIC else {})
         cfg = apply_architecture(cfg, a)
         cfg = apply_task(cfg, t)
-        want_E, want_depth, want_halt = ARCH_EXPECT[a]
+        want_E, want_depth, want_halt = ARCH_EXPECT[t][a]
         mc = cfg["model"]
         good = (mc["num_experts"] == want_E
                 and mc["adaptive_halting"] is want_halt
                 and (want_depth is None or mc["max_depth"] == want_depth)
                 and resolve_task(cfg) == t)
-        # attention is a property of the TASK, on all three architectures:
+        # attention is a property of the LM SHAPE, on all three architectures:
         # plan_language.md §6.6, "MoR keeps attention" -- one expert is not the
-        # same claim as no context.
-        good = good and (mc.get("attention", False) is (t == TASK_LANGUAGE))
+        # same claim as no context. T-OD.3: opdiff is LM-shaped too (token ids
+        # in, vocabulary logits out, a row of 16 packed examples), so it keeps
+        # attention as well.
+        good = good and (mc.get("attention", False) is (t in LM_TASKS))
         ok_pairs += bool(good)
         if not good:
             bad.append((t, a, mc.get("num_experts"), mc.get("max_depth"),
                         mc.get("adaptive_halting"), mc.get("attention")))
-check("TL1.0u all 6 (task, architecture) pairs resolve with both axes intact",
+check("TL1.0u every (task, architecture) pair resolves with both axes intact",
       ok_pairs == len(TASKS) * len(ARCHITECTURES),
       f"{ok_pairs}/{len(TASKS) * len(ARCHITECTURES)}"
-      + (f", bad: {bad}" if bad else "; attention on iff task=language, MoR included"))
+      + (f", bad: {bad}" if bad else "; attention on iff the task is LM-shaped, MoR included"))
 
 # apply_task must be idempotent and order-independent with apply_architecture,
 # because cli.py fixes one order and the tests use the other.
@@ -875,8 +938,12 @@ for _rc in sorted(glob.glob(os.path.join(REPO, "runs", "*", "metrics.json"))):
     if not isinstance(_tok, (int, float)) or not isinstance(_itm, (int, float)):
         continue                                   # pre-fix run: only one key
     _t = _cfg.get("task") or resolve_task(_cfg)
+    # T-OD.3. `tokens_per_item` is the SEQUENCE LENGTH on both LM tasks: an
+    # item is a packed block of `data.seq_len` tokens. opdiff's is 304, not
+    # 256, and getting this wrong would make the throughput invariant below
+    # fail on the opdiff runs (or, worse, make it vacuous).
     _tpi = (int(_cfg.get("data", {}).get("seq_len", 0))
-            if _t == TASK_LANGUAGE else 1)
+            if _t in LM_TASKS else 1)
     _tlx8_rows.append((os.path.basename(_rd), _t, _tok, _itm, _tpi))
     if _t == TASK_LANGUAGE:
         _tlx8_lang += 1
@@ -906,7 +973,7 @@ check("TLX.8c no language run reports a token rate below 1 k tok/s -- the "
          if _tlx8_lang else "N/A")
       if not _tlx8_slow else f"{_tlx8_slow[0][0]} at {_tlx8_slow[0][2]:.1f}")
 
-_tlx8_ar = [r for r in _tlx8_rows if r[1] != TASK_LANGUAGE]
+_tlx8_ar = [r for r in _tlx8_rows if r[1] == TASK_ARITHMETIC]
 check("TLX.8d an ARITHMETIC run's two keys are equal -- an item is a record "
       "there, so the historical records/s reading of the old key is preserved "
       "byte-for-byte",

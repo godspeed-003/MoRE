@@ -321,12 +321,27 @@ def _sha256_file(path):
     return h.hexdigest()
 
 
+# A corpus is only USABLE by the checks below if its PACKED blocks are on
+# disk: the token-level budget check recounts the families through the real
+# `train.npy`, and a manifest without the blocks is a build that stopped
+# between the tokenizer stage and the pack stage.
+#
+# On a machine where the corpus was never packed (the gate machine has the
+# tokenizer and the family lookup but not the 135 M-token arrays, because the
+# corpus is not tracked in git), the loop below used to raise
+# FileNotFoundError on `train.npy` and take the whole file down -- including
+# the checks that have nothing to do with the corpus and could have run. The
+# file already has a `skip()` helper for artifacts that are not built here
+# (the shuffled control, the topic partition), and this is the same case.
 _built = [(c, m) for c in CORPORA
-          if (m := _manifest(c)) is not None and "token_family_sha256" in m]
+          if (m := _manifest(c)) is not None and "token_family_sha256" in m
+          and os.path.exists(os.path.join(LANG, c, "train.npy"))]
 
 if not _built:
     skip("TL3.1a-l", "no corpus has a family lookup yet; run "
                      "data/lang/build_family_lookup.py")
+    skip("TL3.1f", "no corpus has PACKED blocks on this machine; run "
+                   "data/lang/build_language_dataset.py --stage pack")
 
 for corpus, man in _built:
     tag = f"[{corpus}]"
@@ -499,10 +514,11 @@ check("TL3.2b the ARITHMETIC key is unchanged, so Gate L0's contract still holds
       "G5.2b checks this exact string on a single-expert run; the default has to "
       "stay arithmetic for absence-means-arithmetic to survive")
 
-check("TL3.2c the two spellings are DIFFERENT, so no exporter can join them",
-      len(set(M.routing_agreement_keys_all())) == 2,
-      f"{M.routing_agreement_keys_all()} -- one column of accuracies and one of "
-      f"agreements cannot be silently averaged together")
+check("TL3.2c the three spellings are DIFFERENT, so no exporter can join them",
+      len(set(M.routing_agreement_keys_all())) == 3,
+      f"{M.routing_agreement_keys_all()} -- one column of accuracies and two of "
+      f"agreements cannot be silently averaged together. T-OD.3 added the opdiff "
+      f"one (val/routing_agreement_with_group), so the count is 3, not 2.")
 
 _task_raised = False
 try:

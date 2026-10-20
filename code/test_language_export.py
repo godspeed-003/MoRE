@@ -474,11 +474,27 @@ else:
     abl = ex.load_ablations()
     # The cross-task leak with no run directory to refuse it: the Phase 10 file
     # holds arithmetic MSE gaps against an arithmetic MoRE baseline.
-    check("the arithmetic Phase 10 ablation file is NOT ingested into a language "
-          "export, even though it exists on disk",
-          abl is None and ex.PHASE10_RESULT.exists(),
-          f"load_ablations()={type(abl).__name__}, "
-          f"file exists={ex.PHASE10_RESULT.exists()}")
+    #
+    # VACUITY-AWARE. The check needs the arithmetic Phase-10 file to EXIST on
+    # disk, and the T-OD.1 cleanup (user-approved) deleted the arithmetic-era
+    # result tables, so on a machine without them the file is gone and the
+    # check has nothing to demonstrate. It then SKIPS with the reason rather
+    # than failing: a failure would say "the exporter ingested an arithmetic
+    # ablation into a language export", which is not what happened -- the
+    # artifact is simply not here any more. Where the file IS present, the
+    # assertion is unchanged.
+    if ex.PHASE10_RESULT.exists():
+        check("the arithmetic Phase 10 ablation file is NOT ingested into a "
+              "language export, even though it exists on disk",
+              abl is None,
+              f"load_ablations()={type(abl).__name__}, "
+              f"file exists={ex.PHASE10_RESULT.exists()}")
+    else:
+        skip("the arithmetic Phase 10 ablation file is NOT ingested into a "
+             "language export, even though it exists on disk",
+             f"{ex.PHASE10_RESULT} is not on this machine (the T-OD.1 cleanup "
+             f"removed the arithmetic-era result tables), so there is no "
+             f"artifact for the leak to be demonstrated on")
 
     p_runs = ex.write_runs_csv(rows, keys)
     p_agg = ex.write_agg_csv(agg, keys)

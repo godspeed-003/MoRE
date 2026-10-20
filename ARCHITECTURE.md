@@ -302,14 +302,15 @@ from the same `engine.py`, the same routing path, the same halting machinery and
 same balance objective. There is no `language/` package for the same reason there is no
 `moe/` one.
 
-| | `task = arithmetic` (default) | `task = language` |
-|---|---|---|
-| dataset class | `more.data.MoREDataset` | `more.lang_data.MoRELanguageDataset` |
-| input head | `nn.Linear(step_feat_dim, d_model)` + op embedding | `nn.Embedding(vocab_size, d_model)` + learned positions |
-| output head | scalar regression | `nn.Linear(d_model, vocab_size)`, weight-tied |
-| primary metric | MSE against 0.080914 | cross-entropy in **nats/token** against 4.984947 |
-| attention | absent | **one shared causal sublayer** |
-| spec / group | `canonical_spec.json` / `canonical_phase_b` | `canonical_spec_language.json` / `canonical_lang_b` |
+| | `task = arithmetic` (default) | `task = language` | `task = opdiff` |
+|---|---|---|---|
+| dataset class | `more.data.MoREDataset` | `more.lang_data.MoRELanguageDataset` | `more.opdiff_data.MoREOpdiffDataset` |
+| input head | `nn.Linear(step_feat_dim, d_model)` + op embedding | `nn.Embedding(vocab_size, d_model)` + learned positions | `nn.Embedding(vocab_size, d_model)` + learned positions |
+| output head | scalar regression | `nn.Linear(d_model, vocab_size)`, weight-tied | `nn.Linear(d_model, vocab_size)`, weight-tied |
+| primary metric | MSE against 0.080914 | cross-entropy in **nats/token** against 4.984947 | masked cross-entropy in **nats/scored token** (answer digits + EOS) |
+| attention | absent | **one shared causal sublayer** | **one shared causal sublayer** |
+| oracle label space | 6 operation families | 6 POS families | **7 expert groups** (E=7) |
+| spec / group | `canonical_spec.json` / `canonical_phase_b` | `canonical_spec_language.json` / `canonical_lang_b` | `canonical_spec_opdiff.json` / `canonical_opdiff_b` (**unfrozen by design** → every run is `exploratory`) |
 
 **Absence of a `task` key MEANS `arithmetic`.** No `task` field is injected on the
 arithmetic path, which is what preserves all 15 published arithmetic `config_hash`

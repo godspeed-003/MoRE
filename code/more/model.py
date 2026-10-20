@@ -150,6 +150,29 @@ CAPACITY_POLICY = "no_capacity_limit"
 # modules. `config.py` re-exports both names unchanged, so no call site moved.
 TASK_ARITHMETIC = "arithmetic"
 TASK_LANGUAGE   = "language"
+# T-OD.3. The third task: the op-difficulty dataset (16 packed 19-token
+# examples per row, an operation token per example, seven expert groups).
+# It is LM-SHAPED -- token ids in, vocabulary logits out, a tied head, causal
+# self-attention -- and differs from language in the DATA, the vocabulary size
+# (43 vs 8192), the sequence length (304 vs 256) and the oracle label space
+# (7 expert GROUPS vs 6 POS families). See more/opdiff_families.py.
+TASK_OPDIFF     = "opdiff"
+
+# THE TASKS THAT SHARE THE LM SHAPE. `arithmetic` is the odd one out: its
+# input is a [max_steps, step_feat_dim] numeric feature block and its output is
+# a regression scalar, so it has no token vocabulary, no sequence length and no
+# causal attention. The two LM tasks share the input adapter (a token
+# embedding), the output head (a tied LM head), the task loss (a shifted
+# cross-entropy) and the detached family probe -- and differ in everything
+# that comes from the data.
+#
+# ONE constant, because the alternative is a `task == TASK_LANGUAGE` test
+# repeated at twenty-odd sites in engine.py, where the sixteenth one is
+# forgotten and the task silently takes the arithmetic path. The sites that
+# MEAN "language specifically" -- the corpus floor, the POS partition
+# entropy, the frequency-depth report -- keep testing for language
+# explicitly; the sites that mean "LM-shaped" test this.
+LM_TASKS = (TASK_LANGUAGE, TASK_OPDIFF)
 
 
 # ---------------------------------------------------------------------------
@@ -1192,7 +1215,7 @@ class MoREModel(nn.Module):
         # Per-step projection: each step row [step_feat_dim] → [d_model].
         # PyTorch applies Linear to the last dim, so [B, S, F] → [B, S, d_model].
         #
-        # T-L5.2: ARITHMETIC ONLY. The language input adapter is a token embedding
+        # T-L5.2: ARITHMETIC ONLY. The LM input adapter is a token embedding
         # (see the head block below), so `step_proj` and `op_embed` have no meaning
         # there. Not constructed rather than constructed-and-skipped, for the same
         # reason as `regression_head`: an unused module still contributes parameters
@@ -1200,7 +1223,14 @@ class MoREModel(nn.Module):
         # `nn.Embedding(0, d_model)` on language -- `lang_families.NUM_OP_TYPES` is
         # 0 because there is no operation axis -- which is legal to build and raises
         # only when indexed, i.e. the worst kind of latent trap.
-        if str(task) != TASK_LANGUAGE:
+        #
+        # T-OD.3: opdiff is LM-shaped too, so it also skips both. It HAS an
+        # operation axis (25 wide) -- but the operation is already in the token
+        # stream, as the operation token the model reads, so an `op_embed` would
+        # be a second copy of the same information, and on a task whose whole
+        # point is that the model infers the operation from the sequence, it
+        # would be a way of making the task easier than advertised.
+        if str(task) not in LM_TASKS:
             self.step_proj = nn.Sequential(
                 nn.Linear(step_feat_dim, d_model),
                 nn.LayerNorm(d_model),
@@ -1283,11 +1313,11 @@ class MoREModel(nn.Module):
         # parameters to the budget comparison and still invites a future reader to
         # weight it. Absence is the enforceable form of "has no meaning here".
         self.task = str(task)
-        if self.task == TASK_LANGUAGE:
+        if self.task in LM_TASKS:
             if vocab_size is None:
                 raise ValueError(
-                    "task='language' requires vocab_size: the token embedding and "
-                    "the tied LM head are both [vocab_size, d_model], and a "
+                    f"task={self.task!r} requires vocab_size: the token embedding "
+                    "and the tied LM head are both [vocab_size, d_model], and a "
                     "default would silently disagree with the corpus the manifest "
                     "was built for."
                 )
@@ -1409,14 +1439,20 @@ class MoREModel(nn.Module):
                                 the summed counts.
         """
         # [B, max_steps, step_feat_dim] → [B, max_steps, d_model]
-        if self.task == TASK_LANGUAGE:
+        if self.task in LM_TASKS:
             # T-L5.0. `x` is `input_ids [B, S]` long, not a float feature matrix.
             # `step_ops` is all -1 for language (there is no operation axis) and is
             # accepted but unused, so the arithmetic caller's argument order is
-            # untouched.
+            # untouched. On opdiff `step_ops` IS populated (0..24) but is still
+            # UNUSED here: the operation is already in the token stream, as the
+            # operation token the model reads. Handing it in as an embedding
+            # would be a second copy of the same information, and on a task
+            # whose whole point is that the model infers the operation from the
+            # sequence, it would be a way of making the task easier than
+            # advertised.
             if x.dtype not in (torch.long, torch.int32, torch.int64):
                 raise TypeError(
-                    f"task='language' expects integer input_ids, got {x.dtype}. "
+                    f"task={self.task!r} expects integer input_ids, got {x.dtype}. "
                     "A float tensor here would be silently embedded by index "
                     "truncation."
                 )
@@ -1612,12 +1648,12 @@ class MoREModel(nn.Module):
         # decodability. Every routing/AMI/purity number then measures emergent
         # structure with no family signal anywhere in the trunk's objective, and the
         # probe's loss weight is scientifically inert rather than tuned.
-        if self.task == TASK_LANGUAGE:
+        if self.task in LM_TASKS:
             step_cls_out = self.family_probe(h.detach())
         else:
             step_cls_out = self.step_cls_head(h)   # [B, max_steps, num_families]
 
-        if self.task == TASK_LANGUAGE:
+        if self.task in LM_TASKS:
             # T-L5.0 / T-L5.2. No pooling: every position is a prediction, so
             # collapsing the sequence would throw the task away. `reg_out` carries
             # the per-position vocabulary logits and `cls_out` is None -- a packed

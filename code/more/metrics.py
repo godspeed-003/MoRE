@@ -159,6 +159,12 @@ def compute_pairwise_cosine_sim(model: MoREModel):
 ROUTING_AGREEMENT_KEYS = {
     "arithmetic": "val/routing_accuracy",
     "language":   "val/routing_agreement_with_pos",
+    # T-OD.3. The opdiff diagonal is AGREEMENT WITH A GROUP PRIOR, not
+    # accuracy: the seven groups are the generator's designed partition of 25
+    # operations, and a router that separates the shifts from the byte-reverse
+    # may be the better partition while scoring low against this one. Same
+    # discipline as the language POS agreement, same reason.
+    "opdiff":     "val/routing_agreement_with_group",
 }
 
 ROUTING_AGREEMENT_CAPTIONS = {
@@ -177,6 +183,19 @@ ROUTING_AGREEMENT_CAPTIONS = {
         "corpus's own partition entropy -- published per run as "
         "val/routing_pos_partition_load_entropy, ~0.89 and NOT 1.0. It differs "
         "between corpora (dev 0.8884, canonical 0.8942), so use the run's value."
+    ),
+    "opdiff": (
+        "AGREEMENT WITH A GROUP PRIOR, NOT ACCURACY. mean(predicted_expert == "
+        "row_group) against the generator's designed partition of the 25 "
+        "operations into seven expert groups (E1 BITWISE, E2 SHIFT/MINMAX, "
+        "E3 ADD/SUB, E4 MUL, E5 DIV/MOD, E6 SORT/MEDIAN, E7 ITER/GCD). The "
+        "partition is a PRIOR, not a functional ground truth: a router that "
+        "separates SHL from REV may be the better partition of the operation "
+        "space while scoring low here. Read the permutation-invariant metrics "
+        "first -- Hungarian accuracy, AMI and purity -- and read the load "
+        "entropy against this task's own group marginals. The group label is "
+        "NEVER an input feature: the model sees only token ids, and it has to "
+        "infer the operation from the operation token in the sequence."
     ),
 }
 
@@ -644,7 +663,8 @@ def _expected_mutual_information(a: np.ndarray, b: np.ndarray, n: int) -> float:
     return emi
 
 
-def permutation_invariant_routing_metrics(confusion, num_experts: int) -> dict:
+def permutation_invariant_routing_metrics(confusion, num_experts: int,
+                                          family_labels=None) -> dict:
     """
     T6.3 / updated_rules.md §8.3. The full routing-quality report, all of it
     derived from the one E×E confusion matrix.
@@ -713,7 +733,20 @@ def permutation_invariant_routing_metrics(confusion, num_experts: int) -> dict:
     """
     c = _to_contingency(confusion)
     n_tok = float(c.sum())
-    labels = expert_labels(num_experts)
+    # T-OD.3. `family_labels` is an OPTIONAL override of the label manifest,
+    # because the manifest is task-dependent: arithmetic names op families,
+    # language names POS families, opdiff names its seven expert GROUPS. The
+    # default is the arithmetic manifest, so every existing caller keeps
+    # producing byte-identical output -- and that default is deliberate for
+    # language, whose published runs carry the arithmetic labels in their
+    # per-family keys.
+    #
+    # The override changes the NAMES and nothing else: the same cells, the
+    # same assignment, the same statistics. A label is a label, and the only
+    # thing that may differ between two tasks is which partition the labels
+    # name.
+    labels = (list(family_labels) if family_labels is not None
+              else expert_labels(num_experts))
     empty = {
         "raw_accuracy": None, "hungarian_accuracy": None,
         "hungarian_assignment": None, "macro_recall": None, "ami": None,
@@ -1401,11 +1434,17 @@ def language_depth_to_wandb(dm: dict, prefix: str = "depth") -> dict:
 def make_routing_confusion_figure(
     confusion: np.ndarray,
     normalize_rows: bool = True,
+    family_labels=None,
 ) -> plt.Figure:
     """Row-normalized E×E heatmap: actual expert family vs chosen expert.
 
     T5.1: the axis size is read off the matrix, and the tick labels are derived
     from it, so the figure cannot disagree with the data it is drawing.
+
+    T-OD.3: `family_labels` is an OPTIONAL override of the label manifest,
+    because the manifest is task-dependent (arithmetic op families, language
+    POS families, opdiff expert groups). The default is the arithmetic
+    manifest, so every existing figure is byte-identical.
     """
     cm = confusion.astype(np.float64)
     if normalize_rows:
@@ -1422,7 +1461,8 @@ def make_routing_confusion_figure(
 
     fig, ax = plt.subplots(figsize=(8.5, 7.5))
     im = ax.imshow(display, cmap="Blues", vmin=0.0, vmax=vmax)
-    _labels = expert_labels(display.shape[0])
+    _labels = (list(family_labels) if family_labels is not None
+               else expert_labels(display.shape[0]))
     ax.set_xticks(range(len(_labels)))
     ax.set_yticks(range(len(_labels)))
     ax.set_xticklabels([f"E{i + 1}" for i in range(len(_labels))])
@@ -1494,6 +1534,7 @@ def paper_metrics_to_wandb(
     num_experts: int,
     pim: dict | None = None,
     task: str = "arithmetic",
+    family_labels=None,
 ) -> dict:
     """
     Build W&B log dict with paper-ready figures and scalar diagnostics.
@@ -1510,9 +1551,17 @@ def paper_metrics_to_wandb(
     (`routing_agreement_key`), never the arithmetic. It defaults to "arithmetic" so
     every existing caller keeps emitting `val/routing_accuracy` byte-identically --
     Gate L0's 356 includes G5.2b, which checks that exact key.
+
+    T-OD.3: `family_labels` is the same idea for the LABEL MANIFEST, which is
+    task-dependent (arithmetic op families, language POS families, opdiff
+    expert groups). It defaults to None, which means "the arithmetic manifest",
+    so every existing call is byte-identical; opdiff passes its own seven
+    group names.
     """
     log_dict: dict = {}
     routing_defined = num_experts >= 2
+    _labels = (list(family_labels) if family_labels is not None
+               else expert_labels(num_experts))
 
     if routing_defined and not math.isnan(routing_acc):
         log_dict[routing_agreement_key(task)] = routing_acc
@@ -1522,7 +1571,7 @@ def paper_metrics_to_wandb(
         # T5.1: iterate over exactly the experts the matrix HAS. The old loop
         # walked the canonical six and relied on an `i < shape[0]` guard, which
         # silently emitted nothing for expert 7 in a 7-expert run.
-        for i, label in enumerate(expert_labels(num_experts)):
+        for i, label in enumerate(_labels):
             if row_totals[i] > 0:
                 log_dict[f"val/routing_recall/{label}"] = (
                     confusion[i, i] / row_totals[i]
@@ -1534,7 +1583,8 @@ def paper_metrics_to_wandb(
         # the dict in when it has already computed it -- the AMI chance correction
         # is the one non-trivial cost here and should be paid once per validation.
         if pim is None:
-            pim = permutation_invariant_routing_metrics(confusion, num_experts)
+            pim = permutation_invariant_routing_metrics(
+                confusion, num_experts, family_labels=family_labels)
         for key in ("hungarian_accuracy", "macro_recall",
                     "matched_macro_recall", "ami", "purity"):
             if pim[key] is not None:
@@ -1574,11 +1624,14 @@ def paper_metrics_to_wandb(
         log_dict[f"recursion/avg_depth_by_family/{label}"] = depth_val
 
     if routing_defined:
-        cm_fig = make_routing_confusion_figure(confusion, normalize_rows=True)
+        cm_fig = make_routing_confusion_figure(confusion, normalize_rows=True,
+                                                family_labels=family_labels)
         log_dict["paper/routing_confusion_matrix"] = wandb.Image(cm_fig)
         plt.close(cm_fig)
 
-        cm_count_fig = make_routing_confusion_figure(confusion, normalize_rows=False)
+        cm_count_fig = make_routing_confusion_figure(confusion,
+                                                      normalize_rows=False,
+                                                      family_labels=family_labels)
         log_dict["paper/routing_confusion_matrix_counts"] = wandb.Image(cm_count_fig)
         plt.close(cm_count_fig)
 
@@ -1631,6 +1684,27 @@ def halting_supervision_loss(expected_depth, step_ops, step_mask,
     if not bool(valid.any()):
         return expected_depth.sum() * 0.0
 
+    # T-OD.3. NO CURRICULUM IS A DEFINED STATE, NOT A CRASH. The table is
+    # empty by construction on the tasks that have no depth curriculum
+    # (language, opdiff), and an empty table cannot supervise anything:
+    # indexing it with a valid operation id raises IndexError, and padding it
+    # to length V would supervise every token toward depth 0. The honest
+    # contribution of the term is an exact differentiable zero -- and the
+    # engine refuses to ENABLE the term on those tasks at all, so this branch
+    # is a backstop rather than a path.
+    if not len(target_depth_table):
+        return expected_depth.sum() * 0.0
+
+    _max_op = int(flat_ops[valid].max())
+    if _max_op >= len(target_depth_table):
+        raise ValueError(
+            f"operation id {_max_op} is outside the depth curriculum table "
+            f"({len(target_depth_table)} entries). The table and the operation "
+            "axis must come from the SAME task: the arithmetic table is 16 wide "
+            "and the opdiff axis is 25, so pairing them would either raise here "
+            "or measure the wrong operations."
+        )
+
     table  = _torch.as_tensor(target_depth_table, device=expected_depth.device,
                               dtype=expected_depth.dtype)
     target = table[flat_ops[valid].long()]
@@ -1657,6 +1731,26 @@ def depth_allocation_error(expected_depth, step_ops, step_mask,
     valid     = flat_mask & (flat_ops >= 0)
     if not bool(valid.any()):
         return None, None
+
+    # T-OD.3. An EMPTY TABLE MEANS "NO CURRICULUM", and the honest answer is
+    # (None, None) -- N/A -- rather than an error and rather than a 0.0. The
+    # tasks that have no curriculum (language, opdiff) have a VALID operation
+    # axis and no target, so the old "no valid op id" guard did not fire for
+    # them; with an empty table the index would have raised. The depth
+    # ALLOCATION ERROR against a curriculum that does not exist is undefined,
+    # and the metric layer reports undefined quantities as N/A.
+    if not len(target_depth_table):
+        return None, None
+
+    _max_op = int(flat_ops[valid].max())
+    if _max_op >= len(target_depth_table):
+        raise ValueError(
+            f"operation id {_max_op} is outside the depth curriculum table "
+            f"({len(target_depth_table)} entries). The table and the operation "
+            "axis must come from the SAME task: the arithmetic table is 16 wide "
+            "and the opdiff axis is 25, so pairing them would either raise here "
+            "or measure the wrong operations."
+        )
 
     table  = _torch.as_tensor(target_depth_table, device=expected_depth.device,
                               dtype=expected_depth.dtype)

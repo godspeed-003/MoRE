@@ -1913,7 +1913,7 @@ the co-author's agent. Not part of `plan.md` §0–11. Companion paper task:
   113 MB + 1.7 MB smoke, ~13 s generation. `.gitignore` gained
   `opdiff_v2/` + `opdiff_v2_smoke/`.
 
-- [~] **T-OD.3 Port the language pipeline to a third explicit `opdiff` task.**
+- [x] **T-OD.3 Port the language pipeline to a third explicit `opdiff` task.**
   New `code/more/opdiff_data.py` (7-tuple, position-derived loss mask, group
   labels for diagnostics only), `code/more/opdiff_families.py` (7-group
   manifest — frozen `families.py` must NOT be edited), `code/config_opdiff.json`
@@ -1929,27 +1929,94 @@ the co-author's agent. Not part of `plan.md` §0–11. Companion paper task:
   `test_language_task_axis.py` green (it iterates `TASKS`, so a third task must
   satisfy its pair loop) AND an arithmetic + a language config re-resolve to
   their pre-port `config_hash`.
-  **Evidence:** — recon done: `apply_architecture` stamps `num_experts` from the
-  arithmetic manifest (config.py:857/874), so opdiff's E=7 needs a task-aware
-  repair in `apply_task`; run-name/family-cls/persistence/spec maps in
-  config.py:425/453/538 and run_context.py:93 all key on task; engine has 20
-  language-conditional sites. Code not yet written.
+  **Evidence:** 2026-10-21 green. `code/test_opdiff_task_axis.py` **54 passed,
+  0 failed, 0 skipped** (new file; the gate's file lists are fixed, so the 356
+  did not move). `code/run_correctness_suite.py` → TOTAL **356/356**, gates
+  19/31/27/129/150. `code/test_language_task_axis.py` → 79 passed, 0 failed
+  (1 skip; the `phaseB_*` hash check cannot be EVALUATED after the T-OD.1
+  cleanup deleted those run dirs, so it now skips with the reason and a new
+  TL1.0g3 checks the same invariant against the 15 published language cells,
+  which re-hash and match). `code/test_language_families.py` → 43 passed, 0
+  failed, 5 skipped (the corpus-dependent checks skip on a machine without
+  the packed WikiText corpora; the file used to CRASH there).
+  **The hash invariance is mechanical, not asserted:** a pre-port tree of
+  `code/more` was extracted from git, the config files were read from their
+  canonical location so the data paths resolve identically, and all seven
+  resolutions (config.json raw + moe/mor/more, config_language.json raw +
+  moe/mor/more) are byte-identical: `f20b9cbf…`/`5708ff61…`/`3d6e08c5…` and
+  `b947fe42…`/`3f36b0af…`/`8d0b7b9b…`/`df3132fc…`/`1a9868ff…`. The same
+  check lives inside the test suite as OD.7a/OD.7b so it cannot rot.
+  **Decisions locked:** E=7 for moe/more and 1 for mor (the oracle partition
+  is seven groups, and a 6-expert run's confusion matrix is non-square, which
+  makes EVERY permutation-invariant routing number N/A); `ffn_mult` 4/28/4
+  (28 = 7×4, the same budget rule arithmetic and language use — measured gap
+  0.117 % on the non-embedding count); `family_cls` forced 0.0 and a declared
+  non-zero REFUSED (the probe is detached and an opdiff row DOES carry a
+  whole-row group label, so a non-zero weight would be a live supervision
+  signal on the oracle partition); halting supervision REFUSED (no depth
+  curriculum: the generator's nominal difficulty is a placeholder);
+  `step_routing` declared 0.0 but NOT forced (a non-zero value is the
+  labelled `oracle_routing` ablation, as on language); routing agreement
+  published as `val/routing_agreement_with_group`, never as accuracy;
+  `code/canonical_spec_opdiff.json` created and deliberately UNFROZEN, so
+  every opdiff run is `exploratory` and the guard refuses a canonical claim.
+  **Four latent defects fixed on the way** (detail in changelog.md T-OD.3):
+  the depth-curriculum table was bound from the arithmetic task for every task
+  (opdiff's valid 25-wide op axis would have indexed a 16-entry table); the
+  per-op depth tensors were sized 16; `perf/throughput_tokens_sec` counted
+  items instead of tokens on opdiff (the T-LX.8 defect again — 399 vs 121,000
+  "tok/s", and the token rate is what a budget is costed from); and the
+  dataset identity was parameter-derived, so two different generations
+  carried the same version string (the generator now writes per-array
+  SHA-256s and a `dataset_version`).
 
-- [ ] **T-OD.4 Smoke-test all three architectures on `opdiff_v2_smoke`** with
+- [x] **T-OD.4 Smoke-test all three architectures on `opdiff_v2_smoke`** with
   the SAME code files the full runs will use: loss falls; routing metrics sane
   at E=7 (confusion ↔ routing accuracy agreement, Hungarian, AMI, H/log(E));
   per-run dir layout; runs stamped exploratory (no canonical claim); suite
   356/356 + `test_opdiff_*` green after the port.
   **Verify:** one smoke run per architecture (moe/mor/more) on the 3050, every
   check above observed in its `metrics.json` / run dir.
+  **Evidence:** 2026-10-21, three 3-epoch runs on the smoke subset (3,584
+  train rows), exit 0 each, `code/train.py --config code/config_opdiff.json
+  --task opdiff --opdiff_root opdiff_v2_smoke --epochs 3 --seed 42 --run_name
+  opdiffB_smoke_<Arch>_seed42`. **The loss falls on all three**: val/task_loss
+  1.4261→1.3327 (MoE), 1.4129→1.3254 (MoR), 1.3853→1.3087 (MoRE), with MoRE
+  lowest. **Routing metrics are sane at E=7**: the confusion is square (7×7)
+  for the routed arms, so Hungarian/AMI/purity are DEFINED (MoE 0.2241 /
+  0.0738 / —, MoRE 0.1846 / 0.0140 / —), and MoR's are the string "N/A" (it
+  makes no routing decision). **H/log(E)** = 0.5028 (MoE) / 0.6270 (MoRE) —
+  a load-balance diagnostic, not evidence of specialization. **Per-run dir
+  layout**: config.json, resolved_config.json, metrics.json, results.tsv,
+  checkpoint.pt, stdout.log in each `runs/opdiffB_smoke_<Arch>_seed42__<hash>/`.
+  **Runs stamped exploratory**, no canonical claim (the spec is unfrozen by
+  design). **356/356 + 54/54 after the port** ✓.
+  **Two facts that decide where the matrix runs:** MoR's peak is **5,491 MiB
+  = 91 % of this 6 GB card** (the language calibration found that above ~87 %
+  the epoch time goes UP, so the matrix belongs on the 8 GB card, where the
+  same arm is 69 %), and MoR is **9.5× slower per token** than MoE (15,930 vs
+  151,504 tok/s) because it evaluates one dense FFN of width 28 for every
+  token. The first 1-epoch smoke runs were DELETED, not kept: they carried
+  the pre-fix throughput metric (399 vs 121,000 "tok/s").
 
-- [ ] **T-OD.5 Measure tokens/s → epochs × seeds budget → USER APPROVAL.**
+- [~] **T-OD.5 Measure tokens/s → epochs × seeds budget → USER APPROVAL.**
   Approval gate: no full-matrix launch on the co-author's card until the
   wall-clock × 15 (+ pilot) budget has been presented and approved in chat.
   **Verify:** measured tokens/s per architecture from the smoke runs; budget
   presented; explicit user approval recorded.
+  **Evidence:** MEASURED 2026-10-21 from the T-OD.4 smoke runs — 498.4 / 52.4
+  / 95.3 items/s for MoE / MoR / MoRE at batch 48, i.e. 151,504 / 15,930 /
+  28,957 tok/s. **Budget at 3 epochs × 5 seeds** (the frozen seed set 42–46):
+  MoE 3.1 h + MoR 29.5 h + MoRE 16.2 h = **≈ 49 h on the 6 GB gate card, ≈ 33
+  h on the 8 GB card** (the 4060 factor is the language calibration's measured
+  ~1.5×, and the pilot's measured epoch time replaces it). The pilot (3 arms
+  × seed 42) is 9.8 h of that and is NOT extra work — it IS the matrix's
+  seed-42 cells. **THE APPROVAL IS NOT YET RECORDED**: no full-matrix launch
+  may happen until the user approves this budget in chat; the approval is
+  recorded by ticking this box. `HANDOFF.md` §4/§5 tells the co-author's
+  agent to run the pilot and then STOP if this box is unticked.
 
-- [ ] **T-OD.6 Write `HANDOFF.md` on `main` for the co-author's coding agent —
+- [x] **T-OD.6 Write `HANDOFF.md` on `main` for the co-author's coding agent —
   autonomous execution, no co-author checkups.** It must carry: which machine
   and interpreter (`ENVIRONMENT.md`), dataset presence-check + regeneration
   command, exact preflight, pilot (3 archs × seed42) with its acceptance
@@ -1959,6 +2026,28 @@ the co-author's agent. Not part of `plan.md` §0–11. Companion paper task:
   been executed at least once on the smoke path before it is written.
   **Verify:** handoff exists on `main`; each command in it has run once here;
   T-OD.5 approval precedes any launch it instructs.
+  **Evidence:** `HANDOFF.md` written 2026-10-21 (repo root, 12 sections):
+  machine + interpreter (`C:\Users\Hp\anaconda3\envs\more_env\python.exe`,
+  the 8 GB card, with the "base and C:\Python314 have no torch" trap), the
+  dataset check/regenerate/verify block, the preflight, the pilot with SEVEN
+  acceptance checks, the remaining ten cells, the aggregation command and the
+  exact quantities to report back, the stop-at-first-failure protocol, the
+  never-change list (13 rows, each with a reason), the already-measured
+  numbers so they are not re-measured, what the study may and may not claim,
+  and the command list.
+  **Executed here before it was written:** the generator (both datasets), the
+  three smoke runs, `code/run_opdiff_matrix.py --preflight` (exit 0, clean),
+  `code/run_opdiff_matrix.py --pilot --dry-run` (the three launch lines),
+  `code/summarize_opdiff_matrix.py` (refused to aggregate two config hashes
+  for one arm — the intended refusal), `code/run_correctness_suite.py` (356/356)
+  and `code/test_opdiff_task_axis.py` (54/54). NOT executed: `--pilot` and
+  `--all` themselves, which launch the matrix — the dry-run covers their
+  command construction, and the approval gate (T-OD.5) forbids the real
+  launch until the user approves the budget.
+  **NOTE:** the task text says the handoff must point at `ENVIRONMENT.md`;
+  that file does not exist in the tree (the environment record lives in
+  `AGENTS.md` §9), so the handoff names the machine and the interpreter
+  paths inline instead of depending on a missing file.
 
 ---
 
