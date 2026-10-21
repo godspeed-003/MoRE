@@ -201,12 +201,14 @@ epoch times back.
 
 ### 5b. The two capacity ablations (MoR at ffn_mult 4 and 24)
 
-The canonical MoR is **budget-matched** to MoRE: seven experts at mult 4 give
-28 units of FFN hidden width, and MoR's single FFN is given exactly that, so
-the two arms differ in architecture and not in capacity (the measured gap is
-0.117 % of the non-embedding parameters). The two ablation widths answer a
-different question: **does the MoR-vs-MoRE gap depend on the MoR arm's
-parameter budget, or on the architecture?**
+**STATUS 2026-10-21: THESE ARE BEING RUN ON THE GATE MACHINE, NOT HERE. The
+co-author's agent does NOT need to run them.** They were started on the
+6 GB RTX 3050 (Vedant's machine) at the full dataset scale, seed 42, 3
+epochs, and the results will be committed to `main`. The reason is the
+cost: ≈ 9 h (width 24) + ≈ 4 h (width 4) on this card, against ≈ 6 h and
+≈ 4 h on the 8 GB card — and the 8 GB card is the one reserved for the
+matrix. The command is recorded here so the run is reproducible and so a
+re-run is possible:
 
 ```bash
 $PY code/train.py --config code/config_opdiff.json --task opdiff \
@@ -227,22 +229,24 @@ $PY code/train.py --config code/config_opdiff.json --task opdiff \
   `opdiff+ffn_mult_4`) and by their run names, so the aggregator cannot
   admit them into the canonical table by accident.
 
-**RUN THEM AT SEED 42 FIRST, AND THEN DECIDE.** The measured cost (smoke
-subset, this card): MoR@24 ≈ 10,964 tok/s and MoR@4 ≈ 23,738 tok/s, i.e.
-**≈ 6 h and ≈ 4 h per seed** on the 8 GB card at 3 epochs — so all five
-seeds of both would add ~30 h to a 32 h matrix, and a one-seed capacity
-ablation cannot be separated from seed noise. Seed 42 is enough to see
-whether the ladder says anything; the remaining four seeds are worth spending
-only if it does. Report the seed-42 result and ask.
+**WHAT THE LADDER IS AND IS NOT.** It is a **control on the MoR arm**, and
+the comparison it makes is entirely WITHIN the MoR arm: as its budget goes
+28 → 24 → 4, what happens to its validation loss, its depth allocation and
+its per-example exact match? That is a three-point curve on ONE card, and it
+is self-consistent. What it is NOT is a second head-to-head with MoRE: the
+canonical MoRE cell is on the 8 GB card, and a run that differs from another
+in BOTH its budget and its card is a comparison with two variables moved.
+The paper's MoR-vs-MoRE claim does not need this table, because that
+comparison is budget-matched **by construction** (0.117 % of the
+non-embedding parameters) — the ladder exists to show that the MoR arm's
+result is not a capacity artefact, not to establish the headline.
 
-**WHAT THE LADDER ALREADY SHOWS AT SMOKE SCALE** (3 epochs, 1 % of the data,
-one seed — indicative, not a result): the three widths land within 0.02 nats
-of each other (MoR@4 1.3340, MoR@24 1.3498, MoR@28 1.3550, MoRE 1.3430) and
-the per-example exact match is 0.625 / 0.636 / 0.536 / 0.636 respectively.
-**There is no visible capacity effect at this scale** — the arm with 20 % of
-the budget is not worse. That is what a one-seed, 1 %-data read can and
-cannot say: it rules out a large capacity effect and nothing more.
-
+**IF THE PAPER WANTS THE TABLE.** The condition is that it be a control
+table with its own reference row, not a column in the headline table: the
+headline table is the matrix (one card, five seeds, three arms), and the
+ladder is a separate, labelled, one-seed control. A one-seed row in the
+headline table would violate the study's own "mean ± std over five seeds"
+rule, and a row from a different card would violate the one-machine rule.
 ---
 
 ## 6. Aggregation, and what to report back

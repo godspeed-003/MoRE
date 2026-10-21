@@ -2180,12 +2180,22 @@ the co-author's agent. Not part of `plan.md` §0–11. Companion paper task:
   per-token cost is set by the TOTAL work the halt head asks for, not by the
   width of the stack that has to do it — which is also why the ablations are
   expensive: MoR@4 is only ~1.4× faster than MoR@28, not 7×.
-  **The full-scale ablations are in `HANDOFF.md` §5b for the co-author's
-  agent, AT SEED 42 FIRST** (≈ 6 h for width 24 and ≈ 4 h for width 4 per
-  seed on the 8 GB card; all five seeds of both would add ~30 h to a 32 h
-  matrix, and a one-seed capacity ablation cannot be separated from seed
-  noise). The agent reports the seed-42 result and asks before the remaining
-  four seeds are spent.
+  **The full-scale ablations are being run HERE, on the gate machine** (user
+  instruction, 2026-10-21: "ayan won't run this, run it here fully"), not by
+  the co-author's agent: seed 42, 3 epochs, the full 294,000-row dataset, on
+  the 6 GB card, ≈ 9 h (width 24) + ≈ 4 h (width 4). The 8 GB card stays
+  reserved for the matrix. `HANDOFF.md` §5b says so, and records the command.
+  **What the ladder may be compared with:** the three MoR widths are on ONE
+  card in ONE protocol, so the curve is internally consistent; it is NOT a
+  second head-to-head with MoRE, whose canonical cell is on the other card —
+  a comparison that moves both the budget and the card moves two variables.
+  The paper's MoR-vs-MoRE claim does not depend on the ladder (that
+  comparison is budget-matched by construction, 0.117 % of the non-embedding
+  parameters); the ladder shows that the MoR arm's result is not a capacity
+  artefact. **If the paper carries it**, it is a labelled CONTROL table with
+  its own reference row and an explicit one-seed caveat — never a column in
+  the headline table (which is the matrix's: one card, five seeds, three
+  arms).
 
 ---
 

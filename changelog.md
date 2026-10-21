@@ -10347,12 +10347,29 @@ ablations are expensive: MoR@4 is only ~1.4× faster than MoR@28, not 7×.
 
 ### Where they run
 
-The full-scale ablations are in `HANDOFF.md` §5b for the co-author's agent,
-**at seed 42 first**: the measured cost is ≈ 6 h (width 24) and ≈ 4 h (width
-4) per seed on the 8 GB card at 3 epochs, so all five seeds of both would add
-~30 h to a 32 h matrix, and a one-seed capacity ablation cannot be separated
-from seed noise. The agent reports the seed-42 result and asks before the
-remaining four seeds are spent.
+**The full-scale ablations are being run ON THE GATE MACHINE, not on the
+co-author's card** (user instruction, 2026-10-21: "ayan won't run this, run
+it here fully"). Seed 42, 3 epochs, the full 294,000-row dataset, on the
+6 GB RTX 3050: ≈ 9 h for width 24 and ≈ 4 h for width 4. The 8 GB card stays
+reserved for the matrix, and the ablations do not sit in the matrix's way.
+
+**A NOTE ON WHAT THE LADDER MAY BE COMPARED WITH, because it is the trap
+here.** The three MoR widths are on ONE card, in ONE protocol, so the curve
+"as MoR's budget goes 28 → 24 → 4, what happens to its loss, its depth and
+its exact match" is internally consistent. What it is NOT is a second
+head-to-head with MoRE: the canonical MoRE cell is on the other card, and a
+comparison that moves BOTH the budget and the card moves two variables. The
+paper's MoR-vs-MoRE claim does not need the ladder, because that comparison
+is budget-matched **by construction** (0.117 % of the non-embedding
+parameters). The ladder exists to show that the MoR arm's result is not a
+capacity artefact.
+
+**IF THE PAPER CARRIES IT**, the condition is that it be a labelled CONTROL
+table with its own reference row and an explicit one-seed caveat — not a
+column in the headline table, which is the matrix's (one card, five seeds,
+three arms), and not a row from a different card. A one-seed row in the
+headline table would break the study's own "mean ± std over five seeds"
+rule; a row from a different card would break the one-machine rule.
 
 ### Failure tracing
 
