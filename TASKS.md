@@ -2148,6 +2148,45 @@ the co-author's agent. Not part of `plan.md` §0–11. Companion paper task:
   expects invites exactly the confusion the run-name discipline exists to
   prevent.
 
+- [x] **T-OD.8 The capacity ladder: MoR at ffn_mult 4 and 24.** (User-directed,
+  2026-10-21: "run the mor runs of 4 and 24 but you know mor 4 won't be
+  matched to more tho".)
+  The canonical MoR is budget-matched to MoRE (7 × 4 = 28 units of FFN hidden
+  width; measured gap 0.117 % of the non-embedding parameters), so the two
+  ablation widths ask a different question: does the MoR-vs-MoRE gap depend
+  on the MoR arm's PARAMETER BUDGET or on the architecture? MoR@24 is the
+  six-group width (87 % of MoRE's stack); **MoR@4 is not matched to anything**
+  — 792 K non-embedding parameters against MoRE's 3.95 M, i.e. 20 % of the
+  budget — and its number must never be tabled as "MoR".
+  **Verify:** both widths run on the same machine and the same smoke data as
+  the other three smoke runs; both are labelled twice over (the `variant`
+  string `opdiff+ffn_mult_4` / `opdiff+ffn_mult_24` AND the run name), and
+  the aggregator refuses to admit an ablation into the canonical table; the
+  ladder is printed with the non-embedding parameter count beside every row.
+  **Evidence:** 2026-10-21, two 3-epoch runs on the smoke subset (seed 42),
+  exit 0 each. | arm | width | non-emb params | val/task_loss | exact match |
+  depth | tok/s | peak | — MoE 7×4 3,948,558 1.3630 0.622 N/A 161,081 0.72
+  GiB; MoRE 7×4 3,948,558 **1.3430** **0.636** 4.88 30,874 2.44 GiB; MoR
+  7×4 3,943,944 1.3550 0.536 3.67 17,301 5.80 GiB; MoR 6×4 3,418,632 1.3498
+  0.636 4.31 10,964 5.94 GiB; MoR 1×4 792,072 1.3340 0.625 4.75 23,738 2.48
+  GiB. **No visible capacity effect at this scale** — the 20 %-budget arm is
+  not worse — which rules out a LARGE capacity effect and nothing more; it
+  is a one-seed, 1 %-data read, not a result.
+  **A mechanism worth recording, because it changes how the budget is read:**
+  MoR@24 is SLOWER than MoR@28 (10,964 vs 17,301 tok/s) despite a 14 %
+  narrower FFN, and it uses MORE memory. The reason is the recursion: MoR@24
+  settled at an average depth of 4.31 against MoR@28's 3.67, and the FFN
+  work per token is depth × width, so 4.31 × 24 ≈ 3.67 × 28. A MoR run's
+  per-token cost is set by the TOTAL work the halt head asks for, not by the
+  width of the stack that has to do it — which is also why the ablations are
+  expensive: MoR@4 is only ~1.4× faster than MoR@28, not 7×.
+  **The full-scale ablations are in `HANDOFF.md` §5b for the co-author's
+  agent, AT SEED 42 FIRST** (≈ 6 h for width 24 and ≈ 4 h for width 4 per
+  seed on the 8 GB card; all five seeds of both would add ~30 h to a 32 h
+  matrix, and a one-seed capacity ablation cannot be separated from seed
+  noise). The agent reports the seed-42 result and asks before the remaining
+  four seeds are spent.
+
 ---
 
 ## Standing constraints (apply to every task above)

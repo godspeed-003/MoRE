@@ -10290,4 +10290,78 @@ pointer, the three things an agent with no context would otherwise get wrong
 order, the acceptance checks, the stop-at-first-failure protocol, the
 never-change list and what to report back.
 
+## T-OD.8 - the capacity ladder: MoR at ffn_mult 4 and 24
+
+**Date.** 2026-10-21. **Machine.** Vedant's RTX 3050 6 GB.
+
+### The decision
+
+User-directed: "run the mor runs of 4 and 24 but you know mor 4 won't be
+matched to more tho". The canonical MoR is **budget-matched** to MoRE — seven
+experts at mult 4 is 28 units of FFN hidden width, and MoR's single FFN is
+given exactly that, so the two arms differ in architecture and not in
+capacity (measured gap 0.117 % of the non-embedding parameters). The two
+ablation widths ask a different question: **does the MoR-vs-MoRE gap depend on
+the MoR arm's parameter budget, or on the architecture?**
+
+- **MoR at ffn_mult 24** = 6 × 4, the width the arithmetic and language
+  studies give MoR: what MoR would be if the partition had six groups. On
+  this task it is 87 % of MoRE's stack.
+- **MoR at ffn_mult 4** = the under-budgeted small baseline, 792 K
+  non-embedding parameters against MoRE's 3.95 M — **20 % of the budget**. It
+  is not matched to anything, and its number must never be tabled as "MoR".
+
+### What was run, and what it says
+
+Two 3-epoch runs on the smoke subset, seed 42, on the same machine and the
+same data as the other three smoke runs, so the ladder is internally
+consistent. Both are **labelled twice over**: by `resolve_variant`
+(`opdiff+ffn_mult_4`, `opdiff+ffn_mult_24`) and by their run names
+(`opdiffB_smoke_MoR_ffn4_seed42`, `…ffn24…`), so the aggregator cannot admit
+them into the canonical table by accident — it has a separate `--kind
+ablation` and prints the ladder with the non-embedding parameter count next
+to every row.
+
+| arm | width | non-emb params | val/task_loss | exact match | depth | tok/s | peak alloc |
+|---|---|---|---|---|---|---|---|
+| MoE | 7 × 4 | 3,948,558 | 1.3630 | 0.622 | N/A | 161,081 | 0.72 GiB |
+| MoRE | 7 × 4 | 3,948,558 | **1.3430** | **0.636** | 4.88 | 30,874 | 2.44 GiB |
+| MoR | 7 × 4 (= 28) | 3,943,944 | 1.3550 | 0.536 | 3.67 | 17,301 | 5.80 GiB |
+| MoR | 6 × 4 (= 24) | 3,418,632 | 1.3498 | 0.636 | 4.31 | 10,964 | 5.94 GiB |
+| MoR | 1 × 4 | 792,072 | 1.3340 | 0.625 | 4.75 | 23,738 | 2.48 GiB |
+
+**There is no visible capacity effect at this scale**: the arm with 20 % of
+the budget is not worse (1.3340 vs 1.3430 for the matched MoRE), and the
+three widths land within 0.02 nats of each other. That is what a one-seed,
+1 %-data read can and cannot say — it rules out a LARGE capacity effect and
+nothing more, and it is not a result.
+
+**A MECHANISM WORTH RECORDING, because it changes how the budget is read:**
+MoR@24 is *slower* than MoR@28 (10,964 vs 17,301 tok/s) despite a 14 %
+narrower FFN, and it uses *more* memory (5.94 vs 5.80 GiB). The reason is the
+recursion: MoR@24 settled at an average depth of 4.31 against MoR@28's 3.67,
+and the FFN work per token is depth × width, so 4.31 × 24 ≈ 3.67 × 28. The
+per-token cost of a MoR run is set by the TOTAL work the halt head asks for,
+not by the width of the stack it has to do it with — which is also why the
+ablations are expensive: MoR@4 is only ~1.4× faster than MoR@28, not 7×.
+
+### Where they run
+
+The full-scale ablations are in `HANDOFF.md` §5b for the co-author's agent,
+**at seed 42 first**: the measured cost is ≈ 6 h (width 24) and ≈ 4 h (width
+4) per seed on the 8 GB card at 3 epochs, so all five seeds of both would add
+~30 h to a 32 h matrix, and a one-seed capacity ablation cannot be separated
+from seed noise. The agent reports the seed-42 result and asks before the
+remaining four seeds are spent.
+
+### Failure tracing
+
+- An ablation row appearing in the canonical table → the run NAME and the
+  `variant` string; `summarize_opdiff_matrix.py` matches the matrix cells
+  with a regex that an `ffnN` variant cannot match, and the config-hash
+  refusal is now keyed on (arm, variant), so a labelled ablation is a
+  different experiment rather than a second hash for one arm.
+- A capacity number without its parameter count → the ladder table prints the
+  non-embedding count next to every row for exactly that reason.
+
 

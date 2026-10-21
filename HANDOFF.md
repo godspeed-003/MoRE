@@ -199,6 +199,50 @@ remaining ten cells may run. If that box is ever unticked — e.g. on a second
 machine, or after a re-freeze — run §3 and §4 only and report the measured
 epoch times back.
 
+### 5b. The two capacity ablations (MoR at ffn_mult 4 and 24)
+
+The canonical MoR is **budget-matched** to MoRE: seven experts at mult 4 give
+28 units of FFN hidden width, and MoR's single FFN is given exactly that, so
+the two arms differ in architecture and not in capacity (the measured gap is
+0.117 % of the non-embedding parameters). The two ablation widths answer a
+different question: **does the MoR-vs-MoRE gap depend on the MoR arm's
+parameter budget, or on the architecture?**
+
+```bash
+$PY code/train.py --config code/config_opdiff.json --task opdiff \
+    --architecture mor --seed 42 --ffn_mult 24 \
+    --run_name opdiffB_MoR_ffn24_seed42
+$PY code/train.py --config code/config_opdiff.json --task opdiff \
+    --architecture mor --seed 42 --ffn_mult 4 \
+    --run_name opdiffB_MoR_ffn4_seed42
+```
+
+- **MoR at ffn_mult 24 is NOT matched to MoRE** — 24 = 6 × 4 is the width the
+  *arithmetic and language* studies give MoR, i.e. what MoR would be if the
+  partition had six groups. On this task it is 87 % of MoRE's stack.
+- **MoR at ffn_mult 4 is NOT matched to anything** — 792 K non-embedding
+  parameters against MoRE's 3.95 M, i.e. 20 % of the budget. It is the
+  under-budgeted small baseline, and its number must never be tabled as "MoR".
+- Both are **labelled** by `resolve_variant` (`opdiff+ffn_mult_24`,
+  `opdiff+ffn_mult_4`) and by their run names, so the aggregator cannot
+  admit them into the canonical table by accident.
+
+**RUN THEM AT SEED 42 FIRST, AND THEN DECIDE.** The measured cost (smoke
+subset, this card): MoR@24 ≈ 10,964 tok/s and MoR@4 ≈ 23,738 tok/s, i.e.
+**≈ 6 h and ≈ 4 h per seed** on the 8 GB card at 3 epochs — so all five
+seeds of both would add ~30 h to a 32 h matrix, and a one-seed capacity
+ablation cannot be separated from seed noise. Seed 42 is enough to see
+whether the ladder says anything; the remaining four seeds are worth spending
+only if it does. Report the seed-42 result and ask.
+
+**WHAT THE LADDER ALREADY SHOWS AT SMOKE SCALE** (3 epochs, 1 % of the data,
+one seed — indicative, not a result): the three widths land within 0.02 nats
+of each other (MoR@4 1.3340, MoR@24 1.3498, MoR@28 1.3550, MoRE 1.3430) and
+the per-example exact match is 0.625 / 0.636 / 0.536 / 0.636 respectively.
+**There is no visible capacity effect at this scale** — the arm with 20 % of
+the budget is not worse. That is what a one-seed, 1 %-data read can and
+cannot say: it rules out a large capacity effect and nothing more.
+
 ---
 
 ## 6. Aggregation, and what to report back
@@ -222,6 +266,11 @@ It prints three tables:
 - **the compute-versus-k table**: every k value in one row, with the SEEN
   values and the HELD-OUT ones side by side, and the depth the model spent on
   each. That table is where the study's claim is read off.
+
+And with `--kind ablation` (or `--kind smoke`, which includes the smoke
+ablations) it prints **the capacity ladder**: each (arm, width) with its
+non-embedding parameter count next to its loss, so a 0.8 M-parameter arm and
+a 3.9 M one can never be read as the same arm.
 
 **Report back exactly these, per arm, as mean ± std over the seeds:**
 
@@ -293,6 +342,7 @@ label.
 | `loss_weights.family_cls = 0.0` | forced by the task block | the group probe is **detached**; a non-zero weight would put the oracle partition into the trunk's objective — the one confound this study exists to exclude |
 | `halting_supervision` off | forced by the task block | opdiff has no depth curriculum; the generator's nominal difficulty is a placeholder awaiting dense-baseline calibration. The compute-versus-k claim is MEASURED, not supervised |
 | `step_routing = 0.0` | `config_opdiff.json` | the unsupervised router is the arm under study; a non-zero value is a legitimate **labelled** oracle-routing ablation and may never share a table with an unsupervised run |
+| the canonical MoR's `ffn_mult = 28` | `config.py:CANONICAL_FFN_MULT_OPDIFF` | 7 × 4 is what makes MoR budget-matched to MoRE; changing it turns the canonical arm into an ablation |
 | `experiment_group = exploratory` | the driver | the opdiff spec is **unfrozen by design**; the proxy guard refuses a `canonical_opdiff_b` claim, and a run that claims canonical status before the protocol is ratified is a claim nobody can audit |
 | the dataset itself | `make_opdiff_dataset_v3.py` | it is the contract: token layout, k slot, loss mask, group partition, the three k lists. The manifest in the code is cross-checked against it by the test suite |
 | the k lists | the generator's `TRAIN_K` / `INTERP_K` / `EXTRAP_K` | they define what "held out" means. A k that is both trained and held out is not held out, and the preflight refuses it |

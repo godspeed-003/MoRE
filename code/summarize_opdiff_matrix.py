@@ -66,8 +66,18 @@ RUN_DIR_RE = re.compile(r"^opdiffB_(?P<arch>moe|mor|more)_seed(?P<seed>\d+)(__.*
 # distinguishable from a matrix cell, so a smoke run can never be admitted to
 # a matrix table by accident. They are aggregated with `--kind smoke`, which is
 # how the pilot's own numbers are read before the matrix exists.
-SMOKE_DIR_RE = re.compile(r"^opdiffB_smoke_(?P<arch>moe|mor|more)_seed(?P<seed>\d+)(__.*)?$",
-                          re.IGNORECASE)
+SMOKE_DIR_RE = re.compile(
+    r"^opdiffB_smoke_(?P<arch>moe|mor|more)(?:_(?P<variant>ffn\d+))?_seed(?P<seed>\d+)(__.*)?$",
+    re.IGNORECASE)
+# The CAPACITY ABLATIONS: `opdiffB_<Arch>_ffn<N>_seed<S>`. The width is IN THE
+# NAME, so an under-budgeted arm can never be admitted to the canonical table
+# -- and the resolved config's `variant` string says the same thing
+# ("opdiff+ffn_mult_4"). Two independent labels, because a table that mixes a
+# 0.8 M-parameter arm with a 3.9 M one and calls them "MoR" is the exact
+# confusion the parameter-budget rule exists to prevent.
+ABLATION_DIR_RE = re.compile(
+    r"^opdiffB_(?P<arch>moe|mor|more)_(?P<variant>ffn\d+)_seed(?P<seed>\d+)(__.*)?$",
+    re.IGNORECASE)
 
 
 # ---------------------------------------------------------------------------
@@ -84,7 +94,8 @@ def expected_version():
 def collect(expect_version=None, kind="matrix"):
     """The admissible runs, as a list of dicts. Never a computed number."""
     out, skipped = [], []
-    pattern = SMOKE_DIR_RE if kind == "smoke" else RUN_DIR_RE
+    pattern = {"matrix": RUN_DIR_RE, "smoke": SMOKE_DIR_RE,
+               "ablation": ABLATION_DIR_RE}.get(kind, RUN_DIR_RE)
     for d in sorted(glob.glob(os.path.join(RUNS, "opdiffB_*"))):
         base = os.path.basename(d)
         m = pattern.match(base)
@@ -113,6 +124,8 @@ def collect(expect_version=None, kind="matrix"):
         out.append({
             "dir": base,
             "arch": str(cfg.get("architecture") or m.group("arch")).lower(),
+            "variant": m.groupdict().get("variant"),
+            "variant_tag": (cfg.get("provenance") or {}).get("variant"),
             "seed": int((cfg.get("provenance") or {}).get("seed", -1)),
             "config_hash": (cfg.get("provenance") or {}).get("config_hash"),
             "dataset_version": dsv,
@@ -181,10 +194,12 @@ def main(argv=None):
     ap.add_argument("--all-datasets", action="store_true",
                     help="admit every dataset version instead of only the "
                          "configured one (for a diagnostic, never for a table)")
-    ap.add_argument("--kind", choices=("matrix", "smoke"), default="matrix",
+    ap.add_argument("--kind", choices=("matrix", "smoke", "ablation"),
+                    default="matrix",
                     help="'matrix' (the default) reads the matrix cells; "
-                         "'smoke' reads the opdiffB_smoke_* runs instead -- the "
-                         "pilot's own numbers, before the matrix exists")
+                         "'smoke' reads the opdiffB_smoke_* runs -- the pilot's "
+                         "own numbers, before the matrix exists; 'ablation' "
+                         "reads the capacity ablations (opdiffB_<Arch>_ffnN_*)")
     args = ap.parse_args(argv)
 
     expect = None if args.all_datasets else expected_version()
@@ -203,43 +218,51 @@ def main(argv=None):
         print(f"\n  REFUSED: the runs span {len(versions)} dataset versions "
               f"({versions}). A mean across two datasets describes neither.")
         return 2
-    # REFUSAL 2: one config hash per arm.
+    # REFUSAL 2: one config hash per (arm, variant). The VARIANT is part of
+    # the key because a capacity ablation is a DIFFERENT experiment from the
+    # canonical arm -- and it is a LABELLED one ("opdiff+ffn_mult_4"). Two
+    # runs of the SAME (arm, variant) with different config hashes is the real
+    # defect: the config changed between two seeds of one experiment.
     by_arm = defaultdict(set)
     for r in runs:
-        by_arm[r["arch"]].add(r["config_hash"])
+        by_arm[(r["arch"], r["variant"])].add(r["config_hash"])
     bad = {a: sorted(h) for a, h in by_arm.items() if len(h) > 1}
     if bad:
-        print(f"\n  REFUSED: these arms have more than one config hash: {bad}. "
-              "The config changed between two seeds of the same arm, so the arm "
-              "is two experiments.")
+        print(f"\n  REFUSED: these (arm, variant) pairs have more than one "
+              f"config hash: {bad}. The config changed between two seeds of the "
+              "same experiment, so it is two experiments.")
         return 2
 
     print(f"\n  {len(runs)} admissible run(s)\n")
-    print(f"  {'arm':<6} {'n':>2}  {'val/task_loss':>22}  {'depth':>16}  "
+    print(f"  {'arm':<16} {'n':>2}  {'val/task_loss':>22}  {'depth':>16}  "
           f"{'Hungarian':>16}")
     summary = {"dataset_version": versions[0], "arms": {}}
-    for arch in ARMS:
-        rows = [r for r in runs if r["arch"] == arch]
-        if not rows:
-            print(f"  {arch:<6} {0:>2}  {'N/A':>22}")
-            continue
+    # The headline table is per (arm, variant): a capacity ablation is a
+    # DIFFERENT experiment from the canonical arm, and it is a LABELLED one, so
+    # it gets its own row and can never be averaged into the canonical arm's.
+    _arm_groups = {}
+    for r in runs:
+        _arm_groups.setdefault((r["arch"], r["variant"]), []).append(r)
+    for (arch, variant), rows in sorted(
+            _arm_groups.items(), key=lambda kv: (kv[0][0], kv[0][1] or "")):
+        _label = arch if not variant else f"{arch}/{variant}"
         vl = _ms([_num(r["metrics"].get("val/task_loss")) for r in rows])
         dp = _ms([_num(r["metrics"].get("val/avg_recursion_steps")) for r in rows])
         hg = _ms([_num(r["metrics"].get("val/routing_hungarian_accuracy"))
                   for r in rows])
-        print(f"  {arch:<6} {vl[2]:>2}  {_fmt(vl[0], vl[1]):>22}  "
+        print(f"  {_label:<16} {vl[2]:>2}  {_fmt(vl[0], vl[1]):>22}  "
               f"{_fmt(dp[0], dp[1], 2):>16}  {_fmt(hg[0], hg[1]):>16}")
-        summary["arms"][arch] = {
+        summary["arms"][_label] = {
             "n_seeds": vl[2],
             "seeds": sorted(r["seed"] for r in rows),
-            "config_hash": sorted(by_arm[arch]),
+            "config_hash": sorted(by_arm[(arch, variant)]),
             "runs": [r["dir"] for r in rows],
             "metrics": {},
         }
         for key, label, _d in HEADLINE:
             vals = [_num(r["metrics"].get(key)) for r in rows]
             m, s, n = _ms(vals)
-            summary["arms"][arch]["metrics"][key] = {
+            summary["arms"][_label]["metrics"][key] = {
                 "mean": m, "std": s, "n": n,
                 "per_seed": {str(r["seed"]): _num(r["metrics"].get(key))
                              for r in rows},
@@ -247,14 +270,28 @@ def main(argv=None):
 
     # THE FULL HEADLINE TABLE, one row per measured quantity.
     print("\n  every measured quantity (mean ± std over the seeds that have it)")
-    print(f"  {'arm':<6} {'quantity':<28} {'value':>26} {'n':>3}")
-    for arch in ARMS:
-        if arch not in summary["arms"]:
-            continue
+    print(f"  {'arm':<16} {'quantity':<28} {'value':>26} {'n':>3}")
+    for _label in sorted(summary["arms"]):
         for key, label, _d in HEADLINE:
-            e = summary["arms"][arch]["metrics"][key]
-            print(f"  {arch:<6} {label:<28} {_fmt(e['mean'], e['std']):>26} "
+            e = summary["arms"][_label]["metrics"][key]
+            print(f"  {_label:<16} {label:<28} {_fmt(e['mean'], e['std']):>26} "
                   f"{e['n']:>3}")
+
+    # THE PER-OPERATION DEPTH TABLE -- the opdiff study's depth measurement.
+    # It is a MEAN over the seeds of the per-operation average exit depth, and
+    # it is the table the "does the model spend more computation on the
+    # operations that need more" question is answered from.
+    #
+    # The columns are (arm, variant) groups, not arms: an under-budgeted MoR
+    # averaged into the canonical MoR's column would be a table of two
+    # experiments wearing one arm's name.
+    _cols = sorted(summary["arms"])
+
+    def _col_rows(label):
+        for (_a, _v), _rows in _arm_groups.items():
+            if (_a if not _v else f"{_a}/{_v}") == label:
+                return _rows
+        return []
 
     # THE PER-OPERATION DEPTH TABLE -- the opdiff study's depth measurement.
     # It is a MEAN over the seeds of the per-operation average exit depth, and
@@ -265,17 +302,15 @@ def main(argv=None):
                        for r in runs for k in r["metrics"]
                        if k.startswith("recursion/avg_depth_by_op/")})
     if op_names:
-        hdr = f"  {'operation':<10}" + "".join(f"{a:>12}" for a in ARMS)
-        print(hdr)
+        print(f"  {'operation':<10}" + "".join(f"{c:>16}" for c in _cols))
         for op in op_names:
             line = f"  {op:<10}"
-            for arch in ARMS:
-                rows = [r for r in runs if r["arch"] == arch]
+            for c in _cols:
                 vals = [_num(r["metrics"].get(f"recursion/avg_depth_by_op/{op}"))
-                        for r in rows]
+                        for r in _col_rows(c)]
                 m, s, n = _ms(vals)
-                line += (f"{m:>8.2f} ±{s:>3.2f}" if m is not None and s is not None
-                         else (f"{m:>12.2f}" if m is not None else f"{'N/A':>12}"))
+                line += (f"{m:>10.2f} ±{s:>3.2f}" if m is not None and s is not None
+                         else (f"{m:>16.2f}" if m is not None else f"{'N/A':>16}"))
             print(line)
 
     print("\n  average recursion depth by expert group (mean over seeds)")
@@ -283,17 +318,46 @@ def main(argv=None):
                         for r in runs for k in r["metrics"]
                         if k.startswith("recursion/avg_depth_by_family/")})
     if fam_names:
-        print(f"  {'group':<18}" + "".join(f"{a:>12}" for a in ARMS))
+        print(f"  {'group':<18}" + "".join(f"{c:>16}" for c in _cols))
         for fam in fam_names:
             line = f"  {fam:<18}"
-            for arch in ARMS:
-                rows = [r for r in runs if r["arch"] == arch]
+            for c in _cols:
                 vals = [_num(r["metrics"].get(f"recursion/avg_depth_by_family/{fam}"))
-                        for r in rows]
+                        for r in _col_rows(c)]
                 m, s, n = _ms(vals)
-                line += (f"{m:>8.2f} ±{s:>3.2f}" if m is not None and s is not None
-                         else (f"{m:>12.2f}" if m is not None else f"{'N/A':>12}"))
+                line += (f"{m:>10.2f} ±{s:>3.2f}" if m is not None and s is not None
+                         else (f"{m:>16.2f}" if m is not None else f"{'N/A':>16}"))
             print(line)
+
+    # THE CAPACITY LADDER. The question it answers: does the MoR-vs-MoRE gap
+    # depend on the MoR arm's PARAMETER BUDGET, or on the architecture? The
+    # canonical MoR is budget-matched to MoRE (7 x 4 = 28 hidden width); the
+    # other widths are LABELLED ablations and are NOT matched to anything, and
+    # the non-embedding parameter count is printed next to every row precisely
+    # so that no reader can mistake one for another.
+    _groups = {}
+    for r in runs:
+        _groups.setdefault((r["arch"], r["variant"]), []).append(r)
+    if len(_groups) > 1 or any(v for _a, v in _groups):
+        print("\n  the capacity ladder (an UNMATCHED width is a labelled "
+              "ablation, never a MoR cell)")
+        print(f"  {'arm':<6} {'width':<10} {'variant':<22} {'non-emb params':>15} "
+              f"{'val/task_loss':>14} {'exact':>7} {'depth':>7} {'n':>3}")
+        for (_arch, _var), _rows in sorted(
+                _groups.items(), key=lambda kv: (kv[0][0], kv[0][1] or "")):
+            _ne = _rows[0]["metrics"].get("non_embedding_params")
+            _vl = _ms([_num(x["metrics"].get("val/task_loss")) for x in _rows])
+            _ex = _ms([_num(x["metrics"].get("val/exact_match")) for x in _rows])
+            _dp = _ms([_num(x["metrics"].get("val/avg_recursion_steps")) for x in _rows])
+            print(f"  {_arch:<6} {(_var or 'canonical'):<10} "
+                  f"{str(_rows[0].get('variant_tag') or 'canonical'):<22} "
+                  f"{(_ne if _ne else 0):>15,} {_fmt(_vl[0], _vl[1]):>14} "
+                  f"{_fmt(_ex[0], _ex[1], 3):>7} {_fmt(_dp[0], _dp[1], 2):>7} "
+                  f"{_vl[2]:>3}")
+        print("  The canonical MoR row is the budget-matched one (7 x 4 = 28);")
+        print("  every other width is an explicitly labelled ablation and is")
+        print("  NOT comparable with MoRE on capacity -- which is the point of")
+        print("  running it.")
 
     # THE COMPUTE-VERSUS-k TABLE. This is the one the study's OOD claim is
     # read off, and it is the diagnostic the dataset's own caveat asks for: the
