@@ -163,8 +163,13 @@ failed pilot, and the next step is to diagnose it, not to continue.
    on the seen k values before blaming your architecture."*
    (On the smoke subset, at 3 epochs on 1 % of the data, the seen F rows were
    at ~0.17 per digit and 0.00 exact — i.e. **not learned at all yet**, so the
-   smoke pilot says nothing about extrapolation. The matrix is 101× more
+   smoke pilot says nothing about extrapolation. The matrix is 82× more
    data.)
+   **If this check fails, REPORT IT AND CONTINUE.** It is a finding, not a
+   reason to change the protocol: the matrix also measures the primary
+   three-arm comparison, which does not depend on the F rows at all. Do NOT
+   shrink `TRAIN_K`, do NOT change the epochs, do NOT re-freeze anything —
+   report the numbers and let the user decide.
 8. **The VRAM peak is as measured**: `perf/gpu_peak_alloc_gib` ≈ 0.7 (MoE),
    ≈ 2.4 (MoRE), ≈ 5.8 (MoR) GiB. If MoR's peak is materially above 5.8 GiB,
    **stop** and report it.
@@ -187,11 +192,12 @@ resumes: the completed cells are skipped.
 
 The ten remaining cells are seeds 43–46 × {MoE, MoR, MoRE}.
 
-**Approval gate.** The full matrix may only start after the user has
-approved the budget in the T-OD.5 thread. The approval is recorded as a tick
-in `TASKS.md` under T-OD.5. If that box is not ticked, run §3 and §4 only,
-then report the measured epoch times back — that is what the approval is
-based on.
+**Approval gate.** The full matrix was APPROVED by the user on 2026-10-21 at
+the budget in §9 (3 epochs × 5 seeds, ≈ 32 h on this card), and the approval
+is recorded as a tick in `TASKS.md` under T-OD.5. So the pilot AND the
+remaining ten cells may run. If that box is ever unticked — e.g. on a second
+machine, or after a re-freeze — run §3 and §4 only and report the measured
+epoch times back.
 
 ---
 

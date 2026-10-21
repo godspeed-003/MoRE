@@ -457,6 +457,7 @@ and spending it would change every canonical run's identity.
 | `make_opdiff_dataset_v3.py` | generator for the opdiff_v3 dataset (7 expert groups, 25 operations, 384-token rows, a binary iteration-count slot for the F operation, and two held-out splits); writes `opdiff_v3/` + `opdiff_v3_smoke/`, both gitignored |
 | [OPDIFF_DATASET.md](OPDIFF_DATASET.md) | the opdiff dataset explained: the row layout, the k slot, the loss mask, the per-row labels, the F_k difficulty dial, and the two OOD splits |
 | [HANDOFF.md](HANDOFF.md) | the opdiff matrix brief for the co-author's agent: machine, dataset, preflight, pilot, acceptance checks, aggregation, never-change list |
+| [HANDOFF_PROMPT.md](HANDOFF_PROMPT.md) | the prompt to give that agent: the pointer, the interpreter, the GPU, the command order, and what to report back |
 
 There is deliberately no `moe/` or `mor/` folder: one training system with an explicit
 `--architecture {moe,mor,more}` mode, per [plan.md](plan.md) §9.

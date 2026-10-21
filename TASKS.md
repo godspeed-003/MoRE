@@ -2012,7 +2012,7 @@ the co-author's agent. Not part of `plan.md` §0–11. Companion paper task:
   token. The first 1-epoch smoke runs were DELETED, not kept: they carried
   the pre-fix throughput metric (399 vs 121,000 "tok/s").
 
-- [~] **T-OD.5 Measure tokens/s → epochs × seeds budget → USER APPROVAL.**
+- [x] **T-OD.5 Measure tokens/s → epochs × seeds budget → USER APPROVAL.**
   Approval gate: no full-matrix launch on the co-author's card until the
   wall-clock × 15 (+ pilot) budget has been presented and approved in chat.
   **Verify:** measured tokens/s per architecture from the smoke runs; budget
@@ -2026,10 +2026,20 @@ the co-author's agent. Not part of `plan.md` §0–11. Companion paper task:
   card** (the 4060 factor is the language calibration's measured ~1.5×, and
   the pilot's measured epoch time replaces it). The pilot (3 arms × seed 42)
   is 9.0 h of that and is NOT extra work — it IS the matrix's seed-42 cells.
-  **THE APPROVAL IS NOT YET RECORDED**: no full-matrix launch may happen
-  until the user approves this budget in chat; the approval is recorded by
-  ticking this box. `HANDOFF.md` §4/§5 tells the co-author's agent to run the
-  pilot and then STOP if this box is unticked.
+  **APPROVED 2026-10-21** by the user, who was shown this budget and
+  answered "we can just give handoff to ayan" — i.e. the matrix is authorised
+  to run on the co-author's 8 GB card at 3 epochs × 5 seeds, with the pilot
+  first. **The matrix MUST run on the 8 GB card**: MoR's measured peak is
+  5.80 GiB allocated / 6.38 GiB reserved, and the reserved figure is OVER the
+  6 GB card's memory.
+  **STILL OPEN, AND DELIBERATELY DEFERRED TO THE PILOT'S DIAGNOSTIC:** at 1 %
+  of the data the F rows are unsolved (per-k exact match 0.0 for every trained
+  k), so the "right answers on held-out k" claim may not be supportable at 3
+  epochs. The protocol is frozen as-is — the k range, the epochs and the
+  config are NOT changed by the operator — and the pilot's acceptance check 7
+  reports the diagnostic. A finding that the seen F rows are unsolved is
+  REPORTED, not fixed: whether to shrink TRAIN_K or spend more epochs is a
+  scientific decision for the user, not an operational one for the agent.
 
 - [x] **T-OD.6 Write `HANDOFF.md` on `main` for the co-author's coding agent —
   autonomous execution, no co-author checkups.** It must carry: which machine

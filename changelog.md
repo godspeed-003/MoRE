@@ -10252,6 +10252,42 @@ read at all.
 - The language suites: 79/0, 43/0/5 skipped, 79/0/1 skipped, 10/0/1 skipped,
   64/0, 37/0, 47/0/1 skipped, 17/0, 22/0.
 - Three smoke runs, exit 0 each, on the v3 subset; the numbers above.
-- `HANDOFF.md` and `OPDIFF_DATASET.md` rewritten for v3.
+- `HANDOFF.md` rewritten for v3, and `OPDIFF_DATASET.md` added: the row layout,
+  the k slot, the loss mask, the per-row labels, the F_k difficulty dial, and
+  the two OOD splits.
+
+## T-OD.5 - the budget is APPROVED, and the matrix is handed to the co-author's agent
+
+**Date.** 2026-10-21.
+
+**The budget** (measured on the v3 smoke runs, 3 epochs × the frozen seed set
+42–46, 112.9 M-token epoch plus the val and the two OOD passes): MoE 3.1 h +
+MoR 28.4 h + MoRE 16.0 h = **≈ 47 h on the 6 GB gate card, ≈ 32 h on the
+co-author's 8 GB card**. The pilot (3 arms × seed 42) is 9.0 h of that and is
+NOT extra work — it IS the matrix's seed-42 cells.
+
+**The card is not a detail.** MoR's measured peak is **5.80 GiB allocated /
+6.38 GiB reserved** — the reserved figure is OVER the 6 GB card's memory — so
+the matrix runs on the 8 GB card (73 % allocated / 80 % reserved there).
+
+**APPROVED by the user on 2026-10-21**, who was shown this budget and
+answered "we can just give handoff to ayan". T-OD.5 is ticked in `TASKS.md`,
+which is the gate the handoff's own §5 checks.
+
+**ONE THING DELIBERATELY LEFT OPEN.** At 1 % of the data the F rows are
+unsolved — the per-k exact match is 0.0 for every TRAINED k, and the held-out
+ones are 0.0 too — so the "right answers on held-out k" claim may not be
+supportable at 3 epochs. The protocol is frozen as-is (no k-range change, no
+epoch change, no re-freeze by the operator); the pilot's acceptance check 7
+REPORTS the diagnostic, and `HANDOFF.md` §4 says explicitly that a failing
+check 7 is a finding to report and not a reason to change anything. Whether
+to shrink `TRAIN_K` or spend more epochs is a scientific decision for the
+user, and it is taken on the pilot's numbers rather than in advance.
+
+**`HANDOFF_PROMPT.md`** is the prompt to hand the co-author's agent: the
+pointer, the three things an agent with no context would otherwise get wrong
+(the interpreter, the GPU, and what to do when something fails), the command
+order, the acceptance checks, the stop-at-first-failure protocol, the
+never-change list and what to report back.
 
 
