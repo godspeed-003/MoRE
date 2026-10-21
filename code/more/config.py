@@ -1154,17 +1154,17 @@ def _apply_language_block(cfg: dict, declared_family_cls=None) -> dict:
 # ---------------------------------------------------------------------------
 
 # The opdiff shape. The SEQUENCE LENGTH and the VOCABULARY are the two numbers
-# the dataset fixes, and both are MEASURED from `opdiff_v2/meta.json`:
-# row_len 304 (16 examples x 19 tokens) and vocab 43 (18 fixed tokens + 25
+# the dataset fixes, and both are MEASURED from `opdiff_v3/meta.json`:
+# row_len 384 (16 examples x 24 tokens) and vocab 37 (19 fixed tokens + 18
 # operation tokens). They are `setdefault`ed here so a config file, the frozen
 # spec and the CLI can all win -- and the engine REFUSES a run whose
 # data.seq_len / data.vocab_size disagree with the dataset on disk, so a
 # mismatch here is caught before the first batch rather than after the
 # checkpoint is written.
-OPDIFF_SEQ_LEN_DEFAULT    = 304
-OPDIFF_VOCAB_SIZE_DEFAULT = 43
+OPDIFF_SEQ_LEN_DEFAULT    = 384
+OPDIFF_VOCAB_SIZE_DEFAULT = 37
 OPDIFF_N_HEADS_DEFAULT    = 4      # same as language, at d_model 256
-OPDIFF_ROOT_DEFAULT       = "opdiff_v2"
+OPDIFF_ROOT_DEFAULT       = "opdiff_v3"
 
 
 def _apply_opdiff_block(cfg: dict, declared_family_cls=None) -> dict:

@@ -454,7 +454,8 @@ and spending it would change every canonical run's identity.
 | `results/flops_language.json` | the FLOPs accounting read by the paper's efficiency table |
 | `results/language/` | the same artifacts for the language task, written only by `export_results.py --task language` |
 | `runs/<experiment_id>/` | per-run outputs only — config, resolved config, metrics, TSV, held-out depth sidecar; checkpoints and stdout are untracked |
-| `make_opdiff_dataset_v2.py` | generator for the opdiff_v2 arithmetic dataset (7 pure expert groups, 304-token rows); writes `opdiff_v2/` + `opdiff_v2_smoke/`, both gitignored |
+| `make_opdiff_dataset_v3.py` | generator for the opdiff_v3 dataset (7 expert groups, 25 operations, 384-token rows, a binary iteration-count slot for the F operation, and two held-out splits); writes `opdiff_v3/` + `opdiff_v3_smoke/`, both gitignored |
+| [OPDIFF_DATASET.md](OPDIFF_DATASET.md) | the opdiff dataset explained: the row layout, the k slot, the loss mask, the per-row labels, the F_k difficulty dial, and the two OOD splits |
 | [HANDOFF.md](HANDOFF.md) | the opdiff matrix brief for the co-author's agent: machine, dataset, preflight, pilot, acceptance checks, aggregation, never-change list |
 
 There is deliberately no `moe/` or `mor/` folder: one training system with an explicit

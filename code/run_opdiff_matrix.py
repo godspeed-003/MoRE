@@ -200,18 +200,38 @@ def preflight(verbose=True):
             "preflight. Record the dataset_version it prints -- it is the "
             "identity of the bytes and it goes into every run's provenance.")
     else:
-        for split in ("train", "val", "test", "ood"):
-            for suffix in ("x", "group", "diff", "sub"):
+        for split in ("train", "val", "test", "ood_interp", "ood_extrap"):
+            for suffix in ("x", "group", "diff", "k", "sub"):
                 arr = os.path.join(root, f"{split}_{suffix}.npy")
                 if not os.path.exists(arr):
                     problems.append(f"{arr} is missing though meta.json lists the split.")
         m = json.load(open(man_path, "r", encoding="utf-8"))
+        # THE OOD SPLITS ARE THE POINT of the v3 dataset, so their absence is a
+        # problem and not a detail: without them the held-out iteration counts
+        # are not evaluated at all.
+        for split in ("ood_interp", "ood_extrap"):
+            if m.get("rows", {}).get(split, 0) <= 0:
+                problems.append(
+                    f"the {split} split is empty or missing from meta.json. The "
+                    "held-out iteration counts ARE the OOD evaluation; without "
+                    "them the run would report an in-distribution number and "
+                    "call it the OOD result.")
+        _train_k = set(m.get("train_k", []))
+        _interp_k = set(m.get("ood_interp_k", []))
+        _extrap_k = set(m.get("ood_extrap_k", []))
+        if _train_k & (_interp_k | _extrap_k):
+            problems.append(
+                f"a trained k value {_train_k & (_interp_k | _extrap_k)} is also "
+                "in a held-out list. The held-out lists are the whole point: a k "
+                "the model has trained on is not an OOD k.")
         if m.get("dataset_version") is None:
             warnings.append(
                 "meta.json carries no dataset_version: the dataset was generated "
-                "by a generator older than the content-hash change, so its "
-                "identity is the weaker fallback fingerprint. Regenerate it to "
-                "get a content identity.")
+                "by a generator that does not write content hashes, so the "
+                "identity recorded in provenance is the weaker fallback "
+                "fingerprint (meta.json plus a 4 MiB edge of the train split). "
+                "It is still content-sensitive, but a full content hash would be "
+                "better.")
 
     # 3. THE SPEC IS DELIBERATELY UNFROZEN. This is a NOTE, not a problem:
     #    every opdiff run is exploratory, and the guard refusing a canonical
@@ -435,7 +455,7 @@ def main(argv=None):
         name = f"opdiffB_smoke_{disp}_seed44"
         rc, secs = launch(arch, 44, group="opdiffB_smoke",
                           extra=["--epochs", "1",
-                                 "--opdiff_root", "opdiff_v2_smoke",
+                                 "--opdiff_root", "opdiff_v3_smoke",
                                  "--run_name", name],
                           dry_run=args.dry_run)
         print(f"\n  smoke run {'OK' if rc == 0 else f'FAILED rc={rc}'} "

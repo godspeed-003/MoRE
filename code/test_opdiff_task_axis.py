@@ -117,7 +117,7 @@ print("\n--- T-OD.3.1  the manifest agrees with the GENERATOR")
 # opdiff number is wrong in the same direction and nothing looks broken.
 
 _gen_spec = importlib.util.spec_from_file_location(
-    "_opdiff_generator", os.path.join(REPO, "make_opdiff_dataset_v2.py"))
+    "_opdiff_generator", os.path.join(REPO, "make_opdiff_dataset_v3.py"))
 GEN = importlib.util.module_from_spec(_gen_spec)
 _gen_spec.loader.exec_module(GEN)
 
@@ -125,34 +125,36 @@ check("OD.1a the generator and the manifest agree on the TOKEN LAYOUT",
       GEN.OP0 == OF.OP_TOKEN_OFFSET
       and list(GEN.TOK.values()) == [OF.OP_TOKEN_OFFSET + i
                                      for i in range(OF.NUM_OP_TYPES)]
-      and list(GEN.ALL_OPS.keys()) == OF.ALL_OP_NAMES,
+      and list(GEN.OPS.keys()) == OF.ALL_OP_NAMES,
       f"op0={GEN.OP0}/{OF.OP_TOKEN_OFFSET}, "
-      f"{len(GEN.ALL_OPS)} ops, first={list(GEN.ALL_OPS)[0]}, "
-      f"last={list(GEN.ALL_OPS)[-1]}")
+      f"{len(GEN.OPS)} ops, first={list(GEN.OPS)[0]}, "
+      f"last={list(GEN.OPS)[-1]}")
 
-check("OD.1b the vocabulary is 43 = 18 fixed + 25 operation tokens",
-      OF.VOCAB_SIZE == 43 and GEN.OP0 + len(GEN.ALL_OPS) == 43
-      and OF.NUM_OP_TYPES == 25,
+check("OD.1b the vocabulary is 37 = 19 fixed + 18 operation tokens",
+      OF.VOCAB_SIZE == 37 and GEN.OP0 + len(GEN.OPS) == 37
+      and OF.NUM_OP_TYPES == 18,
       f"VOCAB_SIZE={OF.VOCAB_SIZE}, NUM_OP_TYPES={OF.NUM_OP_TYPES}")
 
 _gen_groups = {g - 1: [OF.OP_NAME_TO_IDX[o] for o in ops]
                for g, ops in GEN.GROUPS.items()}
 _man_groups = {g - 1: [OF.OP_NAME_TO_IDX[o] for o in ops]
-               for g, ops in OF.GROUP_OP_NAMES.items()}
-check("OD.1c the group partition is the generator's, and the OOD operations "
-      "are E7 on disk",
+               for g, ops in OF.GROUP_OP_NAMES.items() if g != 7}
+check("OD.1c the group partition is the generator's, and E7 is the F "
+      "operation plus GCD",
       _gen_groups == _man_groups
-      and all(OF.OP_TO_EXPERT[o] == 6 for o in GEN.OOD_OPS)
-      and all(OF.OP_TO_EXPERT[o] == 6 for o in GEN.GROUPS[7]),
-      "E1..E7 as generated; F3/F6/F12 sit in E7 because the generator labels "
-      "the OOD rows with group 7")
+      and OF.GROUP_OP_NAMES[7] == ["F", "GCD"]
+      and "F" in OF.OP_NAME_TO_IDX and "GCD" in OF.OP_NAME_TO_IDX,
+      "E1..E6 as generated; E7 is F (every k) plus GCD, because the generator "
+      "builds E7 from the k list separately")
 
 check("OD.1d every operation maps to exactly one group, and every group is "
       "reachable",
-      len(OF.OP_TO_EXPERT) == 25
-      and set(OF.OP_TO_EXPERT.values()) == set(range(7)),
-      f"{len(OF.OP_TO_EXPERT)} operations over "
-      f"{len(set(OF.OP_TO_EXPERT.values()))} groups")
+      len(set(OF.OP_NAME_TO_IDX)) == 18
+      and set(range(1, 8)) == set(OF.GROUP_OP_NAMES.keys())
+      and set(OF.OP_TO_GROUP) == set(OF.OP_NAME_TO_IDX)
+      and set(OF.OP_TO_GROUP.values()) == set(range(7)),
+      f"{len(OF.OP_NAME_TO_IDX)} operations over "
+      f"{len(OF.GROUP_OP_NAMES)} groups")
 
 check("OD.1e the depth curriculum table is EMPTY -- the generator's nominal "
       "difficulty is a placeholder, not a target",
@@ -177,9 +179,39 @@ _ok, _msg = raises(lambda: OF.expert_labels(0), ValueError, "num_experts")
 check("OD.1h expert_labels(0) raises rather than returning an empty axis",
       _ok, _msg[:70])
 
-_ok, _msg = raises(lambda: OF.op_id_from_token(17), ValueError, "operation token")
+_ok, _msg = raises(lambda: OF.op_id_from_token(18), ValueError, "operation token")
 check("OD.1i a NON-operation token id raises instead of aliasing an "
       "operation",
+      _ok, _msg[:70])
+
+# THE OPERATION-INSTANTIATION AXIS. The per-operation depth breakdown is the
+# compute-versus-k claim, and it can only make that claim if the axis carries
+# one entry per ITERATION COUNT and not one entry for the F operation as a
+# whole.
+check("OD.1j the depth axis is the 17 non-F operations plus one entry per k "
+      "value, named F<k>",
+      OF.NUM_OP_AXIS == 35
+      and OF.OP_AXIS_NAMES[:17] == [o for o in OF.ALL_OP_NAMES if o != "F"]
+      and OF.OP_AXIS_NAMES[17:] == [f"F{k}" for k in OF.K_VALUES],
+      f"axis width {OF.NUM_OP_AXIS}: 17 operations + {len(OF.K_VALUES)} k values")
+
+check("OD.1k the axis covers EVERY k the generator can produce, and the "
+      "held-out lists are disjoint from the trained one",
+      set(GEN.TRAIN_K) | set(GEN.INTERP_K) | set(GEN.EXTRAP_K) == set(OF.K_VALUES)
+      and not (set(GEN.TRAIN_K) & set(GEN.INTERP_K))
+      and not (set(GEN.TRAIN_K) & set(GEN.EXTRAP_K))
+      and not (set(GEN.INTERP_K) & set(GEN.EXTRAP_K)),
+      f"train {GEN.TRAIN_K}, interp {GEN.INTERP_K}, extrap {GEN.EXTRAP_K}")
+
+check("OD.1l the axis index of an F instance is the index of its k, and an "
+      "unknown k RAISES rather than being clamped",
+      OF.op_axis_index("F", 3) == 17 + OF.K_VALUES.index(3)
+      and OF.op_axis_k(OF.op_axis_index("F", 3)) == 3
+      and OF.op_axis_k(OF.op_axis_index("ADD")) is None,
+      f"F3 -> axis {OF.op_axis_index('F', 3)}")
+_ok, _msg = raises(lambda: OF.op_axis_index("F", 99), ValueError, "k=99")
+check("OD.1m an unknown k raises instead of attributing a measured depth to "
+      "another iteration count",
       _ok, _msg[:70])
 
 
@@ -192,13 +224,14 @@ print("\n--- T-OD.3.2  the dataset: the 7-tuple, the mask, the group")
 
 _TMP = tempfile.mkdtemp(prefix="opdiff_tiny_")
 try:
-    # SIX rows per group, not three: the largest group (E7) has six
-    # operations and the generator's split de-duplication needs every
-    # operation to appear in BOTH train and val, or the forbid-map
-    # construction raises. Six is the smallest count that satisfies it.
+    # TWELVE rows per group: E7 has twelve sub-operations (eleven k values plus
+    # GCD) and the generator's split de-duplication needs every sub-operation to
+    # appear in BOTH train and val, or the forbid-map construction raises.
+    # Twelve is the smallest count that satisfies it.
     _rc = subprocess.run(
-        [sys.executable, os.path.join(REPO, "make_opdiff_dataset_v2.py"),
-         "--out", _TMP, "--train_rows_per_group", "6", "--eval_rows_per_group", "6"],
+        [sys.executable, os.path.join(REPO, "make_opdiff_dataset_v3.py"),
+         "--out", _TMP, "--train_rows_per_group", "12",
+         "--eval_rows_per_group", "12", "--ood_rows_per_k", "4"],
         capture_output=True, text=True)
     if _rc.returncode != 0:
         skip("OD.2a-d", f"the generator failed: {_rc.stderr[-200:]}")
@@ -219,10 +252,10 @@ try:
               f"shapes: ids{tuple(_ids.shape)} mask{tuple(_mask.shape)} "
               f"exp{tuple(_exp.shape)} ops{tuple(_ops.shape)}")
 
-        check("OD.2b the row is 304 tokens, the vocabulary is 43, and the "
+        check("OD.2b the row is 384 tokens, the vocabulary is 37, and the "
               "manifest agrees",
-              _ids.shape == (304,) and _ds.seq_len == 304
-              and _ds.vocab_size == 43 == _man["vocab_size"],
+              _ids.shape == (384,) and _ds.seq_len == 384
+              and _ds.vocab_size == 37 == _man["vocab_size"],
               f"seq_len={_ds.seq_len}, vocab={_ds.vocab_size}")
 
         check("OD.2c step_mask is all True and the target is the NaN POISON",
@@ -237,27 +270,42 @@ try:
 
         _raw = np.asarray(np.load(os.path.join(_TMP, "train_x.npy"),
                                   mmap_mode="r")[0], dtype=np.int64)
-        _ex = 19
-        _want_ops = _raw[::_ex] - OF.OP_TOKEN_OFFSET
-        check("OD.2e step_ops is the OWNING EXAMPLE's operation, derived from "
-              "the op token the model is shown",
-              bool((_ops.reshape(-1)[::_ex] == _want_ops).all())
-              and int(_ops.min()) >= 0 and int(_ops.max()) < OF.NUM_OP_TYPES,
-              f"ops at the 16 example starts: {_want_ops.tolist()}")
+        _ex = 24
+        # The axis index of each example, recomputed HERE from the input alone:
+        # the operation token, and for F the k decoded from the binary slot.
+        _hex0 = _man["tokens"]["hex0"]
+        _want = []
+        for _e in range(16):
+            _op_tok = int(_raw[_e * _ex])
+            _op = list(OF.OP_NAME_TO_IDX)[_op_tok - OF.OP_TOKEN_OFFSET]
+            if _op == "F":
+                _k = 0
+                for _j in range(5):
+                    _k |= (int(_raw[_e * _ex + 1 + _j]) - _hex0) << (4 - _j)
+                _want.append(OF.op_axis_index("F", _k))
+            else:
+                _want.append(OF.op_axis_index(_op))
+        check("OD.2e step_ops is the OWNING EXAMPLE's operation INSTANCE, "
+              "decoded from the input the model is shown",
+              bool((_ops.reshape(-1)[::_ex]
+                    == torch.tensor(_want, dtype=torch.long)).all())
+              and int(_ops.min()) >= 0 and int(_ops.max()) < OF.NUM_OP_AXIS,
+              f"axis indices at the 16 example starts: {_want}")
 
         _lm = np.asarray(_man["loss_mask"], dtype=bool)
         check("OD.2f the loss mask comes from the manifest and is shifted by one "
               "for the shift-by-one targets",
-              _ds.loss_mask.shape == (304,)
-              and _ds.loss_mask_shifted.shape == (303,)
+              _ds.loss_mask.shape == (384,)
+              and _ds.loss_mask_shifted.shape == (383,)
               and int(_lm.sum()) == 16 * 9,
-              f"{int(_lm.sum())} scored positions of 304 "
+              f"{int(_lm.sum())} scored positions of 384 "
               f"(16 examples x 9 answer+EOS positions)")
 
-        check("OD.2g the dataset version is the generator's CONTENT hash",
-              bool(_ds.dataset_version) and _ds.dataset_version.startswith("opdiff-v2-")
-              and _ds.dataset_version == _man["dataset_version"]
-              and _ds.train_split_version == _man["dataset_version"],
+        check("OD.2g the dataset version is a MEASURED fingerprint of the bytes "
+              "on disk",
+              bool(_ds.dataset_version)
+              and _ds.dataset_version.startswith("opdiff-v3-")
+              and _ds.train_split_version == _ds.dataset_version,
               f"dataset_version={_ds.dataset_version}")
 
         check("OD.2h an ABSENT dataset yields (None, None) rather than an "
@@ -268,23 +316,67 @@ try:
 
         _ok, _msg = raises(lambda: MoREOpdiffDataset("train",
                                                      root=os.path.join(_TMP, "nope")),
-                           FileNotFoundError, "make_opdiff_dataset_v2.py")
+                           FileNotFoundError, "make_opdiff_dataset_v3.py")
         check("OD.2i a missing dataset raises with the BUILD COMMAND in the "
               "message",
               _ok, _msg[:80])
 
         check("OD.2j a relative opdiff_root resolves against the REPO ROOT, "
               "not the working directory",
-              resolve_opdiff_root("opdiff_v2").replace("\\", "/").endswith(
-                  "/MoRE/opdiff_v2"),
-              resolve_opdiff_root("opdiff_v2"))
+              resolve_opdiff_root("opdiff_v3").replace("\\", "/").endswith(
+                  "/MoRE/opdiff_v3"),
+              resolve_opdiff_root("opdiff_v3"))
 
-        check("OD.2k the OOD split exists and carries group 7 (E7)",
-              "ood" in _man["rows"] and _man["rows"]["ood"] > 0
-              and int(np.load(os.path.join(_TMP, "ood_group.npy"),
+        # THE OOD SPLITS. Two of them, two different questions, and the
+        # dataset refuses to load one whose k values are not the ones its name
+        # promises.
+        _interp_k = sorted({int(k) for k in
+                             np.load(os.path.join(_TMP, "ood_interp_k.npy"),
+                                     mmap_mode="r")})
+        _extrap_k = sorted({int(k) for k in
+                             np.load(os.path.join(_TMP, "ood_extrap_k.npy"),
+                                     mmap_mode="r")})
+        check("OD.2k the two OOD splits hold the RIGHT held-out k values, and "
+              "they are disjoint from the trained ones",
+              _interp_k == sorted(GEN.INTERP_K) and _extrap_k == sorted(GEN.EXTRAP_K)
+              and not (set(_interp_k) & set(GEN.TRAIN_K))
+              and not (set(_extrap_k) & set(GEN.TRAIN_K))
+              and not (set(_interp_k) & set(_extrap_k)),
+              f"interp {_interp_k}, extrap {_extrap_k}, train {GEN.TRAIN_K}")
+
+        check("OD.2l every OOD row is group 7 (E7) -- the iteration-count rows "
+              "ARE the E7 rows",
+              int(np.load(os.path.join(_TMP, "ood_interp_group.npy"),
+                          mmap_mode="r").min()) == 7
+              and int(np.load(os.path.join(_TMP, "ood_extrap_group.npy"),
                               mmap_mode="r").min()) == 7,
-              f"ood rows={_man['rows']['ood']}, group="
-              f"{int(np.load(os.path.join(_TMP, 'ood_group.npy'), mmap_mode='r').min())}")
+              "the OOD splits are F rows, which is why their loss is NOT "
+              "comparable with the validation loss (a mixture of all seven "
+              "groups) -- the comparison is with the per-k F rows")
+
+        # THE k SLOT DECODES TO THE LABEL, ON EVERY ROW OF THE TINY SET. This
+        # is the check that the v3 fix actually works: if the decode and the
+        # label disagreed, the held-out k would be measuring the wrong thing.
+        _kl = np.load(os.path.join(_TMP, "train_k.npy"), mmap_mode="r")
+        _xa = np.load(os.path.join(_TMP, "train_x.npy"), mmap_mode="r")
+        _mismatch = 0
+        for _i in range(min(200, len(_kl))):
+            _row = np.asarray(_xa[_i], dtype=np.int64)
+            if not int(_kl[_i]):
+                continue
+            for _e in range(16):
+                _k = 0
+                for _j in range(5):
+                    _k |= (int(_row[_e * 24 + 1 + _j]) - _hex0) << (4 - _j)
+                if _k != int(_kl[_i]):
+                    _mismatch += 1
+                    break
+        check("OD.2m the k slot in the INPUT decodes to the row's k label, on "
+              "every F row of the sample",
+              _mismatch == 0,
+              f"0 mismatches over {min(200, len(_kl))} rows -- the held-out k "
+              f"is inferable from trained tokens, which is the whole point of "
+              f"v3")
 finally:
     if _TMP:
         shutil.rmtree(_TMP, ignore_errors=True)
@@ -393,8 +485,8 @@ check("OD.3m the config FILE path and the CLI path agree",
       _cfg_file["model"]["num_experts"] == 7
       and _cfg_file["model"]["ffn_mult"] == 4
       and _cfg_file["logging"]["run_name"] == "opdiffB_MoRE"
-      and int(_cfg_file["data"]["seq_len"]) == 304
-      and int(_cfg_file["data"]["vocab_size"]) == 43
+      and int(_cfg_file["data"]["seq_len"]) == 384
+      and int(_cfg_file["data"]["vocab_size"]) == 37
       and _cfg_file["model"]["attention"] is True
       and _cfg_file["model"]["tie_lm_head"] is True,
       f"E={_cfg_file['model']['num_experts']}, "
@@ -474,11 +566,11 @@ check("OD.4d --opdiff_root on a non-opdiff task is REFUSED",
       f"rc={_rc}, {type(_err).__name__}: {str(_err)[:60]}")
 
 _rc, _res, _err = run_cli("--architecture", "more", "--task", "opdiff",
-                          "--opdiff_root", "opdiff_v2_smoke")
+                          "--opdiff_root", "opdiff_v3_smoke")
 check("OD.4e --opdiff_root re-stamps the dataset version from the directory "
       "ACTUALLY read",
       _rc == 0 and _res is not None
-      and _res["data"]["opdiff_root"] == "opdiff_v2_smoke"
+      and _res["data"]["opdiff_root"] == "opdiff_v3_smoke"
       and _res["data"]["dataset_version"] != _cfg_file["data"]["dataset_version"],
       f"root={_res['data']['opdiff_root'] if _res else None}, "
       f"version={_res['data']['dataset_version'] if _res else None}")
@@ -615,8 +707,8 @@ def _build(arch):
         step_feat_dim=12, d_model=mc["d_model"], num_experts=mc["num_experts"],
         max_depth=mc["max_depth"], num_blocks=1, dropout=0.0,
         ffn_mult=mc["ffn_mult"], num_families=7, attention=True,
-        n_heads=mc["n_heads"], max_seq_len=304, task=TASK_OPDIFF,
-        vocab_size=43, routing_persistence=mc.get("routing_persistence", "per_step"),
+        n_heads=mc["n_heads"], max_seq_len=384, task=TASK_OPDIFF,
+        vocab_size=37, routing_persistence=mc.get("routing_persistence", "per_step"),
     )
 
 
@@ -649,13 +741,13 @@ check("OD.6b the opdiff model builds the LM path and NOT the arithmetic one",
       "token embedding, tied LM head, detached probe; no step projection, no "
       "operation embedding, no regression head, no family classifier")
 
-_ids = torch.randint(0, 43, (2, 304))
-_mask = torch.ones(2, 304, dtype=torch.bool)
-_exp = torch.zeros(2, 304, dtype=torch.long)
-_out = _more(_ids, _mask, _exp, torch.zeros(2, 304, dtype=torch.long))
+_ids = torch.randint(0, 37, (2, 384))
+_mask = torch.ones(2, 384, dtype=torch.bool)
+_exp = torch.zeros(2, 384, dtype=torch.long)
+_out = _more(_ids, _mask, _exp, torch.zeros(2, 384, dtype=torch.long))
 check("OD.6c a forward pass returns per-position vocabulary logits and a "
       "7-wide probe",
-      tuple(_out[0].shape) == (2, 304, 43) and tuple(_out[2].shape) == (2, 304, 7)
+      tuple(_out[0].shape) == (2, 384, 37) and tuple(_out[2].shape) == (2, 384, 7)
       and _out[1] is None,
       f"logits{tuple(_out[0].shape)}, probe{tuple(_out[2].shape)}, "
       f"cls_out={_out[1]}")
@@ -670,8 +762,8 @@ check("OD.6d the family probe is DETACHED: its loss sends NO gradient into the "
       "so the group stays a diagnostic and every routing number measures "
       "EMERGENT structure")
 
-_ok, _msg = raises(lambda: _more(torch.rand(2, 304), _mask, _exp,
-                                  torch.zeros(2, 304, dtype=torch.long)),
+_ok, _msg = raises(lambda: _more(torch.rand(2, 384), _mask, _exp,
+                                  torch.zeros(2, 384, dtype=torch.long)),
                    TypeError, "input_ids")
 check("OD.6e a FLOAT input is refused rather than silently embedded by index "
       "truncation",

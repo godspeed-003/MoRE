@@ -62,6 +62,12 @@ ARMS = ["moe", "mor", "more"]
 # is how a summariser silently reports zero admissible runs.
 RUN_DIR_RE = re.compile(r"^opdiffB_(?P<arch>moe|mor|more)_seed(?P<seed>\d+)(__.*)?$",
                         re.IGNORECASE)
+# The SMOKE runs are named `opdiffB_smoke_<Arch>_seed<S>` -- deliberately
+# distinguishable from a matrix cell, so a smoke run can never be admitted to
+# a matrix table by accident. They are aggregated with `--kind smoke`, which is
+# how the pilot's own numbers are read before the matrix exists.
+SMOKE_DIR_RE = re.compile(r"^opdiffB_smoke_(?P<arch>moe|mor|more)_seed(?P<seed>\d+)(__.*)?$",
+                          re.IGNORECASE)
 
 
 # ---------------------------------------------------------------------------
@@ -75,14 +81,15 @@ def expected_version():
     return dsv
 
 
-def collect(expect_version=None):
+def collect(expect_version=None, kind="matrix"):
     """The admissible runs, as a list of dicts. Never a computed number."""
     out, skipped = [], []
+    pattern = SMOKE_DIR_RE if kind == "smoke" else RUN_DIR_RE
     for d in sorted(glob.glob(os.path.join(RUNS, "opdiffB_*"))):
         base = os.path.basename(d)
-        m = RUN_DIR_RE.match(base)
+        m = pattern.match(base)
         if not m:
-            skipped.append((base, "not an opdiffB_<arch>_seed<n> directory"))
+            skipped.append((base, f"not an opdiffB_<arch>_seed<n> {kind} directory"))
             continue
         mp = os.path.join(d, "metrics.json")
         rp = os.path.join(d, "resolved_config.json")
@@ -148,6 +155,8 @@ def _fmt(mean, std, digits=4):
 
 HEADLINE = [
     ("val/task_loss", "val/task_loss", 4),
+    ("val/accuracy", "val accuracy (per digit)", 4),
+    ("val/exact_match", "val exact match (per example)", 4),
     ("val/avg_recursion_steps", "avg recursion steps", 2),
     ("val/routing_agreement_with_group", "agreement with group", 4),
     ("val/routing_hungarian_accuracy", "Hungarian accuracy", 4),
@@ -155,6 +164,14 @@ HEADLINE = [
     ("val/routing_purity", "purity", 4),
     ("train/expert_load_entropy_normalized", "load entropy H/log(E)", 4),
     ("probe/family_ce", "group probe CE", 4),
+    ("ood_interp/task_loss", "ood_interp task_loss", 4),
+    ("ood_interp/accuracy", "ood_interp accuracy", 4),
+    ("ood_interp/exact_match", "ood_interp exact match", 4),
+    ("ood_interp/avg_recursion_steps", "ood_interp avg depth", 2),
+    ("ood_extrap/task_loss", "ood_extrap task_loss", 4),
+    ("ood_extrap/accuracy", "ood_extrap accuracy", 4),
+    ("ood_extrap/exact_match", "ood_extrap exact match", 4),
+    ("ood_extrap/avg_recursion_steps", "ood_extrap avg depth", 2),
 ]
 
 
@@ -164,12 +181,16 @@ def main(argv=None):
     ap.add_argument("--all-datasets", action="store_true",
                     help="admit every dataset version instead of only the "
                          "configured one (for a diagnostic, never for a table)")
+    ap.add_argument("--kind", choices=("matrix", "smoke"), default="matrix",
+                    help="'matrix' (the default) reads the matrix cells; "
+                         "'smoke' reads the opdiffB_smoke_* runs instead -- the "
+                         "pilot's own numbers, before the matrix exists")
     args = ap.parse_args(argv)
 
     expect = None if args.all_datasets else expected_version()
     print("\n=== opdiff matrix " + "=" * 55)
-    print(f"  dataset_version = {expect or '(any)'}")
-    runs, skipped = collect(expect)
+    print(f"  dataset_version = {expect or '(any)'}   kind = {args.kind}")
+    runs, skipped = collect(expect, args.kind)
     for base, why in skipped:
         print(f"  skipped  {base}  -- {why}")
     if not runs:
@@ -273,6 +294,54 @@ def main(argv=None):
                 line += (f"{m:>8.2f} ±{s:>3.2f}" if m is not None and s is not None
                          else (f"{m:>12.2f}" if m is not None else f"{'N/A':>12}"))
             print(line)
+
+    # THE COMPUTE-VERSUS-k TABLE. This is the one the study's OOD claim is
+    # read off, and it is the diagnostic the dataset's own caveat asks for: the
+    # SEEN k values and the HELD-OUT ones in the same table, so a reader can
+    # see whether the model fails on the held-out k values because it cannot
+    # READ the k slot or because it cannot SOLVE an F row at all.
+    _k_names = sorted({k.rsplit("/", 1)[1]
+                        for r in runs for k in r["metrics"]
+                        if k.startswith("val/accuracy_by_op/F")},
+                       key=lambda s: int(s[1:]))
+    if _k_names:
+        print("\n  the compute-versus-k table (F rows only, mean over seeds)")
+        print("  'seen' = the k was trained on; 'HELD OUT' = it was not.")
+        print(f"  {'k':>4} {'status':>10}  {'acc':>8} {'exact':>8} {'depth':>8}   "
+              f"{'ood acc':>8} {'ood exact':>10} {'ood depth':>10}")
+
+        def _axis_mean(arch, prefix, name):
+            rows = [r for r in runs if r["arch"] == arch]
+            m, s, n = _ms([_num(r["metrics"].get(f"{prefix}/{name}"))
+                           for r in rows])
+            return m
+
+        for k in _k_names:
+            for arch in ARMS:
+                rows = [r for r in runs if r["arch"] == arch]
+                if not rows:
+                    continue
+                _acc = _axis_mean(arch, "val/accuracy_by_op", k)
+                _ex = _axis_mean(arch, "val/exact_match_by_op", k)
+                _dp = _axis_mean(arch, "recursion/avg_depth_by_op", k)
+                _oacc = _axis_mean(arch, "ood_interp/accuracy_by_op", k)
+                _oex = _axis_mean(arch, "ood_interp/exact_match_by_op", k)
+                _odp = _axis_mean(arch, "ood_interp/avg_depth_by_op", k)
+                if _oacc is None:
+                    _oacc = _axis_mean(arch, "ood_extrap/accuracy_by_op", k)
+                    _oex = _axis_mean(arch, "ood_extrap/exact_match_by_op", k)
+                    _odp = _axis_mean(arch, "ood_extrap/avg_depth_by_op", k)
+                _held = _oacc is not None
+                def _f(v, d=3):
+                    return f"{v:.{d}f}" if v is not None else "N/A"
+                print(f"  {k:>4} {'HELD OUT' if _held else 'seen':>10}  "
+                      f"{_f(_acc):>8} {_f(_ex):>8} {_f(_dp, 2):>8}   "
+                      f"{_f(_oacc):>8} {_f(_oex):>10} {_f(_odp, 2):>10}   "
+                      f"[{arch}]")
+        print("\n  A HELD-OUT row whose 'acc' is the same as the seen rows' says")
+        print("  the model has not learned to READ the k slot at all -- that is")
+        print("  a task problem, not an architecture problem, and the fix is more")
+        print("  trained k values (see OPDIFF_DATASET.md).")
 
     print("\n  'agreement with group' is agreement with a DESIGNED PRIOR, not")
     print("  accuracy. Read the Hungarian / AMI / purity columns first.")

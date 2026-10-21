@@ -1929,7 +1929,15 @@ the co-author's agent. Not part of `plan.md` §0–11. Companion paper task:
   `test_language_task_axis.py` green (it iterates `TASKS`, so a third task must
   satisfy its pair loop) AND an arithmetic + a language config re-resolve to
   their pre-port `config_hash`.
-  **Evidence:** 2026-10-21 green. `code/test_opdiff_task_axis.py` **56 passed,
+  **Evidence:** 2026-10-21 green. **SUPERSEDED IN PART BY T-OD.7**: the port
+  described here was built against the v2 dataset (304-token rows, vocab 43,
+  25 operation tokens, a single `ood` split); T-OD.7 migrates it to the v3
+  dataset (384-token rows, vocab 37, one F operation with a binary k slot,
+  two held-out splits) and adds the OOD evaluation. The v2 generator has been
+  deleted and the v2 datasets removed. The evidence below is the v2 port's and
+  is kept because the DECISIONS in it (E=7, the budget rule, the two
+  refusals, the unfrozen spec) are unchanged by the migration.
+  `code/test_opdiff_task_axis.py` **56 passed,
   0 failed, 0 skipped** (new file; the gate's file lists are fixed, so the 356
   did not move). The suite proves the loss assembly by construction — logits
   that are perfect at the scored positions and wrong elsewhere give a masked
@@ -1980,20 +1988,22 @@ the co-author's agent. Not part of `plan.md` §0–11. Companion paper task:
   356/356 + `test_opdiff_*` green after the port.
   **Verify:** one smoke run per architecture (moe/mor/more) on the 3050, every
   check above observed in its `metrics.json` / run dir.
-  **Evidence:** 2026-10-21, three 3-epoch runs on the smoke subset (3,584
-  train rows), exit 0 each, `code/train.py --config code/config_opdiff.json
-  --task opdiff --opdiff_root opdiff_v2_smoke --epochs 3 --seed 42 --run_name
-  opdiffB_smoke_<Arch>_seed42`. **The loss falls on all three**: val/task_loss
-  1.4261→1.3327 (MoE), 1.4129→1.3254 (MoR), 1.3853→1.3087 (MoRE), with MoRE
-  lowest. **Routing metrics are sane at E=7**: the confusion is square (7×7)
-  for the routed arms, so Hungarian/AMI/purity are DEFINED (MoE 0.2241 /
-  0.0738 / —, MoRE 0.1846 / 0.0140 / —), and MoR's are the string "N/A" (it
-  makes no routing decision). **H/log(E)** = 0.5028 (MoE) / 0.6270 (MoRE) —
-  a load-balance diagnostic, not evidence of specialization. **Per-run dir
-  layout**: config.json, resolved_config.json, metrics.json, results.tsv,
-  checkpoint.pt, stdout.log in each `runs/opdiffB_smoke_<Arch>_seed42__<hash>/`.
-  **Runs stamped exploratory**, no canonical claim (the spec is unfrozen by
-  design). **356/356 + 54/54 after the port** ✓.
+  **Evidence:** 2026-10-21, three 3-epoch runs on the smoke subset, exit 0
+  each. **SUPERSEDED BY T-OD.7**: the numbers below are the v2 dataset's; the
+  v3 smoke (the one that counts) is in T-OD.7's evidence. `code/train.py
+  --config code/config_opdiff.json --task opdiff --opdiff_root <root> --epochs 3
+  --seed 42 --run_name opdiffB_smoke_<Arch>_seed42`. **The loss falls on all
+  three**: val/task_loss 1.4261→1.3327 (MoE), 1.4129→1.3254 (MoR),
+  1.3853→1.3087 (MoRE), with MoRE lowest. **Routing metrics are sane at E=7**:
+  the confusion is square (7×7) for the routed arms, so Hungarian/AMI/purity
+  are DEFINED (MoE 0.2241 / 0.0738 / —, MoRE 0.1846 / 0.0140 / —), and MoR's
+  are the string "N/A" (it makes no routing decision). **H/log(E)** = 0.5028
+  (MoE) / 0.6270 (MoRE) — a load-balance diagnostic, not evidence of
+  specialization. **Per-run dir layout**: config.json, resolved_config.json,
+  metrics.json, results.tsv, checkpoint.pt, stdout.log in each
+  `runs/opdiffB_smoke_<Arch>_seed42__<hash>/`. **Runs stamped exploratory**,
+  no canonical claim (the spec is unfrozen by design). **356/356 + 54/54 after
+  the port** ✓.
   **Two facts that decide where the matrix runs:** MoR's peak is **5,491 MiB
   = 91 % of this 6 GB card** (the language calibration found that above ~87 %
   the epoch time goes UP, so the matrix belongs on the 8 GB card, where the
@@ -2007,17 +2017,19 @@ the co-author's agent. Not part of `plan.md` §0–11. Companion paper task:
   wall-clock × 15 (+ pilot) budget has been presented and approved in chat.
   **Verify:** measured tokens/s per architecture from the smoke runs; budget
   presented; explicit user approval recorded.
-  **Evidence:** MEASURED 2026-10-21 from the T-OD.4 smoke runs — 498.4 / 52.4
-  / 95.3 items/s for MoE / MoR / MoRE at batch 48, i.e. 151,504 / 15,930 /
-  28,957 tok/s. **Budget at 3 epochs × 5 seeds** (the frozen seed set 42–46):
-  MoE 3.1 h + MoR 29.5 h + MoRE 16.2 h = **≈ 49 h on the 6 GB gate card, ≈ 33
-  h on the 8 GB card** (the 4060 factor is the language calibration's measured
-  ~1.5×, and the pilot's measured epoch time replaces it). The pilot (3 arms
-  × seed 42) is 9.8 h of that and is NOT extra work — it IS the matrix's
-  seed-42 cells. **THE APPROVAL IS NOT YET RECORDED**: no full-matrix launch
-  may happen until the user approves this budget in chat; the approval is
-  recorded by ticking this box. `HANDOFF.md` §4/§5 tells the co-author's
-  agent to run the pilot and then STOP if this box is unticked.
+  **Evidence:** MEASURED 2026-10-21 from the T-OD.7 (v3) smoke runs —
+  161,081 / 17,301 / 30,874 tok/s for MoE / MoR / MoRE at batch 48 on 384-token
+  rows. **Budget at 3 epochs × 5 seeds** (the frozen seed set 42–46), the
+  112.9 M-token epoch plus the val and the two OOD passes: MoE 12.2 min/epoch
+  (3.1 h for the five seeds), MoR 113.6 min/epoch (28.4 h), MoRE 63.9
+  min/epoch (16.0 h) = **≈ 47 h on the 6 GB gate card, ≈ 32 h on the 8 GB
+  card** (the 4060 factor is the language calibration's measured ~1.5×, and
+  the pilot's measured epoch time replaces it). The pilot (3 arms × seed 42)
+  is 9.0 h of that and is NOT extra work — it IS the matrix's seed-42 cells.
+  **THE APPROVAL IS NOT YET RECORDED**: no full-matrix launch may happen
+  until the user approves this budget in chat; the approval is recorded by
+  ticking this box. `HANDOFF.md` §4/§5 tells the co-author's agent to run the
+  pilot and then STOP if this box is unticked.
 
 - [x] **T-OD.6 Write `HANDOFF.md` on `main` for the co-author's coding agent —
   autonomous execution, no co-author checkups.** It must carry: which machine
@@ -2051,6 +2063,80 @@ the co-author's agent. Not part of `plan.md` §0–11. Companion paper task:
   that file does not exist in the tree (the environment record lives in
   `AGENTS.md` §9), so the handoff names the machine and the interpreter
   paths inline instead of depending on a missing file.
+  **REVISED BY T-OD.7** for the v3 dataset: the dataset block, the OOD
+  acceptance checks, the measured numbers and the budget were rewritten; the
+  machine, the protocol and the never-change list are unchanged.
+
+- [x] **T-OD.7 Migrate the opdiff port to the v3 dataset and add the OOD
+  evaluation.** (User-directed, 2026-10-21: "use make_opdiff_dataset_v3.py
+  now and also I deleted the v2 file … so redo the arithmetic with smoke
+  verification and make updated handoff ready for ayan.")
+  The v2 generator is deleted and the v2 datasets removed; the port is
+  rebuilt against `make_opdiff_dataset_v3.py`: 384-token rows (16 examples ×
+  24 tokens), vocab 37, ONE F operation whose iteration count k is written in
+  the INPUT as five binary tokens, and TWO held-out splits (ood_interp: k =
+  3, 6, 9, 11, 14; ood_extrap: k = 17, 20). The engine now EVALUATES both
+  OOD splits every epoch and publishes their loss, accuracy, per-example
+  exact match and per-k depth, and the per-k accuracy/exact match on the
+  validation split — the seen and the held-out k values side by side, which is
+  the diagnostic the dataset's own caveat asks for.
+  **Verify:** the port's tests green against the v3 generator; 356/356 still;
+  three smoke runs on the v3 subset, one per architecture; the OOD metrics
+  present in every run's `metrics.json`; the handoff updated and the dataset
+  explained in a file of its own.
+  **Evidence:** 2026-10-21. `code/test_opdiff_task_axis.py` **62 passed, 0
+  failed, 0 skipped** (the manifest is cross-checked against the v3
+  generator: 18 operation tokens, the 35-wide operation-INSTANTIATION axis,
+  the three k lists and their disjointness, the k slot decoding to the row
+  label on every F row of a 200-row sample, the two OOD splits' contents).
+  `code/run_correctness_suite.py` → TOTAL **356/356**, gates 19/31/27/129/150.
+  The language suites: task-axis 79/0, families 43/0/5 skipped, export 79/0/1
+  skipped, gate l6/l7 10/0/1 skipped, spec-freeze 64/0, route-persistence
+  37/0, lang-heads 47/0/1 skipped, lang-recursion 17/0, lang-causality 22/0.
+  **The v3 smoke (3 epochs, 3,584 train rows, the numbers that count):**
+  val/task_loss 1.4303→1.3630 (MoE), 1.4210→1.3550 (MoR), 1.4225→1.3430
+  (MoRE) — the loss falls on all three and MoRE is lowest; val accuracy
+  0.564 / 0.565 / 0.566 and per-example exact match 0.622 / 0.536 / **0.636**;
+  the routing metrics are DEFINED for the routed arms (Hungarian 0.2513 MoE,
+  0.2084 MoRE) and N/A for MoR, which makes no routing decision. **The OOD
+  splits were evaluated**: ood_interp loss 2.469 / 2.467 / 2.468 and
+  ood_extrap 2.470 / 2.467 / 2.470, with per-digit accuracy ≈ 0.165 and the
+  per-example exact match **0.0** on both, for all three arms.
+  **AND THE DIAGNOSTIC THAT MATTERS**: the SEEN k values are no better — the
+  per-k accuracy on the trained F rows is ≈ 0.166–0.177 and the per-k exact
+  match is **0.0 for every k**. So at 3 epochs on 1 % of the data the model
+  has not learned to solve an F row AT ALL, and the held-out numbers
+  therefore measure "cannot do F", not "cannot extrapolate". That is exactly
+  the diagnostic `OPDIFF_DATASET.md` asks for, and it is why the handoff makes
+  it acceptance check 7 of the pilot.
+  **What the depth DOES already show**: the F rows get 6.0–6.5 of the 7
+  steps while the simple groups get 1.8–4.6, so the model has already
+  learned "F rows are expensive" at the GROUP level — but not yet "k = 16 is
+  more expensive than k = 1" (F1 6.46 vs F16 6.45 for MoR), which needs the
+  k slot to be read.
+  **The v3 dataset**: train 294,000 / val 7,000 / test 7,000 / ood_interp
+  5,000 / ood_extrap 2,000 rows; 112,896,000 train tokens; vocab 37; ~10 s to
+  generate. The smoke subset is 3,584 / 896 / 896 / 640 / 256.
+  **Three implementation decisions worth recording.** (1) The operation axis
+  is 35 wide — the 17 non-F operations plus one entry per k value, named
+  `F1`…`F17`,`F20` — because the compute-versus-k claim is a claim about the
+  ITERATION COUNT, and one `F` entry could not express it. The axis index is
+  derived from the INPUT (the operation token and the k slot the model is
+  shown) and never from a label file; the label file is only a cross-check,
+  and a mismatch RAISES. (2) The per-example EXACT MATCH and the per-k
+  accuracy were added because a token-level accuracy is not the same
+  statement as "the model gave the right answer", and because the OOD loss is
+  NOT comparable with the validation loss (the OOD splits are F rows only) —
+  the comparable number is the per-k F-row one. (3) The depth-allocation
+  error stays N/A: there is no curriculum (the F operation's true depth is k,
+  but the budget is 7 and k runs to 16, so a target of k would be an
+  unreachable irreducible loss), and the compute claim is MEASURED instead.
+  **The v2 generator's deletion is committed here** (`make_opdiff_dataset_v2.py`
+  removed), and the v2 dataset directories were deleted from the machine:
+  their generator no longer exists, so they could never be regenerated, and
+  keeping a 113 MB directory whose layout differs from the one the code
+  expects invites exactly the confusion the run-name discipline exists to
+  prevent.
 
 ---
 

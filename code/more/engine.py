@@ -30,8 +30,8 @@ from .lang_data import MoRELanguageDataset, LANG_ROOT
 # import, and a task-conditional import inside `train()` would be a second
 # place to forget the wiring.
 from .opdiff_data import MoREOpdiffDataset
-from .opdiff_families import (ALL_OP_NAMES as OPDIFF_OP_NAMES,
-                              NUM_OP_TYPES as OPDIFF_NUM_OP_TYPES,
+from .opdiff_families import (OP_AXIS_NAMES as OPDIFF_OP_AXIS_NAMES,
+                              NUM_OP_AXIS as OPDIFF_NUM_OP_AXIS,
                               NUM_FAMILIES as OPDIFF_NUM_FAMILIES,
                               op_target_depth_table as opdiff_target_depth_table)
 from .model import MoEBlock, MoREWrapper, MoREModel
@@ -74,6 +74,155 @@ from .metrics import routing_agreement_key, routing_agreement_caption
 # ---------------------------------------------------------------------------
 # 4. Training loop
 # ---------------------------------------------------------------------------
+
+def _task_loss(reg_out, x, target, task, opdiff_mask1=None):
+    """THE one definition of the task loss, for the train, validation and OOD passes.
+
+    Three tasks, three quantities, and they are not the same function with
+    different constants:
+
+      arithmetic  MSE against the normalised answer scalar.
+      language    causal cross-entropy in NATS/token over every position.
+      opdiff      causal cross-entropy over the generator's SCORED positions
+                  only -- the answer digits and the EOS, at 9 of the 24 tokens
+                  of each example.
+
+    The opdiff mask is passed in rather than recomputed here, because it comes
+    from the dataset's manifest (`meta.json:loss_mask`, shifted by one because
+    the targets are `x[:, 1:]`) and a second implementation of that rule in the
+    engine would be a rule that could drift from the data.
+
+    NATS, not bits, and that is not a presentation choice: every other term in
+    the weighted sum is in nats, and a bits/nats mix inside one weighted sum is
+    a silent ln(2) = 0.693 scaling bug on whichever term is the odd one out.
+    """
+    if task == TASK_LANGUAGE:
+        _V = reg_out.shape[-1]
+        return F.cross_entropy(
+            reg_out[:, :-1, :].reshape(-1, _V),
+            x[:, 1:].reshape(-1),
+        )
+    if task == TASK_OPDIFF:
+        if opdiff_mask1 is None:
+            raise ValueError(
+                "the opdiff loss needs the dataset's loss mask, and none was "
+                "given. The mask says which positions are scored; without it "
+                "the loss would be computed over every position, which asks "
+                "the model to predict the question it was just given."
+            )
+        _V = reg_out.shape[-1]
+        return F.cross_entropy(
+            reg_out[:, :-1, :][:, opdiff_mask1, :].reshape(-1, _V),
+            x[:, 1:][:, opdiff_mask1].reshape(-1),
+        )
+    return F.mse_loss(reg_out.squeeze(-1), target)
+
+
+def _accumulate_axis_depth(depth_sum, depth_count, flat_mask, flat_axis,
+                           exit_depths):
+    """Sum and count exit depths per axis entry. THE one implementation.
+
+    `flat_axis` is an axis index per token -- the operation instance for
+    opdiff, the operation code for arithmetic -- and `exit_depths` is the
+    per-token exit depth. The mean over the counted tokens is the average
+    recursion depth for that axis entry.
+
+    Used by the validation pass AND by the OOD passes, because two copies of
+    this loop are two definitions of "average depth", and the compute-versus-k
+    claim is exactly a claim about that definition.
+    """
+    valid = flat_mask & (flat_axis >= 0)
+    if not bool(valid.any()):
+        return
+    axis = flat_axis[valid].long().cpu()
+    depths = exit_depths[valid].double().cpu()
+    for a, d in zip(axis, depths):
+        depth_sum[a] += d
+        depth_count[a] += 1.0
+
+
+def _new_accuracy_accumulators(axis_n: int, device=None) -> dict:
+    """The accumulators for the accuracy counters, per axis and overall.
+
+    On the MODEL'S device, because the per-axis accumulation is a
+    `scatter_add_` on the model's own index tensor -- a CPU accumulator with
+    CUDA indices is a device mismatch, not a slow path.
+    """
+    return {
+        "correct": 0, "total": 0, "exact": 0, "examples": 0,
+        "axis_correct_sum": torch.zeros(axis_n, dtype=torch.float64, device=device),
+        "axis_correct_n": torch.zeros(axis_n, dtype=torch.float64, device=device),
+        "axis_exact_sum": torch.zeros(axis_n, dtype=torch.float64, device=device),
+        "axis_exact_n": torch.zeros(axis_n, dtype=torch.float64, device=device),
+    }
+
+
+def _accumulate_scored_accuracy(reg_out, x, mask1, axis, examples_per_row,
+                                acc: dict) -> None:
+    """Accumulate the accuracy counters, overall AND per axis entry.
+
+    `axis` is the per-token axis index (the operation instance for opdiff) and
+    `examples_per_row` is the example layout, which is what makes the
+    per-EXAMPLE exact match well defined: an example is exactly right when all
+    of its scored positions are right.
+
+    WHY PER AXIS, AND WHY IT IS THE DIAGNOSTIC THAT MATTERS. The held-out
+    iteration counts are the interesting rows, and the question they raise is
+    "does the model fail on them because it cannot READ the k slot, or because
+    it cannot SOLVE an F row at all?". The per-axis numbers on the SEEN k
+    values answer exactly that: if the seen F rows are also unsolved, the
+    architecture is not what is failing. Without the per-axis split, the only
+    available comparison is the OOD loss against the validation loss -- and
+    those are not comparable, because the validation split is a mixture of all
+    seven groups and the OOD split is F rows only.
+    """
+    V = reg_out.shape[-1]
+    B = int(reg_out.shape[0])
+    if mask1 is None:
+        logits = reg_out[:, :-1, :].reshape(-1, V)
+        targets = x[:, 1:].reshape(-1)
+    else:
+        logits = reg_out[:, :-1, :][:, mask1, :].reshape(-1, V)
+        targets = x[:, 1:][:, mask1].reshape(-1)
+    correct = (logits.argmax(dim=-1) == targets)
+    acc["correct"] += int(correct.sum().item())
+    acc["total"] += int(correct.numel())
+    if axis is not None:
+        # The axis of each SCORED position, aligned with `correct`.
+        _axis_scored = axis[:, :-1][:, mask1].reshape(-1).long()
+        acc["axis_correct_sum"].scatter_add_(
+            0, _axis_scored, correct.to(torch.float64))
+        acc["axis_correct_n"].scatter_add_(
+            0, _axis_scored, torch.ones_like(_axis_scored, dtype=torch.float64))
+    if not examples_per_row:
+        return
+    n_total = int(correct.numel())
+    if n_total % B != 0:
+        raise ValueError(
+            f"the scored positions ({n_total}) do not divide into {B} rows, "
+            "so the per-example exact match is undefined. The loss mask and "
+            "the example layout disagree, which is a data defect."
+        )
+    per_row = n_total // B
+    if per_row % examples_per_row != 0:
+        raise ValueError(
+            f"each row has {per_row} scored positions, which is not a multiple "
+            f"of the {examples_per_row} examples per row, so the per-example "
+            "exact match is undefined. The loss mask and the example layout "
+            "disagree, which is a data defect."
+        )
+    ex_ok = correct.view(B, examples_per_row, per_row // examples_per_row).all(dim=2)
+    acc["exact"] += int(ex_ok.sum().item())
+    acc["examples"] += B
+    if axis is not None:
+        # The axis of each EXAMPLE: every position of an example shares it,
+        # because an example is one operation instance.
+        _axis_ex = axis.view(B, examples_per_row, -1)[:, :, 0].reshape(-1).long()
+        acc["axis_exact_sum"].scatter_add_(
+            0, _axis_ex, ex_ok.reshape(-1).to(torch.float64))
+        acc["axis_exact_n"].scatter_add_(
+            0, _axis_ex, torch.ones_like(_axis_ex, dtype=torch.float64))
+
 
 def train(cfg: dict, run_epochs: int | None = None, ctx: "RunContext | None" = None):
     """
@@ -307,6 +456,34 @@ def train(cfg: dict, run_epochs: int | None = None, ctx: "RunContext | None" = N
         if val_ds is not None else None
     )
 
+    # T-OD.3. THE OOD SPLITS, as evaluation loaders.
+    #
+    # Two of them, and they are TWO DIFFERENT QUESTIONS, which is why they are
+    # two splits and not one:
+    #
+    #   ood_interp   iteration counts INSIDE the trained range that were never
+    #                seen (k = 3, 6, 9, 11, 14 among the trained 1..16). The
+    #                model has to read a composition out of the k slot and
+    #                apply it -- the bit patterns overlap with trained ones, so
+    #                the answer is inferable. This is the realistic target and
+    #                the stronger claim.
+    #   ood_extrap   iteration counts BEYOND the trained range (k = 17, 20).
+    #                The high bit appeared only alone in training, so this is a
+    #                stretch result and is reported as one.
+    #
+    # They are evaluated, not trained on: the loaders are built with
+    # `shuffle=False` and are never iterated in the training loop, so nothing
+    # from them reaches the optimiser.
+    ood_loaders: dict = {}
+    if _task_early == TASK_OPDIFF:
+        for _sp in ("ood_interp", "ood_extrap"):
+            _ods = MoREOpdiffDataset(_sp, root=dc.get("opdiff_root"))
+            ood_loaders[_sp] = DataLoader(
+                _ods, batch_size=min(batch_sz, len(_ods)),
+                shuffle=False, num_workers=num_workers,
+                worker_init_fn=seed_worker)
+            print(f"[Dataset] {_ods}")
+
     # ---- Model ---------------------------------------------------------
     model = MoREModel(
         step_feat_dim=step_feat_dim,
@@ -458,13 +635,14 @@ def train(cfg: dict, run_epochs: int | None = None, ctx: "RunContext | None" = N
     else:
         _expert_labels = expert_labels
     # T-OD.3. The OPERATION AXIS follows the task too: arithmetic and language
-    # have their own (16 arithmetic ops, none on language), and opdiff has 25.
-    # The per-operation depth breakdown is indexed by this list, so a task
-    # whose axis width disagreed with its tensor width would either raise
-    # IndexError mid-validation or -- worse -- attribute a measured depth to
-    # the wrong operation.
+    # have their own (16 arithmetic ops, none on language), and opdiff has the
+    # (operation, k) INSTANCE axis -- 17 non-F operations plus one entry per
+    # iteration count, 35 in all. The per-operation depth breakdown is indexed
+    # by this list, so a task whose axis width disagreed with its tensor width
+    # would either raise IndexError mid-validation or -- worse -- attribute a
+    # measured depth to the wrong operation.
     if _task == TASK_OPDIFF:
-        _OP_AXIS_NAMES, _OP_AXIS_N = OPDIFF_OP_NAMES, OPDIFF_NUM_OP_TYPES
+        _OP_AXIS_NAMES, _OP_AXIS_N = OPDIFF_OP_AXIS_NAMES, OPDIFF_NUM_OP_AXIS
     else:
         _OP_AXIS_NAMES, _OP_AXIS_N = ALL_OP_NAMES, NUM_OP_TYPES
     # T-L5.1: the trivial-baseline floor for THIS corpus, read from the dataset
@@ -543,6 +721,7 @@ def train(cfg: dict, run_epochs: int | None = None, ctx: "RunContext | None" = N
     # arithmetic and language tasks have no such mask (every position is
     # scored), so this is the only place a mask exists.
     _opdiff_loss_mask1 = None
+    _opdiff_examples_per_row = None
     if _task_early == TASK_OPDIFF:
         _ds_m = getattr(train_loader, "dataset", None)
         for _ in range(4):
@@ -558,6 +737,10 @@ def train(cfg: dict, run_epochs: int | None = None, ctx: "RunContext | None" = N
             )
         _mask_np = np.asarray(_ds_m.loss_mask, dtype=bool)[1:]
         _opdiff_loss_mask1 = torch.from_numpy(_mask_np).to(device)
+        # The example layout, read from the same dataset object, because the
+        # per-example EXACT MATCH needs it and it is a property of the DATA
+        # (16 examples per row) rather than a constant of the code.
+        _opdiff_examples_per_row = int(getattr(_ds_m, "examples_per_row", 0)) or None
     target_halt_weight = lw["halting"]
     print(f"[Train] halting: ponder_weight={target_halt_weight}, "
           f"supervision={'ON' if halting_supervision_enabled else 'OFF (pure ACT)'}"
@@ -865,16 +1048,12 @@ def train(cfg: dict, run_epochs: int | None = None, ctx: "RunContext | None" = N
                 #
                 # WHY IT MATTERS HERE AND NOT ON LANGUAGE: an opdiff row
                 # contains 16 examples, and each example's tokens are not
-                # interchangeable -- the operation token, the operands and the
-                # answer are different kinds of position, and scoring the
-                # operands would ask the model to predict the question it was
-                # just given. The generator's mask is the author's statement
-                # of what the task is; the loss follows it.
-                _V = reg_out.shape[-1]
-                task_loss = F.cross_entropy(
-                    reg_out[:, :-1, :][:, _opdiff_loss_mask1, :].reshape(-1, _V),
-                    x[:, 1:][:, _opdiff_loss_mask1].reshape(-1),
-                )
+                # interchangeable -- the operation token, the k slot, the
+                # operands and the answer are different kinds of position, and
+                # scoring the operands would ask the model to predict the
+                # question it was just given. The generator's mask is the
+                # author's statement of what the task is; the loss follows it.
+                task_loss = _task_loss(reg_out, x, target, _task, _opdiff_loss_mask1)
             else:
                 task_loss = F.mse_loss(reg_out.squeeze(-1), target)
 
@@ -1063,7 +1242,14 @@ def train(cfg: dict, run_epochs: int | None = None, ctx: "RunContext | None" = N
         # not inside the `if`, so a non-logging epoch leaves it empty rather than
         # NameError-ing at the merge below.
         val_depth_log: dict = {}
+        # T-OD.3. The validation extras (the accuracy counters), declared out
+        # here for the same reason as `paper_log_dict`.
+        val_extra_log: dict = {}
         pim: dict = {}
+        # T-OD.3. The OOD metrics, declared out here for the same reason as
+        # `paper_log_dict`: a non-logging epoch must leave it empty rather than
+        # NameError at the merge below.
+        ood_log_dict: dict = {}
         if val_loader is not None and (epoch % log["log_interval"] == 0 or epoch == epochs):
             model.eval()
             val_total = 0.0
@@ -1116,6 +1302,13 @@ def train(cfg: dict, run_epochs: int | None = None, ctx: "RunContext | None" = N
             val_exp_depth_n   = 0
             val_halt_acc: dict[str, float] = {}
             val_halt_batches  = 0
+            # T-OD.3. The ACCURACY counters. The loss says how many nats the
+            # model spent; the accuracy says how many digits it got right, and
+            # the per-example EXACT MATCH says how many examples it got
+            # entirely right. The OOD claim is about the last one, and the
+            # per-axis split of both is the diagnostic that says whether the
+            # model cannot READ the k slot or cannot SOLVE an F row at all.
+            val_acc = _new_accuracy_accumulators(_OP_AXIS_N, device)
             # T-L6.1: per-token exit depth, id and loss, accumulated over the whole
             # validation split so the correlations are over the split rather than over
             # whichever batch happened to be last.
@@ -1144,23 +1337,13 @@ def train(cfg: dict, run_epochs: int | None = None, ctx: "RunContext | None" = N
                         first_route, _val_route_stats,
                         val_expected_depth, val_halt_stats,
                     ) = model(x_v, sm_v, se_v, so_v)
-                    l_v = (
-                        F.cross_entropy(
-                            reg_v[:, :-1, :].reshape(-1, reg_v.shape[-1]),
-                            x_v[:, 1:].reshape(-1),
-                        )
-                        if _task == TASK_LANGUAGE
-                        else (
-                            F.cross_entropy(
-                                reg_v[:, :-1, :][:, _opdiff_loss_mask1, :].reshape(-1, reg_v.shape[-1]),
-                                x_v[:, 1:][:, _opdiff_loss_mask1].reshape(-1),
-                            )
-                            if _task == TASK_OPDIFF
-                            else F.mse_loss(reg_v.squeeze(-1), tgt_v)
-                        )
-                    )
+                    l_v = _task_loss(reg_v, x_v, tgt_v, _task, _opdiff_loss_mask1)
                     val_total += l_v.item() * x_v.shape[0]
                     val_n     += x_v.shape[0]
+                    if _task == TASK_OPDIFF:
+                        _accumulate_scored_accuracy(
+                            reg_v, x_v, _opdiff_loss_mask1, so_v,
+                            _opdiff_examples_per_row, val_acc)
 
                     # T-L6.1: exit depth, token id and that token's OWN loss, all
                     # over the identical token set. The set is the positions the loss
@@ -1240,21 +1423,15 @@ def train(cfg: dict, run_epochs: int | None = None, ctx: "RunContext | None" = N
                             accumulate=True,
                         )
 
-                    depth_valid = flat_mask & (flat_ops >= 0)
-                    if depth_valid.any():
-                        ops    = flat_ops[depth_valid].long().cpu()
-                        depths = exit_depths[depth_valid].double().cpu()
-                        for op_id, depth_val in zip(ops, depths):
-                            op_depth_sum[op_id]   += depth_val
-                            op_depth_count[op_id] += 1.0
-
-                    family_valid = flat_mask & (flat_oracle >= 0)
-                    if family_valid.any():
-                        fams   = flat_oracle[family_valid].long().cpu()
-                        depths = exit_depths[family_valid].double().cpu()
-                        for fam_id, depth_val in zip(fams, depths):
-                            family_depth_sum[fam_id]   += depth_val
-                            family_depth_count[fam_id] += 1.0
+                    # T-OD.3. The depth accumulation is the SHARED helper, so the
+                    # validation pass and the OOD passes cannot disagree about
+                    # what "average depth for this operation" means. The
+                    # compute-versus-k claim is exactly a claim about that
+                    # definition.
+                    _accumulate_axis_depth(op_depth_sum, op_depth_count,
+                                           flat_mask, flat_ops, exit_depths)
+                    _accumulate_axis_depth(family_depth_sum, family_depth_count,
+                                           flat_mask, flat_oracle, exit_depths)
 
             val_loss = val_total / max(val_n, 1)
 
@@ -1288,6 +1465,31 @@ def train(cfg: dict, run_epochs: int | None = None, ctx: "RunContext | None" = N
                 val_depth_log["val/avg_recursion_steps"] = (
                     val_exp_depth_sum / val_exp_depth_n
                 )
+            # T-OD.3. The accuracy, in the validation namespace. Published for
+            # opdiff only: it is a NEW quantity, and the language and
+            # arithmetic runs on disk do not carry it, so adding it for them
+            # would make the published tables disagree with a re-run of the
+            # same config.
+            if val_acc["total"] > 0:
+                val_extra_log["val/accuracy"] = (
+                    val_acc["correct"] / val_acc["total"])
+                if val_acc["examples"] > 0:
+                    val_extra_log["val/exact_match"] = (
+                        val_acc["exact"] / val_acc["examples"])
+                # The per-axis accuracy and exact match. For the F rows these
+                # are the SEEN iteration counts, and they are the baseline the
+                # OOD numbers are read against -- the validation loss as a
+                # whole is NOT that baseline, because the validation split is a
+                # mixture of all seven groups and the OOD split is F rows only.
+                for _i, _name in enumerate(_OP_AXIS_NAMES):
+                    if val_acc["axis_correct_n"][_i] > 0:
+                        val_extra_log[f"val/accuracy_by_op/{_name}"] = (
+                            float(val_acc["axis_correct_sum"][_i])
+                            / float(val_acc["axis_correct_n"][_i]))
+                    if val_acc["axis_exact_n"][_i] > 0:
+                        val_extra_log[f"val/exact_match_by_op/{_name}"] = (
+                            float(val_acc["axis_exact_sum"][_i])
+                            / float(val_acc["axis_exact_n"][_i]))
             _vfe = val_halt_acc.get("forced_exits", 0.0)
             _vee = val_halt_acc.get("early_exits",  0.0)
             if (_vfe + _vee) > 0:
@@ -1442,6 +1644,121 @@ def train(cfg: dict, run_epochs: int | None = None, ctx: "RunContext | None" = N
                 task=_task,
                 family_labels=_fam_labels,
             )
+
+            # ---- T-OD.3. THE OOD EVALUATION ---------------------------------
+            #
+            # Two held-out splits, evaluated with the SAME loss and the SAME
+            # depth accumulation as the validation pass (both are the shared
+            # helpers), so the OOD numbers are comparable with the in-
+            # distribution ones by construction rather than by convention.
+            #
+            # WHAT IS PUBLISHED FOR EACH OOD SPLIT, AND WHAT IS NOT:
+            #   * the task loss and its perplexity -- the headline;
+            #   * the average recursion depth -- "did the model spend the right
+            #     amount of computation here";
+            #   * the per-instance (per-k) average depth -- the compute-versus-k
+            #     claim, measured ON THE HELD-OUT ITERATION COUNTS THEMSELVES,
+            #     which is the only way to measure it rather than assume it;
+            #   * the routing agreement -- but NOT the Hungarian / AMI / purity
+            #     report, because every OOD row is group E7: the confusion
+            #     matrix has ONE populated row and six empty ones, so a
+            #     permutation-invariant score over it would be a number with no
+            #     meaning wearing the name of a number that has meaning
+            #     elsewhere. The agreement that IS published is therefore named
+            #     for what it is on this split: the fraction of held-out tokens
+            #     the router sent to the E7 expert.
+            ood_log_dict: dict = {}
+            for _sp, _ld in ood_loaders.items():
+                _ood_total, _ood_n = 0.0, 0
+                _ood_op_sum   = torch.zeros(_OP_AXIS_N, dtype=torch.float64)
+                _ood_op_count = torch.zeros(_OP_AXIS_N, dtype=torch.float64)
+                _ood_fam_sum   = torch.zeros(_F, dtype=torch.float64)
+                _ood_fam_count = torch.zeros(_F, dtype=torch.float64)
+                _ood_exp_sum, _ood_exp_n = 0.0, 0
+                _ood_acc = _new_accuracy_accumulators(_OP_AXIS_N, device)
+                _ood_conf = torch.zeros(_F, _E, dtype=torch.float64)
+                with torch.no_grad():
+                    for x_o, sm_o, se_o, so_o, fam_o, _, tgt_o in _ld:
+                        x_o, sm_o, se_o, so_o, fam_o, tgt_o = (
+                            x_o.to(device), sm_o.to(device), se_o.to(device),
+                            so_o.to(device), fam_o.to(device), tgt_o.to(device)
+                        )
+                        (
+                            reg_o, _, _, _, _, depth_exits_o, _, _, _,
+                            first_route_o, _, expected_depth_o, _,
+                        ) = model(x_o, sm_o, se_o, so_o)
+                        l_o = _task_loss(reg_o, x_o, tgt_o, _task,
+                                         _opdiff_loss_mask1)
+                        _ood_total += l_o.item() * x_o.shape[0]
+                        _ood_n += x_o.shape[0]
+                        if _task == TASK_OPDIFF:
+                            _accumulate_scored_accuracy(
+                                reg_o, x_o, _opdiff_loss_mask1, so_o,
+                                _opdiff_examples_per_row, _ood_acc)
+                        if expected_depth_o is not None:
+                            _vm_o = sm_o.reshape(-1)
+                            if bool(_vm_o.any()):
+                                _ood_exp_sum += float(
+                                    expected_depth_o.reshape(-1)[_vm_o].sum().item())
+                                _ood_exp_n += int(_vm_o.sum().item())
+                        if depth_exits_o is None:
+                            continue
+                        _fm_o = sm_o.reshape(-1)
+                        _fo_o = se_o.reshape(-1)
+                        _ed_o = compute_token_exit_depths(
+                            depth_exits_o, mc["max_depth"]).reshape(-1)
+                        _accumulate_axis_depth(_ood_op_sum, _ood_op_count,
+                                               _fm_o, so_o.reshape(-1), _ed_o)
+                        _accumulate_axis_depth(_ood_fam_sum, _ood_fam_count,
+                                               _fm_o, _fo_o, _ed_o)
+                        if first_route_o is not None:
+                            _fr_o = first_route_o.reshape(-1)
+                            _rv_o = _fm_o & (_fo_o >= 0) & (_fr_o >= 0)
+                            if _rv_o.any():
+                                _oi_o = _fo_o[_rv_o].long()
+                                _pi_o = _fr_o[_rv_o].long()
+                                _ood_conf.index_put_(
+                                    (_oi_o, _pi_o),
+                                    torch.ones(_oi_o.shape[0], dtype=torch.float64),
+                                    accumulate=True,
+                                )
+                _ood_loss = _ood_total / max(_ood_n, 1)
+                ood_log_dict[f"{_sp}/task_loss"] = _ood_loss
+                ood_log_dict[f"{_sp}/loss"] = _ood_loss
+                if math.isfinite(_ood_loss):
+                    ood_log_dict[f"{_sp}/perplexity"] = math.exp(_ood_loss)
+                if _ood_acc["total"] > 0:
+                    ood_log_dict[f"{_sp}/accuracy"] = (
+                        _ood_acc["correct"] / _ood_acc["total"])
+                    if _ood_acc["examples"] > 0:
+                        ood_log_dict[f"{_sp}/exact_match"] = (
+                            _ood_acc["exact"] / _ood_acc["examples"])
+                    for _i, _name in enumerate(_OP_AXIS_NAMES):
+                        if _ood_acc["axis_correct_n"][_i] > 0:
+                            ood_log_dict[f"{_sp}/accuracy_by_op/{_name}"] = (
+                                float(_ood_acc["axis_correct_sum"][_i])
+                                / float(_ood_acc["axis_correct_n"][_i]))
+                        if _ood_acc["axis_exact_n"][_i] > 0:
+                            ood_log_dict[f"{_sp}/exact_match_by_op/{_name}"] = (
+                                float(_ood_acc["axis_exact_sum"][_i])
+                                / float(_ood_acc["axis_exact_n"][_i]))
+                if _ood_exp_n > 0:
+                    ood_log_dict[f"{_sp}/avg_recursion_steps"] = (
+                        _ood_exp_sum / _ood_exp_n)
+                for _i, _name in enumerate(_OP_AXIS_NAMES):
+                    if _ood_op_count[_i] > 0:
+                        ood_log_dict[f"{_sp}/avg_depth_by_op/{_name}"] = (
+                            _ood_op_sum[_i] / _ood_op_count[_i]).item()
+                for _i, _label in enumerate(_expert_labels(_F)):
+                    if _ood_fam_count[_i] > 0:
+                        ood_log_dict[f"{_sp}/avg_depth_by_family/{_label}"] = (
+                            _ood_fam_sum[_i] / _ood_fam_count[_i]).item()
+                if _E > 1 and float(_ood_conf.sum()) > 0:
+                    # Named for what it is on THIS split: every OOD row is group
+                    # E7, so this is the fraction of held-out tokens routed to
+                    # the E7 expert, not a partition score.
+                    ood_log_dict[f"{_sp}/routing_agreement_with_group"] = (
+                        routing_accuracy_from_confusion(_ood_conf, _E))
 
         # ---- Expert metrics (no grad) ----------------------------------
         with torch.no_grad():
@@ -1721,6 +2038,12 @@ def train(cfg: dict, run_epochs: int | None = None, ctx: "RunContext | None" = N
 
         log_dict.update(paper_log_dict)
         log_dict.update(val_depth_log)
+        log_dict.update(val_extra_log)
+        # T-OD.3. The OOD metrics, in their own namespace (`ood_interp/`,
+        # `ood_extrap/`) so they can never be joined with the in-distribution
+        # `val/` columns by position -- the two are different splits and
+        # different claims.
+        log_dict.update(ood_log_dict)
 
         wandb.log(log_dict, step=epoch)
 

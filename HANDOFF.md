@@ -1,20 +1,28 @@
 # HANDOFF.md — the opdiff matrix, for an agent with no other context
 
 **What this is.** The third experimental study of this repository, on a new
-dataset: `opdiff` — rows of 16 packed 19-token arithmetic examples, 25
-operations, seven expert groups, 110.7 M training tokens per epoch. The
-question it asks is the one the whole repository exists for: does a
+dataset: `opdiff` — rows of 16 packed 24-token arithmetic examples, 25
+operations (one of them with a *dial*: an iteration count written in binary in
+the input), seven expert groups, 112.9 M training tokens per epoch, and two
+held-out splits that test the dial on iteration counts the model has never
+seen. The question it asks is the one the whole repository exists for: does a
 top-1-routed mixture of experts that also recurses (MoRE) beat the two
 ablations (MoE = routing without recursion, MoR = recursion without routing) on
-a task where the operations have genuinely different difficulty?
+a task where the operations have genuinely different difficulty — and can it do
+so on the held-out iteration counts too?
 
-**Who is reading this.** An agent on the co-author's machine, with no access
-to this conversation. Every command below has been executed at least once, on
-the smoke path, on the gate machine. The numbers in §9 are measurements, not
+**Who is reading this.** An agent on the co-author's machine, with no access to
+this conversation. Every command below has been executed at least once, on the
+smoke path, on the gate machine. The numbers in §9 are measurements, not
 estimates.
 
 **Read §8 (the never-change list) before you run anything.** It is short and
 it is the list of things that would silently invalidate the study.
+
+**The dataset itself is explained in [OPDIFF_DATASET.md](OPDIFF_DATASET.md).**
+Read §2 of that file before interpreting any number that comes out of a run:
+it defines the row layout, the k slot, the loss mask, the per-row labels and
+the two OOD splits.
 
 ---
 
@@ -29,15 +37,14 @@ it is the list of things that would silently invalidate the study.
 
 That interpreter path is not interchangeable with anything else. The
 co-author's Anaconda **base** and `C:\Python314` have no `torch` at all, so a
-bare `python` fails at `import torch` instead of falling back to CPU. If you
-see `ModuleNotFoundError: No module named 'torch'`, you are on the wrong
-interpreter.
+bare `python` fails at `import torch` instead of falling back to CPU.
 
-**Use the 8 GB card for this matrix.** The measured peak of the heaviest arm
-(MoR) is **5,491 MiB** — 69 % of 8 GB, but 91 % of the 6 GB gate card, which
-is the occupancy at which the language calibration found the epoch time going
-*up* instead of the run failing. Nothing else may use the GPU while a run is
-in flight.
+**Use the 8 GB card for this matrix, and treat the 6 GB card as unusable for
+it.** The measured peak of the heaviest arm (MoR) is **5.80 GiB allocated /
+6.38 GiB reserved** — the reserved figure is *over* the 6 GB card's memory, so
+the arm barely fits there and the allocator is thrashing. On the 8 GB card the
+same arm is 73 % allocated / 80 % reserved, which fits. Nothing else may use
+the GPU while a run is in flight.
 
 The full environment record is `AGENTS.md` §9. The college-lab RTX 4060 is
 deliberately excluded from this matrix: interrupted epochs put a per-machine
@@ -49,43 +56,45 @@ confound inside the seed variance the study reports.
 
 The opdiff dataset is **not tracked in git** (113 MB), so it is regenerated per
 machine. It is deterministic at seed 0, but a different NumPy RNG can produce
-different sampled rows, so **the dataset identity is a content hash and it must
-be recorded**.
+different sampled rows, so **the dataset identity is a fingerprint of the bytes
+and it must be recorded**.
 
 **Check first:**
 
 ```bash
-python -c "import json;m=json.load(open('opdiff_v2/meta.json'));print(m['dataset_version'], m['rows'], m['vocab_size'], m['row_len'])"
+python -c "import json;m=json.load(open('opdiff_v3/meta.json'));print(m['rows'], m['vocab_size'], m['row_len'], m['train_k'], m['ood_interp_k'], m['ood_extrap_k'])"
 ```
 
-Expected: a version string like `opdiff-v2-<12 hex>`, `rows` = 364,000 train /
-7,000 val / 7,000 test / 3,000 ood, `vocab_size` 43, `row_len` 304.
+Expected: rows = 294,000 train / 7,000 val / 7,000 test / 5,000 ood_interp /
+2,000 ood_extrap; `vocab_size` 37; `row_len` 384; `train_k` =
+[1, 2, 4, 5, 7, 8, 10, 12, 13, 15, 16]; `ood_interp_k` = [3, 6, 9, 11, 14];
+`ood_extrap_k` = [17, 20].
 
-**If it is missing, build it** (about 15 s):
+**If it is missing, build it** (about 10 s):
 
 ```bash
-python make_opdiff_dataset_v2.py --out opdiff_v2
+python make_opdiff_dataset_v3.py --out opdiff_v3
 ```
 
-**Verify after building** — the four things that must agree, and the reason
-each one matters:
+**Verify after building** — the things that must agree, and why each matters:
 
 | check | expected | why it matters |
 |---|---|---|
-| `meta.json:vocab_size` | 43 | 18 fixed tokens (SEP, EOS, 16 hex digits) + 25 operation tokens; this is the width of the tied LM head |
-| `meta.json:row_len` | 304 | 16 examples × 19 tokens; the positional table is sized by it |
-| `meta.json:rows.train` | 364,000 | 52,000 rows per group × 7 groups |
-| `meta.json:dataset_version` | present | the content identity that every run's provenance records |
+| `meta.json:vocab_size` | 37 | 19 fixed tokens (SEP, EOS, NULL, 16 hex digits) + 18 operation tokens; this is the width of the tied LM head |
+| `meta.json:row_len` | 384 | 16 examples × 24 tokens; the positional table is sized by it |
+| `meta.json:rows.train` | 294,000 | 42,000 rows per group × 7 groups |
+| `meta.json:train_k` / `ood_interp_k` / `ood_extrap_k` | as above | the held-out iteration counts ARE the OOD evaluation; if they are missing, the run would report an in-distribution number and call it the OOD result |
+| the five splits' `*_x.npy`, `*_group.npy`, `*_diff.npy`, `*_k.npy`, `*_sub.npy` | all present | a half-generated dataset fails at the first batch with a file name in the message |
 
-Do **not** edit `make_opdiff_dataset_v2.py`. It is the dataset contract: the
-token layout, the loss mask, the group partition and the OOD split are all
-defined there, and `code/test_opdiff_task_axis.py` cross-checks the code's
-manifest against it by importing it.
+Do **not** edit `make_opdiff_dataset_v3.py`. It is the dataset contract: the
+token layout, the k slot, the loss mask, the group partition and the split
+definitions are all defined there, and `code/test_opdiff_task_axis.py`
+cross-checks the code's manifest against it by importing it.
 
 **The smoke subset** (1 % of the data, for proving the machine works):
 
 ```bash
-python make_opdiff_dataset_v2.py --out opdiff_v2_smoke --train_rows_per_group 512 --eval_rows_per_group 128
+python make_opdiff_dataset_v3.py --out opdiff_v3_smoke --train_rows_per_group 512 --eval_rows_per_group 128 --ood_rows_per_k 128
 ```
 
 ---
@@ -97,10 +106,10 @@ python code/run_opdiff_matrix.py --preflight
 ```
 
 It checks, before any GPU-hour is spent: a usable CUDA device (it runs a
-matmul, it does not read a flag), the dataset's presence and version, that the
-proxy guard stamps the runs `exploratory` for all three arms, that W&B is
-either logged in or explicitly offline, and the disk headroom for 15
-checkpoints.
+matmul, it does not read a flag), the dataset's presence and its five splits,
+that the trained and held-out k lists are disjoint, that the proxy guard
+stamps the runs `exploratory` for all three arms, that W&B is either logged
+in or explicitly offline, and the disk headroom for 15 checkpoints.
 
 **A non-zero exit means the matrix does not start.** The message names what to
 fix and how.
@@ -125,8 +134,7 @@ failed pilot, and the next step is to diagnose it, not to continue.
 1. **The run finished**: `runs/opdiffB_<Arch>_seed42__<hash>/metrics.json`
    exists and contains `val/task_loss` as a number.
 2. **The loss fell**: `results.tsv` shows `val_loss` lower at epoch 3 than at
-   epoch 1. (Measured on the smoke subset: MoE 1.426 → 1.333, MoR 1.413 →
-   1.325, MoRE 1.385 → 1.309.)
+   epoch 1.
 3. **The routing numbers are defined for the routed arms and N/A for MoR**:
    `val/routing_agreement_with_group` and `val/routing_hungarian_accuracy`
    are numbers for `moe` and `more`, and the string `"N/A"` for `mor`. A
@@ -140,10 +148,27 @@ failed pilot, and the next step is to diagnose it, not to continue.
 5. **The depth numbers are live for the adaptive arms**: `val/avg_recursion_steps`
    is a number for `mor` and `more` and `"N/A"` for `moe` (MoE has no
    recursion at all).
-6. **The VRAM peak is as measured**: `perf/gpu_peak_alloc_gib` ≈ 0.6 (MoE),
-   ≈ 5.5 (MoR), ≈ 2.1 (MoRE) GiB. If MoR's peak is materially above 5,491 MiB,
-   **stop** and report it — the matrix would not fit the 8 GB card either.
-7. **The epoch time is the number §9 predicts**, within ~20 %. If it is
+6. **THE OOD SPLITS WERE EVALUATED**: `ood_interp/task_loss`,
+   `ood_interp/accuracy`, `ood_interp/exact_match`, `ood_extrap/task_loss`
+   and the rest are present in `metrics.json`. If they are missing, the
+   dataset's held-out splits were not evaluated and the OOD claim has no
+   evidence behind it.
+7. **THE F ROWS ARE BEING LEARNED** — this is the check that decides whether
+   the rest of the OOD analysis means anything. Look at
+   `val/accuracy_by_op/F<k>` and `val/exact_match_by_op/F<k>` for the
+   **trained** k values. If those are near zero, the model cannot solve an F
+   row at all, and the held-out numbers are then measuring "the model cannot
+   do F" rather than "the model cannot extrapolate". The dataset's own caveat
+   says exactly this: *"If it fails on ood_interp, check whether it also fails
+   on the seen k values before blaming your architecture."*
+   (On the smoke subset, at 3 epochs on 1 % of the data, the seen F rows were
+   at ~0.17 per digit and 0.00 exact — i.e. **not learned at all yet**, so the
+   smoke pilot says nothing about extrapolation. The matrix is 101× more
+   data.)
+8. **The VRAM peak is as measured**: `perf/gpu_peak_alloc_gib` ≈ 0.7 (MoE),
+   ≈ 2.4 (MoRE), ≈ 5.8 (MoR) GiB. If MoR's peak is materially above 5.8 GiB,
+   **stop** and report it.
+9. **The epoch time is the number §9 predicts**, within ~20 %. If it is
    materially slower, the budget changes and the user must be told before the
    remaining ten runs start.
 
@@ -183,25 +208,39 @@ refuses outright if the runs span more than one dataset version, or if one
 arm's runs have more than one config hash (either would mean a mean over two
 different experiments).
 
+It prints three tables:
+
+- **the headline** (val loss, accuracy, exact match, depth, routing) per arm;
+- **every measured quantity** (mean ± std over the seeds that have it),
+  including the OOD splits' loss, accuracy, exact match and depth;
+- **the compute-versus-k table**: every k value in one row, with the SEEN
+  values and the HELD-OUT ones side by side, and the depth the model spent on
+  each. That table is where the study's claim is read off.
+
 **Report back exactly these, per arm, as mean ± std over the seeds:**
 
 | quantity | key | reading |
 |---|---|---|
 | **primary** | `val/task_loss` | nats/token over the generator's scored positions (answer digits + EOS). Lower is better. |
+| accuracy | `val/accuracy` | per-digit accuracy over the scored positions |
+| exact match | `val/exact_match` | per-example: every digit right. The strict reading of "the right answer". |
 | depth | `val/avg_recursion_steps` | the adaptive arms only; MoE is N/A by construction |
 | routing | `val/routing_hungarian_accuracy` | the permutation-invariant number — **primary for routing** |
 | routing | `val/routing_ami`, `val/routing_purity` | chance-corrected and not; read them together |
 | agreement | `val/routing_agreement_with_group` | agreement with a **designed prior**, NOT accuracy |
 | balance | `train/expert_load_entropy_normalized` | a load-balance diagnostic, not evidence of specialization |
-
-Plus, from the summariser's second table, the **average recursion depth per
-operation** (22 rows) and **per expert group** (7 rows) — that is where
-"does the model spend more computation on the operations that need more of
-it" is answered.
+| **OOD** | `ood_interp/task_loss`, `ood_interp/accuracy`, `ood_interp/exact_match` | the held-out iteration counts inside the trained range — the realistic target |
+| **OOD** | `ood_extrap/…` | the held-out counts beyond the trained range — the stretch result |
+| **compute vs k** | `val/accuracy_by_op/F<k>`, `val/exact_match_by_op/F<k>`, `ood_interp/accuracy_by_op/F<k>`, … | the seen and the held-out k values in one table |
 
 **Do not** quote `total_loss`. It is never a quality metric (CLAUDE.md §4): it
 contains the balance, ponder and probe terms, and a low weighted total is not
 evidence of a good model.
+
+**Do not** compare the OOD loss with the validation loss. The OOD splits are
+F rows only; the validation split is a mixture of all seven groups. The
+comparable number is the **per-k F-row** loss/accuracy on the validation
+split, which is why the aggregator prints the per-k table.
 
 ---
 
@@ -242,14 +281,15 @@ label.
 | the frozen seeds **42–46** | `code/canonical_spec_opdiff.json:seed_set` | the study reports mean ± std over five seeds; one seed is one observation |
 | `config_opdiff.json` | the defaults file | every run's `config_hash` is derived from it; the summariser refuses a matrix whose arms have two hashes |
 | `num_experts = 7` for MoE/MoRE | `config.py:CANONICAL_NUM_EXPERTS_BY_TASK` | seven is the oracle partition's width; six makes the confusion matrix non-square and every permutation-invariant routing number N/A |
-| `ffn_mult = 28` for MoR | `config.py:CANONICAL_FFN_MULT_OPDIFF` | 7 × 4 = 28 is the same budget rule arithmetic and language use; the measured non-embedding gap is 0.117 % and at 24 it would be 14 % short |
+| `ffn_mult = 28` for MoR | `config.py:CANONICAL_FFN_MULT_OPDIFF` | 7 × 4 = 28 is the same budget rule arithmetic and language use; the measured gap is 0.117 % and at 24 it would be 14 % short |
 | `batch_size = 48` | `config_opdiff.json` | measured VRAM headroom per arm; a different batch is a different experiment and is not labelled by anything |
-| `seq_len = 304`, `vocab_size = 43` | `config_opdiff.json` | the dataset's own row length and vocabulary; the engine refuses a mismatch with the files on disk |
+| `seq_len = 384`, `vocab_size = 37` | `config_opdiff.json` | the dataset's own row length and vocabulary; the engine refuses a mismatch with the files on disk |
 | `loss_weights.family_cls = 0.0` | forced by the task block | the group probe is **detached**; a non-zero weight would put the oracle partition into the trunk's objective — the one confound this study exists to exclude |
-| `halting_supervision` off | forced by the task block | opdiff has no depth curriculum; the generator's nominal difficulty is a placeholder awaiting dense-baseline calibration, not a target |
+| `halting_supervision` off | forced by the task block | opdiff has no depth curriculum; the generator's nominal difficulty is a placeholder awaiting dense-baseline calibration. The compute-versus-k claim is MEASURED, not supervised |
 | `step_routing = 0.0` | `config_opdiff.json` | the unsupervised router is the arm under study; a non-zero value is a legitimate **labelled** oracle-routing ablation and may never share a table with an unsupervised run |
 | `experiment_group = exploratory` | the driver | the opdiff spec is **unfrozen by design**; the proxy guard refuses a `canonical_opdiff_b` claim, and a run that claims canonical status before the protocol is ratified is a claim nobody can audit |
-| the dataset itself | `make_opdiff_dataset_v2.py` | it is the contract: token layout, loss mask, group partition, OOD split. The manifest in the code is cross-checked against it by the test suite |
+| the dataset itself | `make_opdiff_dataset_v3.py` | it is the contract: token layout, k slot, loss mask, group partition, the three k lists. The manifest in the code is cross-checked against it by the test suite |
+| the k lists | the generator's `TRAIN_K` / `INTERP_K` / `EXTRAP_K` | they define what "held out" means. A k that is both trained and held out is not held out, and the preflight refuses it |
 | `canonical_spec_opdiff.json`'s nulls | the spec file | they are what makes the guard refuse a canonical claim. Filling them in is a **deliberate act** with a `frozen_by` entry, not a convenience |
 
 **Also never:** put the opdiff numbers in the same table as the arithmetic or
@@ -262,46 +302,46 @@ per scored token; arithmetic's is an MSE), three run-name prefixes
 ## 9. What is already measured (do not re-measure it)
 
 Measured on the **gate machine** (RTX 3050 6 GB), the **smoke subset**
-(3,584 train rows, 896 val rows), batch 48, 3 epochs, seed 42, on
-2026-10-21. The full dataset is **101.6× larger**, so the epoch times below
-are an extrapolation from the measured token rate — the rates themselves are
-direct measurements.
+(3,584 train rows, 896 val, 640 ood_interp, 256 ood_extrap), batch 48, 3
+epochs, seed 42, on 2026-10-21. The full dataset is **82× larger**, so the
+epoch times below are an extrapolation from the measured token rate — the
+rates themselves are direct measurements.
 
-| arm | items/s | tokens/s | val/task_loss (1 ep → 3 ep) | depth | Hungarian | AMI | peak VRAM |
-|---|---|---|---|---|---|---|---|
-| MoE | 498.4 | 151,504 | 1.4261 → 1.3327 | N/A | 0.2241 | 0.0738 | 0.59 GiB |
-| MoR | 52.4 | 15,930 | 1.4129 → 1.3254 | 4.17 | N/A | N/A | **5.49 GiB** |
-| MoRE | 95.3 | 28,957 | 1.3853 → 1.3087 | 5.43 | 0.1846 | 0.0140 | 2.10 GiB |
+| arm | tokens/s | val/task_loss (1 ep → 3 ep) | val accuracy | val exact match | depth | Hungarian | AMI | peak alloc / reserved |
+|---|---|---|---|---|---|---|---|---|
+| MoE | 161,081 | 1.4303 → 1.3630 | 0.564 | 0.622 | N/A | 0.2513 | 0.0749 | 0.72 / 2.16 GiB |
+| MoR | 17,301 | 1.4210 → 1.3550 | 0.565 | 0.536 | 3.67 | N/A | N/A | **5.80 / 6.38 GiB** |
+| MoRE | 30,874 | 1.4225 → 1.3430 | 0.566 | 0.636 | 4.88 | 0.2084 | 0.0323 | 2.44 / 2.66 GiB |
 
-**Extrapolated epoch time on the full dataset (364,000 train + 7,000 val
-rows), 3 epochs per seed, 5 seeds:**
+**Extrapolated epoch time on the full dataset (294,000 train + 7,000 val +
+7,000 OOD rows), 3 epochs per seed, 5 seeds:**
 
 | arm | per epoch | per seed (3 ep) | 5 seeds |
 |---|---|---|---|
-| MoE | 12.4 min | 37 min | 3.1 h |
-| MoR | 118 min | 5.9 h | 29.5 h |
-| MoRE | 65 min | 3.2 h | 16.2 h |
-| **all three** | | **9.8 h** | **≈ 49 h** |
+| MoE | 12.2 min | 37 min | 3.1 h |
+| MoR | 113.6 min | 5.7 h | 28.4 h |
+| MoRE | 63.9 min | 3.2 h | 16.0 h |
+| **all three** | | **9.0 h** | **≈ 47 h** |
 
-On the 8 GB 4060 the same matrix should take **≈ 33 h** (the language
+On the 8 GB 4060 the same matrix should take **≈ 32 h** (the language
 calibration measured the 4060 at ~1.5× the 3050's per-epoch time). Treat that
 as an estimate and **correct it with the pilot's measured epoch time** before
 the remaining ten runs — the pilot is the measurement, and it is the first
 thing in §4.
 
-**These rates are why the matrix is affordable at all**: MoR is 9.5× slower
+**These rates are why the matrix is affordable at all**: MoR is 9.3× slower
 than MoE per token, because MoR evaluates one dense FFN of width 28 for every
 token while MoE evaluates one expert of width 4. MoR's memory peak is the
-same story. This is the parameter-budget rule doing its job, not a defect.
+same story, and it is why the matrix belongs on the 8 GB card.
 
 ---
 
 ## 10. What this study may and may not claim
 
 **May.** A comparison of MoE, MoR and MoRE on a 25-operation dataset with
-seven expert groups, over five seeds, with matched parameter budgets, at
-fixed epochs. The routing numbers are permutation-invariant, so they measure
-the router's **partition**, not its arbitrary numbering.
+seven expert groups, over five seeds, with matched parameter budgets, at fixed
+epochs — and a held-out-iteration-count evaluation in two parts
+(interpolation and extrapolation).
 
 **May not.**
 
@@ -318,7 +358,12 @@ the router's **partition**, not its arbitrary numbering.
   there is **no depth curriculum** on this task, so the depth-allocation
   metrics are N/A by construction — the measured depth is a *behaviour*, and
   the question "does it spend more on the harder operations" is answered by
-  the per-operation depth table, not by an error against a target.
+  the per-operation and per-k depth tables, not by an error against a target.
+- Report the OOD loss against the validation loss. The OOD splits are F rows
+  only; the comparison is with the **per-k F rows** of the validation split.
+- Report the OOD result without the **seen** k values next to it. If the model
+  cannot solve the trained F rows, the held-out numbers say nothing about
+  extrapolation, and the table that shows both is the one that decides it.
 - Put these numbers in the same table as the arithmetic or language study.
 - Report any single seed. The study is mean ± std over five.
 
@@ -331,8 +376,8 @@ the router's **partition**, not its arbitrary numbering.
 PY="C:\Users\Hp\anaconda3\envs\more_env\python.exe"
 
 # 1. the dataset
-$PY make_opdiff_dataset_v2.py --out opdiff_v2
-$PY make_opdiff_dataset_v2.py --out opdiff_v2_smoke --train_rows_per_group 512 --eval_rows_per_group 128
+$PY make_opdiff_dataset_v3.py --out opdiff_v3
+$PY make_opdiff_dataset_v3.py --out opdiff_v3_smoke --train_rows_per_group 512 --eval_rows_per_group 128 --ood_rows_per_k 128
 
 # 2. the preflight (must exit 0)
 $PY code/run_opdiff_matrix.py --preflight
@@ -360,11 +405,12 @@ during a run.
 
 1. The three pilot runs' measured epoch times (from `results.tsv` and
    `perf/throughput_tokens_sec`) and the corrected full-matrix budget.
-2. The full aggregation output, as printed.
+2. The full aggregation output, as printed — including the compute-versus-k
+   table.
 3. The per-operation and per-group depth tables.
 4. Anything that failed, with its verbatim output, and what was done about it.
-5. The `dataset_version` your machine produced — if it differs from
-   `opdiff-v2-a899c743eab0`, say so, because the rows were sampled
-   differently and the runs are on a different dataset.
+5. The `dataset_version` your machine produced — if it differs from the gate
+   machine's, say so, because the rows were sampled differently and the runs
+   are on a different dataset.
 
 Do not paste numbers into a table by hand. The summariser is the table.

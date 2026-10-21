@@ -310,6 +310,7 @@ same balance objective. There is no `language/` package for the same reason ther
 | primary metric | MSE against 0.080914 | cross-entropy in **nats/token** against 4.984947 | masked cross-entropy in **nats/scored token** (answer digits + EOS) |
 | attention | absent | **one shared causal sublayer** | **one shared causal sublayer** |
 | oracle label space | 6 operation families | 6 POS families | **7 expert groups** (E=7) |
+| held-out splits | none | none | **two**: `ood_interp` (k inside the trained range) and `ood_extrap` (k beyond it) |
 | spec / group | `canonical_spec.json` / `canonical_phase_b` | `canonical_spec_language.json` / `canonical_lang_b` | `canonical_spec_opdiff.json` / `canonical_opdiff_b` (**unfrozen by design** → every run is `exploratory`) |
 
 **Absence of a `task` key MEANS `arithmetic`.** No `task` field is injected on the

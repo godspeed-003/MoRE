@@ -7,91 +7,86 @@ already imports `expert_labels`, `ALL_OP_NAMES`, `NUM_OP_TYPES` and
 `NUM_EXPERTS_CANONICAL` from `families.py` can import the identical four names
 from here.
 
-THE DATASET THIS DESCRIBES. `make_opdiff_dataset_v2.py` writes a row = 16
-packed examples x 19 tokens = 304 uint8 token ids. Each example is
+THE DATASET THIS DESCRIBES (v3). `make_opdiff_dataset_v3.py` writes a row =
+16 packed examples x 24 tokens = 384 uint8 token ids. Each example is
 
-    [OP] a3 a2 a1 a0  b3 b2 b1 b0  [SEP]  r7 r6 r5 r4 r3 r2 r1 r0  [EOS]
-     0    1..4         5..8          9       10..17                  18
+    [OP] k4 k3 k2 k1 k0  a3 a2 a1 a0  b3 b2 b1 b0  [SEP]  r7 r6 r5 r4 r3 r2 r1 r0  [EOS]
+     0    1..5            6..9         10..13         14     15..22                  23
 
-with the OP token naming WHICH function to compute, A and B being 16-bit
-operands rendered as 4 hex digits each, and the answer being 8 hex digits.
-Every row belongs to EXACTLY ONE expert group (E1..E7), and a row never mixes
-groups. The group is recorded in `{split}_group.npy` and is NEVER an input
-feature: it is the oracle label the routing metrics are scored against, and
-the supervision target for the labelled `oracle_routing` ablation.
+with the OP token naming WHICH function to compute, a five-token slot holding
+the ITERATION COUNT k of the F operation in binary (five NULL tokens for every
+other operation), A and B being 16-bit operands rendered as 4 hex digits each,
+and the answer being 8 hex digits. Every row belongs to EXACTLY ONE expert
+group (E1..E7), and a row never mixes groups. The group is recorded in
+`{split}_group.npy` and is NEVER an input feature: it is the oracle label the
+routing metrics are scored against.
 
 TOKEN LAYOUT (from `meta.json`, measured, not assumed):
 
-    SEP 0, EOS 1, hex digits 2..17, operation tokens 18..42, vocab 43.
+    SEP 0, EOS 1, NULL 2, hex digits 3..18, operation tokens 19..36, vocab 37.
 
-The 25 operation tokens are the generator's `ALL_OPS` INSERTION order, which
-is NOT sorted and NOT the group order:
+The 18 operation tokens are the generator's `OPS` INSERTION order, which is
+NOT sorted and NOT the group order:
 
-    18 AND  19 OR   20 XOR  21 NOT  22 SHL  23 SHR  24 REV  25 MIN
-    26 MAX  27 ADD  28 SUB  29 MUL  30 DIV  31 MOD  32 SORT 33 MEDIAN
-    34 GCD  35 F1   36 F2   37 F4   38 F8   39 F16
-    40 F3   41 F6   42 F12                      <- OOD, never trained on
+    19 AND  20 OR   21 XOR  22 NOT  23 SHL  24 SHR  25 REV  26 MIN  27 MAX
+    28 ADD  29 SUB  30 MUL  31 DIV  32 MOD  33 SORT 34 MEDIAN 35 GCD  36 F
 
-So `op_id = token_id - 18` is a dense 0..24 axis, and THAT is the axis the
-per-operation depth breakdown is reported on.
+WHY THE k SLOT EXISTS, because it is the whole point of v3. In v2 the F
+operations were separate tokens F1, F2, F4, ..., F16, and the OOD split was
+rows of F3, F6, F12. That could not test anything: **F3's token never appears
+in training, so its embedding is never trained**, and no architecture can
+know that "F3" means three iterations. The accuracy on those rows would be
+near chance for every model, and the "does the router extrapolate to unseen
+iteration counts?" claim would have been vacuous.
 
-WHY SEVEN GROUPS AND NOT SIX. The arithmetic study's six families are a
-functional partition of 16 operations; the opdiff partition is a DESIGNED
-partition of 25 operations, given by the generator, and it is a THIRD study's
-label space. Two consequences follow and both are deliberate:
+In v3 there is ONE F operation token, and k is written out in the five-token
+binary slot using the two hex-digit tokens the model has already learned
+(token 3 = '0', token 4 = '1'). The trained k values are 1, 2, 4, 5, 7, 8, 10,
+12, 13, 15, 16; the held-out ones are 3, 6, 9, 11, 14 (INTERPOLATION -- inside
+the trained range, never seen) and 17, 20 (EXTRAPOLATION -- beyond it). The
+bit patterns overlap: k=3 combines bits the model has seen together in k=7
+and k=15, so a held-out k is inferable from trained tokens. A held-out k
+therefore tests a real capability -- reading a composition out of a slot and
+spending the matching amount of computation -- instead of testing whether an
+untrained embedding can be guessed.
 
-1.  `num_experts` is 7 for the MoE and MoRE arms on this task. That is a
-    different router width from the arithmetic and language studies, which
-    both run 6 experts, so a difference between studies is not confounded
-    with a difference in expert count ONLY if the comparison is made against
-    the same-task MoR/MoE arms. Every opdiff number in this phase is
-    therefore reported against opdiff's own MoE and MoR arms, never against
-    the arithmetic table. Seven is also what keeps the confusion matrix
-    SQUARE (7 oracle groups x 7 experts), which is the precondition for the
-    Hungarian / AMI / purity metrics to be defined at all: the metric layer
-    returns an all-None "empty" report for a non-square matrix, which would
-    have made every permutation-invariant routing number N/A on this task.
-    MoR stays at 1 expert, so its matrix is 7x1 and its routing metrics are
-    N/A by construction -- the same contract arithmetic and language have.
+THE OPERATION AXIS, AND WHY IT IS 35 WIDE AND NOT 18. The per-operation depth
+breakdown (`recursion/avg_depth_by_op/<OP>`) is what answers "does the model
+spend more computation on the operations that need more of it?". For the F
+operation the interesting quantity is not the operation but the ITERATION
+COUNT: the claim is that depth grows with k. So the axis carries one entry
+per (operation, k) INSTANCE: the 17 non-F operations, then one entry per k
+value, named `F1`, `F2`, ..., `F17`, `F20`. The axis index of a token is
+derived from the INPUT -- the operation token and the k slot the model is
+shown -- and never from a label file, so the axis is legitimate operation
+identity and not an oracle.
 
-2.  THE GROUP IS A PRIOR, NOT A GROUND TRUTH OF THE DATA. `families.OP_TO_EXPERT`
-    on arithmetic is functional truth: ADD really does belong with SUB. Here
-    E2 bundles SHL, SHR, REV, MIN and MAX -- shift, byte-reverse, minimum and
-    maximum -- which is a plausible engineering grouping and not a fact. A
-    router that separates the shifts from the byte-reverse may be the better
-    partition while scoring low against this one. So the agreement number is
-    named `routing_agreement_with_group`, never `routing_accuracy`, and the
-    permutation-invariant metrics are primary. This is the same discipline
-    `lang_families.py` applies to POS, and the same reason.
+THERE IS NO DEPTH CURRICULUM. `op_target_depth_table()` returns `[]`, and the
+emptiness is load-bearing: an EMPTY table cannot supervise depth no matter
+which loss weight a future config sets. The F operation's true algorithmic
+depth IS k, but the model's recursion budget is 7 steps, so a target of k = 16
+would be unreachable by construction -- an irreducible loss, the same trap the
+arithmetic study's curriculum had. The compute-versus-k claim is therefore
+MEASURED (the per-k average depth) rather than supervised, and the
+depth-allocation error against a curriculum is N/A, correctly.
 
 THREE THINGS DIFFER FROM ARITHMETIC, and they are the reason this file exists
 rather than a second table in `families.py`:
 
-1.  THERE IS A REAL OPERATION AXIS, and it is 25 wide, not 16. It sizes the
-    per-operation depth breakdown (`recursion/avg_depth_by_op/<OP>`), which is
-    where the "does the model spend more computation on the operations that
-    need more of it" question is actually answered for this dataset.
-
-2.  THERE IS NO DEPTH CURRICULUM. `op_target_depth_table()` returns `[]`, and
-    the emptiness is load-bearing: an EMPTY table cannot supervise depth no
-    matter which loss weight a future config sets, and `halting_supervision`
-    is REFUSED on this task for the same reason language refuses it. The
-    generator's `{split}_diff.npy` is a NOMINAL difficulty (the group number,
-    or 7 + log2(k) for the F ops) and is explicitly a placeholder pending
-    dense-baseline calibration -- it is NOT a depth target and is never read
-    as one.
-
-3.  THE OOD OPS BELONG TO E7 ON DISK. `make_opdiff_dataset_v2.py` builds the
-    `ood` split by calling `gen_group(rng, 7, ...)` with the OOD operation
-    list, so those rows carry group 7 exactly like the E7 rows they are
-    meant to be compared against. The oracle mapping below therefore places
-    F3, F6 and F12 in E7, and the OOD SPLIT (not a different label) is what
-    separates them from the trained F1/F2/F4/F8/F16. The distinction that
-    matters -- "iteration counts never seen in training" -- is a property of
-    the split, and it is recorded as such.
+1.  THERE IS A REAL OPERATION AXIS, 35 wide, and it is 35 wide because the F
+    operation is a family of instances rather than one operation.
+2.  THERE IS NO DEPTH CURRICULUM (above).
+3.  THE SEVEN GROUPS ARE A PRIOR, NOT GROUND TRUTH. `families.OP_TO_EXPERT` on
+    arithmetic is functional truth: ADD really does belong with SUB. Here E2
+    bundles SHL, SHR, REV, MIN and MAX -- shift, byte-reverse, minimum and
+    maximum -- which is a plausible engineering grouping and not a fact. A
+    router that separates the shifts from the byte-reverse may be the better
+    partition while scoring low against this one. So the agreement number is
+    named `routing_agreement_with_group`, never `routing_accuracy`, and the
+    permutation-invariant metrics are primary.
 
 Deliberately free of `torch`, `numpy` and any dataset dependency: this is the
-manifest. `make_opdiff_dataset_v2.py` is the authority for the dataset
+manifest. `make_opdiff_dataset_v3.py` is the authority for the dataset
 contract; this file is the authority for the LABEL SPACE the code uses, and
 the two are cross-checked by `code/test_opdiff_task_axis.py`.
 """
@@ -142,13 +137,12 @@ IDX_TO_FAMILY = {v: k for k, v in FAMILY_TO_IDX.items() if v >= 0}
 # 2. The operation axis
 # ---------------------------------------------------------------------------
 
-# The generator's `ALL_OPS` insertion order, which is the TOKEN order. Do not
-# sort this list: `op_id = token_id - OP_TOKEN_OFFSET` is the index the dataset
-# uses, and a sorted list would silently relabel the axis.
+# The generator's `OPS` insertion order, which is the TOKEN order. Do not sort
+# this list: the op id is the token id minus OP_TOKEN_OFFSET, and a sorted
+# list would silently relabel the axis.
 #
-#   0 AND   1 OR    2 XOR   3 NOT   4 SHL   5 SHR   6 REV   7 MIN
-#   8 MAX   9 ADD  10 SUB  11 MUL  12 DIV  13 MOD  14 SORT 15 MEDIAN
-#  16 GCD  17 F1   18 F2   19 F4   20 F8   21 F16  22 F3   23 F6   24 F12
+#  0 AND   1 OR    2 XOR   3 NOT   4 SHL   5 SHR   6 REV   7 MIN   8 MAX
+#  9 ADD  10 SUB  11 MUL  12 DIV  13 MOD  14 SORT 15 MEDIAN 16 GCD  17 F
 ALL_OP_NAMES: list[str] = [
     "AND", "OR", "XOR", "NOT",
     "SHL", "SHR", "REV", "MIN", "MAX",
@@ -156,29 +150,44 @@ ALL_OP_NAMES: list[str] = [
     "MUL",
     "DIV", "MOD",
     "SORT", "MEDIAN",
-    "GCD", "F1", "F2", "F4", "F8", "F16",
-    # OOD: present in the data, never trained on.
-    "F3", "F6", "F12",
+    "GCD",
+    # The F operation: ONE token, with the iteration count in the k slot.
+    "F",
 ]
 OP_NAME_TO_IDX: dict[str, int] = {n: i for i, n in enumerate(ALL_OP_NAMES)}
 NUM_OP_TYPES = len(ALL_OP_NAMES)
 
-# The first operation token id. `meta.json:tokens.op0` is 18, and the 18 ids
-# below it are SEP (0), EOS (1) and the 16 hex digits (2..17).
-OP_TOKEN_OFFSET = 18
+# The first operation token id. `meta.json:tokens.op0` is 19, and the 19 ids
+# below it are SEP (0), EOS (1), NULL (2) and the 16 hex digits (3..18).
+OP_TOKEN_OFFSET = 19
 
-# The full vocabulary is the 18 fixed tokens plus the 25 operation tokens.
-# `meta.json:vocab_size` is 43 and the LM head is [43, d_model], so a
+# The full vocabulary is the 19 fixed tokens plus the 18 operation tokens.
+# `meta.json:vocab_size` is 37 and the LM head is [37, d_model], so a
 # disagreement here is a disagreement about the size of the output layer.
 NUM_FIXED_TOKENS = OP_TOKEN_OFFSET
 VOCAB_SIZE = NUM_FIXED_TOKENS + NUM_OP_TYPES
 
-# The OOD operation names, which the generator holds out of train/val/test.
-OOD_OP_NAMES: list[str] = ["F3", "F6", "F12"]
+# The F operation's name, and the number of binary tokens its k occupies.
+F_OP_NAME = "F"
+K_BITS = 5
 
-# The generator's `GROUPS`: group number (1..7) -> its operation names. This
-# is the DESIGNED partition, reproduced verbatim; `OP_TO_EXPERT` below is
-# derived from it rather than typed out a second time, so the two cannot drift.
+# EVERY k VALUE THE DATASET CAN CONTAIN, sorted: the trained ones, the
+# interpolation ones and the extrapolation ones. The axis is sized by this
+# list, so a k value that is not in it has no axis entry -- and the dataset
+# raises rather than clamping, because a clamped k would attribute a measured
+# depth to the wrong iteration count.
+K_VALUES: tuple[int, ...] = (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14,
+                             15, 16, 17, 20)
+K_VALUE_TO_IDX: dict[int, int] = {k: i for i, k in enumerate(K_VALUES)}
+
+# The generator's `GROUPS`: group number (1..6) -> its operation names, and
+# E7 built separately (the F operation with every trained k, plus GCD).
+#
+# E7's membership is the OPERATION names, not the instances: "F" covers every
+# iteration count, because the k is the instance axis and the group says which
+# family of operations the row belongs to. The generator's own description of
+# E7 -- "F(k) k in TRAIN_K, plus GCD" -- is the same set written the other way
+# round.
 GROUP_OP_NAMES: dict[int, list[str]] = {
     1: ["AND", "OR", "XOR", "NOT"],
     2: ["SHL", "SHR", "REV", "MIN", "MAX"],
@@ -186,26 +195,40 @@ GROUP_OP_NAMES: dict[int, list[str]] = {
     4: ["MUL"],
     5: ["DIV", "MOD"],
     6: ["SORT", "MEDIAN"],
-    7: ["F1", "F2", "F4", "F8", "F16", "GCD"],
+    7: ["F", "GCD"],
 }
 
-# Operation name -> 0-based GROUP index. Derived from GROUP_OP_NAMES, with the
-# three OOD operations placed in E7 (group 7) because the generator labels the
-# OOD rows with group 7 on disk -- see the module docstring, point 3.
-OP_TO_EXPERT: dict[str, int] = {}
+# Operation name -> 0-based GROUP index, DERIVED from the table above rather
+# than typed out a second time (the two cannot drift). This is the oracle map:
+# which group an operation belongs to. It is a DIAGNOSTIC and a supervision
+# target -- never an input feature.
+OP_TO_GROUP: dict[str, int] = {}
 for _g, _ops in GROUP_OP_NAMES.items():
     for _op in _ops:
-        OP_TO_EXPERT[_op] = _g - 1
-for _op in OOD_OP_NAMES:
-    OP_TO_EXPERT[_op] = 6
+        OP_TO_GROUP[_op] = _g - 1
+# `OP_TO_EXPERT` is the name `families.py` exports for the arithmetic task,
+# where the expert IS the family. Here the two are the same thing too (the
+# oracle expert index of a token is its row's group), and the alias exists so
+# that a reader does not have to know which name this task uses.
+OP_TO_EXPERT = OP_TO_GROUP
 
-# `OP_TO_GROUP` is the same map under the name that says what it is on THIS
-# task: the oracle GROUP, which is the supervision target and the confusion
-# matrix's row axis. On arithmetic the analogous map is called OP_TO_EXPERT
-# because the expert IS the family there; here they are the same thing too
-# (the oracle expert index of a token is its row's group), and the alias
-# exists so that a reader does not have to know which name this task uses.
-OP_TO_GROUP = OP_TO_EXPERT
+# THE DEPTH AXIS. The 17 non-F operations, then one entry per k value.
+#
+# This is the axis the per-operation depth breakdown is reported on, and its
+# width is what the engine's depth tensors are sized by. The F entries are
+# named `F<k>`, which is what makes the compute-versus-k claim a slice of the
+# table rather than a separate mechanism.
+_NON_F_OPS: list[str] = [op for op in ALL_OP_NAMES if op != F_OP_NAME]
+OP_AXIS_NAMES: list[str] = _NON_F_OPS + [f"F{k}" for k in K_VALUES]
+NUM_OP_AXIS = len(OP_AXIS_NAMES)
+
+# The axis index of each non-F operation, and of each k.
+_OP_AXIS_INDEX_OF_OP: dict[str, int] = {op: i for i, op in enumerate(_NON_F_OPS)}
+_K_AXIS_OFFSET = len(_NON_F_OPS)
+# Which axis entries are F instances, and which k each carries.
+AXIS_K_OF_INDEX: dict[int, int] = {
+    _K_AXIS_OFFSET + j: k for j, k in enumerate(K_VALUES)
+}
 
 
 # ---------------------------------------------------------------------------
@@ -242,11 +265,11 @@ def expert_labels(num_experts: int) -> list[str]:
 
 
 def op_token_id(op_name: str) -> int:
-    """The token id of one operation, e.g. "ADD" -> 27.
+    """The token id of one operation, e.g. "ADD" -> 28.
 
     The inverse of `op_id = token - OP_TOKEN_OFFSET`, spelled out because the
     dataset stores token ids and the code stores op ids, and a mix-up between
-    them is a silent 18-wide offset rather than an error.
+    them is a silent 19-wide offset rather than an error.
     """
     if op_name not in OP_NAME_TO_IDX:
         raise KeyError(
@@ -258,7 +281,7 @@ def op_token_id(op_name: str) -> int:
 
 
 def op_id_from_token(token_id: int) -> int:
-    """The dense 0..24 op index of a token id. Raises outside the op range."""
+    """The dense 0..17 op index of a token id. Raises outside the op range."""
     if not (OP_TOKEN_OFFSET <= token_id < OP_TOKEN_OFFSET + NUM_OP_TYPES):
         raise ValueError(
             f"token id {token_id} is not an operation token. Operation tokens "
@@ -270,41 +293,59 @@ def op_id_from_token(token_id: int) -> int:
     return int(token_id) - OP_TOKEN_OFFSET
 
 
-def op_group(op_id: int) -> int:
-    """The oracle group index (0..6) of one op index (0..24)."""
-    if not (0 <= op_id < NUM_OP_TYPES):
-        raise ValueError(
-            f"op_id must be in 0..{NUM_OP_TYPES - 1}, got {op_id}. The op axis "
-            f"is {NUM_OP_TYPES} wide; an id outside it is an indexing bug, and "
-            "clamping it would silently attribute a depth measurement to the "
-            "wrong operation."
+def op_axis_index(op_name: str, k: int = 0) -> int:
+    """The DEPTH-AXIS index of one (operation, k) instance.
+
+    For every operation except F this is the operation's own index. For F it
+    is the index of the k value, because the interesting measurement is the
+    depth of the ITERATION COUNT, not of the operation.
+
+    Raises for an unknown operation or an unknown k. A clamped k would
+    attribute a measured depth to the wrong iteration count, which is the
+    exact failure the compute-versus-k claim cannot survive.
+    """
+    if op_name == F_OP_NAME:
+        if k not in K_VALUE_TO_IDX:
+            raise ValueError(
+                f"k={k} is not one of the dataset's k values {K_VALUES}. An "
+                "unknown k has no axis entry; clamping it would report the "
+                "depth of a different iteration count."
+            )
+        return _K_AXIS_OFFSET + K_VALUE_TO_IDX[k]
+    if op_name not in _OP_AXIS_INDEX_OF_OP:
+        raise KeyError(
+            f"unknown operation {op_name!r}. Known operations: "
+            f"{sorted(OP_NAME_TO_IDX)}."
         )
-    return OP_TO_EXPERT[ALL_OP_NAMES[op_id]]
+    return _OP_AXIS_INDEX_OF_OP[op_name]
+
+
+def op_axis_k(axis_index: int) -> int | None:
+    """The k an axis entry carries, or None for a non-F entry."""
+    return AXIS_K_OF_INDEX.get(int(axis_index))
 
 
 def op_target_depth_table() -> list[float]:
     """EMPTY, and the emptiness is the constraint made mechanical.
 
     `engine.py` binds this table unconditionally at setup, so it must exist and
-    must return something. For opdiff the honest something is nothing: the
-    generator's `{split}_diff.npy` is a NOMINAL difficulty placeholder pending
-    dense-baseline calibration, not a curriculum, and a curriculum invented
-    here would be a depth target fitted to the model that is supposed to be
-    measured against it.
+    must return something. For opdiff the honest something is nothing.
 
-    An EMPTY table cannot supervise depth no matter which loss weight a
-    future config sets, which is strictly stronger than a zero-filled table of
-    length 25 (which would silently supervise every token toward depth 0).
-    Downstream, `epoch_depth_err_n` stays 0, so `depth/allocation_error_abs`
-    and `depth/allocation_error_rel` are absent from the log dict and reported
-    as `N/A` rather than as a suspiciously perfect 0.0.
+    WHY NOT "TARGET DEPTH = k FOR THE F OPERATION", which is the obvious
+    temptation because k IS the true algorithmic depth of that operation. Two
+    reasons, and both are load-bearing:
 
-    NOTE: opdiff DOES have a valid `step_ops` axis (0..24), unlike language.
-    That is why `metrics.halting_supervision_loss` and
-    `metrics.depth_allocation_error` guard on an EMPTY TABLE as well as on an
-    empty valid mask: with 25 valid op ids and a 0-length table, indexing
-    raises IndexError, and with the arithmetic table (16 entries) it would
-    silently measure F1..F12 against the wrong operations.
+    1.  The recursion budget is 7 steps, and the trained k values run to 16.
+        A curriculum target of 16 is unreachable BY CONSTRUCTION, so the term
+        would be an irreducible loss -- the same trap the arithmetic study's
+        curriculum had, and the reason the arithmetic spec's own target depths
+        are bounded by max_steps.
+    2.  The point of the measurement is to find out WHETHER the model allocates
+        depth in proportion to k. Supervising it toward k would manufacture the
+        answer and then report it as a discovery.
+
+    So the compute-versus-k claim is measured -- the per-k average exit depth
+    -- and the depth-allocation error against a curriculum is N/A, correctly.
     """
     return []
 
@@ -343,63 +384,55 @@ if len(set(OPDIFF_GROUP_LABELS)) != NUM_FAMILIES:
         "per-family metric key."
     )
 
-# Every operation must belong to exactly one group, and every group must
-# contain at least one operation. An operation in no group is the E7
-# catch-all defect; a group with no operation is a structurally empty
-# confusion-matrix row, which reads as a routing failure rather than as a
-# manifest defect.
-_missing = [op for op in ALL_OP_NAMES if op not in OP_TO_EXPERT]
-if _missing:
+# The axis must be a bijection: every axis entry must be reachable and every
+# operation and k must land somewhere.
+if NUM_OP_AXIS != len(_NON_F_OPS) + len(K_VALUES):
     raise ValueError(
-        f"operations with no group: {_missing}. Every operation must be "
-        "assigned to exactly one group -- an unmapped operation must raise, "
-        "never fall back (updated_rules.md 2)."
+        f"NUM_OP_AXIS is {NUM_OP_AXIS}, expected "
+        f"{len(_NON_F_OPS) + len(K_VALUES)}."
     )
-_extra = [op for op in OP_TO_EXPERT if op not in OP_NAME_TO_IDX]
-if _extra:
+if len(set(OP_AXIS_NAMES)) != NUM_OP_AXIS:
     raise ValueError(
-        f"group map names operations that do not exist: {_extra}. The map is "
-        "derived from ALL_OP_NAMES, so this can only mean the two lists were "
-        "edited apart."
+        f"duplicate axis labels: {OP_AXIS_NAMES}. Two axis entries sharing a "
+        "name would merge their depth measurements."
+    )
+if len(set(K_VALUE_TO_IDX.values())) != len(K_VALUES):
+    raise ValueError("K_VALUES does not map to a dense 0..N-1 index range.")
+
+# Every operation must be in exactly one group, and every group must contain
+# at least one operation. An operation in no group is the E7 catch-all defect;
+# a group with no operation is a structurally empty confusion-matrix row.
+_mapped = set()
+for _g, _ops in GROUP_OP_NAMES.items():
+    for _op in _ops:
+        if _op in _mapped:
+            raise ValueError(
+                f"operation {_op!r} appears in more than one group. A row must "
+                "belong to exactly one group, or the oracle label is ambiguous."
+            )
+        if _op not in OP_NAME_TO_IDX and not _op.startswith("F(k)"):            raise ValueError(
+                f"group {_g} lists unknown operation {_op!r}. The group map is "
+                "derived from the operation list, and the two must agree."
+            )
+        _mapped.add(_op)
+if F_OP_NAME not in _mapped:
+    raise ValueError("the F operation is in no group; E7 would be empty.")
+
+# The vocabulary arithmetic: 19 fixed tokens (SEP, EOS, NULL, 16 hex digits)
+# plus 18 operation tokens is 37, which is the `meta.json:vocab_size` the
+# config must declare and the width of the tied LM head.
+if VOCAB_SIZE != 37:
+    raise ValueError(
+        f"VOCAB_SIZE is {VOCAB_SIZE}, expected 37 "
+        f"({NUM_FIXED_TOKENS} fixed + {NUM_OP_TYPES} operation tokens). The tied "
+        "LM head is [vocab_size, d_model], so a wrong vocabulary is a wrong "
+        "output layer, not a cosmetic mismatch."
     )
 
-_unreachable = sorted(
-    set(range(NUM_FAMILIES)) - {g for g in OP_TO_EXPERT.values()})
-if _unreachable:
-    raise ValueError(
-        "No operation maps to groups "
-        f"{[OPDIFF_GROUP_LABELS[i] for i in _unreachable]}. A group nothing can "
-        "be assigned to gives a structurally empty confusion-matrix row."
-    )
-
-# The vocabulary arithmetic: 18 fixed tokens (SEP, EOS, 16 hex digits) plus
-# 25 operation tokens is 43, which is the `meta.json:vocab_size` the config
-# must declare and the width of the tied LM head.
-if VOCAB_SIZE != 43:
-    raise ValueError(
-        f"VOCAB_SIZE is {VOCAB_SIZE}, expected 43 "
-        f"({NUM_FIXED_TOKENS} fixed + {NUM_OP_TYPES} operations). The tied LM "
-        "head is [vocab_size, d_model], so a wrong vocabulary is a wrong output "
-        "layer, not a cosmetic mismatch."
-    )
-
-# The operation axis must be dense and complete: every id in 0..24 must be a
-# distinct operation, or `op_id = token - 18` would alias two operations onto
-# one depth bucket.
+# The op id must be a bijection with the token range.
 if len(set(OP_NAME_TO_IDX.values())) != NUM_OP_TYPES:
     raise ValueError(
         "OP_NAME_TO_IDX does not cover 0..%d uniquely. The op id is the token "
         "id minus %d, so it must be a bijection with the token range."
         % (NUM_OP_TYPES - 1, OP_TOKEN_OFFSET)
-    )
-
-# The generator holds F3, F6 and F12 out of training. If one of them ever
-# appears in GROUP_OP_NAMES, the OOD split stops being an OOD split and this
-# guard is the place that says so.
-_leaked = [op for op in OOD_OP_NAMES if op in GROUP_OP_NAMES.get(7, [])]
-if _leaked:
-    raise ValueError(
-        f"OOD operations appear in the trained group partition: {_leaked}. The "
-        "generator holds F3/F6/F12 out of train/val/test; listing them as "
-        "trained operations would make the OOD split meaningless."
     )

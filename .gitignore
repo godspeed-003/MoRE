@@ -93,10 +93,16 @@ runs/_*.log
 # refuses to run when that directory is absent.
 archive/
 
-# --- Generated opdiff_v2 arithmetic datasets (make_opdiff_dataset_v2.py) ------
-# Regenerated in ~13 s by the committed generator; the .npy arrays are data, not
-# source. opdiff_v2 = full (364k rows, 110.7M tokens, ~113 MB);
-# opdiff_v2_smoke = 512 rows/group for fast iteration.
+# --- Generated opdiff datasets (make_opdiff_dataset_v3.py) -------------------
+# Regenerated in ~10 s by the committed generator; the .npy arrays are data, not
+# source. opdiff_v3 = full (294k rows, 112.9M tokens, ~113 MB);
+# opdiff_v3_smoke = 512 rows/group for fast iteration.
+#
+# T-OD.7: the v2 entries are GONE because the v2 generator is deleted (the
+# dataset cannot be regenerated, and a 113 MB directory whose layout differs
+# from the one the code expects is a trap).
+opdiff_v3/
+opdiff_v3_smoke/
 opdiff_v2/
 opdiff_v2_smoke/
 

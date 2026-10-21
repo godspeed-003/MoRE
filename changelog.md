@@ -10147,4 +10147,111 @@ Every command in it has been executed at least once on the smoke path, except
 the two that launch the matrix itself (`--pilot` and `--all`), which are
 covered by `--dry-run` plus the three direct smoke runs.
 
+## T-OD.7 - the opdiff port moves to the v3 dataset, and the OOD split is evaluated
+
+**Date.** 2026-10-21. **Machine.** Vedant's RTX 3050 6 GB.
+
+### The decision
+
+User-directed: the v2 dataset's OOD split was **vacuous as a test**. v2 gave
+F3, F6 and F12 their own operation tokens, and a token that never appears in
+training has an embedding that is never trained -- so no model could know that
+"F3" means three iterations, and the accuracy on those rows would have been
+near chance for every architecture. The claim it was supposed to test ("does
+the router extrapolate to unseen iteration counts?") could not have been
+distinguished from "the model cannot do F at all".
+
+v3 fixes it at the data level: there is **ONE** F operation, and the iteration
+count k is written into the input as five binary tokens built from the two
+hex-digit tokens the model has already learned. The trained k values are
+1, 2, 4, 5, 7, 8, 10, 12, 13, 15, 16; the held-out ones are 3, 6, 9, 11, 14
+(**interpolation** -- inside the trained range, never seen) and 17, 20
+(**extrapolation** -- beyond it). A held-out k is now inferable from trained
+tokens, so it tests a real capability.
+
+The v2 generator is deleted and the v2 datasets removed. The port is rebuilt
+against `make_opdiff_dataset_v3.py`: **384-token rows** (16 examples × 24
+tokens), **vocab 37**, and **two** held-out splits rather than one.
+
+### What the engine had to change
+
+- **The operation axis is 35 wide, not 18.** The per-operation depth
+  breakdown is the compute-versus-k claim, and that claim is about the
+  ITERATION COUNT: one `F` entry would average every k into one number. So
+  the axis carries one entry per (operation, k) INSTANCE -- the 17 non-F
+  operations plus one per k value, named `F1`…`F17`, `F20`. The axis index
+  is derived from the INPUT (the operation token and the k slot the model is
+  shown) and never from a label file; the label file is only a cross-check,
+  and a mismatch RAISES, because a clamped k would attribute a measured depth
+  to the wrong iteration count.
+- **Both OOD splits are evaluated every epoch**, and the engine publishes, per
+  split: the task loss, the perplexity, the per-digit accuracy, the
+  per-example exact match, the average recursion depth, the per-k depth, and
+  the per-k accuracy and exact match.
+- **The per-k accuracy and exact match are published on the VALIDATION split
+  too**, and that is the point: the OOD loss is NOT comparable with the
+  validation loss (the OOD splits are F rows only; the validation split is a
+  mixture of all seven groups), and the dataset's own caveat says "if it fails
+  on ood_interp, check whether it also fails on the SEEN k values before
+  blaming your architecture". The seen and the held-out k values now sit in
+  one table, in the aggregator and in every run's `metrics.json`.
+- **The per-example EXACT MATCH**, because a token-level accuracy is not the
+  same statement as "the model gave the right answer": with 8 answer digits
+  per example, 0.99 per digit is roughly 92 % of examples exactly right.
+- **The loss and the depth accumulation are now ONE definition each**
+  (`engine._task_loss` and `engine._accumulate_axis_depth`), used by the
+  train pass, the validation pass and the two OOD passes, so the OOD numbers
+  are comparable with the in-distribution ones by construction rather than by
+  convention.
+
+### What the smoke says, and what it does NOT say
+
+Three 3-epoch runs on the 1 % subset: the loss falls on all three arms
+(1.4303→1.3630 MoE, 1.4210→1.3550 MoR, 1.4225→1.3430 MoRE), the routing
+metrics are defined for the routed arms and N/A for MoR, and the OOD splits
+are evaluated.
+
+**The OOD result at this scale is: the model gets NO held-out F example
+right (exact match 0.0, per-digit accuracy ≈ 0.165) -- and neither does it
+get any SEEN F example right** (per-k exact match 0.0 for every trained k,
+per-k accuracy ≈ 0.166–0.177). So the held-out numbers currently measure
+"the model cannot do F", not "the model cannot extrapolate". That is the
+diagnostic the dataset asks for, and it is why it is acceptance check 7 of
+the pilot in the handoff.
+
+**What the depth DOES already show:** the F rows get 6.0–6.5 of the 7 steps
+while the simple groups get 1.8–4.6, so the model has already learned "F
+rows are expensive" at the group level -- but not "k = 16 is more expensive
+than k = 1" (F1 6.46 vs F16 6.45 for MoR), which needs the k slot to be
+read at all.
+
+### Failure tracing
+
+- The OOD numbers missing from a run → `code/more/engine.py`, the OOD
+  evaluation block and `ood_loaders`; the splits are built next to the
+  validation loader and are never iterated in the training loop.
+- The OOD loss and the validation loss not comparable → they are NOT, and
+  must not be: the OOD splits are F rows only. The comparable number is
+  `val/accuracy_by_op/F<k>` and friends.
+- The per-k depth or accuracy wrong → `code/more/opdiff_families.py`
+  (`K_VALUES`, `op_axis_index`, `OP_AXIS_NAMES`) and
+  `code/more/opdiff_data.py` (the k decode, and the cross-check against
+  `{split}_k.npy`).
+- A run's dataset identity → `code/more/opdiff_data.py`, `opdiff_versions`.
+  The generator does not write content hashes, so the identity is a
+  fingerprint (meta.json + a 4 MiB edge of the train split), which is
+  content-sensitive but weaker than a full hash.
+
+### Verify
+
+- `code/test_opdiff_task_axis.py` → **62 passed, 0 failed, 0 skipped**,
+  including the manifest-versus-v3-generator cross-check, the 35-wide axis,
+  the k-slot decode matching the row label on every F row of a 200-row
+  sample, and the two OOD splits' contents.
+- `code/run_correctness_suite.py` → TOTAL **356/356**.
+- The language suites: 79/0, 43/0/5 skipped, 79/0/1 skipped, 10/0/1 skipped,
+  64/0, 37/0, 47/0/1 skipped, 17/0, 22/0.
+- Three smoke runs, exit 0 each, on the v3 subset; the numbers above.
+- `HANDOFF.md` and `OPDIFF_DATASET.md` rewritten for v3.
+
 

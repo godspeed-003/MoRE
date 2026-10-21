@@ -8,12 +8,12 @@ SAME 7-TUPLE, with these meanings:
     ----  ----------------------------------  ----------------------------------
     0     x            [S, F] float           input_ids    [seq_len] long
     1     step_mask    [S]    bool            step_mask    [seq_len] bool, ALL TRUE
-    2     step_experts [S]    long            step_experts [seq_len] long, the
-                                              ROW's oracle group (0..6) at every
+    2     step_experts [S]    long            step_experts [S] long, the ROW's
+                                              oracle group (0..6) at every
                                               position
-    3     step_ops     [S]    long            step_ops     [seq_len] long, the
-                                              owning example's operation id
-                                              (0..24) at every position
+    3     step_ops     [S]    long            step_ops     [S] long, the
+                                              DEPTH-AXIS index of the owning
+                                              example's operation instance
     4     family       scalar long            family       scalar long, the row's
                                               group (0..6) -- DIAGNOSTIC only
     5     depth        scalar long            depth        scalar long = seq_len
@@ -26,24 +26,29 @@ which is exactly what `plan.md` §9 forbids (ONE training system with an
 explicit mode). Slots whose opdiff meaning is "nothing" are filled with the
 documented ignore label rather than dropped.
 
-SLOT 3 IS NOT EMPTY, AND THAT IS THE POINT. Language has no operation axis
-(`lang_families.ALL_OP_NAMES` is `[]`), so its `step_ops` is all -1. opdiff HAS
-one: 25 operation ids, and it is what the per-operation depth breakdown
-(`recursion/avg_depth_by_op/<OP>`) is reported on. It is derived from the OP
-TOKEN that is already in the input row -- position `t` belongs to the example
-starting at `t - t % 19`, whose first token IS the operation. Nothing is read
-from a side file, so the operation a token is attributed to is the operation
-the model actually SAW.
+SLOT 3 IS THE DEPTH AXIS, AND IT IS 35 WIDE. The axis carries one entry per
+(operation, k) INSTANCE: the 17 non-F operations, then one entry per k value
+(`F1` ... `F17`, `F20`). The claim this study wants to make -- "the model
+spends more computation on the operations that need more of it" -- is a claim
+about the F operation's ITERATION COUNT, and a single `F` entry could not
+express it: every k would be averaged into one number.
+
+The index is derived from the INPUT -- the operation token and the five-token
+binary k slot the model is shown -- and never from a label file. The label file
+(`{split}_k.npy`) is read only to CROSS-CHECK the decode, and a mismatch
+raises: an axis index that silently disagreed with the input would attribute
+a measured depth to the wrong iteration count, which is the one thing the
+compute-versus-k claim cannot survive.
 
 SLOT 2 IS THE ORACLE GROUP, AND IT IS NOT AN INPUT FEATURE. The group label
 lives in `{split}_group.npy` and is used for exactly two things: the confusion
 matrix's row axis (the oracle's own indexing) and the supervision target of
 the labelled `oracle_routing` ablation. It is never handed to the model: the
-model sees token ids only, and the router has to infer the operation
-difficulty from the operation token that the generator put there. That is the
-whole experimental point of this dataset -- `updated_rules.md` §3 prohibits the
-oracle routing class from being an input feature, and this is the task where
-that prohibition is testable.
+model sees token ids only, and the router has to infer the operation from the
+operation token (and the iteration count from the k slot) that the generator
+put there. That is the whole experimental point of this dataset --
+`updated_rules.md` §3 prohibits the oracle routing class from being an input
+feature, and this is the task where that prohibition is testable.
 
 SLOT 4 IS THE GROUP, DIAGNOSTICALLY. There is no `cls_head` on an LM-shaped
 task (`model.py` does not construct one), so this value reaches no loss. It is
@@ -51,11 +56,11 @@ carried because the engine's tuple has the slot and because a reader of a
 metrics file may want to know the row's group; it is not a supervision signal
 and `loss_weights.family_cls` is refused on this task.
 
-SLOT 5 IS `seq_len` AND IS UNUSED. Arithmetic's `depth` slot carries the number
-of steps in the program; an opdiff row has no step count, because the whole
-point of the format is that there is NO chain of thought -- the answer digits
-follow the operands directly. The engine does not read this slot on an
-LM-shaped task, and the value is a placeholder rather than a measurement.
+SLOT 5 IS `seq_len` AND IS UNUSED. An opdiff row has no step count, because
+the whole point of the format is that there is NO chain of thought -- the
+answer digits follow the operands directly. The engine does not read this slot
+on an LM-shaped task, and the value is a placeholder rather than a
+measurement.
 
 SLOT 6 IS NaN ON PURPOSE -- IT IS A POISON VALUE, NOT A PLACEHOLDER. The LM
 target is `input_ids[1:]` predicted from `input_ids[:-1]`, derived by shifting
@@ -95,8 +100,9 @@ import numpy as np
 import torch
 from torch.utils.data import Dataset
 
-from .opdiff_families import (NUM_FAMILIES, NUM_OP_TYPES, OP_NAME_TO_IDX,
-                               OP_TOKEN_OFFSET)
+from .opdiff_families import (NUM_FAMILIES, NUM_OP_AXIS, NO_FAMILY_IDX,
+                               OP_NAME_TO_IDX, OP_TOKEN_OFFSET, K_BITS,
+                               K_VALUES, F_OP_NAME, op_axis_index)
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _REPO = os.path.abspath(os.path.join(_HERE, "..", ".."))
@@ -105,16 +111,18 @@ _REPO = os.path.abspath(os.path.join(_HERE, "..", ".."))
 # file's directory and not to the working directory. The config file lives in
 # `code/`, and its other relative paths resolve against `code/`; opdiff_root
 # deliberately does not, because the same config file has to mean the same
-# thing on two different machines (Ayan's 4060 and this one) and an absolute
-# path baked into the config would move the `config_hash` per machine and
-# embed a machine-specific string in the provenance record.
-OPDIFF_ROOT_DEFAULT = "opdiff_v2"
+# thing on two different machines (the co-author's 4060 and the gate machine)
+# and an absolute path baked into the config would move the `config_hash` per
+# machine and embed a machine-specific string in the provenance record.
+OPDIFF_ROOT_DEFAULT = "opdiff_v3"
 
-# The generator's splits. `ood` is a FOURTH split, not a fifth row of `test`:
-# it holds F3/F6/F12 rows -- iteration counts never seen in training -- and
-# keeping it separate is what makes "does the model generalise past the
-# trained iteration counts" a measurable question rather than a remark.
-SPLITS = ("train", "val", "test", "ood")
+# The generator's splits. `ood_interp` and `ood_extrap` are TWO separate
+# splits, not one: the first holds iteration counts inside the trained range
+# that were never seen, the second holds counts beyond it. They are different
+# claims with different difficulties, and a study that merged them would be
+# reporting one number for two questions.
+SPLITS = ("train", "val", "test", "ood_interp", "ood_extrap")
+OOD_SPLITS = ("ood_interp", "ood_extrap")
 
 
 def resolve_opdiff_root(value=None) -> str:
@@ -122,10 +130,10 @@ def resolve_opdiff_root(value=None) -> str:
 
     ONE resolution point, called by the dataset constructor and by the version
     stamper, so a relative root cannot mean two different directories in two
-    different places. An absolute path is taken as given (that is how a
-    caller points at a dataset on another drive); a relative one is resolved
-    against the REPO ROOT, not against the process's working directory --
-    a training run must not depend on where it was launched from.
+    different places. An absolute path is taken as given (that is how a caller
+    points at a dataset on another drive); a relative one is resolved against
+    the REPO ROOT, not against the process's working directory -- a training
+    run must not depend on where it was launched from.
     """
     root = str(value if value is not None else OPDIFF_ROOT_DEFAULT)
     if os.path.isabs(root):
@@ -137,31 +145,24 @@ def opdiff_versions(root=None) -> tuple[str | None, str | None]:
     """`(dataset_version, train_split_version)` for the dataset at `root`.
 
     DELIBERATELY NON-FATAL when the dataset is absent, and this is the
-    load-bearing choice. The opdiff dataset is NOT tracked in git (113 MB), so
-    a fresh clone -- Ayan's machine included -- has no dataset until the
+    load-bearing choice. The opdiff dataset is NOT tracked in git, so a fresh
+    clone -- the co-author's machine included -- has no dataset until the
     generator has been run. Raising here would make `--task opdiff` unusable
-    before the build, and defaulting to a guess would put an unmeasured
-    string into provenance. So a missing dataset yields `None`, which the
-    proxy guard already refuses a canonical claim on -- and
-    `MoREOpdiffDataset` raises the real, actionable error with the build
-    command in it when the run actually reaches for the data.
+    before the build, and defaulting to a guess would put an unmeasured string
+    into provenance. So a missing dataset yields `None`, which the proxy guard
+    already refuses a canonical claim on -- and `MoREOpdiffDataset` raises the
+    real, actionable error with the build command in it when the run actually
+    reaches for the data.
 
-    WHAT THE STRING IS. `meta.json` is the generator's own description of the
-    dataset, and (since the generator was extended) it carries a
-    `dataset_version` computed from the SHA-256 of every split it wrote. That
-    is a CONTENT identity: two generations of the same configuration with
-    different sampled rows produce different versions, which is exactly what a
-    provenance field is for.
-
-    THE FALLBACK, for a dataset generated before the generator carried
-    hashes: the SHA-256 of `meta.json` plus a 4 MiB edge fingerprint of the
-    train split. It is weaker than a full content hash -- it can in principle
-    miss a change confined to the middle of the train split -- and it is
-    labelled by construction: the two strings are not interchangeable, because
-    they have different lengths and different prefixes of the same shape but
-    a different provenance story. The fallback exists so that a dataset
-    generated by an older generator is still RECORDED, rather than reported as
-    unversioned.
+    WHAT THE STRING IS. The generator's `meta.json` is PARAMETER-derived -- the
+    same row counts, the same mask, the same token table for any seed -- so
+    hashing it identifies the generator CALL and not the DATA. Two generations
+    that sampled completely different rows would carry the same id. The
+    fingerprint below therefore folds in a 4 MiB edge of the train split, which
+    IS content-dependent: any regeneration that changes the sampled rows
+    changes the edge, and with it the version. It is not a full content hash
+    (it cannot be: a change confined to the middle of the train split would
+    escape it), and the fallback's prefix says so.
 
     WHY `train_split_version` IS THE SAME STRING. On the language task the
     two are different facts: the corpus identity (content hashes of every
@@ -180,16 +181,6 @@ def opdiff_versions(root=None) -> tuple[str | None, str | None]:
     if not (os.path.exists(meta_path) and os.path.exists(train_x)):
         return None, None
     try:
-        with open(meta_path, "r", encoding="utf-8") as fh:
-            man = json.load(fh)
-    except (OSError, ValueError):
-        return None, None
-
-    dsv = man.get("dataset_version")
-    if dsv:
-        return str(dsv), str(dsv)
-
-    try:
         with open(meta_path, "rb") as fh:
             meta_bytes = fh.read()
         with open(train_x, "rb") as fh:
@@ -200,7 +191,8 @@ def opdiff_versions(root=None) -> tuple[str | None, str | None]:
     h.update(meta_bytes)
     h.update(b"|")
     h.update(head)
-    return f"opdiff-v2-fallback-{h.hexdigest()[:8]}", f"opdiff-v2-fallback-{h.hexdigest()[:8]}"
+    v = f"opdiff-v3-fingerprint-{h.hexdigest()[:12]}"
+    return v, v
 
 
 class MoREOpdiffDataset(Dataset):
@@ -216,14 +208,20 @@ class MoREOpdiffDataset(Dataset):
         self.split = split
         self.root = resolve_opdiff_root(root)
         self.dir = self.root
+        # The memory-mapped handles, opened lazily and per process. Declared
+        # here because the OOD-split validation below reads the k labels.
+        self._x = None
+        self._g = None
+        self._k = None
+        self._pid = None
 
         meta_path = os.path.join(self.root, "meta.json")
         if not os.path.exists(meta_path):
             raise FileNotFoundError(
                 f"{meta_path} is missing. Build the dataset first: "
-                f"python make_opdiff_dataset_v2.py --out {self.root}. For the "
-                "smoke subset: --out opdiff_v2_smoke --train_rows_per_group 512 "
-                "--eval_rows_per_group 128."
+                f"python make_opdiff_dataset_v3.py --out {self.root}. For the "
+                "smoke subset: --out opdiff_v3_smoke --train_rows_per_group 512 "
+                "--eval_rows_per_group 128 --ood_rows_per_k 128."
             )
         with open(meta_path, "r", encoding="utf-8") as fh:
             self.manifest = json.load(fh)
@@ -280,11 +278,11 @@ class MoREOpdiffDataset(Dataset):
                 "silently offset."
             )
         _mt = self.manifest["op_tokens"]
-        if len(_mt) != NUM_OP_TYPES:
+        if len(_mt) != len(OP_NAME_TO_IDX):
             raise ValueError(
                 f"meta.json:op_tokens has {len(_mt)} operations, expected "
-                f"{NUM_OP_TYPES}. The op axis width comes from the manifest and "
-                "the manifest and the code must agree."
+                f"{len(OP_NAME_TO_IDX)}. The op axis width comes from the "
+                "manifest and the manifest and the code must agree."
             )
         for _name, _idx in OP_NAME_TO_IDX.items():
             if _name not in _mt:
@@ -300,22 +298,45 @@ class MoREOpdiffDataset(Dataset):
                     "token id, so a shifted token table silently relabels the "
                     "whole operation axis."
                 )
-        if self.vocab_size != OP_TOKEN_OFFSET + NUM_OP_TYPES:
+        if self.vocab_size != OP_TOKEN_OFFSET + len(OP_NAME_TO_IDX):
             raise ValueError(
                 f"meta.json:vocab_size is {self.vocab_size}, expected "
-                f"{OP_TOKEN_OFFSET + NUM_OP_TYPES} "
-                f"({OP_TOKEN_OFFSET} fixed + {NUM_OP_TYPES} operation tokens). "
-                "The tied LM head is [vocab_size, d_model], so this is the size "
-                "of the output layer."
+                f"{OP_TOKEN_OFFSET + len(OP_NAME_TO_IDX)} "
+                f"({OP_TOKEN_OFFSET} fixed + {len(OP_NAME_TO_IDX)} operation "
+                "tokens). The tied LM head is [vocab_size, d_model], so this is "
+                "the size of the output layer."
             )
 
-        # WHICH EXAMPLE EACH POSITION BELONGS TO. Position `t` belongs to the
-        # example that starts at `t - t % example_len`, and that example's
-        # FIRST token is its operation token.
+        # THE k VALUES. The manifest declares which k values are trained, which
+        # are held out for interpolation and which for extrapolation, and every
+        # one of them must have an axis entry -- an unknown k has nowhere to
+        # put its measured depth.
+        self.k_bits = int(self.manifest["tokens"].get("k_bits", K_BITS))
+        if self.k_bits != K_BITS:
+            raise ValueError(
+                f"meta.json:tokens.k_bits is {self.k_bits}, expected {K_BITS}. "
+                "The k slot's width is what the decode assumes."
+            )
+        self.train_k = [int(k) for k in self.manifest.get("train_k", [])]
+        self.ood_interp_k = [int(k) for k in self.manifest.get("ood_interp_k", [])]
+        self.ood_extrap_k = [int(k) for k in self.manifest.get("ood_extrap_k", [])]
+        _unknown = sorted(set(self.train_k + self.ood_interp_k
+                               + self.ood_extrap_k) - set(K_VALUES))
+        if _unknown:
+            raise ValueError(
+                f"meta.json declares k values { _unknown } that the operation "
+                f"axis has no entry for. The axis covers {K_VALUES}. A k with "
+                "no axis entry would have its measured depth attributed to "
+                "another iteration count."
+            )
+        # WHICH EXAMPLE EACH POSITION BELONGS TO. Position `t` belongs to the        # example that starts at `t - t % example_len`, and that example's
+        # FIRST token is its operation token and its SECOND.. are the k slot.
         pos = np.arange(self.seq_len, dtype=np.int64)
         self._bases = (pos - pos % self.example_len)
         self._example_starts = (np.arange(self.examples_per_row, dtype=np.int64)
                                 * self.example_len)
+        self._k_positions = (self._example_starts[:, None]
+                             + np.arange(1, 1 + K_BITS, dtype=np.int64)[None, :])
 
         # THE FILES THIS SPLIT NEEDS. Checked up front so a half-generated
         # dataset fails with the file name in the message rather than at the
@@ -323,22 +344,42 @@ class MoREOpdiffDataset(Dataset):
         self.x_path = os.path.join(self.root, f"{split}_x.npy")
         self.group_path = os.path.join(self.root, f"{split}_group.npy")
         self.diff_path = os.path.join(self.root, f"{split}_diff.npy")
+        self.k_path = os.path.join(self.root, f"{split}_k.npy")
         self.sub_path = os.path.join(self.root, f"{split}_sub.npy")
-        for _p in (self.x_path, self.group_path, self.diff_path, self.sub_path):
+        for _p in (self.x_path, self.group_path, self.diff_path, self.k_path,
+                   self.sub_path):
             if not os.path.exists(_p):
                 raise FileNotFoundError(
                     f"{_p} is missing. The dataset is incomplete -- regenerate "
-                    f"it with: python make_opdiff_dataset_v2.py --out {self.root}"
+                    f"it with: python make_opdiff_dataset_v3.py --out {self.root}"
+                )
+
+        # THE OOD SPLITS' IDENTITY, CHECKED AGAINST THEIR OWN k LABELS. A
+        # split called `ood_interp` that contains a k value outside its
+        # declared held-out list is not an interpolation split, and the whole
+        # point of having two of them is that they are different questions.
+        if split in OOD_SPLITS:
+            _want = (self.ood_interp_k if split == "ood_interp"
+                     else self.ood_extrap_k)
+            _seen = sorted({int(k) for k in self._k_label_array()})
+            if _seen and not set(_seen) <= set(_want):
+                raise ValueError(
+                    f"split {split!r} contains k values {_seen} that are not in "
+                    f"its declared held-out list {_want}. The split's identity "
+                    "(interpolation vs extrapolation) is the whole point of it."
                 )
 
         # Provenance surfaced as attributes so `RunContext` stamps measured
         # values rather than a config author's recollection of them.
         self.dataset_version, self.train_split_version = opdiff_versions(self.root)
-        self._x = None
-        self._g = None
-        self._pid = None
 
     # -- construction helpers ------------------------------------------------
+
+    def _k_label_array(self):
+        """The `{split}_k.npy` labels, memory-mapped. 0 for a non-F row."""
+        if self._k is None:
+            self._k = np.load(self.k_path, mmap_mode="r")
+        return self._k
 
     def _arrays(self):
         """The memory-mapped row and group arrays, opened once per process.
@@ -396,24 +437,65 @@ class MoREOpdiffDataset(Dataset):
         group_idx = grp - 1
         step_experts = torch.full((self.seq_len,), group_idx, dtype=torch.long)
 
-        # The operation of the owning example, at every position. Taken from
-        # the OP TOKEN the model itself is shown, not from a side file.
+        # THE DEPTH AXIS INDEX, PER POSITION.
+        #
+        # The operation token of the owning example, and -- for the F
+        # operation -- the iteration count DECODED FROM THE INPUT's binary
+        # slot. The decode is big-endian: the slot holds k4 k3 k2 k1 k0.
         op_tokens = tok[self._example_starts]
-        if op_tokens.min() < self.op0 or op_tokens.max() >= self.op0 + NUM_OP_TYPES:
+        if op_tokens.min() < self.op0 or op_tokens.max() >= self.op0 + len(OP_NAME_TO_IDX):
             raise ValueError(
                 f"row {idx} of split {self.split!r} has operation tokens in "
                 f"[{int(op_tokens.min())}, {int(op_tokens.max())}], outside the "
-                f"operation range [{self.op0}, {self.op0 + NUM_OP_TYPES - 1}]. "
+                f"operation range [{self.op0}, {self.op0 + len(OP_NAME_TO_IDX) - 1}]. "
                 "Each example must START with its operation token; a row that "
                 "does not was generated against a different layout."
             )
-        step_ops = torch.from_numpy(tok[self._bases] - self.op0)
+        _op_names = list(OP_NAME_TO_IDX.keys())
+        _axis = np.zeros(self.seq_len, dtype=np.int64)
+        for _e in range(self.examples_per_row):
+            _op = _op_names[int(op_tokens[_e]) - self.op0]
+            if _op == F_OP_NAME:
+                _bits = tok[self._k_positions[_e]]
+                if _bits.min() < self.manifest["tokens"]["hex0"] or \
+                        _bits.max() > self.manifest["tokens"]["hex0"] + 1:
+                    raise ValueError(
+                        f"row {idx} of split {self.split!r} has a k slot "
+                        f"{_bits.tolist()} that is not made of the two k-bit "
+                        "tokens; the decode would be meaningless."
+                    )
+                _k = 0
+                for _j, _b in enumerate(_bits):
+                    _k |= (int(_b) - self.manifest["tokens"]["hex0"]) << (K_BITS - 1 - _j)
+                if _k == 0:
+                    raise ValueError(
+                        f"row {idx} of split {self.split!r} has an F operation "
+                        "with a k slot that decodes to 0; the slot must carry "
+                        "the iteration count."
+                    )
+                # Cross-check against the label file, when the row is an F row.
+                _lab = int(self._k_label_array()[idx])
+                if _lab and _lab != _k:
+                    raise ValueError(
+                        f"row {idx} of split {self.split!r} decodes k={_k} from "
+                        f"its input but the label file says {_lab}. The axis "
+                        "index comes from the INPUT, so a disagreement means "
+                        "the two disagree about the row."
+                    )
+                _axis[self._example_starts[_e]:
+                       self._example_starts[_e] + self.example_len] = \
+                    op_axis_index(_op, _k)
+            else:
+                _axis[self._example_starts[_e]:
+                       self._example_starts[_e] + self.example_len] = \
+                    op_axis_index(_op)
+        step_ops = torch.from_numpy(_axis)
 
         return (
             ids,                                                     # 0
             step_mask,                                               # 1
             step_experts,                                            # 2
-            step_ops,                                               # 3
+            step_ops,                                                # 3
             torch.tensor(group_idx, dtype=torch.long),               # 4 family
             torch.tensor(self.seq_len, dtype=torch.long),            # 5 depth
             torch.tensor(float("nan"), dtype=torch.float32),         # 6 poison
@@ -430,12 +512,16 @@ class MoREOpdiffDataset(Dataset):
         """`{split}_diff.npy` -- the generator's NOMINAL difficulty per row.
 
         A PLACEHOLDER, not a measurement: the generator writes the group
-        number, or `7 + log2(k)` for the F operations, and says so. It is
-        exposed so the aggregator can correlate measured depth against it
+        number, `7 + log2(k)` for the F operation and 9 for GCD, and says so.
+        It is exposed so the aggregator can correlate measured depth against it
         WITHOUT re-implementing the nominal rule in a second place, which
         would be a formula that could drift from the generator's.
         """
         return np.load(self.diff_path, mmap_mode="r")
+
+    def k_labels(self):
+        """`{split}_k.npy` -- the iteration count of each row (0 if not F)."""
+        return self._k_label_array()
 
     def sub_op_tokens(self):
         """`{split}_sub.npy` -- the operation token of a single-op row, else -1.

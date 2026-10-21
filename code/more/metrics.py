@@ -931,7 +931,29 @@ DEPTH_KEY_PROVENANCE = {
         "pass": "validation",
         "population": "positions with a mapped operation code",
         "note": ("Arithmetic only. Empty on language, because lang_families.ALL_OP_NAMES "
-                 "is [] -- there is no operation axis."),
+                 "is [] -- there is no operation axis. On opdiff the axis is the "
+                 "OPERATION INSTANCE: one entry per (operation, k), so the F rows "
+                 "carry one entry per iteration count."),
+    },
+    "ood_interp/avg_depth_by_op/": {
+        "pass": "ood_interp evaluation",
+        "population": ("positions with step_mask true and a valid operation-INSTANCE "
+                       "axis entry"),
+        "note": ("T-OD.3. The per-iteration-count average exit depth on the HELD-OUT "
+                 "INTERPOLATION split (k = 3, 6, 9, 11, 14 -- inside the trained "
+                 "range, none of them trained). The compute-versus-k claim is read "
+                 "off this table and its ood_extrap/ twin: the question is whether "
+                 "the depth GROWS with k on iteration counts the model has never "
+                 "seen, and the two splits answer two different questions about it."),
+    },
+    "ood_extrap/avg_depth_by_op/": {
+        "pass": "ood_extrap evaluation",
+        "population": ("positions with step_mask true and a valid operation-INSTANCE "
+                       "axis entry"),
+        "note": ("T-OD.3. The same table on the EXTRAPOLATION split (k = 17, 20 -- "
+                 "beyond the trained range). A stretch result: the high bit appeared "
+                 "only alone in training, so this is reported as a stretch and not as "
+                 "an expectation."),
     },
     "depth/spearman_": {
         "pass": "validation",
