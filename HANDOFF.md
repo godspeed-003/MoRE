@@ -62,18 +62,37 @@ and it must be recorded**.
 **Check first:**
 
 ```bash
-python -c "import json;m=json.load(open('opdiff_v3/meta.json'));print(m['rows'], m['vocab_size'], m['row_len'], m['train_k'], m['ood_interp_k'], m['ood_extrap_k'])"
+python -c "import json;m=json.load(open('opdiff_v4/meta.json'));print(m['dataset_version'], m['rows'], m['vocab_size'], m['row_len'], m['train_k'], m['ood_interp_k'], m['ood_extrap_k'])"
 ```
 
-Expected: rows = 294,000 train / 7,000 val / 7,000 test / 5,000 ood_interp /
-2,000 ood_extrap; `vocab_size` 37; `row_len` 384; `train_k` =
-[1, 2, 4, 5, 7, 8, 10, 12, 13, 15, 16]; `ood_interp_k` = [3, 6, 9, 11, 14];
-`ood_extrap_k` = [17, 20].
+Expected: rows = 294,000 train / 7,000 val / 7,000 test / 1,000 per held-out
+k in ood_interp / 1,000 per held-out k in ood_extrap; `vocab_size` 37;
+`row_len` 384; `train_k`, `ood_interp_k` and `ood_extrap_k` as the generator
+declares them (`TRAIN_K`, `INTERP_K`, `EXTRAP_K` at the top of
+`make_opdiff_dataset_v4.py`) — the lists are set from the MEASURED
+learnability frontier, and they are in the generator, not in a config.
 
 **If it is missing, build it** (about 10 s):
 
 ```bash
-python make_opdiff_dataset_v3.py --out opdiff_v3
+python make_opdiff_dataset_v3.py --out opdiff_v4
+
+**This is the v4 dataset, and its F operation is not the v3 one.**
+v3's F was `f(x) = (x^2 + 12345) mod 4294967291` on a 32-bit
+`x = A||B`; the full-scale measurement showed it was **not learnable
+at ANY k, including k = 1** (0.161-0.172 per-digit accuracy and
+0.0 exact match, against 0.850 for the other six groups), because
+one iteration of a 32-bit modular squaring is a 32x32-bit
+multiplication. v4's F is a per-nibble nonlinear recurrence over the
+eight nibbles of the state, `d'_i = ((d_i XOR d_{(i+1) mod 8}) + 3) mod 16`,
+applied k times: one iteration is a 256-case per-digit table
+(learnable), the k-fold composition has no closed form over a
+4.3e9 state space (so it cannot be memorised or shortcut), and the
+eight digits update in parallel, so one iteration costs about one
+layer and the dial spans the depth budget. See
+[OPDIFF_DATASET.md](OPDIFF_DATASET.md) for the full argument;
+`make_opdiff_dataset_v3.py` is kept because the measurement on it is
+what justifies the change.
 ```
 
 **Verify after building** — the things that must agree, and why each matters:
@@ -94,7 +113,24 @@ cross-checks the code's manifest against it by importing it.
 **The smoke subset** (1 % of the data, for proving the machine works):
 
 ```bash
-python make_opdiff_dataset_v3.py --out opdiff_v3_smoke --train_rows_per_group 512 --eval_rows_per_group 128 --ood_rows_per_k 128
+python make_opdiff_dataset_v3.py --out opdiff_v4_smoke --train_rows_per_group 512 --eval_rows_per_group 128 --ood_rows_per_k 128
+
+**This is the v4 dataset, and its F operation is not the v3 one.**
+v3's F was `f(x) = (x^2 + 12345) mod 4294967291` on a 32-bit
+`x = A||B`; the full-scale measurement showed it was **not learnable
+at ANY k, including k = 1** (0.161-0.172 per-digit accuracy and
+0.0 exact match, against 0.850 for the other six groups), because
+one iteration of a 32-bit modular squaring is a 32x32-bit
+multiplication. v4's F is a per-nibble nonlinear recurrence over the
+eight nibbles of the state, `d'_i = ((d_i XOR d_{(i+1) mod 8}) + 3) mod 16`,
+applied k times: one iteration is a 256-case per-digit table
+(learnable), the k-fold composition has no closed form over a
+4.3e9 state space (so it cannot be memorised or shortcut), and the
+eight digits update in parallel, so one iteration costs about one
+layer and the dial spans the depth budget. See
+[OPDIFF_DATASET.md](OPDIFF_DATASET.md) for the full argument;
+`make_opdiff_dataset_v3.py` is kept because the measurement on it is
+what justifies the change.
 ```
 
 ---
@@ -453,8 +489,42 @@ epochs — and a held-out-iteration-count evaluation in two parts
 PY="C:\Users\Hp\anaconda3\envs\more_env\python.exe"
 
 # 1. the dataset
-$PY make_opdiff_dataset_v3.py --out opdiff_v3
-$PY make_opdiff_dataset_v3.py --out opdiff_v3_smoke --train_rows_per_group 512 --eval_rows_per_group 128 --ood_rows_per_k 128
+$PY make_opdiff_dataset_v3.py --out opdiff_v4
+
+**This is the v4 dataset, and its F operation is not the v3 one.**
+v3's F was `f(x) = (x^2 + 12345) mod 4294967291` on a 32-bit
+`x = A||B`; the full-scale measurement showed it was **not learnable
+at ANY k, including k = 1** (0.161-0.172 per-digit accuracy and
+0.0 exact match, against 0.850 for the other six groups), because
+one iteration of a 32-bit modular squaring is a 32x32-bit
+multiplication. v4's F is a per-nibble nonlinear recurrence over the
+eight nibbles of the state, `d'_i = ((d_i XOR d_{(i+1) mod 8}) + 3) mod 16`,
+applied k times: one iteration is a 256-case per-digit table
+(learnable), the k-fold composition has no closed form over a
+4.3e9 state space (so it cannot be memorised or shortcut), and the
+eight digits update in parallel, so one iteration costs about one
+layer and the dial spans the depth budget. See
+[OPDIFF_DATASET.md](OPDIFF_DATASET.md) for the full argument;
+`make_opdiff_dataset_v3.py` is kept because the measurement on it is
+what justifies the change.
+$PY make_opdiff_dataset_v3.py --out opdiff_v4_smoke --train_rows_per_group 512 --eval_rows_per_group 128 --ood_rows_per_k 128
+
+**This is the v4 dataset, and its F operation is not the v3 one.**
+v3's F was `f(x) = (x^2 + 12345) mod 4294967291` on a 32-bit
+`x = A||B`; the full-scale measurement showed it was **not learnable
+at ANY k, including k = 1** (0.161-0.172 per-digit accuracy and
+0.0 exact match, against 0.850 for the other six groups), because
+one iteration of a 32-bit modular squaring is a 32x32-bit
+multiplication. v4's F is a per-nibble nonlinear recurrence over the
+eight nibbles of the state, `d'_i = ((d_i XOR d_{(i+1) mod 8}) + 3) mod 16`,
+applied k times: one iteration is a 256-case per-digit table
+(learnable), the k-fold composition has no closed form over a
+4.3e9 state space (so it cannot be memorised or shortcut), and the
+eight digits update in parallel, so one iteration costs about one
+layer and the dial spans the depth budget. See
+[OPDIFF_DATASET.md](OPDIFF_DATASET.md) for the full argument;
+`make_opdiff_dataset_v3.py` is kept because the measurement on it is
+what justifies the change.
 
 # 2. the preflight (must exit 0)
 $PY code/run_opdiff_matrix.py --preflight
