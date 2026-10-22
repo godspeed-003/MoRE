@@ -2196,12 +2196,18 @@ the co-author's agent. Not part of `plan.md` §0–11. Companion paper task:
   its own reference row and an explicit one-seed caveat — never a column in
   the headline table (which is the matrix's: one card, five seeds, three
   arms).
-  **SUPERSEDED IN PART BY T-OD.10**: the ladder is PARKED, because the F
-  operation is being redesigned (T-OD.10) and a ladder measured on data that
-  is about to change would be 17 h of GPU spent on a dataset that will not
-  exist. It runs after the port moves to the final dataset.
+  **DROPPED, NOT PARKED (T-OD.10)**: there is no capacity ladder to run. The
+  question it asks — does the MoR-vs-MoRE result depend on MoR's parameter
+  budget? — is answered by a design fact the repository already measures and
+  publishes: MoR's single FFN is given the total hidden width of MoRE's seven
+  experts (7 × 4 = 28), the measured gap in non-embedding parameters is
+  0.117 %, and that is the same reason MoR is a legitimate arm of the
+  published comparison at all. A ladder would re-derive a fixed number, on a
+  baseline arm, on a task whose claim is about the composition. The widths, if
+  they are ever wanted, are in `HANDOFF.md` §5b.
 
-- [~] **T-OD.10 The learnability calibration, and the F operation redesigned.**
+- [x] **T-OD.10 The F operation redesigned (v4), the port migrated, and the
+  calibration and the ladder dropped.**
   (User direction, 2026-10-22: "do (c) then (a) — (c) run the dense-baseline
   calibration first to find the learnability frontier, (a) redesign F so one
   iteration is learnable but chaining isn't shortcut-able — layout, mask, vocab,
@@ -2225,12 +2231,31 @@ the co-author's agent. Not part of `plan.md` §0–11. Companion paper task:
   the port's changes are the k values and the manifest's cross-check target.
   `make_opdiff_dataset_v4.py` is committed ALONGSIDE v3 (v3 is the record of
   the diagnosed hard-tail design, and the paper will want both).
-  **Verify:** the dense reference's per-k curve on v3 (the diagnosis: a plain
-  transformer fails on the old F too, so the redesign answers the DATA and not
-  the architecture) and on v4 (is the new F learnable, and where is the
-  frontier?); the k lists then follow from the measured frontier; the port
-  moves to v4; the smoke is re-run on the final data; and only then does the
-  capacity ladder run.
+  **Verify (as revised, 2026-10-22):** the v3 F operation is unlearnable at
+  every k — a MEASUREMENT, not an inference; the v4 F operation is learnable —
+  also a measurement; the port moves to v4 and the smoke is re-run on the final
+  data; and NEITHER the learnability calibration NOR the capacity ladder runs.
+  **Both are dropped on the paper's own logic, and the reasons are recorded
+  because they are the kind of thing a later agent would otherwise re-derive:**
+  (a) the learnability calibration measures the DATASET's frontier, which is a
+  dataset-design question and not a paper claim — the matrix's own per-k table
+  reports the learnability for free, and the paper's out-of-domain comparison
+  is explicitly exploratory and carries no significance verdict, so no claim
+  rested on the calibration; (b) the capacity ladder (MoR at 4, 24, 28) asks
+  whether the MoR-vs-MoRE result depends on MoR's parameter budget, which is
+  answered by a DESIGN FACT the repository already measures and publishes:
+  MoR's single FFN is given the total hidden width of MoRE's seven experts
+  (7 × 4 = 28), the measured gap in non-embedding parameters is 0.117 %, and
+  that is the same reason MoR is a legitimate arm of the published comparison
+  at all (6 × 4 = 24 on the six-group task). A ladder would re-derive a fixed
+  number, on a BASELINE arm, on a task whose claim is about the composition.
+  **What the operation is actually FOR**, read against the paper ("Adaptive
+  Compute at Matched Parameters: Routing and Recursion Trade Off in Small
+  Language Models"): the paper's depth claims are currently tested against
+  INTERNAL priors (a POS partition, a topic partition) and against a
+  forced-depth sweep. The k dial supplies an EXTERNAL difficulty gradient —
+  difficulty set by the data rather than inferred from it — which is the
+  substrate that claim does not have today.
   **Evidence:** 2026-10-22. v4 generated and VERIFIED: 294,000 / 7,000 /
   7,000 / 1,000 (ood_interp, k=5) / 2,000 (ood_extrap, k=6,7) rows, vocab
   37, 112,896,000 train tokens, `dataset_version` opdiff-v4-b002e4acf878; on a

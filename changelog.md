@@ -10585,6 +10585,31 @@ every run, so on the full matrix it was **~18 minutes per epoch per run,
 The first dense reference had been running for 88 minutes and had not
 finished an epoch, which is what exposed it.
 
+**THE CALIBRATION AND THE LADDER ARE DROPPED, on the paper's own logic.**
+The learnability calibration measures the DATASET's frontier — a dataset-design
+question, not a paper claim — and the matrix's own per-k table reports the
+learnability for free; the paper's out-of-domain comparison is explicitly
+exploratory and carries no significance verdict, so no claim rested on it. The
+capacity ladder (MoR at 4, 24, 28) asks whether the MoR-vs-MoRE result depends
+on MoR's parameter budget, which is answered by a design fact the repository
+already measures and publishes: MoR's single FFN is given the total hidden
+width of MoRE's seven experts (7 x 4 = 28), the measured gap is 0.117 %, and
+that is the same reason MoR is a legitimate arm of the published comparison at
+all (6 x 4 = 24 on the six-group task). A ladder would re-derive a fixed
+number, on a BASELINE arm, on a task whose claim is about the composition.
+
+**WHAT THE OPERATION IS ACTUALLY FOR**, read against the paper ("Adaptive
+Compute at Matched Parameters: Routing and Recursion Trade Off in Small Language
+Models"): the paper's claims are that all three arms sit on the quality/compute
+frontier, that MoRE buys the most quality per unit of compute, and — most
+transferably — that a learned depth policy cannot be established by a mean
+step count or an exit histogram, because a uniform policy forced to the learned
+mean reproduces both. The depth claims are currently tested against INTERNAL
+priors (a POS partition, a topic partition) and against a forced-depth sweep.
+The k dial supplies an EXTERNAL difficulty gradient — difficulty set by the
+data, not inferred from it — which is the substrate that claim does not have
+today.
+
 **The numbers move, and the matrix gets cheaper.** The measured per-epoch
 times in `HANDOFF.md` §9 were taken with the slow evaluation, so they
 overstate the cost: the MoR arm's 113.6 min/epoch included ~18 min of
