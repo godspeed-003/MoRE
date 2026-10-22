@@ -1,12 +1,15 @@
 # The opdiff dataset — what it is, and why it is built this way
 
-The generator is [`make_opdiff_dataset_v3.py`](make_opdiff_dataset_v3.py). This
-file explains the data contract it writes, and it is the reference for anyone
-reading a metric that came out of it.
+The generator is `make_opdiff_dataset_v4.py` for the current design;
+`make_opdiff_dataset_v3.py` is kept alongside it because it is the record of
+the ORIGINAL F operation, and the measurement on it is what justifies the
+change (see "The F operation, and why it changed" at the end). This file
+explains the data contract, and it is the reference for anyone reading a
+metric that came out of a run.
 
 ```bash
-python make_opdiff_dataset_v3.py --out opdiff_v3
-python make_opdiff_dataset_v3.py --out opdiff_v3_smoke --train_rows_per_group 512 --eval_rows_per_group 128 --ood_rows_per_k 128
+python make_opdiff_dataset_v4.py --out opdiff_v4
+python make_opdiff_dataset_v4.py --out opdiff_v4_smoke --train_rows_per_group 64 --eval_rows_per_group 64 --ood_rows_per_k 64
 ```
 
 ---
@@ -59,7 +62,7 @@ indexed by the position whose value is predicted.
 | E7 | F(k) for k in TRAIN_K, plus GCD |
 
 For E7, each row uses a single sub-op **and a single k**, because mixing F1 and
-F16 in one row would blur the per-row difficulty.
+F4 in one row would blur the per-row difficulty.
 
 ---
 
@@ -71,7 +74,7 @@ Each split has these files:
 |---|---|
 | `*_x.npy` | the tokens, shape `(rows, 384)`, uint8 |
 | `*_group.npy` | the expert group, 1 to 7 |
-| `*_diff.npy` | a **nominal** difficulty. 1–6 for E1–E6. `7 + log2(k)` for F_k, and 9 for GCD. The OOD rows get `7 + log2(k)` as well: 8.58 (k=3), 9.58 (k=6), 10.17 (k=9), 10.46 (k=11), 10.81 (k=14), 11.09 (k=17), 11.32 (k=20). **Overwrite these with your calibrated ranking once your dense baselines are done.** |
+| `*_diff.npy` | a **nominal** difficulty. 1–6 for E1–E6. `7 + log2(k)` for F_k, and 9 for GCD. The OOD rows get `7 + log2(k)` as well: 8.58 (k=3), 9.58 (k=6), 10.17 (k=9), 10.46 (k=11), 10.81 (k=14) in the v3 design. **Overwrite these with your calibrated ranking once your dense baselines are done.** |
 | `*_k.npy` | the exact iteration count `k` of the row, 0 when the row is not an F row. This is the label the compute-versus-k analysis is read against. |
 | `*_sub.npy` | the op token for E7 and OOD rows, −1 otherwise |
 
@@ -80,79 +83,99 @@ The token vocabulary is **37**: SEP 0, EOS 1, NULL 2, the 16 hex digits
 
 ---
 
-## F1 to F16: the difficulty dial
+## The F operation, and why it changed
 
-Each F_k takes one 32-bit number, `x = A‖B` (the eight input hex digits read
-as one number), and applies the same scrambling step k times:
+**The v3 design (kept for the record).** `f(x) = (x² + 12345) mod 4294967291`
+on a 32-bit `x = A‖B`, applied k times. The answer is the final x as eight hex
+digits. It was a clean dial: the input format and the output length are
+identical for every k, only the op token and the number of sequential steps
+change, and squaring plus a modulus by a prime is nonlinear so the model
+cannot skip steps.
+
+**Why it had to change.** The first full-scale run (MoR at ffn_mult 4, the
+full 294,000-row dataset, 3 epochs = 18,375 optimizer steps) measured the F
+rows at **0.161–0.172 per-digit accuracy and 0.0 per-example exact match for
+EVERY k — including k = 1** — while the other six groups reached 0.850
+per-digit accuracy. So the F operation was not "hard at high k": it was not
+learned AT ALL, at any k. The reason is the data, not the architecture: one
+iteration of a 32-bit modular squaring is a 32×32-bit multiplication, and
+learning a 32-bit multiplication from data is a known-hard problem for a
+transformer without chain of thought. The failure is flat in k because there
+is no gradient signal in those rows at all. **A difficulty dial whose dial is
+stuck at zero cannot be measured**, so the operation had to change. A dense
+reference (one block, no routing, no recursion) is what confirms that this is
+the data and not the architecture.
+
+**The v4 design.** The F operation is a per-nibble nonlinear recurrence over
+the eight nibbles of the state `x = A‖B`:
 
 ```
-f(x) = (x² + 12345) mod 4294967291
+d'_i = ((d_i XOR d_{(i+1) mod 8}) + 3) mod 16        (one iteration, i = 0..7)
 ```
 
-For example, F1 is one step, F2 is f(f(x)), and F16 is sixteen steps in a
-row. The answer is the final x written as 8 hex digits.
+applied k times, with the answer being the state after k iterations. It has the
+three properties the study needs:
 
-**Why it works as a dial:** the input format and the output length are
-identical for every k. Only the operation token changes (F1, F2, F4, F8 or
-F16) and the number of sequential steps changes with it.
+1. **One iteration is LEARNABLE.** Each output digit is a function of two
+   *input* digits and a constant — a 256-case table, the size of "learn the
+   addition of two 4-bit numbers", which transformers do learn. The state space
+   is 16⁸ = 4.3 × 10⁹, so the operation cannot be memorised.
+2. **The k-fold composition is NOT SHORTCUT-ABLE.** XOR is nonlinear over
+   Z₁₆ and the digit additions carry, so there is no closed form and no small
+   algebraic form; the composed map is a fixed function on 4.3 × 10⁹ states,
+   far too large to memorise. A model that wants the answer for a given k has
+   to UNROLL.
+3. **One iteration costs roughly ONE LAYER**, because the eight digits update
+   in PARALLEL (every `d'_i` depends only on the previous state). So k
+   iterations need about k layers, and **the dial spans the model's depth
+   budget instead of overshooting it** — which is why the k lists are set from
+   the MEASURED frontier rather than from a guess.
 
-**No shortcut:** squaring plus a modulus by a prime is nonlinear, so the model
-can't skip steps. A model without chain of thought has to chain k steps inside
-its layers. A 1-step op might fit in a couple of layers; 16 steps might need
-far more depth, or might not be learnable at all at this parameter count.
-
-**Small example:** f(5) = 25 + 12345 = 12370. f(12370) = 153,029,245, which is
-F2(5). The modulus only starts to matter once x² passes about 4.29 billion.
+Everything else survives the change: the token layout, the loss mask, the
+vocabulary, the operation tokens, the seven groups, the E7 structure, the
+split definitions, the per-row label files, and the operation-instance axis
+the code publishes (one entry per (operation, k), so the per-k depth table
+and the compute-versus-k analysis are unchanged).
 
 ---
 
 ## The OOD part — and the problem with it
 
-OOD means out-of-distribution. The training set only has F1, F2, F4, F5, F7,
-F8, F10, F12, F13, F15 and F16.
+OOD means out-of-distribution. The training set has only the trained k values;
+the held-out ones are split into two parts, and they are TWO DIFFERENT
+QUESTIONS, which is why they are two splits:
 
-**The flaw in the first version of this split.** It held F3, F6 and F12 —
-*separate operation tokens* that never appear in training. Each of those
-tokens' embeddings is therefore never trained, so the model has no way to know
-that "F3" means three steps. Its accuracy on those rows would be near chance
-for every architecture, and the earlier claim that this tests whether the
-router extrapolates was too strong: it could not distinguish "cannot infer
-the difficulty" from "cannot do the arithmetic".
+| split | what it asks |
+|---|---|
+| `ood_interp` | a k INSIDE the trained range that was never seen. The model has to read a composition out of the k slot and apply it — the bit patterns overlap with trained ones, so the answer is inferable. This is the realistic target and the stronger claim. |
+| `ood_extrap` | a k BEYOND the trained range. Harder, because the high bit appeared only alone (in k = 16) during training. Treat it as a stretch result. The baselines will probably fail here too, so it shows a gap even if you do not fully succeed. |
 
-**The fix (v3).** There is now ONE F operation token, and **k is written out
-in the input**, in five binary tokens built from tokens the model has already
-trained on. The model never sees the bit pattern for k = 3, but it can work
-out what it means: the tokens `0` and `1` appear in every slot position
-during training, and the bit patterns overlap (k = 3 combines bits the model
-has seen together in k = 7 and k = 15).
-
-So a held-out k is a real test of a real capability — reading a composition
-out of a slot and spending the matching amount of computation — rather than a
-test of whether an untrained embedding can be guessed.
-
-| split | k values | what it asks |
-|---|---|---|
-| train / val / test | 1, 2, 4, 5, 7, 8, 10, 12, 13, 15, 16 | the seen k values |
-| **ood_interp** | 3, 6, 9, 11, 14 | inside the trained range, never seen — the realistic target and the stronger claim |
-| **ood_extrap** | 17, 20 | beyond the trained range — harder, because bit 4 only ever appeared alone (in k = 16) during training. Treat it as a stretch result. The baselines will probably fail here too, so it shows a gap even if you do not fully succeed. |
+**The flaw in the FIRST version of this split, and why it is not repeated
+here.** v2 gave F3, F6 and F12 their own operation tokens. A token that never
+appears in training has an embedding that is never trained, so no model could
+know that "F3" means three iterations, and the accuracy on those rows would be
+near chance for every architecture. The claim it was meant to test ("does the
+router extrapolate to unseen iteration counts?") could not have been told apart
+from "the model cannot do F at all". **In v3 and v4 there is ONE F operation
+token and k is written out in the input**, so a held-out k is inferable from
+trained tokens and the test is of a real capability.
 
 **The claim this supports:** on unseen k, the model gives the right answers and
 spends compute that scales with k.
 
 **Caveats, and what to do about them.**
 
-- *Learning k is part of the task.* The model has to learn what the binary
-  slot means from only 11 k values. **If it fails on ood_interp, check whether
+- *Learning k is part of the task.* The model has to learn what the binary slot
+  means from the trained k values. **If it fails on ood_interp, check whether
   it also fails on the SEEN k values before blaming your architecture.** The
-  run publishes the per-k accuracy and the per-k exact match on the validation
-  split (`val/accuracy_by_op/F<k>`, `val/exact_match_by_op/F<k>`) precisely so
-  that comparison is one lookup: if the seen F rows are also unsolved, the
-  architecture is not what is failing. If it is, add more training k values.
-- *High k may be too hard for any model.* F with k ≥ 13 without chain of
-  thought may stay near chance for your model and for the baselines alike. The
-  dense-baseline calibration will show where that point is. If it is too low,
-  shrink TRAIN_K and the held-out lists to a lower range — they are constants
-  at the top of the generator.
+  run publishes the per-k accuracy and the per-k exact match on the
+  validation split (`val/accuracy_by_op/F<k>`,
+  `val/exact_match_by_op/F<k>`) precisely so that comparison is one lookup:
+  if the seen F rows are also unsolved, the architecture is not what is
+  failing.
+- *High k may be too hard for any model.* The dense calibration measures
+  where that point is. If the frontier sits below the trained k values, the
+  k lists have to shrink — they are constants at the top of the generator.
 
 ---
 
@@ -166,13 +189,13 @@ Full generation (`--train_rows_per_group 42000 --eval_rows_per_group 1000
 | train | 294,000 | 42,000 rows per group × 7 groups |
 | val | 7,000 | 1,000 per group, disjoint inputs from train |
 | test | 7,000 | 1,000 per group, disjoint from train and val |
-| ood_interp | 5,000 | 1,000 per held-out k (5 k values), all group E7 |
-| ood_extrap | 2,000 | 1,000 per held-out k (2 k values), all group E7 |
+| ood_interp | 1,000 per held-out k | all group E7 |
+| ood_extrap | 1,000 per held-out k | all group E7 |
 
 - **112,896,000 training tokens** (294,000 × 384) — a little above WikiText-103.
 - **vocabulary 37**, row length 384, example length 24, 16 examples per row.
 - Generation takes about 10 seconds.
 - 144 scored positions per row (9 per example × 16 examples).
-- Verified over a 104k-example sample: **0 wrong answers and 0 row-purity
-  violations**, and the decoded k always matched the label. Val and test do not
-  overlap with train.
+- Verified over a 300-row sample per split: **0 wrong answers, 0 row-purity
+  violations, 0 group violations**, and the decoded k always matched the
+  label. Val and test do not overlap with train.
