@@ -130,15 +130,23 @@ def _accumulate_axis_depth(depth_sum, depth_count, flat_mask, flat_axis,
     Used by the validation pass AND by the OOD passes, because two copies of
     this loop are two definitions of "average depth", and the compute-versus-k
     claim is exactly a claim about that definition.
+
+    T-OD.10. THIS LOOP WAS PER-TOKEN PYTHON, and it cost more than the model.
+    The evaluation pass over the val split and the two OOD splits (14,000
+    rows = 5.4 M tokens) spent **18 minutes** in it against 2.7 minutes of
+    actual training: a Python loop with a 0-dim tensor add per token, at tens
+    of microseconds each, on the critical path of every epoch. `scatter_add_`
+    does the same arithmetic in one call, and the numbers are identical
+    (both are a sum over the same tokens, and the accumulation order only
+    moves the last bits of a float64).
     """
     valid = flat_mask & (flat_axis >= 0)
     if not bool(valid.any()):
         return
     axis = flat_axis[valid].long().cpu()
     depths = exit_depths[valid].double().cpu()
-    for a, d in zip(axis, depths):
-        depth_sum[a] += d
-        depth_count[a] += 1.0
+    depth_sum.scatter_add_(0, axis, depths)
+    depth_count.scatter_add_(0, axis, torch.ones_like(axis, dtype=torch.float64))
 
 
 def _new_accuracy_accumulators(axis_n: int, device=None) -> dict:

@@ -329,6 +329,24 @@ class MoREOpdiffDataset(Dataset):
                 "no axis entry would have its measured depth attributed to "
                 "another iteration count."
             )
+        # THE LOOKUP TABLES the vectorised decode uses, built ONCE per dataset
+        # rather than per row: the axis index of each operation, the axis
+        # index of each k, and the operation id of the F token.
+        #
+        # The F operation's entry in the per-operation table is a PLACEHOLDER
+        # (-1): its axis index depends on k, so it is filled in per row by the
+        # k decode below. It cannot be looked up here, because `op_axis_index`
+        # REFUSES an unknown k -- and the F operation with no k is exactly
+        # that.
+        self._axis_of_op = np.array(
+            [(-1 if n == F_OP_NAME else op_axis_index(n)) for n in OP_NAME_TO_IDX],
+            dtype=np.int64)
+        # The k -> axis index map, keyed by the k VALUE (not by its position in
+        # K_VALUES): the decode produces k values, and using a position would
+        # silently mis-map every k above the first.
+        self._k_axis_of = {k: op_axis_index(F_OP_NAME, k) for k in K_VALUES}
+        self._f_op_id = OP_NAME_TO_IDX[F_OP_NAME]
+
         # WHICH EXAMPLE EACH POSITION BELONGS TO. Position `t` belongs to the        # example that starts at `t - t % example_len`, and that example's
         # FIRST token is its operation token and its SECOND.. are the k slot.
         pos = np.arange(self.seq_len, dtype=np.int64)
@@ -451,44 +469,52 @@ class MoREOpdiffDataset(Dataset):
                 "Each example must START with its operation token; a row that "
                 "does not was generated against a different layout."
             )
-        _op_names = list(OP_NAME_TO_IDX.keys())
-        _axis = np.zeros(self.seq_len, dtype=np.int64)
-        for _e in range(self.examples_per_row):
-            _op = _op_names[int(op_tokens[_e]) - self.op0]
-            if _op == F_OP_NAME:
-                _bits = tok[self._k_positions[_e]]
-                if _bits.min() < self.manifest["tokens"]["hex0"] or \
-                        _bits.max() > self.manifest["tokens"]["hex0"] + 1:
+        # The axis index of each EXAMPLE, computed for all 16 at once.
+        #
+        # T-OD.10: this was a Python loop over the 16 examples, and each
+        # iteration made ~6 numpy calls on two-element slices. That cost 763
+        # us per ROW -- 3.7 minutes of pure CPU per epoch per arm, with the GPU
+        # idle for all of it, because the DataLoader runs in the main process
+        # (num_workers = 0). The arithmetic below is the SAME, vectorised: the
+        # operation token of every example, and for the F operation the
+        # iteration count decoded from the binary slot (big-endian: k4..k0).
+        _op_ids = op_tokens - self.op0                       # [16]
+        _is_f = _op_ids == self._f_op_id
+        _axis_per_example = self._axis_of_op[_op_ids]        # [16]
+        if _is_f.any():
+            _hex0 = self.manifest["tokens"]["hex0"]
+            _bits = tok[self._k_positions]                   # [16, K_BITS]
+            if _bits.min() < _hex0 or _bits.max() > _hex0 + 1:
+                _bad = np.where((_bits < _hex0) | (_bits > _hex0 + 1))[0]
+                raise ValueError(
+                    f"row {idx} of split {self.split!r} has a k slot "
+                    f"{_bits[_bad[0]].tolist()} that is not made of the two "
+                    "k-bit tokens; the decode would be meaningless."
+                )
+            _k_all = ((_bits - _hex0) << np.arange(K_BITS - 1, -1, -1)).sum(axis=1)
+            if (_k_all == 0).any():
+                raise ValueError(
+                    f"row {idx} of split {self.split!r} has an F operation "
+                    "with a k slot that decodes to 0; the slot must carry "
+                    "the iteration count."
+                )
+            # Cross-check against the label file, when the row is an F row.
+            _lab = int(self._k_label_array()[idx])
+            if _lab:
+                _dec = int(_k_all[int(np.where(_is_f)[0][0])])
+                if _lab != _dec:
                     raise ValueError(
-                        f"row {idx} of split {self.split!r} has a k slot "
-                        f"{_bits.tolist()} that is not made of the two k-bit "
-                        "tokens; the decode would be meaningless."
+                        f"row {idx} of split {self.split!r} decodes k={_dec} "
+                        f"from its input but the label file says {_lab}. The "
+                        "axis index comes from the INPUT, so a disagreement "
+                        "means the two disagree about the row."
                     )
-                _k = 0
-                for _j, _b in enumerate(_bits):
-                    _k |= (int(_b) - self.manifest["tokens"]["hex0"]) << (K_BITS - 1 - _j)
-                if _k == 0:
-                    raise ValueError(
-                        f"row {idx} of split {self.split!r} has an F operation "
-                        "with a k slot that decodes to 0; the slot must carry "
-                        "the iteration count."
-                    )
-                # Cross-check against the label file, when the row is an F row.
-                _lab = int(self._k_label_array()[idx])
-                if _lab and _lab != _k:
-                    raise ValueError(
-                        f"row {idx} of split {self.split!r} decodes k={_k} from "
-                        f"its input but the label file says {_lab}. The axis "
-                        "index comes from the INPUT, so a disagreement means "
-                        "the two disagree about the row."
-                    )
-                _axis[self._example_starts[_e]:
-                       self._example_starts[_e] + self.example_len] = \
-                    op_axis_index(_op, _k)
-            else:
-                _axis[self._example_starts[_e]:
-                       self._example_starts[_e] + self.example_len] = \
-                    op_axis_index(_op)
+            _k_idx = np.full(self.examples_per_row, -1, dtype=np.int64)
+            for _k in np.unique(_k_all[_is_f]):
+                _k_idx[_k_all == _k] = self._k_axis_of[int(_k)]
+            _axis_per_example = np.where(_is_f, _k_idx, _axis_per_example)
+        # Broadcast each example's axis index over its own positions.
+        _axis = np.repeat(_axis_per_example, self.example_len)
         step_ops = torch.from_numpy(_axis)
 
         return (

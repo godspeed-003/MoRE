@@ -64,7 +64,7 @@
     "family_cls": 0.0
   },
   "data": {
-    "opdiff_root": "opdiff_v3",
+    "opdiff_root": "opdiff_v4",
     "seq_len": 384,
     "vocab_size": 37,
     "subset_fraction": 1.0,
@@ -75,72 +75,13 @@
     "subset_seed": 42,
     "max_val": 1000000.0,
     "pad_value": 0.0,
-    "dataset_version": "opdiff-v3-fingerprint-d796c05792f5",
-    "train_split_version": "opdiff-v3-fingerprint-d796c05792f5"
+    "dataset_version": "opdiff-v4-fingerprint-1197a5cbae10",
+    "train_split_version": "opdiff-v4-fingerprint-1197a5cbae10"
   },
   "logging": {
     "wandb_project": "micro-MoRE-opdiff",
     "log_interval": 1,
-    "run_name": "opdiffB_dense_MoR_seed42",
-    "experiment_group": "exploratory"
+    "run_name": "opdiffB_MoR"
   },
-  "architecture": "mor",
-  "provenance": {
-    "seed": 42,
-    "resolved_epochs": 3,
-    "resolved_subset_fraction": 1.0,
-    "resolved_batch_size": 48,
-    "experiment_id": "opdiffB_dense_MoR_seed42__756cc6d8",
-    "experiment_group": "exploratory",
-    "code_git_commit": "626c0d7f05001ddb4dbaf8dffc9c9945cf345032",
-    "code_git_dirty": true,
-    "config_hash": "756cc6d8e0181d30c844235e5ec7acc53cababa8c02b9f533609a42c58d90f6e",
-    "run_dir": "runs/opdiffB_dense_MoR_seed42__756cc6d8",
-    "architecture": "mor",
-    "variant": "opdiff",
-    "run_name": "opdiffB_dense_MoR_seed42",
-    "dataset_version": "opdiff-v3-fingerprint-d796c05792f5",
-    "train_split_version": "opdiff-v3-fingerprint-d796c05792f5",
-    "resolved_seed": 42,
-    "seed_source": "cli",
-    "seed_declared": true,
-    "seed_set_canonical": [
-      42,
-      43,
-      44,
-      45,
-      46
-    ],
-    "determinism_mode": "warn_only",
-    "torch_deterministic_algorithms": true,
-    "cudnn_deterministic": true,
-    "cudnn_benchmark": false,
-    "cublas_workspace_config": ":4096:8",
-    "determinism_exceptions": [
-      "none"
-    ],
-    "device": "cuda",
-    "gpu_name": "NVIDIA GeForce RTX 3050 6GB Laptop GPU",
-    "gpu_total_mem_gib": 6.0,
-    "gpu_capability": "8.6",
-    "torch_version": "2.6.0+cu126",
-    "torch_cuda_version": "12.6",
-    "wandb_run_id": "9gguyhxy",
-    "halting_mode": "pure_act",
-    "halting_supervision_enabled": false,
-    "halting_supervision_weight": 0.0,
-    "ponder_weight": 0.001,
-    "resolved_routing_mode": "top1_sparse",
-    "resolved_router_noise": "none",
-    "ffn_mult": 28,
-    "routing_supervision_enabled": false,
-    "routing_supervision_weight": 0.0,
-    "family_supervision_enabled": false,
-    "family_cls_weight": 0.0,
-    "router_noise_scale": 0.0,
-    "halt_target_mode": "pure_act",
-    "total_params": 4051720,
-    "embedding_params": 107776,
-    "non_embedding_params": 3943944
-  }
+  "architecture": "mor"
 }

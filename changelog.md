@@ -10555,4 +10555,46 @@ the trained range, and the extrapolation values beyond it.
    17 h of GPU spent on a dataset that will not exist.
 4. The matrix handoff is updated to the final dataset.
 
+### Two performance defects found on the way, both of which were costing more
+### than the model
+
+The dense reference appeared to hang: 88 minutes into epoch 1, with the GPU
+at 0 % and one CPU thread at 100 %. It was not hung — it was spending the
+epoch in the EVALUATION, and the evaluation was the bottleneck by a factor of
+seven. A 10 %-subset timing run (29,400 rows, one epoch, GPU free) took
+**20.7 minutes, of which the training was 2.7 and the evaluation was 18.0**.
+
+1. **The per-token Python loop in the depth accumulation.** `for op_id,
+   depth_val in zip(ops, depths): depth_sum[op_id] += depth_val` — a Python
+   loop with a 0-dim tensor add per token, over 5.4 M tokens per epoch
+   (the val split plus the two OOD splits), at tens of microseconds each.
+   `scatter_add_` does the same arithmetic in one call, and **the resulting
+   per-operation depths are bit-identical** (verified by re-running the same
+   10 % configuration before and after: every `recursion/avg_depth_by_op/*`
+   value matched exactly).
+2. **The dataset's per-row Python loop.** 763 µs per row, because the k
+   decode looped over the 16 examples of a row and made ~6 numpy calls on
+   two-element slices each. With `num_workers = 0` that is 3.7 minutes of
+   pure CPU per epoch per arm, with the GPU idle for all of it. Vectorised,
+   it is 324 µs.
+
+**The effect: the same 10 % epoch went from 20.7 minutes to 3.6** — and
+this is not a smoke-scale curiosity. The evaluation ran on every epoch of
+every run, so on the full matrix it was **~18 minutes per epoch per run,
+~14 hours across the 15 cells** — more than the training it was measuring.
+The first dense reference had been running for 88 minutes and had not
+finished an epoch, which is what exposed it.
+
+**The numbers move, and the matrix gets cheaper.** The measured per-epoch
+times in `HANDOFF.md` §9 were taken with the slow evaluation, so they
+overstate the cost: the MoR arm's 113.6 min/epoch included ~18 min of
+evaluation, and the corrected training-only figure is ~95 min/epoch. The
+budget in the handoff has been re-derived from the corrected figures.
+
+A bug in the vectorised dataset decode was caught and fixed in the same pass:
+the k → axis map was indexed by the k's POSITION in the k list rather than by
+the k VALUE, which raised `IndexError: index 7 is out of bounds` on the first
+k = 7 row. The unit suite was green at that moment — it did not cover a k
+above the first — and the fix is keyed by the value.
+
 
