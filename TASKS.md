@@ -2196,6 +2196,47 @@ the co-author's agent. Not part of `plan.md` §0–11. Companion paper task:
   its own reference row and an explicit one-seed caveat — never a column in
   the headline table (which is the matrix's: one card, five seeds, three
   arms).
+  **SUPERSEDED IN PART BY T-OD.10**: the ladder is PARKED, because the F
+  operation is being redesigned (T-OD.10) and a ladder measured on data that
+  is about to change would be 17 h of GPU spent on a dataset that will not
+  exist. It runs after the port moves to the final dataset.
+
+- [~] **T-OD.10 The learnability calibration, and the F operation redesigned.**
+  (User direction, 2026-10-22: "do (c) then (a) — (c) run the dense-baseline
+  calibration first to find the learnability frontier, (a) redesign F so one
+  iteration is learnable but chaining isn't shortcut-able — layout, mask, vocab,
+  axis and k lists all survive, so the port barely changes".)
+  **(c) The dense reference:** the same engine, data and loss with `max_depth
+  = 1` and the MoR architecture — one shared FFN of width 28 per token, no
+  routing and no recursion (`code/config_opdiff_dense.json`). It answers
+  "when is an operation learnable AT ALL", and its per-k curve is the
+  frontier. It is a REFERENCE, not a matrix cell (the run name
+  `opdiffB_dense_MoR_seed42` is outside the aggregator's matrix pattern, so it
+  cannot be admitted to the three-arm table by accident).
+  **(a) The redesigned F (v4):** `d'_i = ((d_i XOR d_{(i+1) mod 8}) + 3) mod 16`
+  over the eight nibbles of the state `x = A‖B`, iterated k times, with the
+  answer being the state after k iterations. One iteration is a 256-case
+  per-digit table (learnable); the k-fold composition is nonlinear with no
+  closed form over a 4.3e9 state space (so it cannot be memorised or
+  shortcut); and the eight digits update in PARALLEL, so one iteration costs
+  ~one layer and the dial spans the depth budget. **The layout, loss mask,
+  vocabulary, operation tokens, seven groups, E7 structure, split definitions,
+  per-row label files and the 35-wide operation-instance axis all survive** —
+  the port's changes are the k values and the manifest's cross-check target.
+  `make_opdiff_dataset_v4.py` is committed ALONGSIDE v3 (v3 is the record of
+  the diagnosed hard-tail design, and the paper will want both).
+  **Verify:** the dense reference's per-k curve on v3 (the diagnosis: a plain
+  transformer fails on the old F too, so the redesign answers the DATA and not
+  the architecture) and on v4 (is the new F learnable, and where is the
+  frontier?); the k lists then follow from the measured frontier; the port
+  moves to v4; the smoke is re-run on the final data; and only then does the
+  capacity ladder run.
+  **Evidence:** 2026-10-22. v4 generated and VERIFIED: 294,000 / 7,000 /
+  7,000 / 1,000 (ood_interp, k=5) / 2,000 (ood_extrap, k=6,7) rows, vocab
+  37, 112,896,000 train tokens, `dataset_version` opdiff-v4-b002e4acf878; on a
+  300-row sample per split: **0 group violations, 0 E7 purity violations, 0 k
+  decode mismatches**. The calibration runs are in flight (dense reference on
+  v3, then on v4).
 
 ---
 

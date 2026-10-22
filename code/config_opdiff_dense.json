@@ -1,0 +1,71 @@
+{
+  "_README": [
+    "config_opdiff_dense.json -- the DENSE REFERENCE for the opdiff task, and",
+    "the configuration the learnability calibration (T-OD.10) is run with.",
+    "",
+    "WHAT IT IS. The same engine, the same data, the same loss -- and a plain",
+    "one-block transformer: `max_depth = 1` with the MoR architecture means one",
+    "shared FFN (width 28) per token, no routing and no recursion. It is the",
+    "reference the study's claims are read against, and it answers a question",
+    "the three arms cannot: WHEN IS AN OPERATION LEARNABLE AT ALL?",
+    "",
+    "WHY IT IS NEEDED, and what it decides. The first full-scale run showed that",
+    "the F rows are at chance for EVERY k -- including k = 1, the easiest one --",
+    "while the other six groups reach 0.85 per-digit accuracy. That is a fact",
+    "about the DATA (one F iteration is a 32x32-bit modular multiplication,",
+    "which a 4 M-parameter transformer cannot learn without chain of thought),",
+    "not about the architecture. A dense reference says the same thing without",
+    "any mixture or recursion in the picture, and its per-k curve is the",
+    "frontier: the largest k at which a plain model still learns the operation.",
+    "The F operation is then redesigned against that frontier rather than",
+    "guessed at.",
+    "",
+    "IT IS A REFERENCE, NOT A MATRIX CELL. The run name says so --",
+    "`opdiffB_dense_MoR_seed42` -- and the aggregator's matrix pattern cannot",
+    "match it, so a dense reference can never be admitted to the three-arm",
+    "table. It is reported beside the arms, in its own row, labelled."
+  ],
+
+  "task": "opdiff",
+
+  "model": {
+    "d_model": 256,
+    "n_heads": 4,
+    "attention": true,
+    "tie_lm_head": true,
+    "num_blocks": 1,
+    "max_depth": 1,
+    "dropout": 0.1,
+    "routing_mode": "top1_sparse",
+    "router_noise": "none",
+    "halting_supervision": false
+  },
+
+  "training": {
+    "lr": 0.001,
+    "weight_decay": 0.0001,
+    "batch_size": 48,
+    "epochs": 3,
+    "grad_clip": 1.0
+  },
+
+  "loss_weights": {
+    "task": 1.0,
+    "routing_balance": 0.001,
+    "step_routing": 0.0,
+    "halting": 0.001,
+    "halting_supervision": 0.0
+  },
+
+  "data": {
+    "opdiff_root": "opdiff_v3",
+    "seq_len": 384,
+    "vocab_size": 37,
+    "subset_fraction": 1.0
+  },
+
+  "logging": {
+    "wandb_project": "micro-MoRE-opdiff",
+    "log_interval": 1
+  }
+}

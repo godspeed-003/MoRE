@@ -847,6 +847,53 @@ finally:
 
 
 # ===========================================================================
+print("\n--- T-OD.3.8  the exact-match denominator")
+# ===========================================================================
+#
+# The per-example EXACT MATCH is the strict reading of "the model gave the
+# right answer", and it is the number the OOD claim is read off. It was wrong
+# until the first FULL-SCALE run: the counter counts exactly-right EXAMPLES
+# (up to 16 per row) and the denominator was the number of ROWS, so the
+# published value was 11.06 on a run whose true example-level exact match
+# was 0.691 -- a number above 1 for something that is supposed to be a
+# fraction.
+#
+# The check below pins the two things that were confusable: the count is in
+# EXAMPLES, and the published fraction is the count over the EXAMPLES.
+
+from more.engine import _accumulate_scored_accuracy, _new_accuracy_accumulators  # noqa: E402
+
+_B, _EX, _EXLEN, _SCORED = 2, 16, 24, 9
+_S = _EX * _EXLEN
+# A fake batch in the opdiff layout: 16 examples per row, 9 scored positions
+# per example (the answer digits and the EOS), so 144 scored positions per
+# row. EXACTLY the first 3 examples of row 0 are made fully correct and
+# everything else is wrong, so the true example-level exact match is
+# 3 / 32 = 0.09375.
+_fake = torch.zeros(_B, _S, _V)
+_tgt = torch.zeros(_B, _S, dtype=torch.long)
+_mask = torch.zeros(_S - 1, dtype=torch.bool)
+for _e in range(_EX):
+    for _p in range(_EXLEN - _SCORED, _EXLEN):        # 15..23 in the example
+        _t = _e * _EXLEN + _p                          # the target position
+        _mask[_t - 1] = True                          # the mask is over 1..S-1
+        for _b in range(_B):
+            _tgt[_b, _t] = 5
+            _fake[_b, _t - 1, 5 if (_b == 0 and _e < 3) else 6] = 10.0
+_acc = _new_accuracy_accumulators(4, torch.device("cpu"))
+_accumulate_scored_accuracy(_fake, _tgt, _mask, torch.zeros(_B, _S, dtype=torch.long),
+                            _EX, _acc)
+check("OD.8a the exact-match counter counts EXAMPLES, and the published "
+      "fraction is over the examples",
+      _acc["exact"] == 3 and _acc["examples"] == _B * _EX
+      and abs(_acc["exact"] / _acc["examples"] - 3.0 / 32.0) < 1e-12
+      and _acc["exact"] / _acc["examples"] <= 1.0,
+      f"exact={_acc['exact']} examples, denominator={_acc['examples']} "
+      f"-> fraction {_acc['exact'] / _acc['examples']:.5f} (the row-denominator "
+      f"bug produced {_acc['exact'] / 2:.5f}, i.e. a number above 1)")
+
+
+# ===========================================================================
 print(f"\n{len(PASS)} passed, {len(FAIL)} failed, {len(SKIP)} skipped")
 if FAIL:
     print("FAILED:")

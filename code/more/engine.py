@@ -213,7 +213,16 @@ def _accumulate_scored_accuracy(reg_out, x, mask1, axis, examples_per_row,
         )
     ex_ok = correct.view(B, examples_per_row, per_row // examples_per_row).all(dim=2)
     acc["exact"] += int(ex_ok.sum().item())
-    acc["examples"] += B
+    # The denominator is EXAMPLES, not rows. This was wrong until the first
+    # full-scale run: the counter counts exactly-right EXAMPLES (up to 16 per
+    # row) and the denominator was the number of ROWS, so the published
+    # "exact match" came out as 11.06 on a run whose true example-level
+    # exact match was 0.691 -- a number above 1 for something that is
+    # supposed to be a fraction. The fraction is the interpretable quantity
+    # (and the one the OOD claim is read off), so the DENOMINATOR is fixed
+    # here rather than the label being changed: a key called "exact match"
+    # that can exceed 1 is a trap for the next reader.
+    acc["examples"] += B * examples_per_row
     if axis is not None:
         # The axis of each EXAMPLE: every position of an example shares it,
         # because an example is one operation instance.

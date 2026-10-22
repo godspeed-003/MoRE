@@ -10381,4 +10381,178 @@ rule; a row from a different card would break the one-machine rule.
 - A capacity number without its parameter count → the ladder table prints the
   non-embedding count next to every row for exactly that reason.
 
+## T-OD.9 - the first FULL-SCALE result, and a metric bug it exposed
+
+**Date.** 2026-10-22. **Machine.** Vedant's RTX 3050 6 GB.
+
+### What the full-scale run says
+
+The first full-scale opdiff run (MoR at ffn_mult 4, the full 294,000-row
+dataset, 3 epochs = 18,375 optimizer steps, seed 42) finished at
+**val/task_loss 0.4354 nats** and **0.850 per-digit accuracy** — against
+1.3550 and 0.565 on the 1 % smoke subset. So the task is genuinely learnable
+at this scale, and the matrix will produce a real result rather than a
+plateau.
+
+**AND THE F ROWS ARE NOT LEARNABLE — NOT AT ANY k.** The per-k table is
+unambiguous: the per-digit accuracy on the F rows is 0.161–0.172 for every
+TRAINED k (F1 0.164, F16 0.172) and 0.165–0.168 for every held-out one
+(F3 0.167, F6 0.167, F9 0.167, F11 0.166, F14 0.168), with a per-example
+exact match of **0.0 everywhere**, seen and unseen alike. The overall 0.850
+accuracy comes from the six learnable groups.
+
+**WHY, and it is a property of the DATA, not of the architecture.** The F
+operation is `f(x) = (x² + 12345) mod 4294967291` on a 32-bit `x = A‖B`:
+one iteration is a 32×32-bit modular MULTIPLICATION. Learning a 32-bit
+multiplication from data is a known-hard problem for a transformer without
+chain of thought, and no amount of extra training on this budget fixes it —
+which is why the failure is flat in k rather than worsening with it. The
+dataset's own caveat said "F with k ≥ 13 without chain of thought may stay
+near chance"; the measurement is stronger: **k = 1 is already at chance.**
+
+**WHAT THAT DOES TO THE STUDY'S TWO OOD CLAIMS.**
+- "the right answers on unseen k" — NOT SUPPORTABLE with the F rows as
+  designed. The OOD evaluation is wired and runs, and it measures a HARD TAIL
+  honestly, but it cannot distinguish "cannot extrapolate" from "cannot do F"
+  because the model cannot do F at any k.
+- "the right amount of compute on unseen k" — the GROUP-level half holds
+  (the F rows get 6.49 of 7 steps against 1.8–4.6 for the simple groups),
+  but the k-level half does not (F1 6.49 and F16 6.49 are the same number):
+  with no learnable signal in the F rows there is no gradient pressure to
+  learn the k → depth mapping.
+
+**THE OPTIONS, for the user to decide (none of them is an engineering
+fix).** (a) Redesign the F operation so that one iteration is LEARNABLE but
+chaining is not shortcut-able — the layout, the mask, the vocabulary, the
+35-wide axis and the three k lists all survive, so the port barely changes;
+the difficulty of choosing such a recurrence is the real work. (b) Keep the
+data and report the F rows as a documented hard tail, scoping the study to the
+six learnable groups with the OOD evaluation as a negative result. (c) Run
+the dense-baseline calibration FIRST to establish the learnability frontier
+— which is what the dataset's caveat asks for anyway — and let that decide
+between (a) and (b).
+
+### The metric bug the full-scale run exposed
+
+`val/exact_match` came out as **11.0563** on that run. A fraction above 1
+is not a fraction. The counter counts exactly-right EXAMPLES (up to 16 per
+row) and the denominator was the number of ROWS, so the published value was
+"exactly-right examples per row" wearing the name of a fraction.
+
+- **The denominator is fixed** (`acc["examples"] += B * examples_per_row`),
+  because the fraction is the interpretable quantity and the one the OOD claim
+  is read off. Changing the LABEL instead would have left a key called
+  "exact match" that can exceed 1.
+- **The per-axis exact match was never affected** (its denominator was
+  already the number of examples with that axis), so the per-k numbers that
+  the OOD reading rests on — all 0.0 — were right all along.
+- **The OOD split-level exact match was 0.0**, so the wrong denominator did
+  not change any conclusion.
+- **The affected artifacts were re-run, not edited**: the five smoke runs and
+  the full-scale width-4 run carried the mis-scaled value, and a run whose
+  metric is wrong is not evidence. `code/test_opdiff_task_axis.py` OD.8a now
+  pins the semantics: the counter counts examples, the denominator is the
+  examples, and the fraction cannot exceed 1.
+
+### Also recorded: two runs were lost to the environment, not to the code
+
+The first full-scale width-24 run died **silently, with no traceback**, after
+three hours of stable training (GPU 77 %, 5,939 MiB of 6,143, 67 °C) — the
+signature of a process killed from outside, not of a crash. It is now launched
+as a DETACHED process (`Start-Process`), verified to outlive the shell that
+started it, because a harness-managed background job can be reaped.
+
+And the throughput extrapolation from the smoke subset was **27 % optimistic**:
+the width-4 arm was measured at 5.35 h for the full 3 epochs against the
+4.2 h the smoke rate predicted. The full-dataset numbers in `HANDOFF.md` §9
+are the measured ones; the smoke-scale extrapolation is labelled as such
+wherever it appears.
+
+## T-OD.10 - the learnability calibration, and the F operation redesigned
+
+**Date.** 2026-10-22. **Machine.** Vedant's RTX 3050 6 GB.
+**User direction:** "do (c) then (a)" — run the dense-baseline calibration
+first, then redesign F so one iteration is learnable but chaining is not
+shortcut-able, with the layout, mask, vocabulary, axis and k lists surviving.
+
+### (c) The calibration, and what it is for
+
+A **dense reference**: the same engine, the same data, the same loss, and a
+plain one-block transformer — `max_depth = 1` with the MoR architecture, i.e.
+one shared FFN of width 28 per token, no routing and no recursion
+(`code/config_opdiff_dense.json`). It answers the question the three arms
+cannot: **when is an operation learnable at all?** Its per-k curve is the
+learnability frontier.
+
+It is a REFERENCE, not a matrix cell: the run name
+(`opdiffB_dense_MoR_seed42`) is outside the aggregator's matrix pattern, so a
+dense reference can never be admitted to the three-arm table by accident.
+
+### (a) The F operation, redesigned — and why the old one had to go
+
+The v3 F operation was `f(x) = (x² + 12345) mod 4294967291` on a 32-bit
+`x = A‖B`. The full-scale measurement says it was **not hard at high k — it was
+not learned AT ALL, at any k**, including k = 1, while the other six groups
+reached 0.850 per-digit accuracy. One iteration of a 32-bit modular squaring
+is a 32×32-bit multiplication, and that is a known-hard problem for a
+transformer without chain of thought: the failure is flat in k because there
+is no gradient signal in those rows at all. **A difficulty dial whose dial is
+stuck at zero cannot be measured**, so the operation had to change — this is a
+property of the data, and a dense reference is what demonstrates that (it
+fails too).
+
+**The new F (v4) is a per-nibble nonlinear recurrence over the eight nibbles
+of the state `x = A‖B`:**
+
+```
+d'_i = ((d_i XOR d_{(i+1) mod 8}) + 3) mod 16        (one iteration, i = 0..7)
+```
+
+applied k times, with the answer being the state after k iterations. The three
+properties it has to have, and why this one has them:
+
+1. **ONE ITERATION IS LEARNABLE.** Each output digit is a function of TWO
+   INPUT DIGITS and a constant — a 256-case table, the size of "learn the
+   addition of two 4-bit numbers", which transformers do learn. The state
+   space is 16⁸ = 4.3 × 10⁹, so the operation cannot be memorised.
+2. **THE k-FOLD COMPOSITION IS NOT SHORTCUT-ABLE.** XOR is nonlinear over
+   ℤ₁₆ and the digit additions carry, so the map has no closed form and no
+   small algebraic form; and the composed map is a fixed function on 4.3 × 10⁹
+   states, which is far too large to memorise. A model that wants the answer
+   for a given k has to UNROLL.
+3. **ONE ITERATION COSTS ROUGHLY ONE LAYER**, because the eight digits
+   update in PARALLEL (every `d'_i` depends only on the PREVIOUS state). So k
+   iterations need ~k layers, and **the dial spans the model's depth budget
+   instead of overshooting it** — which is why the k lists are chosen from the
+   MEASURED frontier rather than from a guess.
+
+**What survives, and it is the point of the redesign:** the token layout (24
+tokens per example, 16 per row, 384 per row), the loss mask (position % 24 ≥
+15), the vocabulary (37), the operation tokens, the seven expert groups, the
+E7 structure (one sub-op and one k per row), the split definitions, the
+per-row label files, and the 35-wide operation-instance axis. The port's
+changes are the k values and the manifest's cross-check target.
+
+`make_opdiff_dataset_v4.py` is committed alongside v3 rather than replacing
+it: v3 is the record of the diagnosed "hard tail" design, and the paper will
+want both (the v3 measurement is what justifies the v4 design).
+
+**The k lists in v4** are provisional and are set from the calibration:
+`TRAIN_K = [1, 2, 3, 4]`, `INTERP_K = [5]`, `EXTRAP_K = [6, 7]` — the
+trained values inside the measured frontier, one interpolation value inside
+the trained range, and the extrapolation values beyond it.
+
+### The order of work, and what is still open
+
+1. (c-1) the dense reference on the **v3** data → the diagnosis: a plain
+   transformer fails on the old F too, so the redesign is a response to the
+   DATA and not to the architecture.
+2. (c-2) the dense reference on the **v4** data → is the new F learnable, and
+   where exactly is the frontier? The k lists and the manifest follow from
+   it.
+3. The port moves to v4, the smoke is re-run, and only THEN does the capacity
+   ladder run — a ladder measured on data that is about to change would be
+   17 h of GPU spent on a dataset that will not exist.
+4. The matrix handoff is updated to the final dataset.
+
 
