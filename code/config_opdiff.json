@@ -39,10 +39,10 @@
     "    oracle partition, which is the confound this study exists to exclude.",
     "",
     "data block: vocab_size 37 and seq_len 384 are MEASURED from",
-    "opdiff_v3/meta.json by make_opdiff_dataset_v3.py (19 fixed tokens + 18",
+    "opdiff_v4/meta.json by make_opdiff_dataset_v4.py (19 fixed tokens + 18",
     "op tokens; 16 x 24 = 384). opdiff_root is relative to the REPO ROOT and",
     "may be overridden per-run with --opdiff_root (smoke runs use",
-    "opdiff_v3_smoke). dataset_version / train_split_version are STAMPED from",
+    "opdiff_v4_smoke). dataset_version / train_split_version are STAMPED from",
     "meta.json by stamp_opdiff_dataset_versions -- writing them here would be",
     "a declaration about bytes on disk rather than a measurement of them."
   ],
@@ -79,7 +79,7 @@
   },
 
   "data": {
-    "opdiff_root": "opdiff_v3",
+    "opdiff_root": "opdiff_v4",
     "seq_len": 384,
     "vocab_size": 37,
     "subset_fraction": 1.0

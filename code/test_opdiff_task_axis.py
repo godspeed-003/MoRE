@@ -117,7 +117,7 @@ print("\n--- T-OD.3.1  the manifest agrees with the GENERATOR")
 # opdiff number is wrong in the same direction and nothing looks broken.
 
 _gen_spec = importlib.util.spec_from_file_location(
-    "_opdiff_generator", os.path.join(REPO, "make_opdiff_dataset_v3.py"))
+    "_opdiff_generator", os.path.join(REPO, "make_opdiff_dataset_v4.py"))
 GEN = importlib.util.module_from_spec(_gen_spec)
 _gen_spec.loader.exec_module(GEN)
 
@@ -190,7 +190,7 @@ check("OD.1i a NON-operation token id raises instead of aliasing an "
 # whole.
 check("OD.1j the depth axis is the 17 non-F operations plus one entry per k "
       "value, named F<k>",
-      OF.NUM_OP_AXIS == 35
+      OF.NUM_OP_AXIS == 24
       and OF.OP_AXIS_NAMES[:17] == [o for o in OF.ALL_OP_NAMES if o != "F"]
       and OF.OP_AXIS_NAMES[17:] == [f"F{k}" for k in OF.K_VALUES],
       f"axis width {OF.NUM_OP_AXIS}: 17 operations + {len(OF.K_VALUES)} k values")
@@ -229,7 +229,7 @@ try:
     # appear in BOTH train and val, or the forbid-map construction raises.
     # Twelve is the smallest count that satisfies it.
     _rc = subprocess.run(
-        [sys.executable, os.path.join(REPO, "make_opdiff_dataset_v3.py"),
+        [sys.executable, os.path.join(REPO, "make_opdiff_dataset_v4.py"),
          "--out", _TMP, "--train_rows_per_group", "12",
          "--eval_rows_per_group", "12", "--ood_rows_per_k", "4"],
         capture_output=True, text=True)
@@ -301,12 +301,20 @@ try:
               f"{int(_lm.sum())} scored positions of 384 "
               f"(16 examples x 9 answer+EOS positions)")
 
-        check("OD.2g the dataset version is a MEASURED fingerprint of the bytes "
-              "on disk",
+        # The version is a MEASUREMENT of the bytes: the generator's own
+        # content hash when the manifest carries one (v4 does), and the
+        # fallback fingerprint (meta.json plus a 4 MiB edge of the train
+        # split) when it does not (v3 does not). Either way it is measured,
+        # never declared, and the train split's version is the same string
+        # because the splits are carved by the same generation.
+        check("OD.2g the dataset version is a MEASUREMENT of the bytes on disk",
               bool(_ds.dataset_version)
-              and _ds.dataset_version.startswith("opdiff-v3-")
+              and _ds.dataset_version.startswith("opdiff-v4-")
+              and (_ds.dataset_version == _man.get("dataset_version")
+                   or _ds.dataset_version.startswith("opdiff-v4-fingerprint-"))
               and _ds.train_split_version == _ds.dataset_version,
-              f"dataset_version={_ds.dataset_version}")
+              f"dataset_version={_ds.dataset_version} "
+              f"(the generator's own: {_man.get('dataset_version')})")
 
         check("OD.2h an ABSENT dataset yields (None, None) rather than an "
               "exception -- the dataset is not tracked in git",
@@ -316,16 +324,16 @@ try:
 
         _ok, _msg = raises(lambda: MoREOpdiffDataset("train",
                                                      root=os.path.join(_TMP, "nope")),
-                           FileNotFoundError, "make_opdiff_dataset_v3.py")
+                           FileNotFoundError, "make_opdiff_dataset_v4.py")
         check("OD.2i a missing dataset raises with the BUILD COMMAND in the "
               "message",
               _ok, _msg[:80])
 
         check("OD.2j a relative opdiff_root resolves against the REPO ROOT, "
               "not the working directory",
-              resolve_opdiff_root("opdiff_v3").replace("\\", "/").endswith(
-                  "/MoRE/opdiff_v3"),
-              resolve_opdiff_root("opdiff_v3"))
+              resolve_opdiff_root("opdiff_v4").replace("\\", "/").endswith(
+                  "/MoRE/opdiff_v4"),
+              resolve_opdiff_root("opdiff_v4"))
 
         # THE OOD SPLITS. Two of them, two different questions, and the
         # dataset refuses to load one whose k values are not the ones its name
@@ -566,11 +574,11 @@ check("OD.4d --opdiff_root on a non-opdiff task is REFUSED",
       f"rc={_rc}, {type(_err).__name__}: {str(_err)[:60]}")
 
 _rc, _res, _err = run_cli("--architecture", "more", "--task", "opdiff",
-                          "--opdiff_root", "opdiff_v3_smoke")
+                          "--opdiff_root", "opdiff_v4_smoke")
 check("OD.4e --opdiff_root re-stamps the dataset version from the directory "
       "ACTUALLY read",
       _rc == 0 and _res is not None
-      and _res["data"]["opdiff_root"] == "opdiff_v3_smoke"
+      and _res["data"]["opdiff_root"] == "opdiff_v4_smoke"
       and _res["data"]["dataset_version"] != _cfg_file["data"]["dataset_version"],
       f"root={_res['data']['opdiff_root'] if _res else None}, "
       f"version={_res['data']['dataset_version'] if _res else None}")

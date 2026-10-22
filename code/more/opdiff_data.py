@@ -28,7 +28,7 @@ documented ignore label rather than dropped.
 
 SLOT 3 IS THE DEPTH AXIS, AND IT IS 35 WIDE. The axis carries one entry per
 (operation, k) INSTANCE: the 17 non-F operations, then one entry per k value
-(`F1` ... `F17`, `F20`). The claim this study wants to make -- "the model
+(`F1` ... `F7`). The claim this study wants to make -- "the model
 spends more computation on the operations that need more of it" -- is a claim
 about the F operation's ITERATION COUNT, and a single `F` entry could not
 express it: every k would be averaged into one number.
@@ -114,7 +114,7 @@ _REPO = os.path.abspath(os.path.join(_HERE, "..", ".."))
 # thing on two different machines (the co-author's 4060 and the gate machine)
 # and an absolute path baked into the config would move the `config_hash` per
 # machine and embed a machine-specific string in the provenance record.
-OPDIFF_ROOT_DEFAULT = "opdiff_v3"
+OPDIFF_ROOT_DEFAULT = "opdiff_v4"
 
 # The generator's splits. `ood_interp` and `ood_extrap` are TWO separate
 # splits, not one: the first holds iteration counts inside the trained range
@@ -191,7 +191,7 @@ def opdiff_versions(root=None) -> tuple[str | None, str | None]:
     h.update(meta_bytes)
     h.update(b"|")
     h.update(head)
-    v = f"opdiff-v3-fingerprint-{h.hexdigest()[:12]}"
+    v = f"opdiff-v4-fingerprint-{h.hexdigest()[:12]}"
     return v, v
 
 
@@ -219,9 +219,9 @@ class MoREOpdiffDataset(Dataset):
         if not os.path.exists(meta_path):
             raise FileNotFoundError(
                 f"{meta_path} is missing. Build the dataset first: "
-                f"python make_opdiff_dataset_v3.py --out {self.root}. For the "
-                "smoke subset: --out opdiff_v3_smoke --train_rows_per_group 512 "
-                "--eval_rows_per_group 128 --ood_rows_per_k 128."
+                f"python make_opdiff_dataset_v4.py --out {self.root}. For the "
+                "smoke subset: --out opdiff_v4_smoke --train_rows_per_group 64 "
+                "--eval_rows_per_group 64 --ood_rows_per_k 64."
             )
         with open(meta_path, "r", encoding="utf-8") as fh:
             self.manifest = json.load(fh)
@@ -351,7 +351,7 @@ class MoREOpdiffDataset(Dataset):
             if not os.path.exists(_p):
                 raise FileNotFoundError(
                     f"{_p} is missing. The dataset is incomplete -- regenerate "
-                    f"it with: python make_opdiff_dataset_v3.py --out {self.root}"
+                    f"it with: python make_opdiff_dataset_v4.py --out {self.root}"
                 )
 
         # THE OOD SPLITS' IDENTITY, CHECKED AGAINST THEIR OWN k LABELS. A

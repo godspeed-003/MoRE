@@ -7,7 +7,7 @@ already imports `expert_labels`, `ALL_OP_NAMES`, `NUM_OP_TYPES` and
 `NUM_EXPERTS_CANONICAL` from `families.py` can import the identical four names
 from here.
 
-THE DATASET THIS DESCRIBES (v3). `make_opdiff_dataset_v3.py` writes a row =
+THE DATASET THIS DESCRIBES (v4). `make_opdiff_dataset_v4.py` writes a row =
 16 packed examples x 24 tokens = 384 uint8 token ids. Each example is
 
     [OP] k4 k3 k2 k1 k0  a3 a2 a1 a0  b3 b2 b1 b0  [SEP]  r7 r6 r5 r4 r3 r2 r1 r0  [EOS]
@@ -50,16 +50,15 @@ therefore tests a real capability -- reading a composition out of a slot and
 spending the matching amount of computation -- instead of testing whether an
 untrained embedding can be guessed.
 
-THE OPERATION AXIS, AND WHY IT IS 35 WIDE AND NOT 18. The per-operation depth
+THE OPERATION AXIS, AND WHY IT IS 24 WIDE AND NOT 18. The per-operation depth
 breakdown (`recursion/avg_depth_by_op/<OP>`) is what answers "does the model
 spend more computation on the operations that need more of it?". For the F
 operation the interesting quantity is not the operation but the ITERATION
 COUNT: the claim is that depth grows with k. So the axis carries one entry
 per (operation, k) INSTANCE: the 17 non-F operations, then one entry per k
-value, named `F1`, `F2`, ..., `F17`, `F20`. The axis index of a token is
-derived from the INPUT -- the operation token and the k slot the model is
-shown -- and never from a label file, so the axis is legitimate operation
-identity and not an oracle.
+value, named `F1`…`F7`. The axis index of a token is derived from the INPUT --
+the operation token and the k slot the model is shown -- and never from a
+label file, so the axis is legitimate operation identity and not an oracle.
 
 THERE IS NO DEPTH CURRICULUM. `op_target_depth_table()` returns `[]`, and the
 emptiness is load-bearing: an EMPTY table cannot supervise depth no matter
@@ -86,7 +85,7 @@ rather than a second table in `families.py`:
     permutation-invariant metrics are primary.
 
 Deliberately free of `torch`, `numpy` and any dataset dependency: this is the
-manifest. `make_opdiff_dataset_v3.py` is the authority for the dataset
+manifest. `make_opdiff_dataset_v4.py` is the authority for the dataset
 contract; this file is the authority for the LABEL SPACE the code uses, and
 the two are cross-checked by `code/test_opdiff_task_axis.py`.
 """
@@ -176,8 +175,15 @@ K_BITS = 5
 # list, so a k value that is not in it has no axis entry -- and the dataset
 # raises rather than clamping, because a clamped k would attribute a measured
 # depth to the wrong iteration count.
-K_VALUES: tuple[int, ...] = (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14,
-                             15, 16, 17, 20)
+#
+# T-OD.10. The list is the v4 one, and it is set from the MEASURED
+# learnability frontier: the dense calibration says at which k a plain
+# transformer still learns the F operation at all, and the dial has to live
+# inside that frontier, because a dial that overshoots the model's depth
+# budget measures nothing but the budget. The v3 list (1..16 plus 17 and 20)
+# is the record of the ORIGINAL design, whose F operation was not learnable
+# at ANY k -- see make_opdiff_dataset_v3.py and the changelog.
+K_VALUES: tuple[int, ...] = (1, 2, 3, 4, 5, 6, 7)
 K_VALUE_TO_IDX: dict[int, int] = {k: i for i, k in enumerate(K_VALUES)}
 
 # The generator's `GROUPS`: group number (1..6) -> its operation names, and

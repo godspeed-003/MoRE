@@ -58,7 +58,7 @@
   },
 
   "data": {
-    "opdiff_root": "opdiff_v3",
+    "opdiff_root": "opdiff_v4",
     "seq_len": 384,
     "vocab_size": 37,
     "subset_fraction": 1.0
