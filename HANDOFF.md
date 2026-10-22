@@ -232,11 +232,11 @@ failed pilot, and the next step is to diagnose it, not to continue.
    **stop** and report it.
 9. **The epoch time is the number §9 predicts**, within ~20 %. If it is
    materially slower, the budget changes and the user must be told before the
-   remaining ten runs start.
+   remaining twelve cells start.
 
 ---
 
-## 5. The remaining ten runs
+## 5. The remaining twelve cells
 
 ```bash
 python code/run_opdiff_matrix.py --all
@@ -247,12 +247,12 @@ The driver **skips completed runs** (a run directory with a finished
 **stops at the first failure** (§7). Re-running `--all` after a failure
 resumes: the completed cells are skipped.
 
-The ten remaining cells are seeds 43–46 × {MoE, MoR, MoRE}.
+The twelve remaining cells are seeds 43–46 × {MoE, MoR, MoRE}.
 
 **Approval gate.** The full matrix was APPROVED by the user on 2026-10-21 at
 the budget in §9 (3 epochs × 5 seeds, ≈ 32 h on this card), and the approval
 is recorded as a tick in `TASKS.md` under T-OD.5. So the pilot AND the
-remaining ten cells may run. If that box is ever unticked — e.g. on a second
+remaining twelve cells may run. If that box is ever unticked — e.g. on a second
 machine, or after a re-freeze — run §3 and §4 only and report the measured
 epoch times back.
 
@@ -415,10 +415,19 @@ activity, not occupancy.
 | MoRE | 30,874 | 61 min | ~63 min |
 
 **Budget (the arithmetic above is a floor; the per-epoch times are what
-matter):** at 3 epochs x 5 seeds, MoE 3.1 h + MoR ~38 h + MoRE 15.3 h ≈ **56 h
-on the 6 GB card**; at 5 epochs x 5 seeds ≈ **92 h on the 6 GB card**. On the
-8 GB 4060, scale by the language calibration's measured ~1.5x: **≈ 37 h at 3
-epochs and ≈ 61 h at 5 epochs**.
+matter). THE PROTOCOL IS 3 EPOCHS x 5 SEEDS -- `epochs: 3` in
+`code/config_opdiff.json`, which is what the runs use:
+
+| | per epoch | 3 epochs x 5 seeds, 6 GB card | 3 epochs x 5 seeds, 8 GB card |
+|---|---|---|---|
+| MoE | ~14 min | 3.1 h | ~2 h |
+| MoR | ~155 min | ~38 h | ~26 h |
+| MoRE | ~63 min | 15.3 h | ~10 h |
+| **all three** | | **~56 h** | **~38 h** |
+
+The 8 GB figures scale the measured 6 GB ones by the language
+calibration's ~1.5x, and the pilot's measured epoch time replaces
+them as soon as it lands.
 
 **The earlier "≈ 32 h" figure in this file was wrong** and is corrected here: it
 was built from the token rate alone and did not carry the per-step launch
@@ -525,7 +534,7 @@ $PY code/run_opdiff_matrix.py --preflight
 # 3. the pilot = seed 42 (only after the T-OD.5 approval for the FULL matrix)
 $PY code/run_opdiff_matrix.py --pilot
 
-# 4. the remaining ten cells
+# 4. the remaining twelve cells
 $PY code/run_opdiff_matrix.py --all
 
 # 5. the aggregation

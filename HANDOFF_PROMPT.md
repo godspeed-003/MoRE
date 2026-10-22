@@ -37,9 +37,11 @@ pointer.
   in non-embedding parameters — which is the same reason MoR is a legitimate
   arm of the published comparison at all. Do not run MoR at other widths.
 - **The budget is corrected.** The depth-7 arms are kernel-launch-bound, not
-  compute-bound (~2.0 s per batch where the FLOPs say ~0.08 s), so **5 epochs
-  × 5 seeds ≈ 61 h on the 8 GB card** — the earlier "≈ 32 h" ignored that.
-  Per epoch, measured: MoE ~14 min, MoR ~155 min, MoRE ~63 min. The pilot's
+  compute-bound (~2.0 s per batch where the FLOPs say ~0.08 s), so the
+  protocol -- **3 epochs x 5 seeds** (`epochs: 3` in
+  `code/config_opdiff.json`, which is what the runs use) -- is **~38 h on
+  the 8 GB card**, against ~56 h on the 6 GB one. The earlier "~32 h"
+  ignored the per-step launch overhead.
   actual epoch time replaces these as soon as it lands.
 
 **1. Orient first.**
@@ -49,14 +51,14 @@ git pull origin main       # commit faca237 or later
 ```
 Then read, IN FULL, IN THIS ORDER:
 - **`HANDOFF.md`** — the authority: machine and interpreter, the dataset, the
-  preflight, the pilot and its nine acceptance checks, the remaining ten runs,
+  preflight, the pilot and its nine acceptance checks, the remaining twelve cells,
   the aggregation, the stop-at-first-failure protocol, the never-change list,
   the measured numbers, and what the study may and may not claim.
 - **`OPDIFF_DATASET.md`** — what the data is: the row layout, the binary k
   slot, the loss mask, the per-row labels, the F_k difficulty dial, the two
   OOD splits, and why the F operation was redesigned.
 - **`TASKS.md`, the T-OD.5 box** — the budget is approved, so the pilot and
-  the remaining ten cells may run.
+  the remaining twelve cells may run.
 
 **2. Environment — three things that will otherwise waste hours.**
 - Interpreter: `C:\Users\Hp\anaconda3\envs\more_env\python.exe`. Not
@@ -73,7 +75,7 @@ PY="C:\Users\Hp\anaconda3\envs\more_env\python.exe"
 $PY make_opdiff_dataset_v4.py --out opdiff_v4        # the dataset is NOT in git (~10 s)
 $PY code/run_opdiff_matrix.py --preflight            # must exit 0
 $PY code/run_opdiff_matrix.py --pilot                # = the matrix's seed-42 cells (kept)
-$PY code/run_opdiff_matrix.py --all                   # the remaining ten; skips done ones, stops at the first failure
+$PY code/run_opdiff_matrix.py --all                   # the remaining twelve; skips done ones, stops at the first failure
 $PY code/summarize_opdiff_matrix.py --out results/opdiff/summary.json
 $PY code/run_correctness_suite.py                    # the arithmetic total must still be 356
 $PY code/test_opdiff_task_axis.py
