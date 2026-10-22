@@ -201,14 +201,13 @@ epoch times back.
 
 ### 5b. The two capacity ablations (MoR at ffn_mult 4 and 24)
 
-**STATUS 2026-10-21: THESE ARE BEING RUN ON THE GATE MACHINE, NOT HERE. The
-co-author's agent does NOT need to run them.** They were started on the
-6 GB RTX 3050 (Vedant's machine) at the full dataset scale, seed 42, 3
-epochs, and the results will be committed to `main`. The reason is the
-cost: ≈ 9 h (width 24) + ≈ 4 h (width 4) on this card, against ≈ 6 h and
-≈ 4 h on the 8 GB card — and the 8 GB card is the one reserved for the
-matrix. The command is recorded here so the run is reproducible and so a
-re-run is possible:
+**STATUS 2026-10-22: these are NOT yet run, and they are NOT to be run on the
+6 GB gate card.** They belong on the 8 GB card, with the matrix, so that the
+ladder and the arms it is compared against are one machine and one protocol.
+(The earlier plan had them running on the gate machine; that was wrong — a
+ladder measured on a different card from the canonical arms is a comparison
+with two variables moved, and the 6 GB card cannot hold the MoR arm at 97 %
+VRAM occupancy anyway.)
 
 ```bash
 $PY code/train.py --config code/config_opdiff.json --task opdiff \
@@ -226,28 +225,39 @@ $PY code/train.py --config code/config_opdiff.json --task opdiff \
   parameters against MoRE's 3.95 M, i.e. 20 % of the budget. It is the
   under-budgeted small baseline, and its number must never be tabled as "MoR".
 - Both are **labelled** by `resolve_variant` (`opdiff+ffn_mult_24`,
-  `opdiff+ffn_mult_4`) and by their run names, so the aggregator cannot
-  admit them into the canonical table by accident.
+  `opdiff+ffn_mult_4`) AND by their run names, and the aggregator's matrix
+  pattern cannot match an `ffnN` variant, so an ablation can never be
+  admitted into the canonical table by accident.
 
-**WHAT THE LADDER IS AND IS NOT.** It is a **control on the MoR arm**, and
-the comparison it makes is entirely WITHIN the MoR arm: as its budget goes
+**RUN THEM AT SEED 42 FIRST, AND THEN DECIDE.** They are MoR arms, so they
+cost what MoR costs: roughly 4–5 h (width 24) and 3–4 h (width 4) per seed
+at 3 epochs. All five seeds of both would add ~35 h to a ~31 h matrix, and a
+one-seed capacity ablation cannot be separated from seed noise. Seed 42 is
+enough to see whether the ladder says anything; the remaining four seeds are
+worth spending only if it does. Report the seed-42 result and ask.
+
+**WHAT THE LADDER IS AND IS NOT.** It is a **control on the MoR arm**, and the
+comparison it makes is entirely WITHIN the MoR arm: as its budget goes
 28 → 24 → 4, what happens to its validation loss, its depth allocation and
-its per-example exact match? That is a three-point curve on ONE card, and it
-is self-consistent. What it is NOT is a second head-to-head with MoRE: the
-canonical MoRE cell is on the 8 GB card, and a run that differs from another
-in BOTH its budget and its card is a comparison with two variables moved.
-The paper's MoR-vs-MoRE claim does not need this table, because that
-comparison is budget-matched **by construction** (0.117 % of the
-non-embedding parameters) — the ladder exists to show that the MoR arm's
-result is not a capacity artefact, not to establish the headline.
+its per-example exact match? That is a three-point curve on ONE card, in ONE
+protocol, and it is self-consistent. What it is NOT is a second head-to-head
+with MoRE: the canonical MoRE cell is part of the matrix, on the same card
+and the same protocol, so that comparison is fine — but the ladder's own
+rows are the MoR widths, and the non-embedding parameter count is printed
+beside every one of them, because a table that mixes a 0.8 M-parameter arm
+with a 3.9 M one and calls them "MoR" is the confusion the parameter-budget
+rule exists to prevent.
 
-**IF THE PAPER WANTS THE TABLE.** The condition is that it be a control
-table with its own reference row, not a column in the headline table: the
-headline table is the matrix (one card, five seeds, three arms), and the
-ladder is a separate, labelled, one-seed control. A one-seed row in the
-headline table would violate the study's own "mean ± std over five seeds"
-rule, and a row from a different card would violate the one-machine rule.
----
+**THE PAPER'S MoR-vs-MoRE CLAIM DOES NOT DEPEND ON THE LADDER.** That
+comparison is budget-matched **by construction** (0.117 % of the non-embedding
+parameters). The ladder exists to show that the MoR arm's result is not a
+capacity artefact — a control, not a headline.
+
+**IF THE PAPER CARRIES IT.** The condition is that it be a control table with
+its own reference row and an explicit one-seed caveat — not a column in the
+headline table, which is the matrix's (one card, five seeds, three arms), and
+not a row from a different card. A one-seed row in the headline table would
+violate the study's own "mean ± std over five seeds" rule.
 
 ## 6. Aggregation, and what to report back
 
@@ -393,6 +403,13 @@ thing in §4.
 than MoE per token, because MoR evaluates one dense FFN of width 28 for every
 token while MoE evaluates one expert of width 4. MoR's memory peak is the
 same story, and it is why the matrix belongs on the 8 GB card.
+
+**The per-epoch figures above are TRAINING time** (the throughput is measured
+over the training loop), and the evaluation is a separate ~1.5 min per epoch
+after the T-OD.10 fix — it used to be ~18 min per epoch, which was more than
+the training it was measuring, and which is why the first dense reference
+appeared to hang for 88 minutes without finishing an epoch. The budget above
+was measured with the slow evaluation, so it is the conservative figure.
 
 ---
 
