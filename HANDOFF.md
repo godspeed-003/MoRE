@@ -19,6 +19,14 @@ estimates.
 **Read §8 (the never-change list) before you run anything.** It is short and
 it is the list of things that would silently invalidate the study.
 
+**IF ANY RUNS ALREADY EXIST ON AN EARLIER DATASET** (v3, before the F
+operation was redesigned), keep them and do NOT mix them with v4 runs: the
+aggregator refuses to average across dataset versions and says so, and a
+`dataset_version` that differs means the rows were sampled differently, so the
+two sets are two experiments. The port's operation axis covers both datasets'
+k values, so an older run directory is still readable and aggregable — on its
+own.
+
 **The dataset itself is explained in [OPDIFF_DATASET.md](OPDIFF_DATASET.md).**
 Read §2 of that file before interpreting any number that comes out of a run:
 it defines the row layout, the k slot, the loss mask, the per-row labels and
@@ -69,8 +77,18 @@ Expected: rows = 294,000 train / 7,000 val / 7,000 test / 1,000 per held-out
 k in ood_interp / 1,000 per held-out k in ood_extrap; `vocab_size` 37;
 `row_len` 384; `train_k`, `ood_interp_k` and `ood_extrap_k` as the generator
 declares them (`TRAIN_K`, `INTERP_K`, `EXTRAP_K` at the top of
-`make_opdiff_dataset_v4.py`) — the lists are set from the MEASURED
-learnability frontier, and they are in the generator, not in a config.
+`make_opdiff_dataset_v4.py`) — currently `train_k = [1, 2, 3, 4]`,
+`ood_interp_k = [5]`, `ood_extrap_k = [6, 7]`.
+
+**Those lists are a DESIGN choice, not a calibration.** The design's reasoning:
+one F iteration costs about one layer (the eight digits update in parallel), so
+the dial has to live inside the model's depth budget of 7 — a k the model cannot
+do in 7 steps is not a difficulty, it is an arithmetic wall, and the v3
+measurement showed exactly that (the old F operation was at chance at EVERY k,
+including k = 1). A separate calibration run was started and then abandoned: it
+was measuring the dataset's learnability, which is a dataset-design question,
+and the matrix's own per-k table reports it honestly for free. The lists live in
+the generator, not in a config.
 
 **If it is missing, build it** (about 10 s):
 
@@ -197,10 +215,13 @@ failed pilot, and the next step is to diagnose it, not to continue.
    do F" rather than "the model cannot extrapolate". The dataset's own caveat
    says exactly this: *"If it fails on ood_interp, check whether it also fails
    on the seen k values before blaming your architecture."*
-   (On the smoke subset, at 3 epochs on 1 % of the data, the seen F rows were
-   at ~0.17 per digit and 0.00 exact — i.e. **not learned at all yet**, so the
-   smoke pilot says nothing about extrapolation. The matrix is 82× more
-   data.)
+   **The chance level is exact and is the thing to compare against**: an F row's
+   answer is 8 hex digits plus the EOS, so a model that has learned nothing
+   about the operation scores `(8/16 + 1)/9 = 0.1667` per scored position.
+   The v3 F operation measured 0.161–0.172 — i.e. exactly chance, at every k.
+   The v4 F operation is designed to be learnable, so a trained k sitting at
+   0.1667 after the full budget means something is wrong with the run, not with
+   the dataset.
    **If this check fails, REPORT IT AND CONTINUE.** It is a finding, not a
    reason to change the protocol: the matrix also measures the primary
    three-arm comparison, which does not depend on the F rows at all. Do NOT
@@ -235,65 +256,26 @@ remaining ten cells may run. If that box is ever unticked — e.g. on a second
 machine, or after a re-freeze — run §3 and §4 only and report the measured
 epoch times back.
 
-### 5b. The two capacity ablations (MoR at ffn_mult 4 and 24)
+### 5b. No capacity ladder — and why that is the right answer
 
-**STATUS 2026-10-22: these are NOT yet run, and they are NOT to be run on the
-6 GB gate card.** They belong on the 8 GB card, with the matrix, so that the
-ladder and the arms it is compared against are one machine and one protocol.
-(The earlier plan had them running on the gate machine; that was wrong — a
-ladder measured on a different card from the canonical arms is a comparison
-with two variables moved, and the 6 GB card cannot hold the MoR arm at 97 %
-VRAM occupancy anyway.)
+**There is no ladder to run.** The question a ladder asks — "does the MoR-vs-MoRE
+result depend on the MoR arm's parameter budget?" — is answered by a *design
+fact* that this repository already measures and publishes: MoR's single FFN is
+given the total hidden width of MoRE's seven experts (7 x 4 = 28), and the
+measured gap in non-embedding parameters is **0.117 %**. That is the same
+reason MoR is a legitimate arm of the published comparison at all
+(6 x 4 = 24 on the six-group task). A ladder would re-derive a number the
+design already fixes, on a *baseline* arm, on a task whose claim is about the
+composition. It is not run.
 
-```bash
-$PY code/train.py --config code/config_opdiff.json --task opdiff \
-    --architecture mor --seed 42 --ffn_mult 24 \
-    --run_name opdiffB_MoR_ffn24_seed42
-$PY code/train.py --config code/config_opdiff.json --task opdiff \
-    --architecture mor --seed 42 --ffn_mult 4 \
-    --run_name opdiffB_MoR_ffn4_seed42
-```
-
-- **MoR at ffn_mult 24 is NOT matched to MoRE** — 24 = 6 × 4 is the width the
-  *arithmetic and language* studies give MoR, i.e. what MoR would be if the
-  partition had six groups. On this task it is 87 % of MoRE's stack.
-- **MoR at ffn_mult 4 is NOT matched to anything** — 792 K non-embedding
-  parameters against MoRE's 3.95 M, i.e. 20 % of the budget. It is the
-  under-budgeted small baseline, and its number must never be tabled as "MoR".
-- Both are **labelled** by `resolve_variant` (`opdiff+ffn_mult_24`,
-  `opdiff+ffn_mult_4`) AND by their run names, and the aggregator's matrix
-  pattern cannot match an `ffnN` variant, so an ablation can never be
-  admitted into the canonical table by accident.
-
-**RUN THEM AT SEED 42 FIRST, AND THEN DECIDE.** They are MoR arms, so they
-cost what MoR costs: roughly 4–5 h (width 24) and 3–4 h (width 4) per seed
-at 3 epochs. All five seeds of both would add ~35 h to a ~31 h matrix, and a
-one-seed capacity ablation cannot be separated from seed noise. Seed 42 is
-enough to see whether the ladder says anything; the remaining four seeds are
-worth spending only if it does. Report the seed-42 result and ask.
-
-**WHAT THE LADDER IS AND IS NOT.** It is a **control on the MoR arm**, and the
-comparison it makes is entirely WITHIN the MoR arm: as its budget goes
-28 → 24 → 4, what happens to its validation loss, its depth allocation and
-its per-example exact match? That is a three-point curve on ONE card, in ONE
-protocol, and it is self-consistent. What it is NOT is a second head-to-head
-with MoRE: the canonical MoRE cell is part of the matrix, on the same card
-and the same protocol, so that comparison is fine — but the ladder's own
-rows are the MoR widths, and the non-embedding parameter count is printed
-beside every one of them, because a table that mixes a 0.8 M-parameter arm
-with a 3.9 M one and calls them "MoR" is the confusion the parameter-budget
-rule exists to prevent.
-
-**THE PAPER'S MoR-vs-MoRE CLAIM DOES NOT DEPEND ON THE LADDER.** That
-comparison is budget-matched **by construction** (0.117 % of the non-embedding
-parameters). The ladder exists to show that the MoR arm's result is not a
-capacity artefact — a control, not a headline.
-
-**IF THE PAPER CARRIES IT.** The condition is that it be a control table with
-its own reference row and an explicit one-seed caveat — not a column in the
-headline table, which is the matrix's (one card, five seeds, three arms), and
-not a row from a different card. A one-seed row in the headline table would
-violate the study's own "mean ± std over five seeds" rule.
+**IF A LADDER IS EVER WANTED**, the widths are 4 (792 K non-embedding
+parameters, 20 % of the budget), 24 (3.42 M -- the six-group width, i.e. the
+width the arithmetic study gives MoR) and 28 (3.94 M -- the matched one). All
+three must be measured on the SAME card, in the same protocol, or the
+comparison has the card changed as well as the budget. `resolve_variant` labels
+them `opdiff+ffn_mult_4` / `opdiff+ffn_mult_24`, and their run names say so,
+and the aggregator's matrix pattern cannot match them -- so an ablation can
+never be admitted into the canonical table by accident.
 
 ## 6. Aggregation, and what to report back
 
@@ -419,21 +401,32 @@ rates themselves are direct measurements.
 | MoR | 17,301 | 1.4210 → 1.3550 | 0.565 | 0.536 | 3.67 | N/A | N/A | **5.80 / 6.38 GiB** |
 | MoRE | 30,874 | 1.4225 → 1.3430 | 0.566 | 0.636 | 4.88 | 0.2084 | 0.0323 | 2.44 / 2.66 GiB |
 
-**Extrapolated epoch time on the full dataset (294,000 train + 7,000 val +
-7,000 OOD rows), 3 epochs per seed, 5 seeds:**
+**The per-epoch cost, MEASURED, and it is larger than an FLOPs estimate
+suggests.** The two recursive arms are *kernel-launch-bound*, not
+compute-bound: a depth-7 step over 48 rows of 304 tokens issues hundreds of
+tiny kernels, and the measured batch cost is ~2.0 s where the FLOPs say ~0.08 s.
+The GPU reports 70–80 % "utilisation" throughout, which is any-kernel
+activity, not occupancy.
 
-| arm | per epoch | per seed (3 ep) | 5 seeds |
+| arm | tokens/s (measured) | per epoch, training pass | + the evaluation |
 |---|---|---|---|
-| MoE | 12.2 min | 37 min | 3.1 h |
-| MoR | 113.6 min | 5.7 h | 28.4 h |
-| MoRE | 63.9 min | 3.2 h | 16.0 h |
-| **all three** | | **9.0 h** | **≈ 47 h** |
+| MoE | 151,081 | 12.5 min | ~14 min |
+| MoR (28) | 17,301 | ~110–150 min | ~155 min |
+| MoRE | 30,874 | 61 min | ~63 min |
 
-On the 8 GB 4060 the same matrix should take **≈ 32 h** (the language
-calibration measured the 4060 at ~1.5× the 3050's per-epoch time). Treat that
-as an estimate and **correct it with the pilot's measured epoch time** before
-the remaining ten runs — the pilot is the measurement, and it is the first
-thing in §4.
+**Budget (the arithmetic above is a floor; the per-epoch times are what
+matter):** at 3 epochs x 5 seeds, MoE 3.1 h + MoR ~38 h + MoRE 15.3 h ≈ **56 h
+on the 6 GB card**; at 5 epochs x 5 seeds ≈ **92 h on the 6 GB card**. On the
+8 GB 4060, scale by the language calibration's measured ~1.5x: **≈ 37 h at 3
+epochs and ≈ 61 h at 5 epochs**.
+
+**The earlier "≈ 32 h" figure in this file was wrong** and is corrected here: it
+was built from the token rate alone and did not carry the per-step launch
+overhead, and it was measured with an evaluation that cost 18 minutes per epoch
+(the evaluation is now ~1.5 min, after the per-token Python loops in the depth
+accumulation were replaced with a `scatter_add_`). **The pilot's measured epoch
+time is the number to plan against**, and it replaces these estimates as soon
+as it lands.
 
 **These rates are why the matrix is affordable at all**: MoR is 9.3× slower
 than MoE per token, because MoR evaluates one dense FFN of width 28 for every
