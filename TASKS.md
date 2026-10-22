@@ -2235,8 +2235,27 @@ the co-author's agent. Not part of `plan.md` §0–11. Companion paper task:
   7,000 / 1,000 (ood_interp, k=5) / 2,000 (ood_extrap, k=6,7) rows, vocab
   37, 112,896,000 train tokens, `dataset_version` opdiff-v4-b002e4acf878; on a
   300-row sample per split: **0 group violations, 0 E7 purity violations, 0 k
-  decode mismatches**. The calibration runs are in flight (dense reference on
-  v3, then on v4).
+  decode mismatches**. The port moved to v4 (the axis is a 35-wide SUPERSET of
+  the k sets, so the v3 dataset — the record of the "not learnable at any k"
+  measurement — stays evaluable; the data's own k list is still checked against
+  the data's own manifest). `code/test_opdiff_task_axis.py` 63/63; the gate
+  suite 356/356.
+  **TWO PERFORMANCE DEFECTS FOUND AND FIXED, both of which cost more than the
+  model.** The dense reference appeared to hang — 88 minutes into epoch 1 with
+  the GPU at 0 % and one CPU thread at 100 %. It was in the EVALUATION, which
+  was the bottleneck by a factor of seven: a 10 %-subset timing run took 20.7
+  minutes, of which the training was 2.7 and the evaluation 18.0. (1) The
+  per-token Python loop in the depth accumulation — a 0-dim tensor add per token
+  over 5.4 M tokens per epoch — replaced by `scatter_add_`; the resulting
+  per-operation depths are BIT-IDENTICAL (the same 10 % configuration re-run
+  before and after matches on every `recursion/avg_depth_by_op/*` value).
+  (2) The dataset's per-row Python loop (763 µs/row → 324 µs) — the k decode
+  looped over the 16 examples of a row with ~6 numpy calls on two-element
+  slices. **The same 10 % epoch went from 20.7 minutes to 3.6**, and the
+  evaluation had been costing ~18 min per epoch per run — ~14 h across the 15
+  matrix cells, more than the training it was measuring.
+  **The calibration runs are in flight** (dense reference on v4, and on v3 for
+  the diagnosis).
 
 ---
 
