@@ -308,7 +308,22 @@ def main():
     ap.add_argument("--eval_rows_per_group", type=int, default=1_000)
     ap.add_argument("--ood_rows_per_k", type=int, default=1_000)
     ap.add_argument("--seed", type=int, default=0)
+    ap.add_argument("--train_k", type=int, nargs="*", default=None,
+                    help="override the TRAINED k values. Used to build the "
+                         "CALIBRATION dataset, which trains on every k so that "
+                         "a model's per-k accuracy measures whether the "
+                         "OPERATION is learnable at that k rather than whether "
+                         "the model has seen that k. The final train/interp/"
+                         "extrap split is chosen FROM the measured frontier.")
+    ap.add_argument("--interp_k", type=int, nargs="*", default=None)
+    ap.add_argument("--extrap_k", type=int, nargs="*", default=None)
     a = ap.parse_args()
+    if a.train_k is not None:
+        TRAIN_K[:] = list(a.train_k)
+    if a.interp_k is not None:
+        INTERP_K[:] = list(a.interp_k)
+    if a.extrap_k is not None:
+        EXTRAP_K[:] = list(a.extrap_k)
     rng = np.random.default_rng(a.seed)
     os.makedirs(a.out, exist_ok=True)
 

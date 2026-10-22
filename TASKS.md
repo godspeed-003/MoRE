@@ -2254,8 +2254,22 @@ the co-author's agent. Not part of `plan.md` §0–11. Companion paper task:
   slices. **The same 10 % epoch went from 20.7 minutes to 3.6**, and the
   evaluation had been costing ~18 min per epoch per run — ~14 h across the 15
   matrix cells, more than the training it was measuring.
-  **The calibration runs are in flight** (dense reference on v4, and on v3 for
-  the diagnosis).
+  **A CORRECTION TO THE CALIBRATION DESIGN, worth recording because it would
+  have produced a confident wrong answer.** The first calibration was a DENSE
+  reference (`max_depth = 1`) on the new F, on the reasoning that a plain
+  transformer establishes the frontier. It cannot: a one-layer model can only
+  ever do k = 1, so its "frontier" is trivially 1 and says nothing about a
+  model with the study's 7-step budget. The frontier needs a model with the
+  FULL depth budget, so the calibration is now **MoR at `ffn_mult = 24` with
+  `max_depth = 7`** — the width below the canonical 28 (because the canonical
+  width peaks at ~6.3 GiB and does not fit the 6 GB gate card) and the depth
+  that matters. The calibration dataset (`opdiff_v4_calib`) trains on EVERY k
+  (1..7) so that a model's per-k accuracy measures *can it do k at all*
+  rather than *has it seen k*; the final train / interpolation / extrapolation
+  split is then chosen FROM the measured frontier, which is the only order
+  that is not circular. The dense reference is kept for the one thing it IS
+  good for — the old F's diagnosis, where "one layer, one iteration" and
+  "not learnable at any k" are the same statement.
 
 ---
 
