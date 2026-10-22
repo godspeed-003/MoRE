@@ -190,18 +190,23 @@ check("OD.1i a NON-operation token id raises instead of aliasing an "
 # whole.
 check("OD.1j the depth axis is the 17 non-F operations plus one entry per k "
       "value, named F<k>",
-      OF.NUM_OP_AXIS == 24
+      OF.NUM_OP_AXIS == 35
       and OF.OP_AXIS_NAMES[:17] == [o for o in OF.ALL_OP_NAMES if o != "F"]
       and OF.OP_AXIS_NAMES[17:] == [f"F{k}" for k in OF.K_VALUES],
       f"axis width {OF.NUM_OP_AXIS}: 17 operations + {len(OF.K_VALUES)} k values")
 
+# The axis is a LABEL SPACE and may be a superset of the current dataset's k
+# set (it also carries the v3 design's k values, so the v3 dataset -- the
+# source of the "not learnable at any k" measurement -- stays evaluable). What
+# it must NOT do is MISS a k the generator can produce.
 check("OD.1k the axis covers EVERY k the generator can produce, and the "
       "held-out lists are disjoint from the trained one",
-      set(GEN.TRAIN_K) | set(GEN.INTERP_K) | set(GEN.EXTRAP_K) == set(OF.K_VALUES)
+      set(GEN.TRAIN_K) | set(GEN.INTERP_K) | set(GEN.EXTRAP_K) <= set(OF.K_VALUES)
       and not (set(GEN.TRAIN_K) & set(GEN.INTERP_K))
       and not (set(GEN.TRAIN_K) & set(GEN.EXTRAP_K))
       and not (set(GEN.INTERP_K) & set(GEN.EXTRAP_K)),
-      f"train {GEN.TRAIN_K}, interp {GEN.INTERP_K}, extrap {GEN.EXTRAP_K}")
+      f"train {GEN.TRAIN_K}, interp {GEN.INTERP_K}, extrap {GEN.EXTRAP_K}; "
+      f"the axis carries {len(OF.K_VALUES)} k values")
 
 check("OD.1l the axis index of an F instance is the index of its k, and an "
       "unknown k RAISES rather than being clamped",

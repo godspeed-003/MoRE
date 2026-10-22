@@ -50,13 +50,13 @@ therefore tests a real capability -- reading a composition out of a slot and
 spending the matching amount of computation -- instead of testing whether an
 untrained embedding can be guessed.
 
-THE OPERATION AXIS, AND WHY IT IS 24 WIDE AND NOT 18. The per-operation depth
+THE OPERATION AXIS, AND WHY IT IS 35 WIDE AND NOT 18. The per-operation depth
 breakdown (`recursion/avg_depth_by_op/<OP>`) is what answers "does the model
 spend more computation on the operations that need more of it?". For the F
 operation the interesting quantity is not the operation but the ITERATION
 COUNT: the claim is that depth grows with k. So the axis carries one entry
 per (operation, k) INSTANCE: the 17 non-F operations, then one entry per k
-value, named `F1`…`F7`. The axis index of a token is derived from the INPUT --
+value, named `F1`…`F17`, `F20`. The axis index of a token is derived from the INPUT --
 the operation token and the k slot the model is shown -- and never from a
 label file, so the axis is legitimate operation identity and not an oracle.
 
@@ -183,7 +183,15 @@ K_BITS = 5
 # budget measures nothing but the budget. The v3 list (1..16 plus 17 and 20)
 # is the record of the ORIGINAL design, whose F operation was not learnable
 # at ANY k -- see make_opdiff_dataset_v3.py and the changelog.
-K_VALUES: tuple[int, ...] = (1, 2, 3, 4, 5, 6, 7)
+# The axis is a LABEL SPACE, so it is a SUPERSET of the current dataset's k
+# set. The v4 design uses 1..7; the v3 design used 1..16 plus 17 and 20, and
+# the v3 dataset is kept for the record (it is the source of the "the F
+# operation is not learnable at ANY k" measurement), so a run over it still
+# needs an axis entry for its k values. The DATA's own k list is checked
+# against the DATA's own manifest in opdiff_data.py, so a wide axis cannot
+# hide a typo in a dataset.
+K_VALUES: tuple[int, ...] = (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14,
+                             15, 16, 17, 20)
 K_VALUE_TO_IDX: dict[int, int] = {k: i for i, k in enumerate(K_VALUES)}
 
 # The generator's `GROUPS`: group number (1..6) -> its operation names, and
