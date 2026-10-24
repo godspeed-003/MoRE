@@ -18,9 +18,13 @@ WHAT IT REFUSES, and why each refusal is a correctness rule and not caution:
     regenerated on each machine, and a regeneration that sampled different
     rows is a DIFFERENT dataset. Mixing such a run into a mean with the
     others would produce a number that describes no dataset at all.
-  * Two runs of the SAME arm with different `config_hash` are refused as a
-    set. A config that changed between two seeds of one arm means the arm is
-    no longer one arm, and the mean across it is a mean of two experiments.
+  * Two runs of the SAME arm whose RESOLVED CONFIGS differ in any field that is
+    not derived from the seed are refused as a set, naming the field. The config
+    changed between two seeds of one arm, so the arm is no longer one arm and
+    the mean across it is a mean of two experiments. NOTE: `config_hash` itself
+    is NOT a usable test -- the engine stamps the seed into two hashed fields
+    (`training.subset_seed`, `data.subset_seed`), so every seed of every arm has
+    a different hash by construction; see REFUSAL 2 in `main`.
   * A run with fewer than one completed seed is reported as N/A, not as a
     mean over what happened to be there. One seed is a single observation and
     the study reports mean +- std over five.
@@ -130,9 +134,22 @@ def collect(expect_version=None, kind="matrix"):
             "config_hash": (cfg.get("provenance") or {}).get("config_hash"),
             "dataset_version": dsv,
             "group": (cfg.get("logging") or {}).get("experiment_group"),
+            "adaptive": int((cfg.get("model") or {}).get("max_depth") or 1) > 1,
+            "config": cfg,
             "metrics": met,
         })
     return out, skipped
+
+
+def _flatten_config(d, prefix=""):
+    """Leaf-path -> value map, so a nested difference is named by its path."""
+    out = {}
+    for k, v in d.items():
+        if isinstance(v, dict):
+            out.update(_flatten_config(v, prefix + k + "."))
+        else:
+            out[prefix + k] = v
+    return out
 
 
 def _num(v):
@@ -166,9 +183,19 @@ def _fmt(mean, std, digits=4):
 # tables
 # ---------------------------------------------------------------------------
 
+# Recursion-depth quantities that do not exist for a non-adaptive arm. The
+# engine writes "N/A" for `val/avg_recursion_steps` at max_depth == 1 but its OOD
+# twin did not grow the same guard until this was found (MoE published 2.0 on the
+# OOD splits while its realised depth was 1.0). The runs before that fix are on
+# disk and are NOT edited -- a finished run's artifacts are immutable -- so the
+# rule is applied here, where the number is read, for every seed alike. An N/A
+# is the honest reading: MoE has no recursion to measure on any split.
+DEPTH_KEYS = {"val/avg_recursion_steps",
+              "ood_interp/avg_recursion_steps",
+              "ood_extrap/avg_recursion_steps"}
+
 HEADLINE = [
-    ("val/task_loss", "val/task_loss", 4),
-    ("val/accuracy", "val accuracy (per digit)", 4),
+    ("val/task_loss", "val/task_loss", 4),    ("val/accuracy", "val accuracy (per digit)", 4),
     ("val/exact_match", "val exact match (per example)", 4),
     ("val/avg_recursion_steps", "avg recursion steps", 2),
     ("val/routing_agreement_with_group", "agreement with group", 4),
@@ -218,19 +245,58 @@ def main(argv=None):
         print(f"\n  REFUSED: the runs span {len(versions)} dataset versions "
               f"({versions}). A mean across two datasets describes neither.")
         return 2
-    # REFUSAL 2: one config hash per (arm, variant). The VARIANT is part of
-    # the key because a capacity ablation is a DIFFERENT experiment from the
-    # canonical arm -- and it is a LABELLED one ("opdiff+ffn_mult_4"). Two
-    # runs of the SAME (arm, variant) with different config hashes is the real
-    # defect: the config changed between two seeds of one experiment.
+    # REFUSAL 2: one PROTOCOL per (arm, variant).
+    #
+    # THE CONFIG HASH CANNOT BE THE TEST, and comparing it is a defect this
+    # check originally carried. `config_hash` (run_context.config_hash) is
+    # SHA-256 over the resolved config with only `provenance` and `logging`
+    # removed, and the engine stamps the run's seed into TWO hashed fields --
+    # `training.subset_seed` and `data.subset_seed` -- so every seed of every
+    # arm necessarily has a different hash. The old test therefore refused
+    # EVERY multi-seed matrix (measured: MoE 42/43/44 gave 3ea2b9c7, 491048ee,
+    # d88592e9) while admitting any matrix of one seed, which is the case the
+    # smoke runs exercise. The language runs carry the same per-seed hashes
+    # (langB_MoE seed42 -> 51000018, seed43 -> 7d85fe81), so this was never a
+    # property of opdiff.
+    #
+    # The rule that actually matters is preserved and is STRONGER: the full
+    # resolved configs of one (arm, variant) must be identical except for the
+    # fields that are DERIVED FROM THE SEED. Any other difference is a config
+    # change between two seeds and is refused, naming the key, so a protocol
+    # drift is caught even when it does not move the hash into a new bucket.
+    # `subset_fraction` is 1.0 in the opdiff protocol, so `subset_seed` is inert
+    # there and cannot describe a different dataset even in principle.
     by_arm = defaultdict(set)
     for r in runs:
         by_arm[(r["arch"], r["variant"])].add(r["config_hash"])
-    bad = {a: sorted(h) for a, h in by_arm.items() if len(h) > 1}
-    if bad:
-        print(f"\n  REFUSED: these (arm, variant) pairs have more than one "
-              f"config hash: {bad}. The config changed between two seeds of the "
-              "same experiment, so it is two experiments.")
+    seed_free = ("provenance.", "logging.")
+    seed_free_exact = {"training.subset_seed", "data.subset_seed"}
+    drift = []
+    _by_group = {}
+    for r in runs:
+        _by_group.setdefault((r["arch"], r["variant"]), []).append(r)
+    for (arch, variant), rows in sorted(_by_group.items(),
+                                        key=lambda kv: (kv[0][0], kv[0][1] or "")):
+        ref = _flatten_config(rows[0]["config"])
+        for r in rows[1:]:
+            other = _flatten_config(r["config"])
+            for k in sorted(set(ref) | set(other)):
+                if k in seed_free_exact or k.startswith(seed_free):
+                    continue
+                if ref.get(k) != other.get(k):
+                    drift.append((arch, variant, k,
+                                  rows[0]["seed"], ref.get(k),
+                                  r["seed"], other.get(k)))
+    if drift:
+        print("\n  REFUSED: the runs of one (arm, variant) do not share a "
+              "protocol. These fields differ between seeds and are NOT "
+              "seed-derived:")
+        for arch, variant, k, s0, v0, s1, v1 in drift[:20]:
+            print(f"    {arch}/{variant or '-'}  {k}: seed {s0} = {v0!r}, "
+                  f"seed {s1} = {v1!r}")
+        print("  A config that changed between two seeds of one arm means the "
+              "arm is no longer one arm, and the mean across it would be a "
+              "mean of two experiments.")
         return 2
 
     print(f"\n  {len(runs)} admissible run(s)\n")
@@ -260,7 +326,9 @@ def main(argv=None):
             "metrics": {},
         }
         for key, label, _d in HEADLINE:
-            vals = [_num(r["metrics"].get(key)) for r in rows]
+            vals = [_num(r["metrics"].get(key))
+                    if not (key in DEPTH_KEYS and not r["adaptive"]) else None
+                    for r in rows]
             m, s, n = _ms(vals)
             summary["arms"][_label]["metrics"][key] = {
                 "mean": m, "std": s, "n": n,
@@ -364,10 +432,19 @@ def main(argv=None):
     # SEEN k values and the HELD-OUT ones in the same table, so a reader can
     # see whether the model fails on the held-out k values because it cannot
     # READ the k slot or because it cannot SOLVE an F row at all.
+    # The k set is the UNION of the three namespaces, and building it from
+    # `val/accuracy_by_op/F*` alone was a defect: the trained k values are the
+    # ONLY ones with a `val/` entry (the OOD splits carry k = 5 and k = 6,7), so
+    # the table printed four SEEN rows and NO held-out row at all -- the one
+    # comparison the study exists to make was silently absent while the table
+    # still looked complete. Measured on the completed matrix: `_k_names` was
+    # F1..F4 and every `ood acc` cell was N/A.
     _k_names = sorted({k.rsplit("/", 1)[1]
-                        for r in runs for k in r["metrics"]
-                        if k.startswith("val/accuracy_by_op/F")},
-                       key=lambda s: int(s[1:]))
+                       for r in runs for k in r["metrics"]
+                       if (k.startswith("val/accuracy_by_op/F")
+                           or k.startswith("ood_interp/accuracy_by_op/F")
+                           or k.startswith("ood_extrap/accuracy_by_op/F"))},
+                      key=lambda s: int(s[1:]))
     if _k_names:
         print("\n  the compute-versus-k table (F rows only, mean over seeds)")
         print("  'seen' = the k was trained on; 'HELD OUT' = it was not.")

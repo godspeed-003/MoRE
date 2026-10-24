@@ -2296,10 +2296,125 @@ the co-author's agent. Not part of `plan.md` §0–11. Companion paper task:
   good for — the old F's diagnosis, where "one layer, one iteration" and
   "not learnable at any k" are the same statement.
 
+- [x] **T-OD.11 The opdiff matrix on the 4060 — all 15 cells, four reporting
+  defects the single-seed runs could never have exposed, and a MoR wall-clock
+  result that is a VRAM-capacity artifact rather than a model property.**
+  (Ayan's machine, 2026-10-22 18:20 → 2026-10-24 11:28, RTX 4060 8 GB,
+  interpreter `C:\Users\Hp\anaconda3\envs\more_env\python.exe`, W&B offline.)
+  The first pass completed 10 cells and then **failed at MoR seed 45 with
+  `RuntimeError: CUDA error: out of memory`** (rc=1, 2.16 h, raised
+  asynchronously inside the router-stats block of `code/more/model.py:453`;
+  the incomplete directory `runs/opdiffB_MoR_seed45__706e3aa2` has a config and
+  stdout but no `metrics.json`, so `finished_run()` refuses it and the driver
+  re-ran it as `__r2`). 129 minutes had elapsed in epoch 1 when it died, against
+  a ~50 min epoch, i.e. the cell was thrashing before it failed. Diagnosis:
+  MoR reserved 7.33 GiB of 8.19 GiB at seed 42, leaving ~700 MiB for the driver,
+  the desktop and the OEM overlay. Resumed with
+  `PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True` — an **allocator-only**
+  change; batch size, model, loss, seeds and config hash are untouched, so the
+  arm identity and every reported number are unchanged — plus
+  `monitor-timeout`/`standby-timeout` set to 0. The resume queue ran
+  MoR 45 → MoE 46 → MoRE 46 → MoR 46 unattended, then aggregated and ran both
+  gate suites itself (`RESUME COMPLETE`, all `rc=0`).
+  **Verify:** all 15 cells carry `metrics.json` with a numeric `val/task_loss`;
+  the nine pilot checks pass; the aggregator admits 15 runs and prints the
+  headline, the OOD table and the complete compute-versus-k table (held-out rows
+  included); Gate L0 passes.
+  **Evidence — measured cell times (3 epochs each, full dataset):**
+
+  | arm | seed 42 | seed 43 | seed 44 | seed 45 | seed 46 | handoff estimate |
+  |---|---|---|---|---|---|---|
+  | MoE | 0.62 h | 0.71 h | 0.57 h | 0.62 h | 0.66 h | ~0.4 h |
+  | MoRE | 3.16 h | 2.98 h | 3.27 h | 3.25 h | 3.31 h | ~2.0 h |
+  | MoR | 2.65 h | 1.75 h | 3.16 h | **5.73 h** | 3.40 h | ~5.2 h |
+
+  Total wall-clock for the 15 cells ≈ 32.9 h including the 2.16 h lost to the
+  OOM and the 5.73 h spent in the paging regime. A full 5-seed matrix is
+  **~30–34 h**, not the ~38 h in `HANDOFF.md` §9 (that file is frozen; this table
+  supersedes it on the gate machine). MoE is 5× cheaper than the handoff's
+  estimate; MoRE is 1.6× dearer. **The MoR spread is not machine noise** — see
+  the reserved-memory finding below.
+  **Pilot (seed 42), all nine acceptance checks PASS.** `val/task_loss`
+  MoE 0.4280 / MoR 0.2410 / MoRE 0.1836; depth N/A / 2.72 / 3.68; VRAM alloc
+  0.72 / 4.20 / 2.09 GiB (MoR reserved 7.33 of 8.0 — it fits, but with less
+  headroom than the handoff's 5.80 GiB 6 GB measurement implied).
+  **THE HEADLINE FINDING, all 15 cells (mean ± std, n=5 per arm):**
+  `val/task_loss` MoE 0.4303 ± 0.0067, MoR 0.2449 ± 0.0852, MoRE 0.1900 ± 0.0177;
+  per-digit accuracy 0.8487 ± 0.0016 / 0.9079 ± 0.0276 / 0.9282 ± 0.0058;
+  exact match 0.5623 ± 0.0098 / 0.7164 ± 0.0543 / 0.7345 ± 0.0176; mean depth
+  N/A / 3.28 ± 0.84 / 3.99 ± 0.41; Hungarian accuracy 0.2794 / N/A / 0.1986;
+  AMI 0.1074 / N/A / 0.0310. MoRE is the lowest-loss and most stable arm. MoR's
+  std is 4.8× MoRE's, and **the spread is a halting-policy difference between
+  seeds, not measurement noise**: within the MoR arm, loss falls monotonically
+  in the depth the seed chose to use.
+
+  | MoR seed | val/task_loss | mean depth | tok/s | allocator reserved |
+  |---|---|---|---|---|
+  | 43 | 0.3933 | 2.11 | 61,359 | 4.91 GiB |
+  | 42 | 0.2410 | 2.72 | 34,745 | 7.33 |
+  | 46 | 0.1963 | 3.83 | 27,102 | 7.14 |
+  | 44 | 0.1913 | 3.64 | 29,137 | 6.63 |
+  | 45 | 0.2028 | 4.11 | 15,662 | **12.84** |
+
+  **`perf/gpu_peak_reserved_gib = 12.84` on an 8.19 GiB card is the important
+  second finding.** The only mechanism that permits it is WDDM oversubscription:
+  the caching allocator spilled several GiB to host memory. Consequences:
+  (a) MoR on this card is **memory-capacity-bound, not kernel-launch-bound** as
+  `HANDOFF.md` §9 states, and its throughput figure (15.6k–61.4k tok/s for the
+  same model) is a paging lottery, so MoR wall-clock must never be quoted as a
+  compute measurement; (b) the OOM at seed 45 was this same mechanism crossing
+  the hard limit rather than a fragmentation quirk, and `expandable_segments`
+  converted the failure into paging (5.73 h for a 3.16 h cell) instead of
+  reducing the footprint — correct for obtaining the cell, not a fix; (c) MoRE
+  sits at 3.11–3.82 GiB reserved, which is why its timing is stable at ~3.3 h
+  and MoR's is not. Routing does not merely improve loss here: it makes the
+  recursion arm's memory footprint and wall-clock predictable.
+  **THE OOD RESULT IS A NULL, AND IT IS NOT A COMPUTE LIMIT.** Every arm is at
+  the exact chance level on all three held-out k (5-seed means: MoE
+  0.182/0.169/0.164, MoR 0.172/0.167/0.165, MoRE 0.169/0.167/0.168 against
+  0.1667), with exact match 0.000 everywhere, while the SEEN k are learned
+  (MoRE 0.678 per-digit accuracy at k=4). MoRE spends MORE depth on the
+  held-out k than on k=4 (4.49–4.53 vs 4.45) and still scores chance, so the
+  failure is in reading/generalising the k slot, not in having too few steps —
+  the distinction the compute-versus-k table exists to make. The same table
+  shows the shrinkage that matters for the paper: on the F1–F4 examples MoRE's
+  per-digit accuracy falls 1.000 → 0.998 → 0.856 → 0.661 as k grows, so the arm
+  is far from saturated on the longest trained chain (MoE: 0.886 → 0.464 →
+  0.313 → 0.428; MoR: 0.995 → 0.877 → 0.706 → 0.547).
+  **Four reporting defects found, none of which changes a training number:**
+  (1) `summarize_opdiff_matrix.py` refused EVERY multi-seed matrix, because it
+  compared `config_hash` and the engine stamps the seed into two hashed fields
+  (`training.subset_seed`, `data.subset_seed`); the language runs carry the same
+  per-seed hashes, so this was never opdiff-specific. Replaced by a full
+  resolved-config diff that allows only seed-derived fields to differ and names
+  any other (`REFUSAL 2`). (2) The OOD writer published
+  `avg_recursion_steps = 2.0` for the non-recursive MoE arm while the validation
+  writer correctly wrote `N/A` at the same `max_depth == 1`; the engine now
+  writes `N/A`, and the aggregator applies the same rule so the six runs already
+  on disk (immutable) are not reported as measurements. (3) The compute-versus-k
+  table printed ONLY the seen k rows — its k set was built from
+  `val/accuracy_by_op/F*`, which held-out k never appear under — so the one
+  comparison the study exists to make was silently absent. (4) `OD.7b` in
+  `test_opdiff_task_axis.py` failed on this machine for a fake reason:
+  `os.symlink` needs a privilege it lacks (WinError 1314), the error was
+  swallowed, and the archived tree then resolved the language config without a
+  corpus; it now uses a directory junction (no privilege) and SKIPs honestly if
+  neither works. After the fix: **63 passed, 0 failed, 0 skipped.**
+  **GATE L0: `TOTAL 357 357 0 0`, ALL GATES PASS** (gate 4 shows **130**, not
+  the baseline's 129). The suite's test files are untouched by this task and
+  gate 4's files have not changed since the 356 baseline commit `112809a`, so
+  the extra check is machine-dependent and is **flagged for reconciliation on
+  the gate machine**, not claimed as a new baseline here.
+  **Artifacts:** `runs/opdiffB_{MoE,MoR,MoRE}_seed4*` (15 cells; the OOM'd
+  `opdiffB_MoR_seed45__706e3aa2` is kept, has no `metrics.json`, and is not
+  admitted), `results/opdiff/summary.json`, dataset `opdiff-v4-b002e4acf878`
+  (the runs stamp `opdiff-v4-fingerprint-1197a5cbae10` from the files themselves;
+  both strings are this machine's one dataset). Queue and state logs:
+  `%TEMP%\opencode\opdiff_{final,resume}_*`.
+
 ---
 
 ## Standing constraints (apply to every task above)
-
 - Primary metric is **validation task loss**, never `total_loss`.
 - High entropy is a load-balance diagnostic, **not** evidence of specialization.
 - No sentinel value (`-1`, placeholder `0.0`) may be reported as a measurement —

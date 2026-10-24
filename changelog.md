@@ -10623,3 +10623,105 @@ k = 7 row. The unit suite was green at that moment — it did not cover a k
 above the first — and the fix is keyed by the value.
 
 
+
+## T-OD.11 - the matrix runs on the 4060, and four reporting defects it exposed
+
+**What ran.** Seeds 42 (MoE, MoR, MoRE), 43 (all three) and 44 (MoE, MoRE) on
+the full `opdiff_v4` dataset, 3 epochs each, on the 8 GB RTX 4060. Eight of the
+fifteen cells. Measured cell cost: MoE 0.57-0.71 h, MoRE 2.98-3.27 h, MoR
+1.75-2.65 h. The 38 h budget in `HANDOFF.md` Â§9 is superseded: the card is
+faster on the long pole than the 6 GB-scaled figure and slower on MoRE, and
+MoR's own two seeds differ by 50 %, so the budget has to be a range.
+
+**Result.** `val/task_loss` over the completed seeds: MoE 0.4260 +/- 0.0047
+(n=3), MoR 0.3172 +/- 0.1077 (n=2), MoRE 0.1811 +/- 0.0023 (n=3). Every arm is
+at chance on every held-out k (0.164-0.182 against 0.1667) while the trained k
+are learned, and MoRE spends MORE steps on the held-out k than on k=4 (4.35 vs
+4.30). The OOD failure is a failure to use the k slot, not a depth shortage.
+
+**THE DEFECT THAT MATTERS FOR EVERY FUTURE MATRIX, in
+`code/summarize_opdiff_matrix.py` (`REFUSAL 2`).** The aggregator compared
+`provenance.config_hash` within an arm and refused when it saw more than one.
+It will always see more than one: `config_hash` is taken over the resolved
+config minus `provenance` and `logging`, and the engine writes the run's seed
+into TWO hashed fields, `training.subset_seed` and `data.subset_seed`. Measured:
+MoE seeds 42/43/44 gave `3ea2b9c7`, `491048ee`, `d88592e9`, and every one of
+those runs is the same protocol. The check had never been exercised beyond a
+single seed (every opdiff run on disk before today was a one-seed smoke), and
+the language runs carry the same per-seed hashes (`langB_MoE` seed42 ->
+`51000018`, seed43 -> `7d85fe81`), so this was never opdiff-specific. The check
+now diffs the full flattened resolved config and permits differences only under
+`provenance.`, `logging.`, `training.subset_seed` and `data.subset_seed`,
+refusing anything else by name. That is stronger than the hash comparison it
+replaces: a protocol drift is named, not merely bucketed.
+
+**Three more, all in what a reader sees rather than in what a run computes.**
+`engine.py`'s OOD block published `{split}/avg_recursion_steps = 2.0` for the
+non-recursive MoE arm while the validation block correctly wrote `"N/A"` at the
+same `max_depth == 1` (the guard had grown on one writer only); it now writes
+`"N/A"`, and the aggregator applies the same rule to the six runs already on
+disk, which are immutable. The compute-versus-k table built its k set from
+`val/accuracy_by_op/F*` alone, and held-out k only exist under
+`ood_interp`/`ood_extrap`, so the table printed four SEEN rows and NO held-out
+row while still looking complete; the set is now the union of the three
+namespaces. `test_opdiff_task_axis.py` OD.7b failed for a fake reason on this
+machine: it symlinked the repo's `data/` into the archived pre-port tree,
+`os.symlink` raised WinError 1314 (no privilege), the error was swallowed, the
+archived tree resolved `config_language.json` against a root with no corpus, and
+the two hashes were computed against different data. It now uses a directory
+junction (no privilege needed) and SKIPs with the reason if neither works.
+
+**Verified by.** `code/summarize_opdiff_matrix.py --out
+results/opdiff/summary.json` (headline, OOD table, complete compute-versus-k
+table, capacity table); `code/run_correctness_suite.py` -> `TOTAL 357 357 0 0`,
+ALL GATES PASS (gate 4 is 130 here against the 356 baseline's 129, with the test
+files untouched since `112809a` -- flagged for the gate machine rather than
+re-baselined); `code/test_opdiff_task_axis.py` -> 63 passed, 0 failed.
+
+**Failure tracing.** Multi-seed aggregation refused -> `REFUSAL 2` in
+`summarize_opdiff_matrix.py`. A non-recursive arm shows a recursion depth ->
+`engine.py`'s `{split}/avg_recursion_steps` writer, and `DEPTH_KEYS` in the
+aggregator. A held-out k is missing from the compute-versus-k table ->
+`_k_names` in the aggregator. OD.7b fails only on one machine ->
+`_pre_sees_data` in `test_opdiff_task_axis.py`.
+
+**Completion, and the failure that got us there (2026-10-24 11:28).** All 15
+cells finished; the resume queue aggregated (`rc=0`) and ran both gate suites
+(`rc=0`) unattended. The first pass had died at MoR seed 45:
+`RuntimeError: CUDA error: out of memory`, 2.16 h in, raised asynchronously from
+the router-stats block at `code/more/model.py:453`; the incomplete
+`runs/opdiffB_MoR_seed45__706e3aa2` has no `metrics.json`, so `finished_run()`
+refused it and the driver wrote `__r2`. Resumed with
+`PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True` — allocator only, so batch
+size, model, loss, seeds and config hash are unchanged and the arm identity is
+the same — and with display/idle sleep disabled.
+
+**The real cause is not fragmentation.** MoR seed 45 recorded
+`perf/gpu_peak_reserved_gib = 12.84` on an 8.19 GiB card; the only mechanism
+that allows this is WDDM oversubscription, i.e. the allocator paging segments
+into host memory. So MoR on this machine is **memory-capacity-bound**, not
+kernel-launch-bound as `HANDOFF.md` §9 says: per-seed MoR throughput spans
+15,662–61,359 tok/s for the same model, and wall-clock spans 1.75–5.73 h. Do not
+quote MoR time as a compute measurement; and when a MoR cell is slow, read
+`perf/gpu_peak_reserved_gib` before suspecting load — if it exceeds the card's
+memory the cell is paging. `expandable_segments` turned the OOM into paging
+(MoR 45: 5.73 h for a 3.16 h cell), which is what we wanted for one cell but is
+not a fix. MoRE reserves 3.11–3.82 GiB and never paged, which is why its
+wall-clock is stable at ~3.3 h in all five seeds.
+
+**Final numbers (n=5).** `val/task_loss` MoE 0.4303 ± 0.0067, MoR 0.2449 ±
+0.0852, MoRE 0.1900 ± 0.0177. The MoR spread is a halting-policy difference
+between seeds, not noise: loss falls monotonically in the depth the seed chose
+to use (depth 2.11 -> 0.3933, 2.72 -> 0.2410, 3.64 -> 0.1913, 3.83 -> 0.1963,
+4.11 -> 0.2028). OOD stays at chance in every arm (exact match 0.000), while
+MoRE reaches 0.678 per-digit at k=4 and spends *more* depth on held-out k
+(4.49–4.53) — a failure to read the k slot, not a compute shortage. On the
+F1–F4 examples MoRE falls 1.000 / 0.998 / 0.856 / 0.661 as k grows, so k=4 is
+not saturated.
+
+**Failure tracing additions.** A MoR cell OOMs or crawls ->
+`code/more/model.py:453` and `perf/gpu_peak_reserved_gib` (paging), not the
+router. A cell must be re-run after an allocator change -> the stale
+`runs/...__<hash>` directory without `metrics.json` is ignored; the re-run
+appears as `__r2`. Aggregate/gate output for this run:
+`%TEMP%\opencode\opdiff_resume_{state.txt,summary.log,gate_l0.log,task_axis.log}`.

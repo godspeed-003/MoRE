@@ -812,12 +812,31 @@ try:
         # would be missing. The junction makes the two trees see the same
         # data, which is what makes the hashes comparable.
         _pre_data = os.path.join(_pre_dir, "data")
+        _pre_sees_data = False
         if not os.path.exists(_pre_data) and os.path.isdir(os.path.join(REPO, "data")):
-            try:
-                os.symlink(os.path.join(REPO, "data"), _pre_data,
-                           target_is_directory=True)
-            except (OSError, NotImplementedError):
-                pass
+            # A DIRECTORY JUNCTION FIRST on Windows. `os.symlink` needs
+            # SeCreateSymbolicLinkPrivilege, which a normal user does not have
+            # (measured here: WinError 1314), and the old bare `except: pass`
+            # therefore left the archived tree with no data directory. It then
+            # resolved `config_language.json` against a root with NO corpus, so
+            # its `data.dataset_version` differed from the live tree's and the
+            # hash comparison failed for a fake reason -- OD.7b failed on this
+            # machine while OD.7a (whose config has no dataset-dependent field)
+            # passed. A junction is a reparse point and needs no privilege.
+            if os.name == "nt":
+                _jrc = subprocess.run(
+                    ["cmd", "/c", "mklink", "/J", _pre_data,
+                     os.path.join(REPO, "data")],
+                    capture_output=True, text=True)
+                _pre_sees_data = (_jrc.returncode == 0
+                                  and os.path.isdir(_pre_data))
+            if not _pre_sees_data:
+                try:
+                    os.symlink(os.path.join(REPO, "data"), _pre_data,
+                               target_is_directory=True)
+                    _pre_sees_data = os.path.isdir(_pre_data)
+                except (OSError, NotImplementedError):
+                    _pre_sees_data = False
         _pre_code = os.path.join(_pre_dir, "code")
         _script = os.path.join(_pre_dir, "_hash.py")
         with open(_script, "w", encoding="utf-8") as _fh:
@@ -851,10 +870,20 @@ try:
                   "pre-port tree's",
                   _pre["config.json"] == _now["config.json"],
                   ", ".join(f"{k}:{v[:8]}" for k, v in sorted(_now["config.json"].items())))
-            check("OD.7b the LANGUAGE config hash is byte-identical to the "
-                  "pre-port tree's",
-                  _pre["config_language.json"] == _now["config_language.json"],
-                  ", ".join(f"{k}:{v[:8]}" for k, v in sorted(_now["config_language.json"].items())))
+            if _pre_sees_data:
+                check("OD.7b the LANGUAGE config hash is byte-identical to the "
+                      "pre-port tree's",
+                      _pre["config_language.json"] == _now["config_language.json"],
+                      ", ".join(f"{k}:{v[:8]}" for k, v in sorted(_now["config_language.json"].items())))
+            else:
+                # Neither junction nor symlink worked, so the archived tree has
+                # no corpus and its language dataset_version is not comparable
+                # with the live tree's. SKIP with the reason: an N/A is honest,
+                # and a FAIL here would accuse the port of a change it did not
+                # make.
+                skip("OD.7b", "the pre-port tree cannot see data/lang (no "
+                              "junction or symlink privilege on this machine), "
+                              "so its language dataset_version is not comparable")
 finally:
     shutil.rmtree(_pre_dir, ignore_errors=True)
 

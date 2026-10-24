@@ -1760,8 +1760,20 @@ def train(cfg: dict, run_epochs: int | None = None, ctx: "RunContext | None" = N
                                 float(_ood_acc["axis_exact_sum"][_i])
                                 / float(_ood_acc["axis_exact_n"][_i]))
                 if _ood_exp_n > 0:
-                    ood_log_dict[f"{_sp}/avg_recursion_steps"] = (
-                        _ood_exp_sum / _ood_exp_n)
+                    # Non-adaptive arms have no recursion: at max_depth == 1 the
+                    # ACT loop still reports an "expected depth" of 2.0 (exit
+                    # step + one), which is not a measurement of anything and
+                    # contradicts `val/avg_recursion_steps`, which writes "N/A"
+                    # at the same max_depth (see the T11.1 block below). The
+                    # validation writer grew that guard and this one did not, so
+                    # a non-recursive arm published a recursion depth on the OOD
+                    # splits only (measured: MoE ood_interp/avg_recursion_steps
+                    # = 2.0 with ood_interp/avg_depth_by_op/F5 = 1.0).
+                    if int(mc["max_depth"]) > 1:
+                        ood_log_dict[f"{_sp}/avg_recursion_steps"] = (
+                            _ood_exp_sum / _ood_exp_n)
+                    else:
+                        ood_log_dict[f"{_sp}/avg_recursion_steps"] = "N/A"
                 for _i, _name in enumerate(_OP_AXIS_NAMES):
                     if _ood_op_count[_i] > 0:
                         ood_log_dict[f"{_sp}/avg_depth_by_op/{_name}"] = (

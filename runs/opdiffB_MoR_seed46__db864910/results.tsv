@@ -1,0 +1,4 @@
+epoch	train_task_loss	val_loss	expert_entropy_normalized	avg_depth	mean_cos_sim	max_cos_sim	routing_agreement_with_group	routing_hungarian_acc	routing_ami	val_perplexity	nats_below_bigram_floor	depth_rho_model_loss	depth_logfreq_partial_norm
+1	0.582890	0.319858	N/A	3.49	N/A	N/A	N/A	N/A	N/A	1.3769	N/A	N/A	N/A
+2	0.269018	0.222891	N/A	3.73	N/A	N/A	N/A	N/A	N/A	1.2497	N/A	N/A	N/A
+3	0.213181	0.196275	N/A	3.69	N/A	N/A	N/A	N/A	N/A	1.2169	N/A	N/A	N/A
