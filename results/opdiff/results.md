@@ -13,7 +13,11 @@ and may never enter the headline language table (`canonical_spec.json` guard).
 They are a same-protocol, same-dataset, same-split comparison of the three
 architectures on the opdiff task. Provenance: dataset
 `opdiff-v4-fingerprint-1197a5cbae10` (built `opdiff-v4-b002e4acf878`),
-`code_git_commit b41f3a3`, `total_params 4,056,334` identical in all three arms,
+`code_git_commit b41f3a3`; MoE and MoRE are parameter-**identical** at
+4,056,334 and MoR sits **0.114 % lower** at 4,051,720 -- the router and the
+seven halt heads MoR does not have, the same residual structure as the
+language matrix's 0.069 %, and it runs *against* any MoRE-favourable
+reading;
 batch 48, seq 384, 3 epochs, train k ∈ {1,2,3,4}, interpolation k = 5,
 extrapolation k ∈ {6,7}, V = 37.
 

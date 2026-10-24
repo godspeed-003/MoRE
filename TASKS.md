@@ -2405,6 +2405,20 @@ the co-author's agent. Not part of `plan.md` §0–11. Companion paper task:
   gate 4's files have not changed since the 356 baseline commit `112809a`, so
   the extra check is machine-dependent and is **flagged for reconciliation on
   the gate machine**, not claimed as a new baseline here.
+  **RECONCILED ON THE GATE MACHINE (2026-10-24): the 356 baseline is intact
+  and no re-baselining is needed.** `python code/run_correctness_suite.py` at
+  `3ec1d5b` on the CPU gate machine gives **`TOTAL 356 356 0 0`** with gate 4
+  = **129** -- the frozen number, exactly. The extra check the 4060 fired is
+  identified: `test_phase6_seeding.py:draw_all()` adds a `torch_cuda` stream
+  only under `torch.cuda.is_available()`, and the `for stream in A1:` loop
+  emits one `T6.1a same seed reproduces {stream}` check per stream, so a CUDA
+  machine additionally runs `T6.1a same seed reproduces torch_cuda`. Measured
+  here: `draw_all(42)` returns
+  `['random', 'numpy', 'torch_cpu', 'dataloader_generator']` -- four checks --
+  with `torch.cuda.is_available() == False`; the 4060 has five. **The
+  published count is the CPU one and stays 356.** A machine-dependent check
+  count is not a defect, but it must never be reconciled by re-baselining the
+  frozen number on whichever machine happened to run last.
   **Artifacts:** `runs/opdiffB_{MoE,MoR,MoRE}_seed4*` (15 cells; the OOM'd
   `opdiffB_MoR_seed45__706e3aa2` is kept, has no `metrics.json`, and is not
   admitted), `results/opdiff/summary.json`, dataset `opdiff-v4-b002e4acf878`

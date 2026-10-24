@@ -10624,6 +10624,47 @@ above the first — and the fix is keyed by the value.
 
 
 
+## T-OD.12 - the gate-4 flag from T-OD.11 is closed, and one factual error in the opdiff results file
+
+Two documentation-level corrections. **No training number changes, no code
+behaviour changes, and the frozen baseline does not move.**
+
+**THE GATE-4 FLAG IS CLOSED, AND THE BASELINE IS INTACT.** T-OD.11 reported
+`TOTAL 357 357 0 0` on the 4060 with gate 4 at 130 against the frozen 129, and
+correctly refused to re-baseline on a machine that was not the one the baseline
+was measured on. Re-run here, at `3ec1d5b`, on the CPU gate machine:
+**`TOTAL 356 356 0 0`, gate 4 = 129** -- the published number, exactly.
+
+**The extra check is identified, not assumed.** `code/test_phase6_seeding.py`
+builds its stream dict in `draw_all()`, which adds a `torch_cuda` stream only
+under `torch.cuda.is_available()`; the `for stream in A1:` loop then emits one
+`T6.1a same seed reproduces {stream}` check per stream. A CUDA machine
+therefore additionally runs `T6.1a same seed reproduces torch_cuda`, and gate 4
+-- which is `[test_phase5_dimensions.py, test_phase6_seeding.py]` -- counts one
+more. Measured here: `draw_all(42)` ->
+`['random', 'numpy', 'torch_cpu', 'dataloader_generator']`, four checks, with
+`torch.cuda.is_available() == False`; the 4060 has five. Both machines pass the
+checks they run. **The published count is the CPU one and stays 356.** If a
+future agent sees 357 on a CUDA box, that is why; it is not a reason to touch
+`run_correctness_suite.py` or the baseline.
+
+**ONE FACTUAL ERROR IN `results/opdiff/results.md`, fixed.** The admissibility
+paragraph said `total_params 4,056,334` was "identical in all three arms". It is
+not: the resolved configs give MoE 4,056,334, MoRE 4,056,334 and **MoR
+4,051,720**, i.e. MoR is 0.114 % lower -- the router and the seven halt heads it
+does not have. That is the intended design (the same residual structure as the
+language matrix's 0.069 %, where MoR is also the smaller arm) and it runs
+*against* any MoRE-favourable reading, so leaving "identical" in place would
+have handed a reviewer a reason to distrust a file whose numbers are otherwise
+correct. Verified from
+`runs/opdiffB_{MoE,MoR,MoRE}_seed42__*/resolved_config.json`
+`provenance.total_params`.
+
+**Failure tracing.** Gate count differs between machines ->
+`draw_all()` in `test_phase6_seeding.py` and the per-stream loop below it. A
+parameter claim in a results file -> the `provenance.total_params` field of any
+`resolved_config.json`, never the prose.
+
 ## T-OD.11 - the matrix runs on the 4060, and four reporting defects it exposed
 
 **What ran.** Seeds 42 (MoE, MoR, MoRE), 43 (all three) and 44 (MoE, MoRE) on
