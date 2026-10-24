@@ -151,6 +151,23 @@ opdiff_v2_smoke/
 !runs/langB_MoR_seed45__4041a890/checkpoint.pt
 !runs/langB_MoR_seed46__fb91cdff/checkpoint.pt
 
+# The 15 ADMITTED canonical opdiff checkpoints (T-OD.11)
+!runs/opdiffB_MoE_seed42__3ea2b9c7/checkpoint.pt
+!runs/opdiffB_MoE_seed43__491048ee/checkpoint.pt
+!runs/opdiffB_MoE_seed44__d88592e9/checkpoint.pt
+!runs/opdiffB_MoE_seed45__e342c989/checkpoint.pt
+!runs/opdiffB_MoE_seed46__4b1c470d/checkpoint.pt
+!runs/opdiffB_MoRE_seed42__1b6e1898/checkpoint.pt
+!runs/opdiffB_MoRE_seed43__992ef073/checkpoint.pt
+!runs/opdiffB_MoRE_seed44__c4eaf97f/checkpoint.pt
+!runs/opdiffB_MoRE_seed45__a1a69ac3/checkpoint.pt
+!runs/opdiffB_MoRE_seed46__f684616d/checkpoint.pt
+!runs/opdiffB_MoR_seed42__e077cad2/checkpoint.pt
+!runs/opdiffB_MoR_seed43__9acbcd8f/checkpoint.pt
+!runs/opdiffB_MoR_seed44__6ee08f08/checkpoint.pt
+!runs/opdiffB_MoR_seed45__706e3aa2__r2/checkpoint.pt
+!runs/opdiffB_MoR_seed46__db864910/checkpoint.pt
+
 # --- Global output filenames that Phase 0 abolished -------------------------
 # Listed so a stray legacy write is never committed by accident.
 /best_model.pt
