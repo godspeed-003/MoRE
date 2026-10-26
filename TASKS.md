@@ -2426,6 +2426,56 @@ the co-author's agent. Not part of `plan.md` §0–11. Companion paper task:
   both strings are this machine's one dataset). Queue and state logs:
   `%TEMP%\opencode\opdiff_{final,resume}_*`.
 
+- [x] **T-OD.13a TEST 1 — depth-matched uniform control on the 15 opdiff
+  checkpoints.** (Ayan's 4060, 2026-10-25, ~25 min GPU.)
+  Adds an inference-only `force_depth` path to `MoREWrapper.forward`
+  (`code/more/model.py`): step weight 1.0 on the forced step and 0.0 earlier,
+  so the returned state is the state AT depth d, not the ACT mixture; `None`
+  leaves training bit-identical (asserted: at `max_depth = 1`, forced d=1 is
+  bit-identical to the learned pass in all five MoE seeds). Every checkpoint is
+  evaluated nine times (learned + d=1..7); margins are
+  `uniform_loss - learned_loss`, positive = learned halting is better.
+  **Verify:** `code/eval_depth_control.py` runs all 15 cells; `--from-json`
+  re-aggregates without the GPU; `code/test_depth_control.py` passes 16/16.
+  **Evidence (n=5, mean ± std, median in brackets):**
+  `margin_matched` MoRE **0.8424 ± 0.3952** (1.0176) vs MoR **0.8372 ± 1.1601**
+  (0.2821); `margin_best` MoRE 0.0950 ± 0.0748 (0.0443) vs MoR 0.2215 ± 0.1243
+  (0.2000); MoE both `N/A by construction`.
+  Ratio MoRE/MoR **1.01× of means, 3.61× of medians, 0.43× for best-uniform.**
+  Reading: MoRE's halting does substantial work on opdiff (0.84 nats, ~14× its
+  language value), but a WELL-CHOSEN fixed depth nearly reaches its loss, so
+  routing makes the depth policy replaceable rather than more valuable than
+  MoR's. Forced curves differ in shape: MoRE falls monotonically to d≈6 then
+  rises at 7; MoR is U-shaped (min d=2–4) and degrades beyond its trained depth.
+  MoR seed 43 is pathological (forced-d=2 loss 3.29) and is what makes the
+  mean-ratio unreliable; both ratios are therefore reported, never one.
+  **Artifacts:** `results/opdiff/depth_control.{json,md}`,
+  `code/eval_depth_control.py`, `code/test_depth_control.py`.
+- [ ] **T-OD.13b TEST 2 — language training-set-size sweep (45 cells).**
+  (Ayan's 4060, started 2026-10-25, W&B offline.) 3 scales
+  (2.5 / 10 / 40 % of the 526,320 canonical train blocks) × 3 arms × 5 seeds;
+  every other protocol field frozen; group `subset_lang_sweep`, names
+  `langSub_<Arch>_f{025,100,400}`, so no cell can be claimed canonical.
+  Adds `--subset_fraction` (language-only; writes `data` AND `training` and
+  publishes `resolved_subset_fraction`). Subsets are permuted prefixes of one
+  `randperm(subset_seed)`, hence nested per seed (asserted at n=526320 for all
+  five seeds). Language arrays were rebuilt bit-identically
+  (`lang-wikitext-103-bpe8192-len256-800d6154`, all three sha256 match);
+  `token_train_count.npy` / `token_decile.npy` rebuilt identically too.
+  **Status at commit:** 38/45 cells complete (2.5 % and 10 % complete; 40 %
+  MoE complete, MoR 3/5). The forced-depth control on these cells
+  (`code/eval_lang_depth_control.py`) is written and NOT yet run, so the
+  per-scale margin ratio — the quantity the sweep exists to measure — does not
+  exist yet. **Do not cite any TEST 2 number until it does.** Resume with
+  `code/run_lang_subset_sweep.py --all`; aggregate with
+  `code/summarize_lang_subset_sweep.py --strict`.
+  **Artifacts:** `results/language/subset_sweep_progress.tsv` (authoritative
+  per-cell progress) and `results/language/subset_sweep_logs/`. The aggregate
+  `subset_sweep.{json,md}` is regenerated at 45/45 and deliberately NOT
+  committed while it says PARTIAL — a halfway table in the repo is a number
+  waiting to be cited. `SUBSET_SWEEP_STATE.md` is a live scratchpad, also not
+  committed (it records the state at a stop, so it is stale by construction).
+
 ---
 
 ## Standing constraints (apply to every task above)

@@ -123,14 +123,18 @@ reconciliation on the gate machine**, not re-baselined here);
 
 MoR seed 45 died at 2.16 h with `RuntimeError: CUDA error: out of memory`
 raised asynchronously from the router-stats block of `code/more/model.py:453`
-after 129 min in epoch 1 (a MoR epoch is ~50 min). It was re-run as `__r2` with
-`PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True` — allocator only, so batch
-size, model, loss, seeds and config hash are unchanged. The stale directory
-`runs/opdiffB_MoR_seed45__706e3aa2` has no `metrics.json` and is not admitted by
-the aggregator; it is kept as evidence. When a MoR cell is slow or dies, read
-`perf/gpu_peak_reserved_gib` first: above the card's memory the cell is paging,
-and no amount of load-shedding will fix it — the batch size has to fit or the
-cell has to move to a bigger card.
+after 129 min in epoch 1 (a MoR epoch is ~50 min). It was re-run as `__r2`
+with `PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True`, which is a NO-OP on
+this platform (torch 2.5.1 on Windows warns "expandable_segments not
+supported on this platform"), so the retry ran under the same allocator
+configuration as the failed attempt — do not attribute its success to that
+variable. The first attempt OOMed and the retry paged on identical settings;
+the mechanism is WDDM oversubscription, not fragmentation. The stale
+directory `runs/opdiffB_MoR_seed45__706e3aa2` has no `metrics.json` and is
+not admitted by the aggregator; it is kept as evidence. When a MoR cell is
+slow or dies, read `perf/gpu_peak_reserved_gib` first: above the card's
+memory the cell is paging, and no amount of load-shedding will fix it —
+the batch size has to fit or the cell has to move to a bigger card.
 
 ## 8. Caveats on any paper claim
 

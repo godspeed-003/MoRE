@@ -10732,23 +10732,27 @@ cells finished; the resume queue aggregated (`rc=0`) and ran both gate suites
 `RuntimeError: CUDA error: out of memory`, 2.16 h in, raised asynchronously from
 the router-stats block at `code/more/model.py:453`; the incomplete
 `runs/opdiffB_MoR_seed45__706e3aa2` has no `metrics.json`, so `finished_run()`
-refused it and the driver wrote `__r2`. Resumed with
-`PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True` — allocator only, so batch
-size, model, loss, seeds and config hash are unchanged and the arm identity is
-the same — and with display/idle sleep disabled.
+refused it and the driver wrote `__r2`. The resume was launched with
+`PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True`, which is a NO-OP on this
+platform: torch 2.5.1 on Windows warns "expandable_segments not supported on
+this platform" (verified 2026-10-26). The resumed cell therefore ran under
+the SAME allocator configuration as the failed attempt; the difference
+between the two attempts is run-to-run memory pressure, not a setting.
+Display/idle sleep was also disabled for the resume.
 
 **The real cause is not fragmentation.** MoR seed 45 recorded
 `perf/gpu_peak_reserved_gib = 12.84` on an 8.19 GiB card; the only mechanism
 that allows this is WDDM oversubscription, i.e. the allocator paging segments
 into host memory. So MoR on this machine is **memory-capacity-bound**, not
 kernel-launch-bound as `HANDOFF.md` §9 says: per-seed MoR throughput spans
-15,662–61,359 tok/s for the same model, and wall-clock spans 1.75–5.73 h. Do not
-quote MoR time as a compute measurement; and when a MoR cell is slow, read
-`perf/gpu_peak_reserved_gib` before suspecting load — if it exceeds the card's
-memory the cell is paging. `expandable_segments` turned the OOM into paging
-(MoR 45: 5.73 h for a 3.16 h cell), which is what we wanted for one cell but is
-not a fix. MoRE reserves 3.11–3.82 GiB and never paged, which is why its
-wall-clock is stable at ~3.3 h in all five seeds.
+15,662–61,359 tok/s for the same model, and wall-clock spans 1.75–5.73 h. Do
+not quote MoR time as a compute measurement; and when a MoR cell is slow,
+read `perf/gpu_peak_reserved_gib` before suspecting load — if it exceeds the
+card's memory the cell is paging. The 5.73 h MoR-45 cell IS a paging cell,
+but not because of `expandable_segments`: that variable did nothing here, and
+the retry paged where the first attempt OOMed under identical settings. MoRE
+reserves 3.11–3.82 GiB and never paged, which is why its wall-clock is
+stable at ~3.3 h in all five seeds.
 
 **Final numbers (n=5).** `val/task_loss` MoE 0.4303 ± 0.0067, MoR 0.2449 ±
 0.0852, MoRE 0.1900 ± 0.0177. The MoR spread is a halting-policy difference
@@ -10766,3 +10770,98 @@ router. A cell must be re-run after an allocator change -> the stale
 `runs/...__<hash>` directory without `metrics.json` is ignored; the re-run
 appears as `__r2`. Aggregate/gate output for this run:
 `%TEMP%\opencode\opdiff_resume_{state.txt,summary.log,gate_l0.log,task_axis.log}`.
+﻿
+---
+
+## T-OD.13a — depth-matched uniform control on opdiff (2026-10-25)
+
+**Question.** MoRE's recursive depth is adaptive. On language the halting head
+collapsed (97.3 % forced exit), so the canonical language result does not
+establish that adaptive depth is worth anything. Opdiff is the one matrix where
+halting did something. Does that something survive a control that is allowed
+the same number of uniform steps?
+
+**Method.** `force_depth` on `MoREWrapper.forward` (`code/more/model.py`): step
+weight 1.0 at the forced step, 0.0 before it, so the output is the state AT that
+depth — not the ACT mixture of all depths. `None` restores the trained path
+unchanged, verified as a bit-identical loss at `max_depth = 1` in all five MoE
+seeds (max |diff| 0.000e+00). Each of the 15 admitted checkpoints is evaluated
+nine times: learned, and forced d=1..7. `margin = uniform_loss - learned_loss`,
+positive meaning learned halting beat that fixed depth.
+
+**Result (n=5 per arm; mean ± std, [median]).**
+
+| arm | learned | margin_matched | margin_best |
+|---|---|---|---|
+| MoE | 0.4303 ± 0.0067 | N/A by construction | N/A by construction |
+| MoR | 0.2449 ± 0.0852 | 0.8372 ± 1.1601 [0.2821] | 0.2215 ± 0.1243 [0.2000] |
+| MoRE | 0.1881 ± 0.0135 | 0.8424 ± 0.3952 [1.0176] | 0.0950 ± 0.0748 [0.0443] |
+
+MoRE/MoR ratio 1.006× of means, **3.608× of medians**, 0.4288× for
+best-uniform. MoE is N/A, not 0: with one uniform depth there is nothing to
+match.
+
+**Reading.** (i) MoE is an implementation check, and passes: learned loss equals
+forced d=1 to four decimal places on every seed — its router-only model is a
+fixed-depth model by construction. (ii) On opdiff MoRE's halting is worth ~0.84
+nats, about 14× its value on language (0.06), so the language collapse is not a
+property of the halting mechanism. (iii) The mean ratio is not a robust result:
+it is carried by MoR seed 43, whose forced-d=2 loss is 3.29 — one seed that
+selected depth 2.11 while its own depth-2 policy was badly mistuned. The median
+(3.6×) says MoRE's depth policy is far better than MoR's *learned* depth, and
+the best-uniform column (0.43×) says the opposite for the *best* fixed depth: a
+fixed 5–6 steps nearly reaches MoRE's loss, whereas no fixed depth reaches
+MoR's. Conclusion that the data supports: routing makes the depth policy
+**replaceable** by a constant on this task, not more valuable than MoR's. The
+two columns are a bracket, not a contradiction.
+(iv) Forced depth returns the final state rather than the ACT mixture, so every
+margin is inflated where the matched integer lands on the steep part of the
+curve — MoRE's d=3 does; MoR's minimum is flat across d=2–4 and its curve turns
+up past d=5, where it was trained. Curves are in `depth_control.md`.
+
+**Failure tracing.** A margin of `N/A` on MoE is correct (by construction), not
+a missing measurement. `margin_matched` on MoR is unstable across seeds while
+`margin_best` is not -> look at a single seed's forced curve before quoting the
+mean; `_arm_of()` normalises provenance `architecture` because opdiff writes it
+lowercase. Re-aggregate without the GPU with `eval_depth_control.py
+--from-json`. The forced-depth path is inference-only: `force_depth = 0` or `>=
+max_depth` raises rather than silently clipping.
+
+**Artifacts.** `results/opdiff/depth_control.{json,md}`,
+`code/eval_depth_control.py`, `code/test_depth_control.py` (16/16, standalone --
+it is NOT registered in `run_correctness_suite.py`, whose 357/356 story is
+machine-dependent and frozen).
+
+**Correction to the T-OD.11 record (2026-10-26).** The earlier entry said the
+MoR-45 resume with `PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True` turned the
+OOM into paging. That variable is a NO-OP on this platform — torch 2.5.1 on
+Windows warns `expandable_segments not supported on this platform` — so the
+retry ran under the same allocator configuration as the failed attempt, and the
+attempt-to-attempt difference is run-to-run memory pressure. What stands
+unchanged: reserved 12.84 GiB on an 8.19 GiB card is WDDM oversubscription; MoR
+is memory-capacity-bound here; MoR wall-clock is not a compute measurement; and
+MoR seed 45 really did take 5.73 h for a 3.16 h cell. Both original sentences
+are rewritten in place in this file and in `results/opdiff/results.md` §7.
+
+## T-OD.13b — language subset sweep (in progress, not a result)
+
+45 cells, 3 scales × 3 arms × 5 seeds, group `subset_lang_sweep`, data otherwise
+frozen. **38/45 complete at commit time**, and the forced-depth control on those
+cells has not been run — so the per-scale `margin_matched` ratio, the quantity
+the sweep exists to produce, does not exist yet. Partial `val/task_loss` means
+(MoE / MoR / MoRE): 2.5 % 5.1539 / 5.0665 / 4.9682; 10 % 4.4271 / 4.3348 /
+4.1499; 40 % 4.0646 / 3.7351 (n=3, partial) / pending. The ordering MoRE < MoR < MoE
+holds at both completed scales; the gap does not close as data grows. MoRE's
+mean depth rises 3.83–5.31 -> 6.74–6.82 between 2.5 % and 10 %, i.e. the halting
+head saturates against the depth cap once the task is learnable. None of this is
+citable until 45/45 and the depth control land; the ledger box is unticked on
+purpose.
+
+**Failure tracing.** Driver `code/run_lang_subset_sweep.py` (preflight, resume by
+skip, stop on first failure); aggregator refuses non-canonical group, protocol
+mismatch, mixed `dataset_version` and missing metrics, and `--strict` requires
+45. Two aggregator bugs already fixed: the cell regex rejected `f100`/`f400`
+(`f0(?:25|100|400)` -> `f(?:025|100|400)`), and `data.subset_seed` was being
+treated as a protocol constant when it varies per seed by design. Data `pack`
+and the decile rebuild both need the BASE interpreter (more_env has no
+`tokenizers`/`transformers`/`datasets`), not the CUDA one.

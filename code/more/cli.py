@@ -41,6 +41,17 @@ def build_parser(default_architecture: str | None = None) -> argparse.ArgumentPa
     p.add_argument("--blocks", type=int, default=None)
     p.add_argument("--batch_size", type=int, default=None)
     p.add_argument("--seed", type=int, default=None)
+    p.add_argument(
+        "--subset_fraction", type=float, default=None,
+        help="T-OD.13. Train on the first `f` of a deterministic permutation of "
+             "the training split (0 < f <= 1). The permutation is "
+             "torch.randperm(n, generator=manual_seed(subset_seed)) sliced from "
+             "the front (engine.py), so the subsets are NESTED across f for a "
+             "fixed seed and a 2.5%% run is a literal prefix of the 10%% and 40%% "
+             "runs. This is a PROXY knob: run_context's Gate 0 guard refuses any "
+             "canonical claim from a run with f < 1.0, which is correct. The "
+             "resolved value is published as resolved_subset_fraction.",
+    )
     p.add_argument("--run_name", type=str, default=None)
     p.add_argument(
         "--halting_supervision", dest="halting_supervision",
@@ -459,6 +470,30 @@ def main(argv=None, default_architecture: str | None = None) -> int:
         elif task == TASK_OPDIFF:
             stamp_opdiff_dataset_versions(raw_cfg)
 
+        if args.subset_fraction is not None:
+            _f = float(args.subset_fraction)
+            if not (0.0 < _f <= 1.0):
+                raise ValueError(
+                    f"--subset_fraction must satisfy 0 < f <= 1, got {_f}. "
+                    "0.0 would select an empty training set and >1 cannot be "
+                    "satisfied by a split of the dataset on disk; both would "
+                    "fail later with a message that does not name the flag."
+                )
+            if task != TASK_LANGUAGE:
+                # T-OD.13. The size sweep exists to test whether MoRE's
+                # language-cost ratio is substrate-dependent, and it is only
+                # meaningful if the ONLY varying field is the training-set
+                # size. On opdiff the same flag would be an unlabelled change
+                # to a published matrix, so it is refused rather than allowed
+                # to look like a harmless knob.
+                raise ValueError(
+                    f"--subset_fraction is available on --task {TASK_LANGUAGE} "
+                    f"only, but this run is task={task!r}. The opdiff matrix is "
+                    "already published under the full dataset; a subset run of "
+                    "it would be a proxy that the exporter must refuse, and "
+                    "there is no study that needs it."
+                )
+
         resolved = resolve_overrides(
             raw_cfg,
             epochs=args.epochs,
@@ -467,7 +502,9 @@ def main(argv=None, default_architecture: str | None = None) -> int:
             seed=args.seed,
             run_name=args.run_name,
             experiment_group=args.experiment_group,
+            subset_fraction=args.subset_fraction,
         )
+
         # T2.4: gate the dense-routing ablation on the FINAL run label, after
         # --run_name / --experiment_group have been applied. Checking earlier
         # would test the default label instead of the real one.

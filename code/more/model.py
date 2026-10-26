@@ -676,6 +676,7 @@ class MoREWrapper(nn.Module):
         x: torch.Tensor,
         step_mask: torch.Tensor,
         step_experts: torch.Tensor | None = None,
+        force_depth: int | None = None,
     ):
         """
         Args:
@@ -685,6 +686,14 @@ class MoREWrapper(nn.Module):
             step_experts : [B, S] long — oracle expert index per token (-1 for pad).
                            When provided, oracle CE is computed directly on router
                            logits at each depth step (short gradient path to router).
+            force_depth  : INFERENCE-ONLY uniform-depth control
+                           (code/eval_depth_control.py). Every token runs exactly
+                           this many steps and the returned state is the state AT
+                           that depth, not the ACT-weighted mixture: the step
+                           weight is 1.0 on the forced step and 0.0 on all
+                           earlier ones. This is what makes the control a policy
+                           that ignores its input. `None` (training, and every
+                           existing caller) leaves behaviour bit-identical.
         Returns (11-tuple):
             final_output      : [B, S, d_model] — ACT convex combination of the
                                 per-step states, NOT the state at exit time.
@@ -980,6 +989,24 @@ class MoREWrapper(nn.Module):
                 stop_local = torch.ones(N_active, dtype=torch.bool, device=x.device) \
                     if last_step else torch.zeros(N_active, dtype=torch.bool,
                                                   device=x.device)
+                step_weight = stop_local.to(x.dtype)
+                new_cum     = cum_active + step_weight
+                remainder_c = step_weight
+            elif force_depth is not None:
+                # FORCED-DEPTH CONTROL (eval_depth_control.py). No halting
+                # decision is read: every token stops on exactly step
+                # `force_depth`, so `step_weight` is 1.0 there and 0.0 on every
+                # earlier step. The accumulator therefore returns the state at
+                # that depth, not a convex mixture of states -- which is the
+                # whole point of a depth-matched uniform policy.
+                #
+                # Halt probabilities are still computed above (they cost almost
+                # nothing) but are not used, so no gradient flows to the halt
+                # heads. This branch is unreachable in training: the default is
+                # None and engine.py never passes the argument.
+                stop_local = torch.full(
+                    (N_active,), bool(depth >= int(force_depth)),
+                    dtype=torch.bool, device=x.device)
                 step_weight = stop_local.to(x.dtype)
                 new_cum     = cum_active + step_weight
                 remainder_c = step_weight
@@ -1400,6 +1427,7 @@ class MoREModel(nn.Module):
         step_mask: torch.Tensor,
         step_experts: torch.Tensor | None = None,
         step_ops: torch.Tensor | None = None,
+        force_depth: int | None = None,
     ):
         """
         Args:
@@ -1438,6 +1466,21 @@ class MoREModel(nn.Module):
                                 blocks, with forced/early rates recomputed from
                                 the summed counts.
         """
+        # FORCED-DEPTH CONTROL (inference only; see MoREWrapper.forward).
+        # Range-checked here rather than inside the depth loop so a caller that
+        # asks for d > max_depth gets an error instead of a silently clamped
+        # number: "forced 7 steps" and "forced max_depth steps" are the same
+        # run only when max_depth is 7, and a table must not imply otherwise.
+        if force_depth is not None:
+            force_depth = int(force_depth)
+            _md = int(self.blocks[0].max_depth)
+            if not (1 <= force_depth <= _md):
+                raise ValueError(
+                    f"force_depth={force_depth} is outside 1..{_md}; "
+                    "the uniform-depth control may not exceed the model's "
+                    "recursion budget."
+                )
+
         # [B, max_steps, step_feat_dim] → [B, max_steps, d_model]
         if self.task in LM_TASKS:
             # T-L5.0. `x` is `input_ids [B, S]` long, not a float feature matrix.
@@ -1527,7 +1570,7 @@ class MoREModel(nn.Module):
                 h, b_loss, block_ponder, depth_exits, block_expert_idx,
                 avg_depth, block_oracle_ce, first_route, block_route_stats,
                 block_expected_depth, block_halt_stats,
-            ) = block(h, step_mask, step_experts)
+            ) = block(h, step_mask, step_experts, force_depth=force_depth)
             # T4.1: each block's balance loss is already a mean over its own
             # depth calls, so summing here would reintroduce the magnitude
             # defect along the block axis. Divided by the block count below --

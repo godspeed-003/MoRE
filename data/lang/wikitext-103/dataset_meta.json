@@ -89,7 +89,7 @@
     "normalized": 0.27238032486571845
   },
   "decile_generator": "data/lang/build_depth_deciles.py",
-  "decile_generator_commit": "681622892fbd5d559b05bbe5d75d7667535da968",
+  "decile_generator_commit": "f184af99c8a1140ac9e647513839c33e18e0d6eb",
   "decile_is_canonical": false,
   "decile_purpose": "ablation F (supervised_curriculum) only. plan_language.md \u00a75: canonical language runs invent no depth target, so loss_weights.halting_supervision stays 0.0 and halting stays pure ACT. The decile->depth mapping is a DESIGN CHOICE and lives in code/more/lang_families.py:decile_target_depth, not in this artifact.",
   "decile_table": [

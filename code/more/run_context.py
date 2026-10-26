@@ -804,7 +804,8 @@ def resolve_overrides(cfg: dict, *, epochs: int | None = None,
                       batch_size: int | None = None,
                       seed: int | None = None,
                       run_name: str | None = None,
-                      experiment_group: str | None = None) -> dict:
+                      experiment_group: str | None = None,
+                      subset_fraction: float | None = None) -> dict:
     """
     Apply CLI overrides into a deep copy of cfg so the resolved config is the
     single truthful record of what actually ran.
@@ -836,6 +837,14 @@ def resolve_overrides(cfg: dict, *, epochs: int | None = None,
         out["logging"]["run_name"] = run_name
     if experiment_group is not None:
         out["logging"]["experiment_group"] = experiment_group
+    if subset_fraction is not None:
+        # T-OD.13. The subset block is read from `data` by engine.py (engine.py
+        # `subset_fraction = float(dc.get("subset_fraction", 1.0))`) but has
+        # historically also been written under `training`; the two are mirrored
+        # here exactly as `seed` mirrors subset_seed above, so the resolved
+        # config never disagrees with itself about the dataset size.
+        out["data"]["subset_fraction"] = subset_fraction
+        out["training"]["subset_fraction"] = subset_fraction
 
     # Truthful record of the values the training loop will actually use.
     prov["resolved_epochs"] = out["training"].get("epochs")
