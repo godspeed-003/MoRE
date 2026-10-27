@@ -10845,6 +10845,13 @@ are rewritten in place in this file and in `results/opdiff/results.md` §7.
 
 ## T-OD.13b — language subset sweep (in progress, not a result)
 
+**Superseded by the completion entry at the end of this file.** The partial
+40 % MoR mean quoted in this section (3.7351, n=3) becomes 3.7317 (n=5), and
+the final MoRE value at 40 % (3.7566) reverses the ordering this partial
+table suggested. The opinion stated here -- that a halfway table is a number
+waiting to be cited -- is the reason it was held back, and the two missing
+MoR cells are exactly what changed the conclusion.
+
 45 cells, 3 scales × 3 arms × 5 seeds, group `subset_lang_sweep`, data otherwise
 frozen. **38/45 complete at commit time**, and the forced-depth control on those
 cells has not been run — so the per-scale `margin_matched` ratio, the quantity
@@ -10865,3 +10872,73 @@ mismatch, mixed `dataset_version` and missing metrics, and `--strict` requires
 treated as a protocol constant when it varies per seed by design. Data `pack`
 and the decile rebuild both need the BASE interpreter (more_env has no
 `tokenizers`/`transformers`/`datasets`), not the CUDA one.
+
+---
+
+## T-OD.13b — language training-set-size sweep, complete (2026-10-26)
+
+45/45 cells, 3 scales × 3 arms × 5 seeds, 19.72 h wall, driver rc=0. Every cell
+is a proxy (subsampled train split) and appears in no canonical table.
+
+**The result, and it is a reversal.** `val/task_loss` (n=5, mean ± std), MoRE
+minus MoR in brackets:
+
+| scale | MoE | MoR | MoRE | MoRE − MoR |
+|---|---|---|---|---|
+| 2.5 % | 5.1539 ± 0.0167 | 5.0665 ± 0.0163 | 4.9682 ± 0.0706 | −0.0984 |
+| 10 % | 4.4271 ± 0.0249 | 4.3348 ± 0.0504 | 4.1499 ± 0.0283 | −0.1849 |
+| 40 % | 4.0646 ± 0.0272 | 3.7317 ± 0.0774 | 3.7566 ± 0.0276 | **+0.0250** |
+
+MoRE is the best arm at the two small scales and the worst recursive arm at the
+largest. The original partial table, computed at 38/45 with three MoR seeds at
+40 %, showed MoRE still ahead there; the two missing MoR seeds (44, 45: losses
+3.6924 and 3.6821 at depth 6.6) are what moved MoR below MoRE. This is why the
+partial aggregate was never committed.
+
+**Mechanism — halting collapse.** MoRE forced-exit rate 0.0404 → 0.8240 →
+0.9617; mean depth 4.33 → 6.77 → 6.95 against a cap of 7. At 40 % MoRE is, in
+effect, a fixed-depth-7 model: the halting head has stopped choosing. MoR at the
+same scale is still heterogeneous (forced exit 0.4727, depth 5.03 ± 2.29, i.e.
+two seeds at the cap and three at depth 2–3), and `margin_best` for MoR grows
+0.067 → 0.356 → 0.394, meaning the best fixed depth gets worse relative to its
+learned policy as data grows.
+
+**Forced-depth control, independent of the loss table.** `margin_matched`
+(nats): MoRE 0.313 → 0.097 → 0.029, MoR 1.372 → 1.354 → 1.534; ratio 0.23× →
+0.07× → 0.02×. At 40 % MoRE's `matched` and `best` margins are the same number,
+0.0293: its own chosen depth is already the best uniform depth, so the adaptive
+policy contributes nothing beyond a constant. MoR's margin does not decay with
+data. Both arms beat a uniform depth; only MoR's margin stays large enough to
+mean the *allocation* is doing work.
+
+**Claim supported.** Outcome C with a qualifier, for language at 3 epochs and
+this single model size: MoRE's small-data advantage is real (+0.10, +0.18 nats)
+but fragile — at 2.5 % its own std (0.07) is only slightly below its gap to MoR
+(0.10), and one seed halted at depth 2.55 — and it ends when the halting head
+saturates against the cap, where the routing half does not compensate. MoR is
+the better recursive arm at 40 %. Note the floor: every 40 % arm is below the
+4.9849 bigram floor and 2.5 % MoRE clears it by 0.017, so these are
+learning-signal measurements, not quality claims.
+
+**Failure tracing.** (1) The first full eval pass failed on all 45 cells with
+`ValueError: routing_persistence must be one of ('per_token', 'per_step'), got
+'step'` — `build_model` in `eval_lang_depth_control.py` retyped defaults instead
+of importing them; the engine's legacy default is `per_step`. It now imports
+`CANONICAL_ROUTING_MODE`, `CANONICAL_ROUTER_NOISE`, `ROUTER_NOISE_*_DEFAULT`,
+`ROUTING_PERSISTENCE_LEGACY` and takes `step_feat_dim` as required. A retyped
+default in an eval script silently evaluates a different architecture; the
+`learned_matches_metrics` check (|delta| ≤ 1e-3, else margins `N/A (loss
+mismatch)`) is the guard — and on the fixed script every cell reproduced its
+`metrics.json` loss to 0.00e+00. (2) `OUT_JSON.name` raised `AttributeError`
+after the last cell; `OUT_JSON` is a path string, so the final line crashed
+*after* writing both outputs — visible only because the process exit code was
+checked. (3) The reading paragraph in `subset_sweep.md` is now generated from
+the aggregated payload, so prose cannot drift from the tables.
+
+**Artifacts.** `results/language/subset_sweep.{json,md}`,
+`results/language/depth_control_langsub.{json,md}`,
+`results/language/subset_sweep_progress.tsv`,
+`results/language/subset_sweep_logs/`, driver
+`code/run_lang_subset_sweep.py`, aggregator
+`code/summarize_lang_subset_sweep.py`, control
+`code/eval_lang_depth_control.py` (GPU run ≈ 12 min for 45 cells).

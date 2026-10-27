@@ -2451,7 +2451,7 @@ the co-author's agent. Not part of `plan.md` §0–11. Companion paper task:
   mean-ratio unreliable; both ratios are therefore reported, never one.
   **Artifacts:** `results/opdiff/depth_control.{json,md}`,
   `code/eval_depth_control.py`, `code/test_depth_control.py`.
-- [ ] **T-OD.13b TEST 2 — language training-set-size sweep (45 cells).**
+- [x] **T-OD.13b TEST 2 — language training-set-size sweep (45 cells).**
   (Ayan's 4060, started 2026-10-25, W&B offline.) 3 scales
   (2.5 / 10 / 40 % of the 526,320 canonical train blocks) × 3 arms × 5 seeds;
   every other protocol field frozen; group `subset_lang_sweep`, names
@@ -2462,13 +2462,45 @@ the co-author's agent. Not part of `plan.md` §0–11. Companion paper task:
   five seeds). Language arrays were rebuilt bit-identically
   (`lang-wikitext-103-bpe8192-len256-800d6154`, all three sha256 match);
   `token_train_count.npy` / `token_decile.npy` rebuilt identically too.
-  **Status at commit:** 38/45 cells complete (2.5 % and 10 % complete; 40 %
-  MoE complete, MoR 3/5). The forced-depth control on these cells
-  (`code/eval_lang_depth_control.py`) is written and NOT yet run, so the
-  per-scale margin ratio — the quantity the sweep exists to measure — does not
-  exist yet. **Do not cite any TEST 2 number until it does.** Resume with
-  `code/run_lang_subset_sweep.py --all`; aggregate with
-  `code/summarize_lang_subset_sweep.py --strict`.
+  **COMPLETE (2026-10-26). 45/45 cells trained (19.72 h wall, driver rc=0) and
+  all 45 evaluated at forced depths d=1..7 by `code/eval_lang_depth_control.py`.
+  Every learned pass reproduced the cell's own `metrics.json` `val/task_loss`
+  exactly (delta 0.00e+00), so what the control reports is the checkpoint the
+  table reports.
+  **Verify:** the aggregator admits 45/45 under `--strict`, with no protocol
+  problem, one `data.dataset_version`, and `data.subset_seed == seed` in every
+  cell.
+  **Evidence -- `val/task_loss` (n=5, mean +/- std; MoRE minus MoR):**
+  2.5 % MoE 5.1539 +/- 0.0167, MoR 5.0665 +/- 0.0163, MoRE 4.9682 +/- 0.0706
+  (-0.0984); 10 % 4.4271 / 4.3348 / 4.1499 (-0.1849); 40 % 4.0646 / 3.7317 +/-
+  0.0774 / 3.7566 +/- 0.0276 (**+0.0250**).
+  **The ordering reverses at 40 %.** MoRE is the lowest-loss arm at both small
+  scales and the highest-loss recursive arm at the largest: the advantage does
+  not merely shrink with data, it disappears and changes sign.
+  **Mechanism: halting collapse, not routing failure.** MoRE's forced-exit rate
+  goes 0.04 -> 0.82 -> 0.96 and its mean depth 4.33 -> 6.77 -> 6.95 against a
+  cap of 7, i.e. by 40 % it is a fixed-depth-7 model in effect. MoR stays
+  heterogeneous at the same scale (forced exit 0.47, depth 5.03 +/- 2.29) and is
+  the only arm whose tokens still get different amounts of computation.
+  **Independent confirmation from the forced-depth control.** `margin_matched`
+  MoRE 0.313 -> 0.097 -> 0.029 nats; MoR 1.372 -> 1.354 -> 1.534; MoRE/MoR ratio
+  0.23x -> 0.07x -> 0.02x. At 40 % MoRE's `matched` and `best` margins are the
+  same number (0.0293): its own chosen depth is the best uniform depth
+  available, which is what a collapsed policy must produce.
+  **Reading.** Outcome C with a qualifier: MoRE's small-data gain is real
+  (+0.10 and +0.18 nats) but fragile -- its 2.5 % std (0.07) is only slightly
+  smaller than its 0.10 gap to MoR -- and it ends when the halting head
+  saturates. MoR retains adaptive depth at 40 % and beats MoRE there.
+  All cells are proxies: 40 % is below the 4.9849 bigram floor for every arm and
+  2.5 % clears it only by 0.017, so this is a learning-signal study, not a
+  quality study. Nothing here may enter a canonical table.
+  **Artifacts:** `results/language/subset_sweep.{json,md}` (aggregate + reading,
+  generated), `results/language/depth_control_langsub.{json,md}` (per-cell
+  forced curves), `results/language/subset_sweep_progress.tsv`,
+  `results/language/subset_sweep_logs/`. `SUBSET_SWEEP_STATE.md` is a live
+  scratchpad recording a stop, not an artifact, and is not committed.
+  Reproduce with `code/summarize_lang_subset_sweep.py --strict`; re-derive the
+  margins without the GPU with `code/eval_lang_depth_control.py --from-json`.
   **Artifacts:** `results/language/subset_sweep_progress.tsv` (authoritative
   per-cell progress) and `results/language/subset_sweep_logs/`. The aggregate
   `subset_sweep.{json,md}` is regenerated at 45/45 and deliberately NOT

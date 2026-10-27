@@ -52,7 +52,12 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from more.config import TASK_LANGUAGE
 from more.engine import _task_loss
 from more.lang_data import MoRELanguageDataset
-from more.model import MoREModel
+from more.families import NUM_EXPERTS_CANONICAL
+from more.model import (MoREModel, CANONICAL_ROUTING_MODE,
+                        CANONICAL_ROUTER_NOISE,
+                        ROUTER_NOISE_ANNEAL_STEPS_DEFAULT,
+                        ROUTER_NOISE_INIT_SCALE_DEFAULT,
+                        ROUTING_PERSISTENCE_LEGACY)
 
 CODE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(CODE)
@@ -74,20 +79,35 @@ def out(msg):
 
 
 def build_model(cfg, device):
+    """Mirror engine.py's MoREModel construction EXACTLY.
+
+    A missing key must resolve to the same default the trainer used, otherwise
+    this script evaluates a different architecture and reports a loss mismatch
+    that is ours, not the run's. The first version defaulted
+    `routing_persistence` to the string "step", which is not a valid mode
+    (model.py rejects it) -- the engine's legacy default is "per_step". Every
+    default below is therefore taken from the same constant the engine imports,
+    not retyped.
+    """
     mc, dc = cfg["model"], cfg["data"]
     return MoREModel(
-        step_feat_dim=mc.get("step_feat_dim", 8),
+        step_feat_dim=mc["step_feat_dim"],
         d_model=mc["d_model"],
         num_experts=mc["num_experts"],
         max_depth=mc["max_depth"],
         num_blocks=mc["num_blocks"],
-        dropout=mc.get("dropout", 0.0),
+        dropout=mc["dropout"],
         fixed_depth=mc.get("fixed_depth", False),
-        routing_mode=mc.get("routing_mode", "top1"),
-        routing_persistence=mc.get("routing_persistence", "step"),
-        router_noise=mc.get("router_noise", "none"),
+        routing_mode=mc.get("routing_mode", CANONICAL_ROUTING_MODE),
+        routing_persistence=mc.get("routing_persistence",
+                                   ROUTING_PERSISTENCE_LEGACY),
+        router_noise=mc.get("router_noise", CANONICAL_ROUTER_NOISE),
+        router_noise_init=mc.get("router_noise_init",
+                                 ROUTER_NOISE_INIT_SCALE_DEFAULT),
+        router_noise_anneal_steps=mc.get("router_noise_anneal_steps",
+                                         ROUTER_NOISE_ANNEAL_STEPS_DEFAULT),
         ffn_mult=mc.get("ffn_mult", 4),
-        num_families=6,
+        num_families=NUM_EXPERTS_CANONICAL,
         attention=bool(mc.get("attention", False)),
         n_heads=int(mc.get("n_heads", 4)),
         max_seq_len=int(dc["seq_len"]),
@@ -392,7 +412,7 @@ def main(argv=None):
         os.makedirs(os.path.dirname(OUT_JSON), exist_ok=True)
         json.dump(payload, open(OUT_JSON, "w", encoding="utf-8"), indent=2)
         write_md(payload)
-    out(f"-> {OUT_JSON.name}, {OUT_MD.name}")
+    out(f"-> {os.path.basename(OUT_JSON)}, {os.path.basename(OUT_MD)}")
     return 0
 
 
