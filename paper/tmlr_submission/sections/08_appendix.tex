@@ -190,6 +190,16 @@ the budget competition (\S\ref{sec:competition}) as the account the data support
 \subsection{One engine, three modes}
 
 
+\paragraph{Definition.}
+A \emph{MoRE block} routes a token once, at its post-embedding state, to one of
+$E$ independent expert FFNs, then reuses that expert's parameters for an adaptive
+number of recursion steps; Eq.~\ref{eq:block} is the block and the token's output
+is the halting-weighted mixture of Eq.~\ref{eq:halt-w}. The two component
+architectures are its limits: $T=1$ recovers a sparse mixture of experts (MoE),
+and $E=1$ recovers weight-tied adaptive recursion (MoR). $E$ is read from the
+task's family manifest---six on language, seven on arithmetic---and total FFN
+width is matched within each task.
+
 MoE, MoR and MoRE are configurations of one implementation with an explicit
 \texttt{architecture} mode, not three codebases. They share one data pipeline, one
 optimiser setup and one evaluation path, so a difference between them cannot be a
@@ -212,7 +222,7 @@ giving MoR's single FFN a multiplier of $24 = 4 \times 6$. The result is
 0.069\% deficit that is six per-expert halt heads, the router and FFN biases. That
 residual is irreducible at any integer multiplier, and it runs \emph{against} the
 headline result: the arm with slightly fewer parameters is the one that wins in
-domain.
+domain on the language task.
 
 \section{Metric definitions}
 \label{app:metrics}
@@ -289,53 +299,6 @@ training throughputs compare hardware as much as architectures; we therefore tim
 inference for all fifteen checkpoints on one GPU (an RTX 3050 laptop GPU), on the
 identical out-of-domain blocks at batch size 32, after a warm-up batch.
 
-\section{The subset sweep behind the depth-saturation finding}
-\label{app:saturation}
-
-\subsection{Depth saturation is a data-scale effect, not an architectural limit}
-
-
-\textbf{[MEASURED, four points at fixed hyperparameters.]} MoRE's halting sits at
-the ceiling on the full corpus (97.3\% forced-exit, mean depth 6.955 of 7). It is
-tempting to read that as the architecture being unable to learn adaptive depth. A
-subset sweep falsifies that reading.
-
-\begin{center}
-{\dispsize
-\setlength{\tabcolsep}{9pt}\renewcommand{\arraystretch}{1.25}
-\small
-\begin{tabular}{lcc}
-\toprule
-training data & mean depth & forced exit \\
-\midrule
-2.5\%             & 2.43 & $\approx 0$ \\
-10\%              & 1.92 & $\approx 0$ \\
-40\%              & 1.97 & $\approx 0$ \\
-100\% (canonical) & 6.96 & 0.973 \\
-\bottomrule
-\end{tabular}
-}
-\end{center}
-
-At every reduced-data point the same model, at the same ponder weight, allocates
-depth adaptively---exit rates near zero, mean depth between 1.9 and 2.4, inside a
-budget of 7. The collapse appears only at full scale. \textbf{So the failure is a
-calibration finding, not an architectural one}: the ponder penalty that produces
-adaptive depth on a small corpus cannot hold depth down at this one.
-
-We state the limit of that claim precisely, because the sweep is exploratory
-(single seed, subset fraction below 1, and it may never be quoted as a canonical
-result). The subset axis is \emph{not} cleanly monotone---2.5\% gives 2.43 but 40\%
-gives 1.97---so the honest phrasing is that \emph{saturation emerges somewhere
-between 40\% and 100\% of the data}, not that depth is monotone in training steps.
-The mechanism is consistent: the ponder term is linear in expected depth, while the
-task gradient grows as the model fits, so the fixed penalty is outpaced. Once the
-halting sigmoid saturates, its gradient vanishes and the linear-penalty ACT scheme
-cannot recover on its own \citep{graves2016act}. \citet{banino2021pondernet}
-replaces the linear penalty with a KL divergence against a geometric prior, which
-keeps a gradient on the halt head near saturation, and is the principled fix; we
-did not run it, and it is named as future work rather than as a result.
-
 \section{Training protocol and hyperparameters}
 \label{app:protocol}
 
@@ -385,7 +348,7 @@ either: setting it to zero \emph{collapses} the expert load onto a single expert
 (load entropy 0.0001) and drives AMI to zero. A near-uniform per-token router
 distribution coexisting with balanced load and above-chance specialisation is
 therefore not a pathology to be tuned out---and we note that we initially read it
-as one before the sweep refuted us (\S\ref{sec:honesty}).
+as one.
 
 Specialisation itself is real, and measured against per-run controls rather than
 against chance. MoRE's AMI is $0.1803 \pm 0.0246$ against a permutation control of
@@ -406,8 +369,8 @@ preserve adaptive depth, in the same architecture.
 
 Three epochs is a compute budget, and no arm is trained to convergence
 (\S\ref{sec:protocol}). This interacts badly with exactly the mechanism the paper
-studies: \S\ref{sec:saturation} shows depth allocation is demonstrably
-budget-dependent, so the behaviour at 10 epochs is genuinely unknown and might
+studies: the language arm's halting already sits at its budget ceiling at three
+epochs, so the behaviour at ten epochs is genuinely unknown and might
 differ in the direction that matters. Every arm receives the identical budget, so
 the comparison is internally valid; the generalisation to trained-to-convergence
 models is not established.
@@ -416,7 +379,8 @@ models is not established.
 that gap.} The admitted runs log validation loss once per epoch, so the curve over
 the three epochs is available for all fifteen cells. The final-epoch drop is
 $0.091$ nats for MoE, $0.132$ for MoR and $0.176$ for MoRE: \textbf{the arm that
-loses in domain is the one still improving fastest when the budget ends.} We state
+loses in domain on the language task is the one still improving fastest when the
+budget ends.} We state
 the differential and not a crossing point---the curves decelerate, so extrapolating
 an epoch at which MoRE overtakes MoR would be inventing a number---but it makes the
 in-domain ordering explicitly budget-dependent, in the direction this paper's
@@ -426,7 +390,7 @@ closing.
 
 \begin{center}
 {\dispsize
-\setlength{\tabcolsep}{9pt}\renewcommand{\arraystretch}{1.25}
+\setlength{\tabcolsep}{4pt}\renewcommand{\arraystretch}{1.25}
 \small
 \begin{tabular}{lccc}
 \toprule
@@ -450,10 +414,10 @@ variance-ratio result in \S\ref{sec:quality}---a policy collapsing to a
 near-constant has less left to vary---which we otherwise report as open.
 
 Relatedly, one hyperparameter configuration per arm was frozen from a grid run on a
-corpus roughly 60$\times$ smaller, and \S\ref{sec:saturation} demonstrates that at
-least one weight---the ponder penalty---did not transfer. We did not re-tune per
-arm, so the headline ordering could in principle be re-ordered by a per-architecture
-search. Given the gaps involved (0.12 nats between the recursive arms), we regard
+corpus roughly 60$\times$ smaller, and at least one weight---the ponder
+penalty---did not transfer from the development corpus. No configuration was
+re-tuned per arm, so the headline ordering could in principle be re-ordered by a
+per-architecture search. Given the gaps involved (0.12 nats between the recursive arms), we regard
 that as a real risk for the MoR--MoRE comparison and a small one for the comparisons
 against MoE.
 
@@ -461,7 +425,7 @@ against MoE.
 \label{app:disclosures}
 
 Several facts about this study would count against it if a reader discovered them
-independently, so we state them. An earlier composed arm re-routed at every step, violated the specification, and its apparent parity with MoR was an artefact---the architecturally correct arm scores $0.134$ nats \emph{worse}. The pre-registration is partial, and the MoR-versus-MoE comparison was specified after its data existed. And the matrix spans two GPUs over four code revisions; the retrained arms reproduced to $-0.117\sigma$ and $-0.119\sigma$, a common-mode offset that cancels in every between-arm gap carrying a verdict (the MoE$-$MoR gap moved by 0.000185 nats), though per-seed values do not reproduce. English supplies no ground-truth depth, so we report no per-token depth-allocation error: the metric is \texttt{N/A}, not zero. Appendix~\ref{app:disclosures} gives all of it in full.
+independently, so we state them. An earlier composed arm re-routed at every step, violated the specification, and its apparent parity with MoR was an artefact---the architecturally correct arm scores $0.134$ nats \emph{worse}. The pre-registration is partial, and the MoR-versus-MoE comparison was specified after its data existed. And the matrix spans two GPUs over four code revisions; the retrained arms reproduced to $-0.117\sigma$ and $-0.119\sigma$, a common-mode offset that cancels in every between-arm gap carrying a verdict (the MoE$-$MoR gap moved by 0.000185 nats), though per-seed values do not reproduce. English supplies no ground-truth depth, so we report no per-token depth-allocation error: the metric is \texttt{N/A}, not zero.
 \textbf{An earlier version of the composed arm was not the architecture we define,
 and fixing it made our headline worse.} It re-routed at every recursion step,
 letting a token traverse up to seven \emph{different} expert FFNs---a heterogeneous

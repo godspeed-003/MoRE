@@ -10942,3 +10942,105 @@ the aggregated payload, so prose cannot drift from the tables.
 `code/run_lang_subset_sweep.py`, aggregator
 `code/summarize_lang_subset_sweep.py`, control
 `code/eval_lang_depth_control.py` (GPU run ≈ 12 min for 45 cells).
+
+## T-LA.29 - two tasks: arithmetic added, language saturation retracted, MoRE defined (2026-11-01)
+
+**Machine.** Ayan's RTX 4060 8 GB (user `Hp`). No training run; every number here
+is transcribed from `results/opdiff/results.md` and
+`results/opdiff/depth_control.md`, whose provenance is dataset
+`opdiff-v4-fingerprint-1197a5cbae10` (build `opdiff-v4-b002e4acf878`, commit
+`b41f3a3`).
+
+**Title and definition.** Retitled `MoRE: Mixture of Recursive Experts` in both
+`main.tex` files; the acronym was previously never expanded anywhere in the
+paper, and `MoR` sits one letter away. The abstract now defines it, the
+introduction defines it after the composition sentence, and
+`paper/common/03_method.tex` gains a `\paragraph{Definition.}` stating the block,
+its two limits (`T=1` is MoE, `E=1` is MoR), and that `E` comes from each task's
+manifest---six on language, seven on arithmetic.
+
+**Arithmetic as a second task, in the body.** New `\subsection{The arithmetic
+task}` in `02_setup.tex` (`sec:arith-task`) and new
+`\subsection{A task built for the architecture}` at the end of `04_results.tex`
+(`sec:arithmetic`). The results section carries Table~3 (digit CE, accuracy,
+exact match, depth, AMI, parameters; final epoch, `0.1900 +/- 0.0177` for MoRE)
+and Table~4 (the depth-control bracket: depth-matched `0.842` vs `0.837`;
+best-uniform `0.095` vs `0.221`). Both tables are transcribed by hand, with a
+comment naming the two `results/opdiff/` files; there is no generator for them
+(unlike `tab:main`, which `code/make_table_main.py` owns). The depth table is a
+checkpoint re-evaluation and its caption says so; the main table is final epoch.
+The two are never combined.
+
+**Claim ladder actually written.** Against MoE the gap is decisive (`0.2403` nats,
+disjoint seed ranges). Against MoR it is not resolvable at five seeds: MoRE is
+lower in 4/5, its spread is 4.8x smaller, but the `0.055` mean gap sits inside
+MoR's `0.085` sd. The four negatives travel with the table: no generalisation to
+unseen `k` (every arm at chance, read as this budget's learnability frontier
+because seen `k=3,4` already degrade to `0.856`/`0.661`); depth flat across `k`
+(`4.43 -> 4.45`); AMI below MoE (`0.031` vs `0.107`); and the depth policy is
+replaceable by a fixed depth of 5-6.
+
+**Saturation subsection deleted, not repaired.** `05_mechanism.tex` lost the
+whole `ACLMOVE:saturation` block (old lines 73-118) and its
+`APPENDIX`/`TMLR_APPENDIX` entries in `paper/assemble_submissions.py`. Reason:
+its source `code/lang_sweep_tlx20.json` is a single-seed batch-64 proxy whose
+status forbids quoting, its three cited run directories are absent from `runs/`,
+and a 5-seed re-measurement puts depth at `6.77`/`6.95` for the 10 %/40 %
+points, not `1.92`/`1.97`. The paper now says only what is measured: the language
+halt head saturates (97.3 % forced exit), and the arithmetic arm with the same
+halt head and the same `285x` gradient ratio settles near four of seven steps.
+The replacement paragraph is outside any marker, so it stays in both bodies.
+Three dangling `\S\ref{sec:saturation}` citations were rewired; the section
+title became "Why the Composition Does Not Add on Language" and "Four accounts"
+became "Three accounts".
+
+**All four "not run" sentences removed** (user decision): the sweep sentence in
+`06_limitations.tex`, the depth-matched-control paragraph, "which we did not
+run" in `05_mechanism.tex`, and the Holm-slot sentence. The generic accounting
+rule in `02_setup.tex` ("a declared comparison that could not be run still
+consumes its slot") remains, so Family A's `m=4` is still coherent. The
+sparsity-confound paragraph was rewritten as a scoping statement ("what the
+present evidence identifies is the ordering between these three
+configurations") rather than an admission.
+
+**Dangling reference found and fixed.** `assemble_submissions.py`'s
+self-containment check flagged `app:disclosures` as undefined in the ACL tree.
+The `ACLMOVE:disclosures` inline replacement ended with a pointer to an appendix
+that ACL does not build (the block is TMLR-only). Removed the pointer; the ACL
+body carries the full prose immediately below, and TMLR's appendix section still
+exists. This was the pre-existing defect recorded at T-LA.28.
+
+**Build.** TinyTeX's temp extraction was corrupt (only `msvcr100.dll` in
+`bin/windows`), so `code/compile_papers.py` could not find `pdflatex`. Re-fetched
+`TinyTeX-1-windows-v2026.10.exe` (73.7 MB, a 7-Zip SFX, not an Inno installer:
+`/VERYSILENT` exits 7) and extracted with the SFX's own switches
+`-y -o"<dir>"`. The archive root is `TinyTeX/`, so the result nests one level too
+deep and has to be flattened to `out\TinyTeX\bin\windows`.
+
+- `paper/assemble_submissions.py` -> TMLR 13/13 blocks moved, ACL 12/13; both
+  trees self-contained.
+- `code/check_latex_lint.py` -> 24 files clean.
+- `code/compile_papers.py` -> TMLR 22 pp, 0 errors, 0 overfull, 0 undefined;
+  ACL 20 pp, 0 errors, 0 overfull, 0 undefined.
+- `code/check_overflow.py` -> nothing outside the text block in either venue.
+- `code/make_overleaf_zips.py` -> both zips rebuilt.
+- `code/measure_counted_pages.py` -> **TMLR 14.18 counted pages (norm 12, over
+  2.18)**; **ACL 11.64 (hard limit 8, over 3.64)**. TMLR was 11.64 before this
+  change, so the arithmetic body costs ~2.5 pages. ACL was already ~9 (deferred
+  at T-LA.15/24), so the arithmetic section worsens an existing blocker. The
+  user deferred the page decision; the arithmetic depth-control table is the
+  first candidate to move.
+
+**Trap hit here - TeX Live 2026 widened three ACL tabulars.** After the first
+successful ACL compile, `check_overflow.py` reported three boxes the previous
+build did not: `tab:main` 27.0pt, the competition halting grid 29.7pt, the budget
+table 23.9pt. Cause is the newer TeX Live metrics, not the new prose. Fixed by
+`\setlength{\tabcolsep}{4pt}`: added to the two `center` tables in the common
+sources, and to `code/make_table_main.py` so a regeneration keeps it. Rebuild
+then reported 0 overfull in both venues.
+
+**Where to look.** `paper/common/04_results.tex` (the arithmetic section and both
+tables), `02_setup.tex` (`sec:arith-task`), `05_mechanism.tex` (the replacement
+halting paragraph), `06_limitations.tex` (the arithmetic-limits subsection),
+`paper/assemble_submissions.py` (`APPENDIX`, `TMLR_APPENDIX`),
+`code/make_table_main.py` (`tabcolsep`).

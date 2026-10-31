@@ -15,22 +15,32 @@ it appears to need. The composition inherits an efficiency argument from each
 side. What it does not inherit is evidence---whether it beats either component at
 a matched budget has not, to our knowledge, been isolated.
 
+We call this composition \emph{Mixture of Recursive Experts} (MoRE): a token is
+routed once, from its post-embedding state, to one of $E$ independent expert
+FFNs, and that expert's weights---never another's---are reused for an adaptive
+number of recursion steps under learned halting.
+
 We isolate it. One training engine implements three configurations differing only
 in the fields their definitions require: routing without recursion (MoE, six
-experts, depth 1), recursion without routing (MoR, one shared block, depth up to
-7), and the composition (MoRE, six experts, depth up to 7). All three sit at
+experts on the language task, depth 1), recursion without routing (MoR, one
+shared block, depth up to 7), and the composition (MoRE, six experts, depth up to
+7). All three sit at
 $\approx$5.58M parameters, share a bit-identical input representation, and train
 on the same fixed split of WikiText-103 \citep{merity2017wikitext} with the same
 optimiser budget, so a difference between arms cannot be a difference in the
-harness, the data, or the parameter count.
+harness, the data, or the parameter count. A second task---arithmetic with seven
+operation groups, its own manifest and a matched budget within that task---uses
+the same engine and is reported in \S\ref{sec:arithmetic}; it is built so that
+routing and recursion both have something to do.
 
 \paragraph{What we find.} The composition occupies the compute-efficient point of
 the three, and the honest accounting of what it does and does not buy is the
 paper.
 
 \begin{itemize}[leftmargin=1.4em,itemsep=1.5pt,topsep=2pt]
-\item \textbf{All three arms sit on the quality/compute frontier, and the
-  composition buys the most quality per unit of compute.} MoRE improves on MoE by
+\item \textbf{On the language task, all three arms sit on the quality/compute
+  frontier, and the composition buys the most quality per unit of compute.} MoRE
+  improves on MoE by
   $7.9\%$ validation loss ($3.948 \rightarrow 3.637$ nats/token) at $2.19\times$
   MoE's inference FLOPs where MoR needs $8.87\times$: $72\%$ of MoR's gain for
   $25\%$ of its compute, roughly $3\times$ the quality per unit compute. Out of
@@ -39,17 +49,26 @@ paper.
   Pareto-dominated---which is the one respect in which composing the mechanisms
   does something neither does alone.
 
-\item \textbf{But recursion alone remains the lowest-loss arm in domain.} MoR
-  reaches 3.515 against MoRE's 3.637: the composition trades $0.1216$ nats,
-  significant at our resolution floor, for a $4\times$ inference-FLOP saving.
-  These are two axes and we never substitute one for the other. Adding routing
-  improves neither in-domain quality over MoR nor routing quality over MoE.
+\item \textbf{But on the language task recursion alone remains the lowest-loss
+  arm.} MoR reaches 3.515 against MoRE's 3.637: the composition trades $0.1216$
+  nats, significant at our resolution floor, for a $4\times$ inference-FLOP
+  saving. These are two axes and we never substitute one for the other. On that
+  task, adding routing improves neither in-domain quality over MoR nor routing
+  quality over MoE.
 
-\item \textbf{Recursion's adaptive depth is real; the composition's barely
-  survives.} Against a \emph{depth-matched} uniform policy---forced to the learned
-  policy's own mean depth, so total compute is fixed---MoR's halting buys 1.47
-  nats and MoRE's 0.06, a factor of 24. MoRE's halting has collapsed to running to
-  budget on $97.3\%$ of tokens.
+\item \textbf{Recursion's adaptive depth is real on the language task; the
+  composition's barely survives there.} Against a \emph{depth-matched} uniform
+  policy---forced to the learned policy's own mean depth, so total compute is
+  fixed---MoR's halting buys 1.47 nats and MoRE's 0.06, a factor of 24. MoRE's
+  halting has collapsed to running to budget on $97.3\%$ of tokens.
+
+\item \textbf{On an arithmetic task built to exercise the composition, it is
+  the lowest-loss arm.} Seven operation groups, no group label in the input, and
+  a difficulty axis written into the input: MoRE reaches $0.190$ nats against
+  $0.245$ for recursion alone and $0.430$ for MoE, lower in four of five seeds
+  and with a $4.8\times$ tighter spread than recursion. Routing is what
+  stabilises recursion; the halting head is input-dependent but replaceable by a
+  fixed depth ($0.095$ nats against the best uniform depth).
 
 \item \textbf{A diagnostic that generalises.} A mean step count and an exit
   histogram---what this literature almost always reports---do \emph{not} establish
@@ -69,7 +88,8 @@ paper.
 We report this as a trade-off measured at this scale, not a verdict on either
 mechanism in general. The contribution is the decomposition: because MoE
 \emph{is} MoRE with the depth budget set to one and all three arms are
-parameter-matched from one codebase, each contrast varies one thing.
+parameter-matched from one codebase within each task, each contrast varies one
+thing.
 
 \section{Related Work}
 \label{sec:related}

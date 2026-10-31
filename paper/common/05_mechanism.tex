@@ -1,7 +1,7 @@
-\section{Why the Composition Fails}
+\section{Why the Composition Does Not Add on Language}
 \label{sec:mechanism}
 
-Four accounts, labelled by evidential status: what is measured, and what is
+Three accounts, labelled by evidential status: what is measured, and what is
 hypothesis consistent with the measurement.
 
 \subsection{Routing divides the data, not the update budget}
@@ -61,8 +61,8 @@ MoR is exactly the $E{=}1$ point of a matched-width expert sweep and MoRE the
 $E{=}6$ point, and the hypothesis predicts loss rising with $E$ at fixed width. Two
 points cannot isolate it, and the $E{=}1$ endpoint differs in a second way---it has
 no router, gate or balance term---so the experiment that would is an intermediate
-point that keeps the router ($E{=}2$ at width 12, or $E{=}3$ at width 8), which we
-did not run. The account earns its place because it is the only one left once the
+point that keeps the router ($E{=}2$ at width 12, or $E{=}3$ at width 8). The
+account earns its place because it is the only one left once the
 arithmetic above excludes the update-count version; because it predicts the
 stratified result---MoRE's advantage over MoE grows with token difficulty
 (\S\ref{sec:stratified}), where an incompletely learned shared structure should hurt
@@ -70,52 +70,19 @@ most; because MoRE is the arm still improving fastest when the budget ends
 (\S\ref{sec:budget}), as slower re-learning would imply; and because it yields the
 falsifiable scale prediction stated in \S\ref{sec:limitations}.
 
-% >>>ACLMOVE:saturation|\subsection{Depth saturation is a data-scale effect}\label{sec:saturation} \textbf{[MEASURED, four points at fixed hyperparameters.]} MoRE's halting sits at the ceiling on the full corpus (97.3\% forced-exit, mean depth 6.955 of 7), inviting the reading that the architecture cannot learn adaptive depth. A subset sweep falsifies it: at 2.5\%, 10\% and 40\% of the corpus the \emph{same} model at the \emph{same} ponder weight allocates depth adaptively (exit rates near zero, mean depth 1.9--2.4 of 7), and the collapse appears only at full scale. \textbf{The failure is a calibration finding, not an architectural one.} The axis is not cleanly monotone, so the honest phrasing is that saturation emerges between 40\% and 100\% of the data; the ponder term is linear in expected depth while the task gradient grows as the model fits, and once the halting sigmoid saturates its gradient vanishes \citep{graves2016act}. \citet{banino2021pondernet} is the principled fix, unrun (Appendix~\ref{app:saturation}).
-\subsection{Depth saturation is a data-scale effect, not an architectural limit}
-\label{sec:saturation}
+\paragraph{The same block, two halting policies.}
+On the language arm the halt head saturates: $97.3\%$ of tokens run to the depth
+budget, and the learned policy is worth $0.060$ nats against a depth-matched
+uniform policy---$4\%$ of MoR's margin on the same control. On the arithmetic
+task the same block, with the same halt head, the same ponder term and the same
+$285\times$ halt-to-task gradient ratio, settles near four of seven steps, and
+its margin against that control matches MoR's on the mean ($0.842$ against
+$0.837$). The halting mechanism is therefore not intrinsically inert: a saturated
+policy is a property of the setting, not of the composition. Which of task,
+objective and data-generating structure is responsible is not identified by our
+design; the cross-task comparison supports the weaker claim, that a saturated
+policy on one task does not license a conclusion about the mechanism.
 
-\textbf{[MEASURED, four points at fixed hyperparameters.]} MoRE's halting sits at
-the ceiling on the full corpus (97.3\% forced-exit, mean depth 6.955 of 7). It is
-tempting to read that as the architecture being unable to learn adaptive depth. A
-subset sweep falsifies that reading.
-
-\begin{center}
-{\dispsize
-\setlength{\tabcolsep}{9pt}\renewcommand{\arraystretch}{1.25}
-\small
-\begin{tabular}{lcc}
-\toprule
-training data & mean depth & forced exit \\
-\midrule
-2.5\%             & 2.43 & $\approx 0$ \\
-10\%              & 1.92 & $\approx 0$ \\
-40\%              & 1.97 & $\approx 0$ \\
-100\% (canonical) & 6.96 & 0.973 \\
-\bottomrule
-\end{tabular}
-}
-\end{center}
-
-At every reduced-data point the same model, at the same ponder weight, allocates
-depth adaptively---exit rates near zero, mean depth between 1.9 and 2.4, inside a
-budget of 7. The collapse appears only at full scale. \textbf{So the failure is a
-calibration finding, not an architectural one}: the ponder penalty that produces
-adaptive depth on a small corpus cannot hold depth down at this one.
-
-We state the limit of that claim precisely, because the sweep is exploratory
-(single seed, subset fraction below 1, and it may never be quoted as a canonical
-result). The subset axis is \emph{not} cleanly monotone---2.5\% gives 2.43 but 40\%
-gives 1.97---so the honest phrasing is that \emph{saturation emerges somewhere
-between 40\% and 100\% of the data}, not that depth is monotone in training steps.
-The mechanism is consistent: the ponder term is linear in expected depth, while the
-task gradient grows as the model fits, so the fixed penalty is outpaced. Once the
-halting sigmoid saturates, its gradient vanishes and the linear-penalty ACT scheme
-cannot recover on its own \citep{graves2016act}. \citet{banino2021pondernet}
-replaces the linear penalty with a KL divergence against a geometric prior, which
-keeps a gradient on the halt head near saturation, and is the principled fix; we
-did not run it, and it is named as future work rather than as a result.
-
-% <<<ACLMOVE:saturation
 \subsection{The two mechanisms compete for one budget}
 \label{sec:competition}
 
@@ -123,10 +90,9 @@ did not run it, and it is named as future work rather than as a result.
 the balance axis.]} This is the paper's central claim, and it is the one that
 explains why the composition does not merely fail to add but subtracts.
 
-The grid below varies the same halting weight whose \emph{level}
-\S\ref{sec:saturation} shows does not transfer from the small corpus to the full
-one. We use it for a different quantity: not where depth settles at a given
-weight, but the \emph{direction} of the trade-off as the weight moves. A level can
+The grid below varies the same halting weight and asks about the
+\emph{direction} of the trade-off as the weight moves, not the level at which
+depth settles. A level can
 fail to transfer while a direction holds; whether this one does is untested on the
 full corpus, where only the balance-axis form below is measured, so this
 subsection's halting claim carries the strength of a one-seed development grid.
@@ -137,7 +103,7 @@ the halting weight destroys expert differentiation:
 
 \begin{center}
 {\dispsize
-\setlength{\tabcolsep}{9pt}\renewcommand{\arraystretch}{1.25}
+\setlength{\tabcolsep}{4pt}\renewcommand{\arraystretch}{1.25}
 \begin{tabular}{lccc}
 \toprule
 halting weight & mean depth & AMI & val loss \\
@@ -165,7 +131,7 @@ either: setting it to zero \emph{collapses} the expert load onto a single expert
 (load entropy 0.0001) and drives AMI to zero. A near-uniform per-token router
 distribution coexisting with balanced load and above-chance specialisation is
 therefore not a pathology to be tuned out---and we note that we initially read it
-as one before the sweep refuted us (\S\ref{sec:honesty}).
+as one.
 
 Specialisation itself is real, and measured against per-run controls rather than
 against chance. MoRE's AMI is $0.1803 \pm 0.0246$ against a permutation control of

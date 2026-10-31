@@ -4,6 +4,12 @@
 \subsection{Data and split}
 \label{sec:data}
 
+We use two tasks. The language task, described here, measures the three arms on
+a realistic vocabulary. The arithmetic task, described in
+\S\ref{sec:arith-task}, is built so that the architecture's own assumption is
+testable: that operation-typed computations deserve separate parameters and
+different amounts of recursion.
+
 All arms train on WikiText-103 \citep{merity2017wikitext} with a byte-pair
 vocabulary of 8{,}192 tokens and packed sequences of length 256
 % >>>TMLRONLY
@@ -132,6 +138,54 @@ training throughputs compare hardware as much as architectures; we therefore tim
 inference for all fifteen checkpoints on one GPU (an RTX 3050 laptop GPU), on the
 identical out-of-domain blocks at batch size 32, after a warm-up batch.
 % <<<ACLMOVE:flops
+
+\subsection{The arithmetic task}
+\label{sec:arith-task}
+
+Natural language supplies no operation label, so the language comparison can say
+what the three arms do but not whether routing and depth are used for their
+intended purpose. The arithmetic task is an instrument built to make that
+testable, not a benchmark: it removes every route by which the structure could be
+faked.
+
+An example is 24 tokens: an operation token, five binary slots carrying the
+operation's iteration count $k$, two 16-bit operands as four hex digits each, a
+separator, an eight-digit (32-bit) result, and an end token. Sixteen independent
+examples are packed into a 384-token row, and rows are group-pure. There is no
+chain of thought: the answer digits follow the operands directly, so any
+sequential computation must happen in the recursion rather than in the token
+stream. The operation's group is never an input---the router sees the operation
+token and must infer the family---and a non-iterated operation carries a null
+$k$, so the layout is identical for every operation and the slot cannot leak the
+group. Only the eight result digits and the end token are scored, 144 of 384
+positions per row.
+
+Seven groups, one per expert, come from the task's own manifest: bitwise, shift
+and min--max, add--subtract, multiply, divide and modulo, sort and median, and a
+final group holding greatest-common-divisor together with the iterated
+operation. The iterated operation is a per-nibble recurrence---each digit
+updated from itself and its neighbour, plus a constant, modulo 16---applied $k$
+times to the eight nibbles of the concatenated operands. One application is a
+$256$-case table, so it is learnable at this scale, while the $k$-fold
+composition is not shortcut-able and one application costs about one block
+application, which is what lets $k$ span the seven-step budget instead of
+overshooting it. Training uses $k \in \{1,2,3,4\}$; $k = 5$ is held out inside
+the trained range and $k \in \{6,7\}$ beyond it. There is no depth curriculum: no
+target depth is supervised, so the per-$k$ average depth is a measurement rather
+than a target, and the per-operation depth-allocation error is correctly
+\texttt{N/A}.
+
+The training set is 294{,}000 rows, 112.9M tokens, slightly more than
+WikiText-103. The protocol mirrors the language one: three arms, five seeds,
+3 epochs, batch 48, $d_{\text{model}} = 256$, one block, 4 attention heads,
+$T = 7$, with total FFN width matched within the task---seven experts at
+multiplier 4 against a single FFN at multiplier 28. MoE and MoRE are
+parameter-identical at 4{,}056{,}334; MoR is $0.11\%$ \emph{smaller} at
+4{,}051{,}720, so the residual runs against the composition. The loss is masked
+cross-entropy over the result digits, not a regression objective. The protocol
+was not frozen in advance: these are same-protocol measurements across the three
+architectures, and no multiplicity correction is claimed.
+
 \subsection{Statistics}
 \label{sec:stats}
 

@@ -55,8 +55,7 @@
 
 \graphicspath{{fig/}}
 
-\title{Adaptive Compute at Matched Parameters: Routing and\\
-Recursion Trade Off in Small Language Models}
+\title{MoRE: Mixture of Recursive Experts}
 
 % Ignored under the anonymous (default) option; fill in for camera-ready.
 \author{\name Anonymous Author(s) \email anonymous@example.com \\
@@ -129,31 +128,42 @@ Recursion Trade Off in Small Language Models}
 Conditional computation chooses either \emph{which} parameters process a token
 ---sparse mixture-of-experts (MoE)---or \emph{how much} computation it receives
 ---adaptive-depth weight-tied recursion (MoR). Composing them should inherit
-both. We test whether it pays: one engine, three
-configurations, parameters matched to 0.069\% ($\approx$5.58M), bit-identical
-inputs, five seeds, exact randomisation tests under a pre-registered correction,
-on WikiText-103.
+both. We test whether it pays: one engine, three configurations, parameters
+matched to 0.069\% ($\approx$5.58M on language), bit-identical inputs, five
+seeds, exact randomisation tests under a pre-registered correction, on
+WikiText-103 and on an arithmetic task built to exercise the composition.
 
-All three arms sit on the quality/compute trade-off, and the composition (MoRE)
-buys the most quality per unit of compute. It improves on MoE by $7.9\%$
-validation loss at $2.19\times$ MoE's inference FLOPs, where recursion alone needs
-$8.87\times$. Both ratios share an identical output projection worth $79.9\%$ of
-MoE's per-token compute; excluding it, the composition's advantage over recursion
-\emph{grows}, to $17\%$ of its compute and $4.2\times$ the quality per unit compute.
-Out of domain the composition is stronger still, reaching lower loss than recursion
-alone at under a fifth of its compute; that comparison is exploratory and carries
-no significance verdict.
+We call the composition \emph{Mixture of Recursive Experts} (MoRE): a token is
+routed once, from its post-embedding state, to one of $E$ independent expert
+FFNs, and that expert's weights---never another's---are reused for an adaptive
+number of recursion steps under learned halting. On the language task all three
+arms sit on the quality/compute trade-off, and the composition buys the most
+quality per unit of compute. It improves on MoE by $7.9\%$ validation loss at
+$2.19\times$ MoE's inference FLOPs, where recursion alone needs $8.87\times$.
+Both ratios share an identical output projection worth $79.9\%$ of MoE's
+per-token compute; excluding it, the composition's advantage over recursion
+\emph{grows}, to $17\%$ of its compute and $4.2\times$ the quality per unit
+compute. Out of domain the composition is stronger still, reaching lower loss
+than recursion alone at under a fifth of its compute; that comparison is
+exploratory and carries no significance verdict.
 
-It is not lowest-loss in domain. Recursion alone leads by $0.1216$ nats, as extreme
-as a five-seed design admits and weaker than significance; we attribute it to
-recursion activating six times more feed-forward parameters per token at matched
-total parameters, which is its design rather than a confound. Adding routing
-improves neither in-domain quality nor routing quality over MoE. Most
-transferably: a mean step count and an exit histogram cannot establish
-input-dependent depth, since a uniform policy forced to the learned mean
-reproduces both. Against that control, recursion's learned policy is worth
-$1.471$ nats over a depth-matched uniform one and the composition's $0.060$; we do
-not treat that ratio as a verdict, its denominator being small.
+On the language task it is not lowest-loss. Recursion alone leads by $0.1216$
+nats, as extreme as a five-seed design admits and weaker than significance; we
+attribute it to recursion activating six times more feed-forward parameters per
+token at matched total parameters, which is its design rather than a confound.
+Adding routing improves neither in-domain quality nor routing quality over MoE
+on that task. Most transferably: a mean step count and an exit histogram cannot
+establish input-dependent depth, since a uniform policy forced to the learned
+mean reproduces both. Against that control on language, recursion's learned
+policy is worth $1.471$ nats and the composition's $0.060$; we do not treat that
+ratio as a verdict, its denominator being small.
+
+The arithmetic task reverses the ordering. There the composition is the
+lowest-loss arm: $0.190$ nats against $0.245$ for recursion alone and $0.430$
+for MoE, lower in four of five seeds and with a $4.8\times$ tighter spread than
+recursion. Routing is what stabilises recursion, and a fixed depth recovers most
+of what the learned policy buys ($0.095$ nats against the best uniform depth),
+so the halting head is input-dependent but not load-bearing.
 \end{abstract}
 
 \input{sections/01_intro}

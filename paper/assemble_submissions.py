@@ -114,7 +114,6 @@ APPENDIX = [
     # made an iso-FLOP control a condition of acceptance and FLOPs carry the
     # paper's whole efficiency claim, while the body only ever pointed at it.
     ("flops",       "Counting FLOPs, and measuring throughput", "app:flops"),
-    ("saturation",  "The subset sweep behind the depth-saturation finding", "app:saturation"),
     ("protocol",    "Training protocol and hyperparameters", "app:protocol"),
     ("blimp",       "BLiMP and EWoK, in full", "app:blimp"),
     # T-LA.8: the body still measured ~9.5 counted pages. The competition
@@ -167,7 +166,7 @@ TMLR_ONLY_APPENDIX = {"disclosures"}
 # anything but ranking.
 TMLR_APPENDIX = ["floor_proof", "holm_detail", "integrity", "metrics",
                  "protocol", "engine", "stratified", "trapping",
-                 "competition2", "blimp", "saturation", "flops", "budget",
+                 "competition2", "blimp", "flops", "budget",
                  "disclosures"]
 
 

@@ -75,8 +75,7 @@
 
 \graphicspath{{fig/}}
 
-\title{Adaptive Compute at Matched Parameters: Routing and Recursion\\
-Trade Off in Small Language Models}
+\title{MoRE: Mixture of Recursive Experts}
 
 % Anonymised under [review]; fill in for camera-ready.
 \author{Anonymous ARR Submission}
@@ -100,22 +99,35 @@ Conditional computation chooses either \emph{which} parameters process a token
 ---sparse mixture-of-experts (MoE)---or \emph{how much} computation it receives
 ---adaptive-depth weight-tied recursion (MoR). Composing them should inherit
 both. We test whether it pays: one engine, three configurations, parameters
-matched to 0.069\% ($\approx$5.58M), bit-identical inputs, five seeds, exact
-randomisation tests under a pre-registered correction, on WikiText-103.
+matched to 0.069\% ($\approx$5.58M on language), bit-identical inputs, five
+seeds, exact randomisation tests, on WikiText-103 and on an arithmetic task
+built to exercise the composition.
 
-All three arms lie on the quality/compute frontier, and the composition (MoRE)
-buys the most quality per unit of compute: $7.9\%$ better validation loss than
-MoE at $2.19\times$ its inference FLOPs where recursion alone needs
-$8.87\times$---$72\%$ of recursion's gain for $25\%$ of its compute. Out of
-domain it \emph{dominates} recursion alone, reaching lower loss at a quarter of
-the compute. It is not lowest-loss in domain: recursion alone leads by $0.1216$
-nats, significant at our resolution floor, and routing improves neither
-in-domain quality nor routing quality over MoE, so we keep the quality and
-compute axes separate. We trace the deficit to a competition for one per-token
-budget, excluding two rival explanations. Most transferably: a mean step count
-and an exit histogram cannot establish input-dependent depth, since a uniform
-policy forced to the learned mean reproduces both---and scoring against that
-control separates our recursive arms by a factor of 24.
+We call the composition \emph{Mixture of Recursive Experts} (MoRE): a token is
+routed once, from its post-embedding state, to one of $E$ independent expert
+FFNs, and that expert's weights---never another's---are reused for an adaptive
+number of recursion steps under learned halting. On the language task all three
+arms lie on the quality/compute frontier, and the composition buys the most
+quality per unit of compute: $7.9\%$ better validation loss than MoE at
+$2.19\times$ its inference FLOPs where recursion alone needs $8.87\times$---$72\%$
+of recursion's gain for $25\%$ of its compute. Out of domain it \emph{dominates}
+recursion alone, reaching lower loss at a quarter of the compute. On that task
+it is not lowest-loss: recursion alone leads by $0.1216$ nats, and routing
+improves neither in-domain quality nor routing quality over MoE, so we keep the
+quality and compute axes separate. We trace the deficit to a competition for one
+per-token budget, excluding two rival explanations.
+
+Most transferably, a mean step count and an exit histogram cannot establish
+input-dependent depth, since a uniform policy forced to the learned mean
+reproduces both---and scoring against that control separates our language arms
+by a factor of 24.
+
+The arithmetic task reverses the ordering. There the composition is the
+lowest-loss arm: $0.190$ nats against $0.245$ for recursion alone and $0.430$
+for MoE, lower in four of five seeds and with a $4.8\times$ tighter spread than
+recursion. Routing is what stabilises recursion, and a fixed depth recovers most
+of what the learned policy buys ($0.095$ nats against the best uniform depth),
+so the halting head is input-dependent but not load-bearing.
 \end{abstract}
 
 \input{sections/01_intro}

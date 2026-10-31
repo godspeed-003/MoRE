@@ -23,16 +23,18 @@ already the better arm on data it was not trained on.
 The measurement that would falsify it: hold parameters, depth budget and optimiser
 fixed; sweep training tokens over at least a decade; and report the MoR$-$MoRE gap
 as a function of tokens per expert. If the gap is flat or widening, the diversity
-account is wrong. We did not run that sweep, and a second model size is unrun too.
+account is wrong.
 
-\paragraph{The control that separates composition from sparsity was not run.}
+\paragraph{What this evidence does and does not separate.}
 \S\ref{sec:dilution} shows that recursion alone spends six times the active
 feed-forward parameters, and that this accounts for the easy half of the ordering.
 A MoR narrowed to the same active width at the same depth would separate the
-composition from sparse activation alone; \textbf{it was not run}, and \textbf{we
-do not claim the composition beats sparsity on this evidence}.
+composition from sparse activation alone. What the present evidence identifies is
+therefore the ordering between these three configurations, not sparse activation
+in isolation, and \textbf{we do not claim the composition beats sparsity on this
+evidence}.
 
-\subsection*{Budget, not convergence}\label{sec:budget} The 3-epoch budget leaves every arm short of convergence (\S\ref{sec:protocol}), and the arms are furthest apart on that axis at the cutoff: the final-epoch drop is $0.091$ nats for MoE, $0.132$ for MoR and $0.176$ for MoRE, so \textbf{the arm that loses in domain is the one still improving fastest}. The ordering is therefore budget-dependent, in the direction this paper's mechanism predicts (\S\ref{sec:dilution}); we do not extrapolate a crossing epoch, because the curves decelerate. Appendix~\ref{app:budget} gives the per-epoch curves and the rest of this section.
+\subsection*{Budget, not convergence}\label{sec:budget} The 3-epoch budget leaves every arm short of convergence (\S\ref{sec:protocol}), and the arms are furthest apart on that axis at the cutoff: the final-epoch drop is $0.091$ nats for MoE, $0.132$ for MoR and $0.176$ for MoRE, so \textbf{the arm that loses in domain on the language task is the one still improving fastest}. The ordering is therefore budget-dependent, in the direction this paper's mechanism predicts (\S\ref{sec:dilution}); we do not extrapolate a crossing epoch, because the curves decelerate. Appendix~\ref{app:budget} gives the per-epoch curves and the rest of this section.
 
 \subsection*{Statistical resolution}
 
@@ -42,10 +44,7 @@ admits'' is the strongest statement available, and it is weaker than significanc
 no larger effect could produce a smaller $p$ here, only more seeds could. Cohen's
 $d$ is reported alongside every gap because a large $d$ on a small gap is the
 misreading to avoid---across our own re-exports $d$ moved by a factor of 1.5 while
-the gap moved by less than 0.005 nats. One comparison in the pre-registered Family
-A, a depth-matched fixed-depth control, was declared before results existed and
-never run; it still consumes its Holm slot, so the correction is not loosened by
-its absence (Appendix~\ref{app:stats}).
+the gap moved by less than 0.005 nats.
 
 \subsection*{Evaluation caveats}
 
@@ -60,6 +59,32 @@ conclusions.
 
 The perplexities in Table~\ref{tab:main} are intra-study quantities for the same
 reason and are not comparable to published WikiText-103 numbers.
+
+\subsection*{The arithmetic task}
+
+The arithmetic results come from one 8\,GiB laptop GPU and a matrix of roughly
+33 hours, and they describe one dataset design rather than arithmetic in general.
+Three boundaries matter for reading them.
+
+The seven groups are a prior supplied by the task's own manifest, not a ground
+truth about how arithmetic decomposes, so the low routing AMI is not evidence
+against specialisation; it is evidence that a stronger router may carve
+differently. Nor are the language arm's six experts and the arithmetic arm's
+seven the same model class at two widths: each count comes from its own manifest
+and total FFN width is matched within a task, so no claim crosses tasks.
+
+MoR's seed spread is the largest quantity in the matrix, and it reflects a
+distribution over halting policies rather than measurement noise: seeds settle on
+different depths and loss tracks the depth each chose. A five-seed mean therefore
+describes that distribution, and the composition's advantage is as much a
+reduction in its variance as a move in its mean. One MoR seed paged on this card,
+so no throughput comparison is drawn from arithmetic.
+
+The difficulty axis is the iteration count, and every arm is at chance on counts
+it did not train on. Since per-digit accuracy already degrades across the seen
+counts at this budget, that is a boundary of this design rather than an
+architectural verdict. The arithmetic protocol was not frozen in advance and no
+multiplicity correction is claimed for its table.
 
 \subsection*{Disclosures}
 \label{sec:honesty}
@@ -89,7 +114,7 @@ reason and are not comparable to published WikiText-103 numbers.
 % self-contained. ACL's Limitations section is a required part of its defined
 % format -- do not shorten it, and diff the OTHER venue's generated tree.
 Several facts about this study would count against it if a reader discovered them
-independently, so we state them. An earlier composed arm re-routed at every step, violated the specification, and its apparent parity with MoR was an artefact---the architecturally correct arm scores $0.134$ nats \emph{worse}. The pre-registration is partial, and the MoR-versus-MoE comparison was specified after its data existed. And the matrix spans two GPUs over four code revisions; the retrained arms reproduced to $-0.117\sigma$ and $-0.119\sigma$, a common-mode offset that cancels in every between-arm gap carrying a verdict (the MoE$-$MoR gap moved by 0.000185 nats), though per-seed values do not reproduce. English supplies no ground-truth depth, so we report no per-token depth-allocation error: the metric is \texttt{N/A}, not zero. Appendix~\ref{app:disclosures} gives all of it in full.
+independently, so we state them. An earlier composed arm re-routed at every step, violated the specification, and its apparent parity with MoR was an artefact---the architecturally correct arm scores $0.134$ nats \emph{worse}. The pre-registration is partial, and the MoR-versus-MoE comparison was specified after its data existed. And the matrix spans two GPUs over four code revisions; the retrained arms reproduced to $-0.117\sigma$ and $-0.119\sigma$, a common-mode offset that cancels in every between-arm gap carrying a verdict (the MoE$-$MoR gap moved by 0.000185 nats), though per-seed values do not reproduce. English supplies no ground-truth depth, so we report no per-token depth-allocation error: the metric is \texttt{N/A}, not zero.
 \textbf{An earlier version of the composed arm was not the architecture we define,
 and fixing it made our headline worse.} It re-routed at every recursion step,
 letting a token traverse up to seven \emph{different} expert FFNs---a heterogeneous

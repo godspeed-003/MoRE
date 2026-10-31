@@ -7,11 +7,18 @@ three arms lie on the quality/compute frontier; MoRE buys the most quality per
 unit of compute ($72\%$ of recursion's gain for $25\%$ of its compute) and out of
 domain \emph{dominates} recursion alone, reaching lower loss at a quarter of the
 compute---the one respect in which composing the mechanisms does something
-neither does alone. What it does not buy is in-domain quality: recursion alone
-leads by 0.1216 nats, significant at our resolution floor. The mechanism is not
-the obvious one---routing does not dilute the update budget, and subspace
-trapping fails three ways---but a competition for one per-token budget, in which
-the arm preserving specialisation saturates its depth. We release the engine, the
-evaluation battery, and the forced-depth control, and it is the last we would
-most like to see reused: it costs one inference pass, and it is what separates
-two arms that are indistinguishable by mean-and-histogram.
+neither does alone. What it does not buy is in-domain quality on the language
+task: recursion alone leads by 0.1216 nats, significant at our resolution floor.
+The language mechanism is not the obvious one---routing does not dilute the
+update budget, and subspace trapping fails three ways---but a competition for one
+per-token budget, in which the arm preserving specialisation saturates its depth.
+
+The arithmetic task, built so that routing and recursion both have something to
+do, reverses the ordering: there the composition is the lowest-loss arm and the
+most stable one, and a fixed depth recovers most of what its learned policy buys.
+The general lesson is that neither mechanism's value transfers across settings by
+assumption: what a composition buys is a property of the task, and the controls
+that establish it cost one inference pass. We release the engine, the evaluation
+battery, the forced-depth control, and the arithmetic task generator, and it is
+the control we would most like to see reused, because it is what separates two
+arms that are indistinguishable by mean-and-histogram.

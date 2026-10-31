@@ -3,15 +3,18 @@
 
 \subsection{Setting and notation}
 
-The task is autoregressive language modelling on packed token sequences. Write
+The language task is autoregressive language modelling on packed token sequences.
+Write
 $E$ for the number of experts, $T$ for the maximum recursion depth, $d$ for the
 model width, and $\mathbf{h}^{(0)}_s \in \mathbb{R}^{d}$ for the post-embedding
-state of position $s$. Unlike a synthetic benchmark, natural language supplies
-\emph{no per-token oracle}---neither an expert index nor a complexity label---so
-every structural claim below must rest on permutation-invariant statistics or on
+state of position $s$. Natural language supplies \emph{no per-token
+oracle}---neither an expert index nor a complexity label---so every structural
+claim on that task must rest on permutation-invariant statistics or on
 comparisons against a controlled alternative. This is why
 \S\ref{sec:halting} is built around a forced-depth sweep rather than around
-agreement with ground truth.
+agreement with ground truth, and why \S\ref{sec:arithmetic} adds a task in which
+the operation identity is legible to the model and the difficulty axis is
+measured rather than supervised.
 
 \subsection{Routing}
 
@@ -106,11 +109,13 @@ remainder $R$ does. Eq.~\ref{eq:ponder} is the ponder cost. It is worth noting
 that the gradient reaching the halt heads through $R$ is small compared with the
 task gradient: a direct measurement in our implementation puts the halt gradient
 at roughly $285\times$ below the task term. This ratio is the quantitative form
-of the failure analysed in \S\ref{sec:mechanism}: the ponder term is large enough
+of the tension analysed in \S\ref{sec:mechanism}: the ponder term is large enough
 to be optimised away but too weak to hold depth down once the task gradient
-accumulates, and once the halting sigmoid saturates the gradient through $R$
-vanishes \citep{graves2016act}. \citet{banino2021pondernet} is the principled fix
-and is future work (\S\ref{sec:limitations}).
+accumulates, and on the language task the halting sigmoid reaches saturation,
+where the gradient through $R$ vanishes \citep{graves2016act}.
+\citet{banino2021pondernet} replaces the linear penalty with a KL divergence
+against a geometric prior, which keeps a gradient on the halt head near
+saturation.
 
 The training objective is a weighted sum of terms that we report separately and
 never as a single number:
@@ -140,4 +145,4 @@ zero because natural language supplies no per-token oracle expert and no per-tok
 oracle depth to supervise against. The canonical router is therefore unsupervised
 with respect to the per-token routing decision.
 
-\subsection{One engine, three modes}\label{sec:engine} MoE, MoR and MoRE are configurations of one implementation with an explicit \texttt{architecture} mode, so a difference between arms cannot be a difference in the harness. Equalising \emph{total} FFN hidden width gives MoR's single FFN a multiplier of $24=4\times6$: \textbf{5{,}584{,}908 parameters for MoE and MoRE, identical, and 5{,}581{,}063 for MoR}---a $0.069\%$ deficit that is the router MoR lacks, and which runs \emph{against} our headline since the lighter arm wins in domain. Appendix~\ref{app:engine} derives it.
+\subsection{One engine, three modes}\label{sec:engine} MoE, MoR and MoRE are configurations of one implementation with an explicit \texttt{architecture} mode, so a difference between arms cannot be a difference in the harness. Equalising \emph{total} FFN hidden width gives MoR's single FFN a multiplier of $24=4\times6$: \textbf{5{,}584{,}908 parameters for MoE and MoRE, identical, and 5{,}581{,}063 for MoR}---a $0.069\%$ deficit that is the router MoR lacks, and which runs \emph{against} our headline since the lighter arm wins in domain on the language task. Appendix~\ref{app:engine} derives it.

@@ -6,19 +6,20 @@ warn you about.
 
 ---
 
-## 1. BLOCKER — the 8-page limit has never been measured, and overrunning is a desk rejection
+## 1. BLOCKER — the body is 11.64 pages against a hard 8-page limit
 
 ARR long papers are limited to **eight (8) pages of content**. The Limitations
 section, the Ethical Considerations section, references and appendices do **not**
 count.
 
-**This body was written for TMLR, which has no page limit. It is very likely
-over 8 pages here.** No LaTeX toolchain existed on the machine that assembled
-this, so **the document has never been compiled** and the page count is unknown.
+**Measured on the last clean build:** 11.64 counted pages, so the body is 3.64
+pages over. It was already ~9 pages before the arithmetic task was added as a
+full results section (T-LA.29), which cost roughly 2.6 pages. Compiling is not
+the blocker; **cutting is**.
 
-**Compile it before you edit anything else.** If it overruns, cut in this order —
-the argument survives all four, and each is a block move to an appendix rather
-than a rewrite. (The same list is in `main.tex`'s preamble.)
+If the overrun is to be closed, cut in this order — the argument survives all
+four, and each is a block move to an appendix rather than a rewrite. The
+arithmetic task stays in the body by decision; these are the remaining levers.
 
 1. `sections/03_setup.tex` — the statistics and integrity-checks subsections →
    appendix (~0.75 page). The claims they support can be restated in one

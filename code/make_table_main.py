@@ -125,6 +125,7 @@ def render(g) -> str:
         r"\begin{table*}[t]",
         r"\centering",
         r"\footnotesize",
+        r"\setlength{\tabcolsep}{4pt}",
         r"\caption{All results, five seeds, mean$\,\pm\,$std. \textbf{Upper block:} each"
         r" cell is \emph{score (difference vs MoE, inference FLOPs$\times$ vs MoE,"
         r" $|$difference$|$ per FLOPs-multiplier)}; MoE is the reference arm, so its cells"

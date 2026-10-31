@@ -3868,3 +3868,53 @@ Known pre-existing and NOT from this change: `acl_submission` reports undefined
 the citing prose; proven on an unmodified tree, and `assemble_submissions.py`
 forbids the fix by moving the block back. Full record: `changelog.md` T-LA.28;
 commits `2a31b36` + `f75c4f7` (now on `main`).
+
+## T-LA.29 - second task (arithmetic) in the body, saturation retracted, MoRE defined
+
+**Date.** 2026-11-01. **Machine.** Ayan's RTX 4060 8 GB. **Status.** DONE, both
+venues reassembled, compiled, zipped. No training run; arithmetic numbers are
+transcribed from `results/opdiff/results.md` and
+`results/opdiff/depth_control.md`.
+
+### What changed
+
+- Title is `MoRE: Mixture of Recursive Experts`; the acronym is defined in both
+  abstracts, in `01_intro.tex`, and in a `\paragraph{Definition.}` in
+  `03_method.tex`.
+- New `sec:arith-task` in `02_setup.tex`: 24-token example layout, group purity,
+  no group label in the input, the `k` slot, seven groups, splits, 294k rows /
+  112.9M tokens, 3 arms x 5 seeds, matched FFN width, parameter counts, digit
+  cross-entropy. Says the protocol was not frozen in advance.
+- New `sec:arithmetic` at the end of `04_results.tex`, with Table 3 (main,
+  final-epoch `0.1900 +/- 0.0177`) and Table 4 (depth control bracket). The
+  strongest claims: decisive vs MoE, not resolvable vs MoR at n=5, 4.8x tighter
+  spread, routing stabilises recursion, halting replaceable at `0.095`.
+- `05_mechanism.tex`: the `ACLMOVE:saturation` block is deleted (source
+  `code/lang_sweep_tlx20.json` is a single-seed proxy whose run directories are
+  missing and whose `1.92`/`1.97` depths do not reproduce; 5-seed re-measurement
+  is `6.77`/`6.95`). Replaced by the cross-task halting paragraph; section
+  retitled "Why the Composition Does Not Add on Language".
+- `06_limitations.tex`: all four "not run" sentences removed; arithmetic
+  limitations added; conclusion covers both tasks.
+- `assemble_submissions.py`: `saturation` removed from `APPENDIX` and
+  `TMLR_APPENDIX`; the dangling ACL `app:disclosures` pointer removed from the
+  `ACLMOVE:disclosures` inline text.
+- `make_table_main.py`: emits `\tabcolsep 4pt` in `tab:main`; the two `center`
+  tables in `05_mechanism.tex` and `06_limitations.tex` use 4pt as well, to clear
+  three TeX Live 2026 overfull boxes.
+
+### Verify
+
+- `python paper/assemble_submissions.py`: TMLR 13/13, ACL 12/13, both
+  self-contained (was one undefined `app:disclosures` in ACL before the fix).
+- `python code/check_latex_lint.py`: clean, 24 files.
+- `python code/compile_papers.py`: TMLR 22 pp / ACL 20 pp, 0 errors, 0 overfull,
+  0 undefined refs or citations.
+- `python code/check_overflow.py`: nothing outside the text block in either.
+- `python code/measure_counted_pages.py`: TMLR **14.18** (norm 12, over 2.18;
+  was 11.64), ACL **11.64** (hard 8, over 3.64; was ~9 and already deferred).
+  **Page decision deferred by the user.** Arithmetic stays in the body; the
+  depth-control table is the first candidate to move.
+- `python code/make_overleaf_zips.py`: both bundles rebuilt.
+- PDF text check: title on page 1, arithmetic on pp. 10-12, mechanism on p. 12,
+  limitations on p. 14; Table 3 values match `results/opdiff/results.md`.
