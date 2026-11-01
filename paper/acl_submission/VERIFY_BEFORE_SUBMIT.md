@@ -6,16 +6,16 @@ warn you about.
 
 ---
 
-## 1. BLOCKER — the body is 11.64 pages against a hard 8-page limit
+## 1. BLOCKER — the body is 11.78 pages against a hard 8-page limit
 
 ARR long papers are limited to **eight (8) pages of content**. The Limitations
 section, the Ethical Considerations section, references and appendices do **not**
 count.
 
-**Measured on the last clean build:** 11.64 counted pages, so the body is 3.64
+**Measured on the last clean build:** 11.78 counted pages, so the body is 3.78
 pages over. It was already ~9 pages before the arithmetic task was added as a
-full results section (T-LA.29), which cost roughly 2.6 pages. Compiling is not
-the blocker; **cutting is**.
+full results section (T-LA.29), which cost roughly 2.6 pages, and the future-work
+paragraph (T-LA.30) added 0.14. Compiling is not the blocker; **cutting is**.
 
 If the overrun is to be closed, cut in this order — the argument survives all
 four, and each is a block move to an appendix rather than a rewrite. The

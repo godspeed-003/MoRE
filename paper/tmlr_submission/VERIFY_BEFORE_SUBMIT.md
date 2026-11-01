@@ -9,16 +9,23 @@ Measured on the last clean build (`python code/compile_papers.py`):
 | | value |
 |---|---|
 | PDF total | **22 pages** |
-| counted main content (to References) | **14.18 pages** against the ~12-page norm |
+| counted main content (to References) | **14.28 pages** against the ~12-page norm |
 | LaTeX errors | **0** |
 | overfull boxes (content outside the text block) | **0** |
 | undefined references / citations | **0** |
 | bibliography entries rendered | **18 of 18** |
 
-**The body is 2.18 pages over the ~12-page norm** after the arithmetic task was
-added as a full results section (T-LA.29). TMLR sets no hard limit; the norm is
-the author guide's recommendation. The arithmetic depth-control table is the
-first candidate to move if a decision is made to return under 12.
+**The body is 2.28 pages over the ~12-page norm** after the arithmetic task was
+added as a full results section (T-LA.29) and the future-work paragraph was
+added (T-LA.30; costs 0.10 page). TMLR sets no hard limit; the norm is the
+author guide's recommendation. The arithmetic depth-control table is the first
+candidate to move if a decision is made to return under 12.
+
+**A measured route to 12 pages exists and has not been applied** (T-LA.30).
+Layout tightening plus four block moves reaches 12.18--12.30; moving the Pareto
+figure as well reaches 11.77, leaving slack. See the T-LA.30 changelog entry for
+the measured per-item savings. Do not quote a page number from a source build:
+`measure_counted_pages.py` must be re-run after `assemble_submissions.py`.
 
 ---
 

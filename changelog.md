@@ -11044,3 +11044,96 @@ tables), `02_setup.tex` (`sec:arith-task`), `05_mechanism.tex` (the replacement
 halting paragraph), `06_limitations.tex` (the arithmetic-limits subsection),
 `paper/assemble_submissions.py` (`APPENDIX`, `TMLR_APPENDIX`),
 `code/make_table_main.py` (`tabcolsep`).
+
+---
+
+## T-LA.30 — future-work extensions; measured route back to 12 pages (not applied)
+
+**What.** Two additions requested by the user, and the page-cost analysis that
+follows from them. No result in the paper changed and no training run was made.
+
+**Future work, inserted in `06_limitations.tex` after the conclusion.** Two
+extensions, both stated as tests rather than as claims. (i) The engine applies
+*one* dense block per recursion step; stacking several distinct blocks and
+backpropagating through the whole stack would separate a property of weight-tied
+depth from a property of the single-block budget, and would let parameter depth
+and recursion depth vary independently within an expert. (ii) Every expert
+currently sees the raw token embedding, so each must model English and its
+nuances before it can specialise; an input-decoding stage---layers shared by all
+experts that map the token to a task-appropriate representation---would let the
+expert FFNs specialise on the routed computation instead. This is deliberately
+in the conclusion, not the method, because it describes what the implementation
+does *not* do; do not move it next to the architecture description without
+keeping the "current implementation" wording.
+
+**Measured cost of that insertion.** TMLR 14.18 -> 14.28 (+0.10); ACL
+11.64 -> 11.78 (+0.14). Rebuild order matters: `assemble_submissions.py` first,
+`compile_papers.py` second. Compiling without assembling leaves the old sections
+in the venue trees and silently reports the pre-edit count.
+
+**Page attribution of the arithmetic addition.** TMLR body is 22 PDF pages,
+14.28 counted (References starts on p15). Approximate spans: intro + related
+work 2.35 pp; method 1.7; setup 1.2; language results 3.5; arithmetic results
+1.0; mechanism 1.4; limitations 1.2; conclusion 0.2. Arithmetic is therefore
+much cheaper than the ~2.5 pp the earlier estimate assumed: its two tables and
+prose fit in about one page. The overrun is the paper's total length, not the
+arithmetic section alone.
+
+**Every reduction lever, measured individually against the 14.18 baseline**
+(TMLR, `paper/tmlr_submission`; applied to a throwaway copy, never the tracked
+tree):
+
+| Lever | Counted | Saving |
+|---|---|---|
+| baseline (before future work) | 14.18 | -- |
+| `L` layout: textheight 9.4->9.6 in, parskip 4.2->3.0 pt, `\colfigwidth` 0.6->0.52, depth-curve figure 0.92->0.82 | 13.47 | 0.71 |
+| `R` TMLR Related Work: four paragraphs -> one | 13.79 | 0.39 |
+| `T` move Table 4 (arithmetic depth control) to appendix | 13.89 | 0.29 |
+| `D` move "The depth-matched control, as a general diagnostic" to appendix | 13.79 | 0.39 |
+| `O` move the OOD-dataset provenance paragraph to appendix | 13.89 | 0.29 |
+| `F` fold "Four limits that travel with the table" into the Limitations subsection | 13.89 | 0.29 |
+| `X` deeper layout: textheight 9.7 in, parskip 2.4 pt, `\colfigwidth` 0.46, depth curve 0.74, `\dispsize` -> `\normalsize` | combined only | ~0.36 over `L` |
+| `P` move the Pareto figure to appendix | combined only | ~0.53 under `X` |
+
+Savings are not additive: float placement quantises the count, and adding a cut
+can move a float without moving the References landmark. Measured combinations
+(with the future-work paragraph already in): `LRTDOFX` = 12.30; `LRTDOFY` =
+12.30; `LRTDOFXP` = 11.77. `LRTDOFZWQ` (tightest layout + Table 1 moved) = 12.18.
+Removing one intro bullet made it *worse* (12.44), which is the quantisation,
+not a real effect.
+
+**Conclusion: 12 pages is reachable, with about 0.2 pp of slack, and the
+comfortable route needs the Pareto figure moved to the appendix.** Without that
+figure the plan lands at 12.2--12.3, i.e. still nominally over. The figure
+duplicates the FLOPs/modulus columns of `tab:main`; the dominance result survives
+in the prose of `04_results.tex` and the figure moves to the appendix with its
+caption intact, so this is a move, not a deletion. The alternative is a layout
+denser than `X` plus a prose trim, which leaves no slack for copy-edits. The user
+deferred the decision; nothing here was applied.
+
+**ACL is not closable by this plan.** 11.78 against a hard 8. Bringing ACL under
+8 with the arithmetic section kept in the body would require moving roughly 3.8
+pp---essentially all of the language results and much of the setup---which
+contradicts the decision that arithmetic stays a full body section. That blocker
+remains deferred and is recorded in `paper/acl_submission/VERIFY_BEFORE_SUBMIT.md`.
+
+**Tool defect fixed.** `code/measure_counted_pages.py` defaulted to
+`paper/acl_submission/main.pdf` when given `--venue` but no path, so
+`--venue tmlr` printed a plausible TMLR count for the ACL document (13.20 against
+the real 14.18). It now derives the path from the venue; the pathless,
+venue-less case keeps its historical ACL default. This is the same class of
+failure the script's own docstring warns about (`detect_venue`), and it produced
+the 13.20 figure that briefly appeared in this session's notes.
+
+**Verified by.**
+- `python paper/assemble_submissions.py`: TMLR 13/13, ACL 12/13, self-contained.
+- `python code/compile_papers.py`: TMLR 22 pp, ACL 20 pp, 0 errors, 0 overfull,
+  0 undefined refs or citations.
+- `python code/measure_counted_pages.py --venue tmlr` -> 14.28; `--venue acl`
+  -> 11.78 (now measures the correct PDF; verified both).
+- Page-cut variants built in `%TEMP%\opencode\cutrun`, never in the repo.
+
+**Where to look.** `paper/common/06_limitations.tex` (future-work paragraph at
+the end of the conclusion); `paper/tmlr_submission/main.tex` (layout levers `L`,
+`X`); `paper/assemble_submissions.py` (`TMLR_APPENDIX`, block-move mechanism for
+`T`, `D`, `O`, `P`); `code/measure_counted_pages.py` (`main`, path resolution).

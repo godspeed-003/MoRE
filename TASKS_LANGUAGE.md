@@ -3918,3 +3918,52 @@ transcribed from `results/opdiff/results.md` and
 - `python code/make_overleaf_zips.py`: both bundles rebuilt.
 - PDF text check: title on page 1, arithmetic on pp. 10-12, mechanism on p. 12,
   limitations on p. 14; Table 3 values match `results/opdiff/results.md`.
+
+## T-LA.30 - future work on blocks and shared input decoding; 12-page route measured, not applied
+
+**Date.** 2026-11-01. **Machine.** Ayan's RTX 4060 8 GB. **Status.** DONE for the
+text addition and the measurement; the page reduction is **deliberately not
+applied** pending the user's decision. No training run.
+
+### What changed
+
+- `06_limitations.tex`, end of the conclusion: a `\paragraph{Future work.}`
+  with two extensions. (i) The engine applies one dense block per recursion
+  step; stacking several distinct blocks and backpropagating through the whole
+  stack would separate weight-tied depth from the single-block budget and let
+  parameter depth and recursion depth vary independently. (ii) All experts see
+  the raw token embedding; an input-decoding stage shared across experts would
+  let the expert FFNs specialise on the routed computation rather than on
+  English and its nuances, and would test whether the routing gains are limited
+  by input representational capacity.
+- `code/measure_counted_pages.py`: fixed the path default. `--venue tmlr` with
+  no path used to measure `paper/acl_submission/main.pdf` and print a plausible
+  wrong count (13.20 vs 14.18); the path is now derived from the venue.
+- `paper/*/VERIFY_BEFORE_SUBMIT.md`: page counts updated to the post-addition
+  measurement, with a pointer to the measured reduction plan.
+
+### Page measurements (TMLR, throwaway copy)
+
+Baseline after the addition: **14.28** counted (22 pp total), norm 12, over
+2.28. Individually measured levers: layout tightening 0.71; Related Work
+compressed to one paragraph 0.39; Table 4 to appendix 0.29; depth-matched
+diagnostic paragraph to appendix 0.39; OOD provenance paragraph to appendix
+0.29; "Four limits" folded into Limitations 0.29. Combined with the deeper
+layout variant: **12.30**. Adding the Pareto figure move: **11.77**.
+
+**Answer to the user's question: yes, 12 is reachable.** The low-risk set alone
+lands at 12.3 (nominally over); the Pareto figure move buys 0.53 and lands at
+11.77 with slack for copy-edits. ACL remains 11.78 against a hard 8 and is not
+closable without removing the arithmetic section from the body; that blocker is
+unchanged and deferred.
+
+### Verify
+
+- `python paper/assemble_submissions.py`: TMLR 13/13, ACL 12/13, both
+  self-contained.
+- `python code/compile_papers.py`: TMLR 22 pp, ACL 20 pp, 0 errors, 0 overfull,
+  0 undefined refs or citations.
+- `python code/measure_counted_pages.py --venue tmlr` -> **14.28**; `--venue acl`
+  -> **11.78** (both now read the correct PDF).
+- Reduction variants built under `%TEMP%\opencode\cutrun`; the tracked paper was
+  not modified by them.

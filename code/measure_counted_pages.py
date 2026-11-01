@@ -125,7 +125,16 @@ def main() -> int:
         del args[i:i + 2]
         if venue not in RULES:
             raise SystemExit(f"--venue must be one of {list(RULES)}")
-    path = args[0] if args else "paper/acl_submission/main.pdf"
+    # T-LA.30. `--venue tmlr` with no path used to fall through to the ACL PDF
+    # and print a perfectly plausible TMLR count for the wrong document
+    # (13.20 against the real 14.18). The venue already names the file, so use
+    # it; the pathless-no-venue case keeps its historical ACL default.
+    if args:
+        path = args[0]
+    elif venue:
+        path = os.path.join("paper", venue + "_submission", "main.pdf")
+    else:
+        path = "paper/acl_submission/main.pdf"
     venue = venue or detect_venue(path)
     landmarks, cols, limit, note = RULES[venue]
     stops = set(landmarks)

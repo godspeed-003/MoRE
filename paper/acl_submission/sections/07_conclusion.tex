@@ -22,3 +22,15 @@ that establish it cost one inference pass. We release the engine, the evaluation
 battery, the forced-depth control, and the arithmetic task generator, and it is
 the control we would most like to see reused, because it is what separates two
 arms that are indistinguishable by mean-and-histogram.
+
+\paragraph{Future work.} Two extensions follow from the implementation as it
+stands. The engine applies one dense block per recursion step; stacking several
+distinct blocks and backpropagating through the whole stack would separate a
+property of weight-tied depth from a property of the single-block budget, and
+would let parameter depth and recursion depth vary independently within an
+expert. Second, every expert currently sees the raw token embedding, so each must
+model English and its nuances before it can exercise its specialisation. An
+input-decoding stage---layers shared by all experts that map the token to a
+task-appropriate representation---would let the expert FFNs specialise on the
+routed computation rather than on decoding, and would test whether the routing
+gains observed here are limited by representational capacity at the input.
