@@ -1,4 +1,4 @@
-# VERIFY_BEFORE_SUBMIT.md — TMLR
+﻿# VERIFY_BEFORE_SUBMIT.md â€” TMLR
 
 **Status: no blockers remain.** The paper compiles clean and every item that was
 a blocker in earlier revisions has been closed. What is left below is judgement
@@ -9,15 +9,15 @@ Measured on the last clean build (`python code/compile_papers.py`):
 | | value |
 |---|---|
 | PDF total | **22 pages** |
-| counted main content (to References) | **14.28 pages** against the ~12-page norm |
+| counted main content (to References) | **14.33 pages** against the ~12-page norm |
 | LaTeX errors | **0** |
 | overfull boxes (content outside the text block) | **0** |
 | undefined references / citations | **0** |
 | bibliography entries rendered | **18 of 18** |
 
-**The body is 2.28 pages over the ~12-page norm** after the arithmetic task was
+**The body is 2.33 pages over the ~12-page norm** after the arithmetic task was
 added as a full results section (T-LA.29) and the future-work paragraph was
-added (T-LA.30; costs 0.10 page). TMLR sets no hard limit; the norm is the
+added (T-LA.30/31; costs 0.15 page). TMLR sets no hard limit; the norm is the
 author guide's recommendation. The arithmetic depth-control table is the first
 candidate to move if a decision is made to return under 12.
 
@@ -29,7 +29,7 @@ the measured per-item savings. Do not quote a page number from a source build:
 
 ---
 
-## 1. Closed since the last revision — do not re-raise these
+## 1. Closed since the last revision â€” do not re-raise these
 
 - **The bibliography is fully verified.** `refs.bib` carries **zero** unverified
   entries. The EWoK entry was wrong in *every* guessed field and is now
@@ -45,22 +45,22 @@ the measured per-item savings. Do not quote a page number from a source build:
   overflow the *ACL* column by up to 48%; TMLR's wider measure never showed it,
   and both are clean now. Verify with `python code/check_overflow.py`.
 
-## 2. Judgement calls — yours, not blockers
+## 2. Judgement calls â€” yours, not blockers
 
 - [x] **Title.** Final: *"MoRE: Mixture of Recursive Experts."* The earlier
       "Parameter- and FLOP-Matched" candidate was rejected as inaccurate: the
       arms are parameter-matched but deliberately **not** FLOP-matched, and
-      1.00×/8.87×/2.19× is the central measurement.
+      1.00Ã—/8.87Ã—/2.19Ã— is the central measurement.
 - [ ] **The Pareto figure costs one page.** `fig_pareto` took the body from 12 to
       13 pages. TMLR sets no limit and asks that length be justified by content;
       this figure is what revealed that MoR is Pareto-*dominated* out of domain,
-      a result the table had understated. Keep it unless you disagree — but the
+      a result the table had understated. Keep it unless you disagree â€” but the
       ~12-page norm is a real convention.
 - [ ] **`math_commands.tex` is shipped and never `\input`.** It comes with the
       official TMLR template and is kept so the folder matches it. Delete it if
       you prefer a minimal upload; nothing references it.
 
-## 3. Anonymity — currently correct, do not "fix" it
+## 3. Anonymity â€” currently correct, do not "fix" it
 
 `\usepackage{tmlr}` with **no option** is the anonymous submission mode, and
 TMLR review is double-blind. The `\author{}` block is ignored and replaced by
@@ -82,13 +82,13 @@ TMLR review is double-blind. The `\author{}` block is ignored and replaced by
       `results/language/results_tables.md`, battery from
       `results/language/eval_summary.md`, per-seed from
       `results/language/results.json` (`admitted_runs[]`). Nothing was
-      hand-copied. **`results.csv` is unusable for per-seed claims** — its
+      hand-copied. **`results.csv` is unusable for per-seed claims** â€” its
       architecture and run-id columns are all `N/A`; use `results.json`.
 - [ ] **Exploratory vs confirmatory tiering is intact.** The headline table and
       the pairwise tests are confirmatory, Holm-corrected over two
       pre-registered families. The evaluation battery, the forced-depth sweep,
       the stratified loss, the subspace and dynamic probes, and the seed-variance
-      comparison are **exploratory and uncorrected** — no significance verdict
+      comparison are **exploratory and uncorrected** â€” no significance verdict
       from any of them may appear in the abstract or conclusions. Check the
       abstract still obeys this.
 - [ ] **The two axes stay separate.** At matched parameters MoR is lowest-loss by
@@ -115,7 +115,7 @@ trim them to save space:
 
 ## 6. How to rebuild
 
-Do not edit `sections/*.tex` or `fig/fig_architecture.tex` here — they are
+Do not edit `sections/*.tex` or `fig/fig_architecture.tex` here â€” they are
 generated copies and will be overwritten. Edit `paper/common/*.tex` (or
 `paper/fig/`), then:
 
@@ -141,7 +141,7 @@ python code/check_overflow.py
 python code/make_overleaf_zips.py
 ```
 
-The lint catches source defects that compile silently — most importantly
+The lint catches source defects that compile silently â€” most importantly
 shell-expansion damage, which once turned `MoRE$-$MoE` into `MoREhBc` and set a
 whole sentence in math italic with zero errors and zero warnings. **Never edit a
 `.tex` file through a shell string**; write a `.py` file and run it.
@@ -160,10 +160,11 @@ whole sentence in math italic with zero errors and zero warnings. **Never edit a
 | `sections/07_conclusion.tex` | conclusion |
 | `refs.bib` | bibliography, 18 entries, all verified |
 | `tmlr.sty`, `tmlr.bst`, `fancyhdr.sty` | official TMLR style files, unmodified |
-| `math_commands.tex` | template file, **not used** — see §2 |
+| `math_commands.tex` | template file, **not used** â€” see Â§2 |
 | `fig/fig_architecture.tex` | the block diagram, pure TikZ (needs `\usepackage{tikz}`, already in the preamble) |
 | `fig/fig_*.pdf` | four generated figures, from `code/make_paper_figures.py` |
 
 `tmlr.sty` does **not** set the bibliography style, so `main.tex` must declare
-`\bibliographystyle{tmlr}` — unlike the ACL version, where `acl.sty` sets it and
+`\bibliographystyle{tmlr}` â€” unlike the ACL version, where `acl.sty` sets it and
 declaring it again silently broke bibtex.
+

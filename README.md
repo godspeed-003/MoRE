@@ -32,31 +32,40 @@ component gives alone.
 > Full evidence, and the limits on every claim above:
 > **[results/language/results.md](results/language/results.md)**.
 
-### Two tasks, and this page is about the second one
+### Three tasks, one engine
 
-The repository runs the same engine on two tasks, selected by one field:
+The repository runs the same engine on three tasks, selected by one field:
 
 | `task` | data | target | status |
 | :--- | :--- | :--- | :--- |
-| `language` | WikiText-103, BPE-8192, packed to 256 tokens | next token, **per-token cross-entropy in nats** | **canonical matrix complete** (15 runs, 5 seeds x 3 arms) --- **this is the submitted paper** |
-| `arithmetic` (default) | synthetic `more6-v1`, 70,000 programs | one regressed scalar, **mean squared error** | complete --- the predecessor study, retained as history |
+| `language` | WikiText-103, BPE-8192, packed to 256 tokens | next token, **per-token cross-entropy in nats** | **canonical matrix complete** (15 runs, 5 seeds x 3 arms) --- **the submitted paper's first result** |
+| `opdiff` | `opdiff-v4`, 294,000 rows, 7 operation groups | eight result digits, **digit cross-entropy** | **the submitted paper's second result** (15 runs, 5 seeds x 3 arms, 3 epochs); `exploratory` --- the protocol is deliberately unfrozen |
+| `arithmetic` (default) | synthetic `more6-v1`, 70,000 programs | one regressed scalar, **mean squared error** | historical pilot --- **design superseded**, retained as provenance |
 
-**The arithmetic phase is finished and is the reason the language study exists.**
-It produced an Outcome C: on that synthetic task MoRE was indistinguishable from
-MoE and significantly worse than MoR, while the halting mechanism was mechanically
-real but beaten in *behaviour* by a policy that ignores its input. Whether that
-result on a 70,000-program synthetic regression predicts anything about a
-135 M-token language model was the open question, and the reason the language
-matrix was run rather than the arithmetic result being generalised. The arithmetic
-code, data and results are kept because they are the provenance of that decision
-and because the 356-check correctness gate measures the arithmetic engine, which
-the language task reuses unchanged.
+**`more6-v1` was the pilot, and its design is not the one the paper uses.** It
+produced an Outcome C: on that synthetic task MoRE was indistinguishable from MoE
+and worse than MoR, while the halting mechanism was mechanically real but beaten
+in *behaviour* by a policy that ignores its input. Three design choices made that
+task a weak instrument: a single scalar target gives one error signal per example
+and saturates; difficulty was hand-authored rather than supplied by the data; and
+a `family_cls = 0.5` term put the operation-family labels directly into the
+training objective, so its routing metrics were partly supervised. The code, data
+and results are kept because they are the provenance of the language study and
+because the 356-check correctness gate measures the arithmetic engine, which the
+other two tasks reuse unchanged.
 
-**The two primary metrics are an MSE and a cross-entropy; they may never appear
-in one table** ([CLAUDE.md](CLAUDE.md) 6) and the exporter refuses to combine them.
-Absence of a `task` key **means arithmetic**: that is what keeps all 15 published
-arithmetic `config_hash` values, and therefore every canonical run's identity,
-unchanged by the language work.
+**`opdiff-v4` fixes all three.** It scores eight digits per row, exposes the
+iteration count `k` as an external difficulty dial, and refuses any non-zero
+`family_cls` (the head is detached), so its routing metrics are emergent. On it
+the ordering is the opposite one: MoRE 0.190, MoR 0.245, MoE 0.430 digit
+cross-entropy. Full evidence and admissibility:
+**[results/opdiff/results.md](results/opdiff/results.md)**.
+
+**The three primary metrics---MSE, token cross-entropy and digit
+cross-entropy---may never appear in one table** ([CLAUDE.md](CLAUDE.md) 6), and
+the exporter refuses to combine them. Absence of a `task` key **means
+arithmetic**: that is what keeps all 15 published pilot `config_hash` values, and
+therefore every canonical run's identity, unchanged by the later work.
 
 
 The language quickstart is §6; the corpus is §3b. If you are here to *run* the

@@ -11137,3 +11137,70 @@ the 13.20 figure that briefly appeared in this session's notes.
 the end of the conclusion); `paper/tmlr_submission/main.tex` (layout levers `L`,
 `X`); `paper/assemble_submissions.py` (`TMLR_APPENDIX`, block-move mechanism for
 `T`, `D`, `O`, `P`); `code/measure_counted_pages.py` (`main`, path resolution).
+
+---
+
+## T-LA.31 — `opdiff-v4` is the sole arithmetic study; `more6-v1` relabelled as pilot
+
+**What.** A provenance and scoping pass, no new measurements and no number
+changes. The user's decision: keep `opdiff-v4` as the paper's arithmetic task and
+treat the design `more6-v1` follows as rejected.
+
+**Why the two cannot be one study.** They differ in design and budget at once.
+`more6-v1`: 16 hand-chosen operations, one regressed scalar, MSE, 50 epochs,
+batch 768, ~3.20M parameters, and a **live `family_cls = 0.5`** six-way
+classification term (the second-largest loss term). `opdiff-v4`: 25 operations in
+7 manifest groups, eight result digits scored by cross-entropy, 3 epochs, batch
+48, ~4.06M parameters, and `family_cls` **refused** (`cli.py` raises; the head is
+detached, so routing metrics are emergent). Consequently `more6-v1`'s AMI ~0.50
+is partly supervised and `opdiff-v4`'s ~0.03 is emergent: the metric gap is a
+supervision difference, not a task difference, and the AMI 0.50 claim cannot be
+carried into the paper.
+
+**Repo labels.** `README.md` now describes three tasks (language, opdiff,
+arithmetic-default) instead of two; the `more6-v1` row is "historical pilot,
+design superseded", with a paragraph naming the three weaknesses (scalar target,
+hand-authored difficulty, supervised family term) and the `opdiff-v4` result.
+`ARCHITECTURE.md` section retitled "The historical arithmetic result
+(`more6-v1`, design superseded)" with a blockquote pointing at
+`results/opdiff/results.md` and the opposite ordering. Numbers and provenance are
+untouched; nothing was deleted (archive rule).
+
+**Paper scoping.** The abstract (both venues), `\S\ref{sec:arithmetic}`'s opening
+and the arithmetic-limitations subsection now say "at this protocol's fixed
+three-epoch budget". No convergence claim is made for `opdiff-v4`, and the pilot
+is the reason the budget has to be named. The TMLR Reproducibility Statement no
+longer says a frozen specification ships for everything: the language spec is
+frozen, the arithmetic protocol is reported with its unfrozen status and dataset
+fingerprint.
+
+**Entropy counterexample added (`05_mechanism.tex`).** Directly after the
+near-uniform-router paragraph: MoE load entropy `0.600 ± 0.133` against MoRE
+`0.958 ± 0.006`, with AMI `0.164`/`0.180` and Hungarian `0.362`/`0.359`
+indistinguishable. Sourced from the language runs (`results/language/
+results_tables.md`), never from arithmetic.
+
+**Depth–difficulty wording corrected (`04_results.tex`).** The old text said
+depth is deepest on function words, then called "the alignment of depth with
+difficulty robust" on the strength of ρ = +0.30. Those answer different
+questions and only coexist if function words carry higher per-token loss, which
+the paper does not measure. Replaced with: per-token depth tracks the model's own
+loss on every seed, the family ordering is not a content-word preference, and
+neither statistic is read as allocation to intrinsic difficulty; the unstable
+quantity is the amount of compute skipped.
+
+**Build effect.** TMLR 14.28 -> **14.33** counted (+0.05); ACL 11.78 -> **11.88**
+(+0.10); ACL total PDF 20 -> 21 pp because the added prose pushed the appendix.
+One 1.8 pt ACL overfull hbox appeared in the future-work paragraph and was
+removed by rewording "task-appropriate representation" to "encode the token into
+a form suited to the task". Both venues now 0 errors, 0 overfull, 0 undefined.
+The measured 12-page route is unchanged: `P` (Pareto to appendix) would now land
+near 11.82.
+
+**Where to look.** `paper/acl_submission/main.tex` and
+`paper/tmlr_submission/main.tex` (abstract, repro statement);
+`paper/common/04_results.tex` (arithmetic scoping, depth wording);
+`paper/common/05_mechanism.tex` (entropy numbers); `paper/common/06_limitations.tex`
+(arithmetic limitations, future work); `README.md` (three-task table);
+`ARCHITECTURE.md` (historical-result note); `results/opdiff/results.md`
+(authoritative arithmetic numbers).

@@ -30,7 +30,7 @@ property of weight-tied depth from a property of the single-block budget, and
 would let parameter depth and recursion depth vary independently within an
 expert. Second, every expert currently sees the raw token embedding, so each must
 model English and its nuances before it can exercise its specialisation. An
-input-decoding stage---layers shared by all experts that map the token to a
-task-appropriate representation---would let the expert FFNs specialise on the
+input-decoding stage---layers shared by all experts that encode the token into a
+form suited to the task---would let the expert FFNs specialise on the
 routed computation rather than on decoding, and would test whether the routing
 gains observed here are limited by representational capacity at the input.

@@ -130,8 +130,11 @@ MoRE & 6.960 & 6.953 & 6.957 & 6.955 & 6.962 & 6.953 & \textbf{0.009} \\
 
 MoR's early-exit rate is the seed-unstable quantity ($6.4\%$--$42.2\%$), and its
 instability is informative: the two seeds that exit most are the two with the
-\emph{worst} loss. The \emph{alignment} of depth with difficulty is robust while
-the \emph{amount} of compute skipped is not, and costs loss.
+\emph{worst} loss. Per-token depth tracks each model's own loss on every seed, but
+the family ordering is not a content-word preference---MoR spends the least depth
+on nouns and the most on function words---so we read neither statistic as
+allocation to intrinsic difficulty. The amount of compute skipped is the unstable
+part, and it costs loss.
 
 \subsection{Where the composition does pay: robustness and efficiency}
 \label{sec:ood}
@@ -247,8 +250,8 @@ realise more of the FLOP advantage; we claim only the measured fraction.
 The language task can show that the composition does not add, but not whether
 routing and recursion are being used for their intended purpose: natural language
 supplies no operation label and no difficulty axis. The arithmetic task of
-\S\ref{sec:arith-task} supplies both by construction, and on it the in-domain
-ordering reverses.
+\S\ref{sec:arith-task} supplies both by construction, and on it---at this
+protocol's fixed three-epoch budget---the in-domain ordering reverses.
 
 % Arithmetic numbers transcribed from results/opdiff/results.md (tab:arith) and
 % results/opdiff/depth_control.md (tab:arith-depth); no generator yet.

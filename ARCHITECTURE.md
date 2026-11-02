@@ -1295,7 +1295,16 @@ results files at the single end-of-Phase-11 commit. Until then provenance rests 
 Per-phase evidence is in [TASKS.md](TASKS.md); how each change was made and what
 breaks if you undo it is in [changelog.md](changelog.md).
 
-### The canonical result
+### The historical arithmetic result (`more6-v1`, design superseded)
+
+> **Read this as history, not as the paper's arithmetic result.** The submitted
+> paper's second task is `opdiff-v4` (seven operation groups, eight result digits,
+> 3 epochs, no family supervision), whose ordering is the opposite one:
+> MoRE 0.190, MoR 0.245, MoE 0.430. See `results/opdiff/results.md`. `more6-v1`
+> is retained because it is the pilot that motivated that redesign and because
+> the correctness gate exercises this engine. Its three weaknesses---a single
+> scalar target, hand-authored difficulty, and a live `family_cls = 0.5`
+> term---are why it was replaced, not evidence about the composition.
 
 Full dataset `more6-v1`, 50 epochs, seeds 42–46, `experiment_group =
 canonical_phase_b`, primary metric **last-epoch `val/task_loss`** (the checkpoint

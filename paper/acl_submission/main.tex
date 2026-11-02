@@ -122,10 +122,10 @@ input-dependent depth, since a uniform policy forced to the learned mean
 reproduces both---and scoring against that control separates our language arms
 by a factor of 24.
 
-The arithmetic task reverses the ordering. There the composition is the
-lowest-loss arm: $0.190$ nats against $0.245$ for recursion alone and $0.430$
-for MoE, lower in four of five seeds and with a $4.8\times$ tighter spread than
-recursion. Routing is what stabilises recursion, and a fixed depth recovers most
+On the arithmetic task, at its fixed three-epoch budget, the ordering reverses.
+There the composition is the lowest-loss arm: $0.190$ nats against $0.245$ for
+recursion alone and $0.430$ for MoE, lower in four of five seeds and with a
+$4.8\times$ tighter spread than recursion. Routing is what stabilises recursion, and a fixed depth recovers most
 of what the learned policy buys ($0.095$ nats against the best uniform depth),
 so the halting head is input-dependent but not load-bearing.
 \end{abstract}

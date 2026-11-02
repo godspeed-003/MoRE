@@ -120,8 +120,8 @@ reason and are not comparable to published WikiText-103 numbers.
 \subsection{The arithmetic task}
 
 The arithmetic results come from one 8\,GiB laptop GPU and a matrix of roughly
-33 hours, and they describe one dataset design rather than arithmetic in general.
-Three boundaries matter for reading them.
+33 hours, and they describe one dataset design and one three-epoch budget rather
+than arithmetic in general. Three boundaries matter for reading them.
 
 The seven groups are a prior supplied by the task's own manifest, not a ground
 truth about how arithmetic decomposes, so the low routing AMI is not evidence
@@ -238,7 +238,7 @@ property of weight-tied depth from a property of the single-block budget, and
 would let parameter depth and recursion depth vary independently within an
 expert. Second, every expert currently sees the raw token embedding, so each must
 model English and its nuances before it can exercise its specialisation. An
-input-decoding stage---layers shared by all experts that map the token to a
-task-appropriate representation---would let the expert FFNs specialise on the
+input-decoding stage---layers shared by all experts that encode the token into a
+form suited to the task---would let the expert FFNs specialise on the
 routed computation rather than on decoding, and would test whether the routing
 gains observed here are limited by representational capacity at the input.

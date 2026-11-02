@@ -3967,3 +3967,50 @@ unchanged and deferred.
   -> **11.78** (both now read the correct PDF).
 - Reduction variants built under `%TEMP%\opencode\cutrun`; the tracked paper was
   not modified by them.
+
+## T-LA.31 - opdiff-v4 as the only arithmetic study; more6-v1 relabelled pilot
+
+**Date.** 2026-11-02. **Machine.** Ayan's RTX 4060 8 GB. **Status.** DONE. No
+training run and no number changed; provenance, scope and two interpretation
+sentences.
+
+### What changed
+
+- `README.md`: three tasks, not two. `more6-v1` is the historical pilot with its
+  design superseded (single scalar target, hand-authored difficulty, live
+  `family_cls = 0.5`); `opdiff-v4` is the paper's second result. Points at
+  `results/opdiff/results.md`.
+- `ARCHITECTURE.md`: section retitled "The historical arithmetic result
+  (`more6-v1`, design superseded)" plus a note giving the opposite opdiff
+  ordering.
+- Abstracts (both venues), `04_results.tex` arithmetic opening and
+  `06_limitations.tex` arithmetic subsection: the reversal is scoped to "this
+  protocol's fixed three-epoch budget". No convergence claim is made.
+- `05_mechanism.tex`: entropy counterexample with numbers - MoE `0.600 +/- 0.133`
+  vs MoRE `0.958 +/- 0.006`, AMI `0.164`/`0.180`, Hungarian `0.362`/`0.359`.
+  Language-sourced; arithmetic AMI is not imported.
+- `04_results.tex`: removed "alignment of depth with difficulty is robust", which
+  conflicted with deepest-on-function-words. Now: per-token depth tracks the
+  model's own loss on every seed; the family ordering is not a content-word
+  preference; the unstable part is how much compute is skipped.
+- TMLR Reproducibility Statement: language spec frozen, arithmetic protocol
+  unfrozen and reported as such with its dataset fingerprint.
+
+### Why
+
+`more6-v1` (16 ops, MSE, 50 epochs, `family_cls` 0.5) and `opdiff-v4` (25 ops in
+7 groups, digit CE, 3 epochs, `family_cls` refused) differ in design and budget
+together. Their AMI gap (0.50 vs 0.03) is therefore a supervision difference, not
+a task finding. Citing the older task as "the arithmetic result" would put an
+Outcome C next to the paper's opposite conclusion without saying they are
+different instruments.
+
+### Verify
+
+- `python paper/assemble_submissions.py`: both trees self-contained.
+- `python code/compile_papers.py`: TMLR 22 pp, ACL 21 pp, 0 errors.
+- `python code/check_overflow.py`: 0 overfull in both (a 1.8 pt ACL hbox was
+  removed by rewording the future-work phrase).
+- `python code/measure_counted_pages.py --venue tmlr` -> **14.33** (norm 12);
+  `--venue acl` -> **11.88** (hard 8; still the deferred blocker).
+- `python code/check_latex_lint.py`: 24 files clean.

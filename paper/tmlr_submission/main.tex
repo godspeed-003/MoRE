@@ -158,10 +158,10 @@ mean reproduces both. Against that control on language, recursion's learned
 policy is worth $1.471$ nats and the composition's $0.060$; we do not treat that
 ratio as a verdict, its denominator being small.
 
-The arithmetic task reverses the ordering. There the composition is the
-lowest-loss arm: $0.190$ nats against $0.245$ for recursion alone and $0.430$
-for MoE, lower in four of five seeds and with a $4.8\times$ tighter spread than
-recursion. Routing is what stabilises recursion, and a fixed depth recovers most
+On the arithmetic task, at its fixed three-epoch budget, the ordering reverses.
+There the composition is the lowest-loss arm: $0.190$ nats against $0.245$ for
+recursion alone and $0.430$ for MoE, lower in four of five seeds and with a
+$4.8\times$ tighter spread than recursion. Routing is what stabilises recursion, and a fixed depth recovers most
 of what the learned policy buys ($0.095$ nats against the best uniform depth),
 so the halting head is input-dependent but not load-bearing.
 \end{abstract}
@@ -211,8 +211,9 @@ measure and which bear on any downstream use of these checkpoints.
 Reproducibility details---seeds, data identifiers, model and optimiser
 parameters, compute budget, hardware, statistical protocol and provenance
 caveats---appear in \S\ref{sec:engine}--\ref{sec:stats} and
-\S\ref{sec:limitations}; a frozen configuration specification ships with the
-code.
+\S\ref{sec:limitations}. The language specification is frozen and ships with the
+code; the arithmetic protocol is reported with its unfrozen status and its
+dataset fingerprint.
 
 % T-LA.14. APPENDIX. TMLR sets no hard page limit but its author guide
 % recommends 12 pages of main content, and the body measured ~14.4 -- note that
