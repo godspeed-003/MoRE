@@ -13,6 +13,7 @@ Measured on the last clean build (`python code/compile_papers.py`):
 | LaTeX errors | **0** |
 | overfull boxes (content outside the text block) | **0** |
 | undefined references / citations | **0** |
+| page numbers | **yes** — right header on every page (`\rhead{\thepage}` in `main.tex`; the stock `tmlr.sty` prints none) |
 | bibliography entries rendered | **18 of 18** |
 
 **The body is now under the norm: 11.82 against 12.** T-LA.32 applied the

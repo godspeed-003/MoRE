@@ -120,6 +120,15 @@
 
 \setlength{\parskip}{2.4pt plus 0.4pt minus 0.4pt}
 
+% PAGE NUMBERS (T-LA.32). tmlr.sty sets \pagestyle{fancy}, clears the headers
+% with \fancyhead{} and sets only \lhead{Under review as submission to TMLR}; it
+% never defines a page number in the header or the footer, so the official
+% template prints none and a reviewer cannot cite a page ("see p. 7"). The right
+% header is deliberate: the footer would sit at 0.575in - 0.42in footskip, i.e.
+% ~11pt from the paper edge, which the printer margin can eat. This costs no
+% vertical space. \maketitle sets no page style, so it applies to page 1 too.
+\rhead{\thepage}
+
 \renewcommand{\topfraction}{0.92}
 \renewcommand{\bottomfraction}{0.75}
 \renewcommand{\textfraction}{0.06}

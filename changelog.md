@@ -11268,6 +11268,19 @@ perplexity paragraph merged into the evaluation caveat.
 errors, 0 overfull hbox/vbox, 0 undefined refs or citations, 24 .tex files lint
 clean.
 
+**Page numbers (follow-up, same task).** The TMLR PDF carried **no page numbers
+anywhere**, which is the official template's behaviour rather than a regression:
+`tmlr.sty` sets `\pagestyle{fancy}`, clears the header with `\fancyhead{}`, sets
+only `\lhead{Under review as submission to TMLR}`, and never defines `\rhead`,
+`\cfoot` or `\thepage`. A reviewer cannot then cite a page. Fixed in the TMLR
+layout block with `\rhead{\thepage}` — the right header, not the footer, because
+at a 0.575in bottom margin the footer baseline would sit ~11pt from the paper
+edge. `\maketitle` sets no page style, so page 1 is numbered too. ACL is
+unaffected: its template already numbers pages (A4, ~48pt from the bottom).
+Confirmed by reading back all 20 rendered pages: the number is present on every
+one, and the counted body is unchanged at 11.82 because a header costs no
+vertical space.
+
 **Where to look.** `paper/assemble_submissions.py` (`APPENDIX`,
 `TMLR_APPENDIX`, `TMLR_ONLY_APPENDIX` — the three lists must agree or a block
 moves in the wrong venue); `paper/common/04_results.tex` (the `ACLMOVE` markers
