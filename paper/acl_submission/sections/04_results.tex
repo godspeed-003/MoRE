@@ -37,7 +37,7 @@ with forced depth up to a point, in opposite directions:
 
 \begin{figure*}[t]
 \centering
-\includegraphics[width=0.92\linewidth]{fig_depth_curve.pdf}
+\includegraphics[width=\depthfigwidth]{fig_depth_curve.pdf}
 \caption{Validation loss against forced uniform recursion depth, five seeds. Lines
 are the forced-depth sweep---the canonical checkpoints with every token forced to
 exactly $d$ steps at inference; stars mark each arm's \emph{learned} policy at its
@@ -147,7 +147,7 @@ scores each arm against the inference FLOPs it costs.
 \centering
 \footnotesize
 \setlength{\tabcolsep}{4pt}
-\caption{All results, five seeds, mean$\,\pm\,$std. \textbf{Upper block:} each cell is \emph{score (difference vs MoE, inference FLOPs$\times$ vs MoE, $|$difference$|$ per FLOPs-multiplier)}; MoE is the reference arm, so its cells carry the score alone. Scores are lower-better for loss and higher-better for accuracy; the third number is a \textbf{modulus}, so it is higher-better on \emph{every} row---how much quality each unit of compute bought. Quality at matched parameters and quality per unit of compute are distinct axes and we never substitute one for the other. Validation loss is the primary metric (final epoch; \emph{best} equals \emph{last} on all 15 cells, so no model selection occurred). Pairwise, exact two-sided randomization test, every comparison at the floor $p_{\min}=0.00794$: MoRE$-$MoE $-0.3113$ ($d\,{-15.9}$); MoRE$-$MoR $+0.1216$ ($d\,{+4.7}$); MoE$-$MoR $+0.4329$ ($d\,{+14.7}$). OOD is held-out Pile text: 1500 blocks from 943 documents, each contributing at most 512 tokens (\S\ref{sec:ood}). \textbf{Lower block:} $\Delta$ floor is the margin below the bigram baseline of 4.9849 nats (positive \emph{beats} it); FLOPs are inference FLOPs per token at each arm's measured mean depth (Appendix~\ref{app:flops}); throughput is inference for all fifteen checkpoints on one GPU, identical blocks and batch. The OOD, BLiMP and throughput rows are \textbf{exploratory}---outside both declared families, uncorrected.}
+\caption{All results, five seeds, mean$\,\pm\,$std. \textbf{Upper block:} each cell is \emph{score (difference vs MoE, inference FLOPs$\times$ vs MoE, $|$difference$|$ per FLOPs-multiplier)}; MoE is the reference arm, so its cells carry the score alone. Loss is lower-better and accuracy higher-better; the third number is a \textbf{modulus}, so it is higher-better on \emph{every} row---how much quality each unit of compute bought. Validation loss is the primary metric (final epoch; \emph{best} equals \emph{last} on all 15 cells, so no model selection occurred). Pairwise, exact two-sided randomization test, every comparison at the floor $p_{\min}=0.00794$: MoRE$-$MoE $-0.3113$ ($d\,{-15.9}$); MoRE$-$MoR $+0.1216$ ($d\,{+4.7}$); MoE$-$MoR $+0.4329$ ($d\,{+14.7}$). OOD is held-out Pile text, 1500 blocks from 943 documents at most 512 tokens each (\S\ref{sec:ood}). \textbf{Lower block:} $\Delta$ floor is the margin below the bigram baseline of 4.9849 nats (positive \emph{beats} it); FLOPs are inference FLOPs per token at each arm's measured mean depth (Appendix~\ref{app:flops}); throughput is inference for all fifteen checkpoints on one GPU, identical blocks and batch. The OOD, BLiMP and throughput rows are \textbf{exploratory}---outside both declared families, uncorrected.}
 \label{tab:main}
 \vspace{2pt}
 \begin{tabular}{llll}
@@ -170,22 +170,17 @@ Throughput (blocks/s) & \textbf{1119} & 212 & 310 \\
 % <<<GENERATED:tab_main
 
 \paragraph{Reading the two FLOPs rows.} All arms share an output projection worth
-$79.9\%$ of MoE's per-token compute; excluding it the composition looks dearer than
-MoE and cheaper than MoR, and wins under either accounting. The third column of
-Table~\ref{tab:main} uses the total accounting, as that table's multipliers do; the
-per-FLOPs figures quoted here are the excluded ones. Appendix~\ref{app:flops}
-derives both.
-
-Three things follow.
+$79.9\%$ of MoE's per-token compute. Table~\ref{tab:main} uses the total
+accounting; the per-FLOPs figures quoted here are the excluded ones, and
+Appendix~\ref{app:flops} derives both.
 
 \textbf{In domain on the language task, all three arms are on the frontier; out
 of domain, MoRE dominates.} Fig.~\ref{fig:pareto} plots loss against inference
 compute. In domain no arm Pareto-dominates another: MoE is cheapest, MoR is
 best, MoRE sits between
 them, so MoRE's in-domain claim is a \emph{ratio}---the most quality per unit of
-compute---and not a position the others fail to occupy. We are explicit about this
-because the weaker reading is the one a reviewer should be able to check and find
-already stated.
+compute---and not a position the others fail to occupy. We state the weaker
+reading explicitly, because it is the one a reviewer can check.
 
 Out of domain the relationship changes in kind rather than degree. On held-out
 text from the Pile \citep{gao2020pile} MoRE reaches 7.212 nats against MoR's 7.423
@@ -226,12 +221,11 @@ $8.87\times$ MoE's inference FLOPs; MoRE pays $2.19\times$---$25\%$ of MoR's tot
 inference compute. Excluding the output projection all three arms share, those
 become $6.92\times$ and $17\%$ (Table~\ref{tab:main}), and MoRE buys $0.045$ nats
 per FLOPs-multiplier against MoR's $0.011$: $4.2\times$ the quality per unit
-compute on validation loss, $8.1\times$ out of domain. \textbf{We state the two axes separately
-and do not substitute one for the other}: at matched parameters, and on the
-language task, MoR is lowest-loss
-by $0.1216$ nats, which is significant at our resolution floor; per unit of
-inference compute MoRE is ahead. ``Comparable to MoR'' is therefore only ever a
-\emph{per-FLOP} statement in this paper, never an absolute-quality one.
+compute on validation loss, $8.1\times$ out of domain. \textbf{The two axes are
+never substituted}: at matched parameters, on the language task, MoR is
+lowest-loss by $0.1216$ nats, at our resolution floor, while per unit of
+inference compute MoRE is ahead---so ``comparable to MoR'' is only ever a
+\emph{per-FLOP} statement here, never an absolute-quality one.
 
 FLOPs, not wall-clock, is the compute measure, and the throughput row shows how
 much of the FLOP advantage our implementation turns into speed. Timed on one GPU
@@ -292,9 +286,8 @@ The stability difference is the more informative result. MoR's seeds settle on
 different halting policies---one chose a mean depth of $2.11$ and scored
 $0.393$, another chose $4.11$ and scored $0.203$---and its loss falls
 monotonically in the depth each seed chose. MoRE holds a policy near four steps
-in every seed and its loss stays inside a narrow band. One MoR seed also paged,
-reserving $12.8$\,GiB on an $8.2$\,GiB card, so its throughput is not a compute
-measurement and we quote none.
+in every seed and its loss stays inside a narrow band. One MoR seed also paged
+($12.8$\,GiB on an $8.2$\,GiB card), so we quote no arithmetic throughput.
 
 \paragraph{Is the halting policy doing work?} We force every token to each depth
 $1,\dots,7$ at inference and rescore the same checkpoint, as on language. The
@@ -338,14 +331,10 @@ $0.095$: a constant depth of five or six recovers most of what the policy buys,
 so the composition's advantage is routing's, not halting's. MoR is the arm whose
 policy is hard to replace ($0.221$), and its mean matched margin is carried by
 one seed whose halting collapsed. Swapping the halt head for a constant leaves
-MoRE far ahead of MoE and still ahead of MoR.
-
-We do not compare the language and arithmetic margins as numbers: the tasks have
-different vocabularies, scoring rules and scales. What differs is not the size of
-the margin but whether a fixed depth recovers it. On language a fixed depth
-recovers all of MoRE's $0.060$; on arithmetic it recovers most of $0.842$ but not
-all. That is enough to say the language reading was specific to that setting, and
-not enough to quantify a difference.
+MoRE far ahead of MoE and still ahead of MoR. We do not compare the two tasks'
+margins as numbers---different vocabularies, scoring rules and scales---but a fixed
+depth recovers all of MoRE's $0.060$ on language and most of its $0.842$ on
+arithmetic, so the language reading was specific to that setting.
 
 \paragraph{Four limits that travel with the table.} First, no arm generalises to
 unseen iteration counts. Every arm is at chance on $k = 5,6,7$ (per-digit

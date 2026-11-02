@@ -137,13 +137,23 @@ APPENDIX = [
     # so ACL's body keeps the full prose. Do not "fix" ACL's page count by
     # reaching for this block again.
     ("disclosures", "Disclosures in full", "app:disclosures"),
+    # T-LA.32. The 2.5-page reduction the user authorised. Four more blocks move
+    # for TMLR ONLY (ACL's body is unchanged: this venue keeps its own format and
+    # its own deferred page problem). Each replacement keeps the claim, the number
+    # that supports it and a pointer, so nothing is asserted only in an appendix.
+    ("oodprovenance", "The out-of-domain set, and the version it replaces",
+     "app:ood-provenance"),
+    ("pareto",      "The loss--compute plane", "app:pareto"),
+    ("arithdepth",  "Depth control on the arithmetic task", "app:arith-depth"),
+    ("arithlimits", "The four arithmetic limits in full", "app:arith-limits"),
 ]
 
 # Blocks the ACL assembler must NOT treat as moved, even though they appear in
 # APPENDIX so that TMLR can pick them up. These are TMLR-only page moves; ACL
 # keeps the prose in the body. The user reaffirmed on T-LA.24 that ACL follows
 # its own defined format and TMLR follows none.
-TMLR_ONLY_APPENDIX = {"disclosures"}
+TMLR_ONLY_APPENDIX = {"disclosures", "oodprovenance", "pareto", "arithdepth",
+                      "arithlimits"}
 
 # T-LA.14: TMLR MOVES A SUBSET TOO.
 #
@@ -167,7 +177,8 @@ TMLR_ONLY_APPENDIX = {"disclosures"}
 TMLR_APPENDIX = ["floor_proof", "holm_detail", "integrity", "metrics",
                  "protocol", "engine", "stratified", "trapping",
                  "competition2", "blimp", "flops", "budget",
-                 "disclosures"]
+                 "disclosures", "oodprovenance", "pareto", "arithdepth",
+                 "arithlimits"]
 
 
 def appendix_order(venue):

@@ -105,14 +105,14 @@ Depth is trained through the expected-depth term
 \end{equation}
 }
 where the step count $N$ is discrete and contributes no gradient while the
-remainder $R$ does. Eq.~\ref{eq:ponder} is the ponder cost. It is worth noting
-that the gradient reaching the halt heads through $R$ is small compared with the
-task gradient: a direct measurement in our implementation puts the halt gradient
-at roughly $285\times$ below the task term. This ratio is the quantitative form
-of the tension analysed in \S\ref{sec:mechanism}: the ponder term is large enough
-to be optimised away but too weak to hold depth down once the task gradient
-accumulates, and on the language task the halting sigmoid reaches saturation,
-where the gradient through $R$ vanishes \citep{graves2016act}.
+remainder $R$ does. Eq.~\ref{eq:ponder} is the ponder cost. The gradient reaching
+the halt heads through $R$ is small compared with the task gradient---a direct
+measurement in our implementation puts it at roughly $285\times$ below the task
+term. That ratio is the quantitative form of the tension analysed in
+\S\ref{sec:mechanism}: the ponder term is large enough to be optimised away but
+too weak to hold depth down once the task gradient accumulates, and on the
+language task the halting sigmoid reaches saturation, where the gradient through
+$R$ vanishes \citep{graves2016act}.
 \citet{banino2021pondernet} replaces the linear penalty with a KL divergence
 against a geometric prior, which keeps a gradient on the halt head near
 saturation.

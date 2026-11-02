@@ -1,8 +1,8 @@
 \section{Why the Composition Does Not Add on Language}
 \label{sec:mechanism}
 
-Three accounts, labelled by evidential status: what is measured, and what is
-hypothesis consistent with the measurement.
+Three accounts follow, labelled by evidential status: measured, or hypothesis
+consistent with measurement.
 
 \subsection{Routing divides the data, not the update budget}
 \label{sec:dilution}
@@ -54,14 +54,13 @@ block but has to be re-learned independently inside all six experts. Six partial
 copies of shared structure fit in the same parameter budget as one complete copy
 only by making each copy worse.
 
-This is a hypothesis, not an isolated effect, and we label it as one. The
-comparison it concerns is nonetheless already two points on the axis it is about.
-Because the budget equalises \emph{total} FFN width ($6 \times 4 = 1 \times 24$),
-MoR is exactly the $E{=}1$ point of a matched-width expert sweep and MoRE the
-$E{=}6$ point, and the hypothesis predicts loss rising with $E$ at fixed width. Two
-points cannot isolate it, and the $E{=}1$ endpoint differs in a second way---it has
-no router, gate or balance term---so the experiment that would is an intermediate
-point that keeps the router ($E{=}2$ at width 12, or $E{=}3$ at width 8). The
+This is a hypothesis, not an isolated effect, and we label it as one. Because the
+budget equalises \emph{total} FFN width ($6 \times 4 = 1 \times 24$), MoR is
+exactly the $E{=}1$ point of a matched-width expert sweep and MoRE the $E{=}6$
+point, and the hypothesis predicts loss rising with $E$ at fixed width; two points
+cannot isolate it, and the $E{=}1$ endpoint also has no router, gate or balance
+term. The experiment that would is an intermediate point that keeps the router
+($E{=}2$ at width 12, or $E{=}3$ at width 8). The
 account earns its place because it is the only one left once the
 arithmetic above excludes the update-count version; because it predicts the
 stratified result---MoRE's advantage over MoE grows with token difficulty
@@ -87,15 +86,14 @@ policy on one task does not license a conclusion about the mechanism.
 \label{sec:competition}
 
 \textbf{[MEASURED on a calibration grid; the canonical-corpus form is measured on
-the balance axis.]} This is the paper's central claim, and it is the one that
-explains why the composition does not merely fail to add but subtracts.
+the balance axis.]} This is the paper's central claim: it explains why the
+composition does not merely fail to add but subtracts.
 
 The grid below varies the same halting weight and asks about the
 \emph{direction} of the trade-off as the weight moves, not the level at which
-depth settles. A level can
-fail to transfer while a direction holds; whether this one does is untested on the
-full corpus, where only the balance-axis form below is measured, so this
-subsection's halting claim carries the strength of a one-seed development grid.
+depth settles: a level can fail to transfer while a direction holds. Whether this
+one does is untested on the full corpus, so this subsection's halting claim
+carries the strength of a one-seed development grid.
 
 Depth and specialisation are not independent knobs in MoRE the way they are in MoR
 and MoE separately. On the calibration grid, recovering adaptive depth by raising
@@ -121,8 +119,7 @@ The mechanism is direct: fewer recursion steps means fewer expert applications p
 token, which means fewer opportunities for experts to differentiate. \textbf{Tune
 toward adaptive depth and specialisation collapses; preserve specialisation and
 depth saturates.} Both mechanisms draw on the same per-token compute budget, and at
-this parameter and data budget neither gets enough. (This grid is on a smaller dev
-corpus at one seed; it is a mechanism demonstration and carries that caveat.)
+this parameter and data budget neither gets enough.
 
 % >>>ACLMOVE:competition2|The competition has a second face: the balance term is load-bearing and cannot be traded for depth either---zeroing it collapses the load onto one expert and drives AMI to zero. Specialisation is real against per-run permutation controls (MoRE AMI $0.1803$ vs control $0.0249$, $z=13.43$; MoE $0.1637$ vs $0.0364$) and the two arms are \emph{not} distinguishable, so recursion does not improve routing just as routing does not preserve adaptive depth. Appendix~\ref{app:specialisation} gives the controls.
 The competition has a second face on the canonical corpus, along a different axis.

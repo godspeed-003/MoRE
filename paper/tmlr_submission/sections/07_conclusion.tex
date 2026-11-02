@@ -6,22 +6,22 @@ adaptive recursion buys efficiency and robustness rather than peak quality. All
 three arms lie on the quality/compute frontier; MoRE buys the most quality per
 unit of compute ($72\%$ of recursion's gain for $25\%$ of its compute) and out of
 domain \emph{dominates} recursion alone, reaching lower loss at a quarter of the
-compute---the one respect in which composing the mechanisms does something
-neither does alone. What it does not buy is in-domain quality on the language
+compute. What it does not buy is in-domain quality on the language
 task: recursion alone leads by 0.1216 nats, significant at our resolution floor.
-The language mechanism is not the obvious one---routing does not dilute the
-update budget, and subspace trapping fails three ways---but a competition for one
-per-token budget, in which the arm preserving specialisation saturates its depth.
+The language mechanism is a competition for one per-token budget, not the obvious
+dilution or trapping accounts: routing does not dilute the update budget,
+subspace trapping fails three ways, and the arm that preserves specialisation
+saturates its depth.
 
 The arithmetic task, built so that routing and recursion both have something to
 do, reverses the ordering: there the composition is the lowest-loss arm and the
 most stable one, and a fixed depth recovers most of what its learned policy buys.
 The general lesson is that neither mechanism's value transfers across settings by
-assumption: what a composition buys is a property of the task, and the controls
-that establish it cost one inference pass. We release the engine, the evaluation
-battery, the forced-depth control, and the arithmetic task generator, and it is
-the control we would most like to see reused, because it is what separates two
-arms that are indistinguishable by mean-and-histogram.
+assumption: what a composition buys is a property of the task, and the control
+that establishes it costs one inference pass. We release the engine, the
+evaluation battery, the forced-depth control and the arithmetic task generator;
+the control is what we would most like to see reused, because it is what
+separates two arms indistinguishable by mean-and-histogram.
 
 \paragraph{Future work.} Two extensions follow from the implementation as it
 stands. The engine applies one dense block per recursion step; stacking several
@@ -31,6 +31,6 @@ would let parameter depth and recursion depth vary independently within an
 expert. Second, every expert currently sees the raw token embedding, so each must
 model English and its nuances before it can exercise its specialisation. An
 input-decoding stage---layers shared by all experts that encode the token into a
-form suited to the task---would let the expert FFNs specialise on the
-routed computation rather than on decoding, and would test whether the routing
-gains observed here are limited by representational capacity at the input.
+form suited to the task---would let the expert FFNs specialise on the routed
+computation rather than on decoding, and would test whether routing gains here
+are capacity-limited at the input.

@@ -6,16 +6,17 @@ warn you about.
 
 ---
 
-## 1. BLOCKER â€” the body is 11.88 pages against a hard 8-page limit
+## 1. BLOCKER â€” the body is 11.66 pages against a hard 8-page limit
 
 ARR long papers are limited to **eight (8) pages of content**. The Limitations
 section, the Ethical Considerations section, references and appendices do **not**
 count.
 
-**Measured on the last clean build:** 11.88 counted pages, so the body is 3.88
+**Measured on the last clean build:** 11.66 counted pages, so the body is 3.66
 pages over. It was already ~9 pages before the arithmetic task was added as a
 full results section (T-LA.29), which cost roughly 2.6 pages, and the future-work
-paragraphs (T-LA.30/31) added 0.24. Compiling is not the blocker; **cutting is**.
+paragraphs (T-LA.30/31) added 0.24; shared-prose trims in T-LA.32 took 0.21
+back (11.88 -> 11.66), because the shared sources are cut for TMLR too. Compiling is not the blocker; **cutting is**.
 
 If the overrun is to be closed, cut in this order â€” the argument survives all
 four, and each is a block move to an appendix rather than a rewrite. The
@@ -158,4 +159,5 @@ That rewrites both venue trees and re-runs the self-containment check (every
 
 An Ethical Considerations section is written inline in `main.tex` (optional for
 ARR, page-exempt when placed at the end).
+
 

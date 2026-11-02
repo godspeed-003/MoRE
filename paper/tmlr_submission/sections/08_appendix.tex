@@ -464,3 +464,79 @@ they do; the reproducible quantity is the arm mean.
 ground-truth depth per token, so that metric is \texttt{N/A}---not zero. A zero
 would read as perfect allocation against a curriculum that does not exist.
 
+\section{The out-of-domain set, and the version it replaces}
+\label{app:ood-provenance}
+
+\textbf{What the out-of-domain set is, and the version it replaces.} The 1{,}500
+scored blocks come from 943 documents of a 10{,}000-document sample of the Pile
+\citep{gao2020pile}, each contributing at most 512 tokens, with the Pile's
+Wikipedia subset excluded because our training corpus is Wikipedia. An earlier
+draft scored the first 1{,}500 blocks of the same sample unconstrained: those came
+from 102 documents, one of them a single book supplying $58\%$ of the tokens. We
+fixed the capped rule before scoring it and report both. The ordering is unchanged
+and the gap nearly so---MoRE 7.573, MoR 7.802, MoE 8.272 on the earlier set, a
+MoRE$-$MoR gap of $-0.229$ at $p = 0.048$---so the inversion is not an artefact of
+one document.
+
+\section{The loss--compute plane}
+\label{app:pareto}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\colfigwidth]{fig_pareto.pdf}
+\caption{Loss \emph{improvement over MoE} against inference FLOPs per token,
+five seeds, error bars one standard deviation; both domains share one scale
+because each is differenced against its own MoE baseline. In domain (solid) no
+arm dominates another---the three trace a frontier and MoRE's claim is the
+slope from MoE, not its position. Out of domain (dashed) MoR is
+\emph{dominated}: MoRE improves more, at a quarter of the inference compute.
+Exploratory, uncorrected.}
+\label{fig:pareto}
+\end{figure}
+
+\section{Depth control on the arithmetic task}
+\label{app:arith-depth}
+
+% Arithmetic depth-control numbers from results/opdiff/depth_control.md.
+\begin{table*}[t]
+\centering
+\small
+\caption{Depth control on the arithmetic task: validation digit cross-entropy
+gained over a forced uniform depth, five seeds, mean$\,\pm\,$std. Checkpoint
+re-evaluation of the best-validation checkpoint, so these margins are not
+comparable to Table~\ref{tab:arith}, which is final-epoch. Forced depth returns
+the final state rather than the ACT mixture, so every margin includes a read-out
+penalty, and MoRE's depth-matched integer lands on the steep part of its curve,
+which inflates the matched margin. The two rows are a bracket, not two
+contradictory measurements.}
+\label{tab:arith-depth}
+\vspace{2pt}
+\begin{tabular}{lcc}
+\toprule
+gained over & MoRE & MoR \\
+\midrule
+uniform at learned mean depth & 0.842\,$\pm$\,0.395 & 0.837\,$\pm$\,1.160 \\
+best uniform depth & \textbf{0.095}\,$\pm$\,0.075 & 0.221\,$\pm$\,0.124 \\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+\section{The four arithmetic limits in full}
+\label{app:arith-limits}
+
+\paragraph{Four limits that travel with the table.} First, no arm generalises to
+unseen iteration counts. Every arm is at chance on $k = 5,6,7$ (per-digit
+accuracy $\approx 0.167$, exact match zero) while seen counts are learned, and
+MoRE spends no less depth on the held-out counts. We read this as this budget's
+learnability frontier rather than as an architectural verdict, since per-digit
+accuracy already degrades across the seen counts ($0.998$ at $k=2$, $0.856$ at
+$k=3$, $0.661$ at $k=4$). Second, depth does not track difficulty: MoRE's mean
+depth is flat across the seen counts ($4.43$ to $4.45$) while accuracy collapses,
+which is the opposite of the adaptive-computation premise and is reported as
+measured, not as allocation. Third, routing does not align with the seven-group
+prior: MoRE's AMI is $0.031$ against MoE's $0.107$, and Hungarian-matched
+accuracy $0.199$ against $0.279$. The groups are a prior, not a ground truth, and
+a stronger router may carve differently---but this is not evidence for
+operation-aligned routing either. Fourth, the depth policy is replaceable, as
+above.
+

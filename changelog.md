@@ -11204,3 +11204,74 @@ near 11.82.
 (arithmetic limitations, future work); `README.md` (three-task table);
 `ARCHITECTURE.md` (historical-result note); `results/opdiff/results.md`
 (authoritative arithmetic numbers).
+
+---
+
+## T-LA.32 — TMLR body cut to 11.82 counted pages (2.51 removed, user-authorised)
+
+**What.** The user authorised applying the reduction T-LA.30 measured and left
+unapplied: "cut the content before the references by 2.5 pages strict". Counted
+body 14.33 -> **11.82** (-2.51) against the ~12-page norm. No training run, no
+measured number changed, no claim removed from the paper.
+
+**Five TMLR-only block moves.** All five are registered in `APPENDIX`,
+`TMLR_APPENDIX` and `TMLR_ONLY_APPENDIX` in `paper/assemble_submissions.py`, so
+`appendix_order("acl")` subtracts them and ACL keeps the prose in its body. Each
+replacement is a self-contained sentence carrying the result and its numbers:
+
+| id | appendix section | label | body keeps |
+|---|---|---|---|
+| `oodprovenance` | The out-of-domain set, and the version it replaces | `app:ood-provenance` | 943 documents / <=512 tokens; earlier-set 7.573 / 7.802 / 8.272 |
+| `pareto` | The loss--compute plane | `app:pareto` | the frontier and dominance reading with 7.212 / 7.423 / 7.946 |
+| `arithdepth` | Depth control on the arithmetic task | `app:arith-depth` | 0.842 vs 0.837 matched, 0.095 vs 0.221 best-uniform, bracket caveat |
+| `arithlimits` | The four arithmetic limits in full | `app:arith-limits` | a five-line `Four limits` paragraph naming all four with numbers |
+| (intro) | — | — | TMLR Related Work compressed from four `\paragraph` blocks to one paragraph |
+
+**Layout (TMLR only, `paper/tmlr_submission/main.tex`).** `textwidth` 6.9 -> 7.1
+in with `\oddsidemargin`/`\evensidemargin` -0.3 in; `textheight` 9.7 -> 9.8 in
+with `\headsep` -0.1 in so the 0.575-in bottom margin is unchanged; `\parskip`
+4.2 -> 2.4 pt; `\colfigwidth` 0.6 -> 0.46; `\dispsize` `\large` ->
+`\normalsize`. New macro `\depthfigwidth` (TMLR 0.66, ACL 0.92) replaces the
+hard-coded `0.92\linewidth` on the forced-depth curve, which at a 7.1-in measure
+was a half-page float. Margins are now 0.7 in horizontal / 0.6 in vertical; a
+rendered page was inspected at 100 dpi and reads as dense but normal.
+
+**Prose.** ~20 paragraphs tightened by one to three lines: the two-FLOPs reading
+paragraph, `tab:main`'s caption (the axis-substitution sentence duplicated the
+body), the arithmetic-task layout description, the `Three things follow` signpost
+(stale — it introduced four items), the mechanism section's direction/level
+preamble and its duplicated one-seed caveat, the scale and evaluation-caveat
+paragraphs, the conclusion, and the future-work sentence.
+
+**Two defects found while cutting.**
+
+1. **The introduction quoted the superseded OOD set.** `01_intro.tex` said MoRE
+   "reaches 7.573 nats against MoR's 7.802", which are the *unconstrained* draw's
+   numbers from `results/language/eval_summary.md`; every other place in the paper
+   reports the capped set (7.212 / 7.423, `tab:main` and §4.3). Fixed to the
+   capped numbers. Both sets stay in the paper — the earlier one now lives in the
+   `oodprovenance` appendix block, which is where its provenance is explained.
+2. **The conclusion's mechanism sentence had no main verb** ("The language
+   mechanism is not the obvious one---...---but a competition for one
+   per-token budget, ..."). Rewritten as "is a competition for one per-token
+   budget, not the obvious dilution or trapping accounts: ...".
+
+**Why nothing was cut.** The arithmetic task stays a full body section
+(decision), `opdiff-v4` stays the sole arithmetic study, and every sentence that
+carries a number or a falsifiable claim was either moved with a body summary or
+compressed. The only deletions are restatements made elsewhere: the
+axis-substitution sentence, the paging note in §7 that repeated §4, and the
+perplexity paragraph merged into the evaluation caveat.
+
+**Build effect.** TMLR 22 pp / 14.33 -> 20 pp / **11.82**; ACL 21 pp / 11.88 ->
+20 pp / **11.66** (it fell too, because the trimmed sources are shared). 0
+errors, 0 overfull hbox/vbox, 0 undefined refs or citations, 24 .tex files lint
+clean.
+
+**Where to look.** `paper/assemble_submissions.py` (`APPENDIX`,
+`TMLR_APPENDIX`, `TMLR_ONLY_APPENDIX` — the three lists must agree or a block
+moves in the wrong venue); `paper/common/04_results.tex` (the `ACLMOVE` markers
+and their replacements); `paper/common/01_intro.tex` (TMLR Related Work);
+`paper/tmlr_submission/main.tex` (layout block, `\colfigwidth`,
+`\depthfigwidth`, `\dispsize`); `paper/tmlr_submission/VERIFY_BEFORE_SUBMIT.md`
+(measured counts and the lever order for the next cut).

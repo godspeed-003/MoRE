@@ -8,24 +8,36 @@ Measured on the last clean build (`python code/compile_papers.py`):
 
 | | value |
 |---|---|
-| PDF total | **22 pages** |
-| counted main content (to References) | **14.33 pages** against the ~12-page norm |
+| PDF total | **20 pages** |
+| counted main content (to References) | **11.82 pages** against the ~12-page norm |
 | LaTeX errors | **0** |
 | overfull boxes (content outside the text block) | **0** |
 | undefined references / citations | **0** |
 | bibliography entries rendered | **18 of 18** |
 
-**The body is 2.33 pages over the ~12-page norm** after the arithmetic task was
-added as a full results section (T-LA.29) and the future-work paragraph was
-added (T-LA.30/31; costs 0.15 page). TMLR sets no hard limit; the norm is the
-author guide's recommendation. The arithmetic depth-control table is the first
-candidate to move if a decision is made to return under 12.
+**The body is now under the norm: 11.82 against 12.** T-LA.32 applied the
+2.5-page reduction the user authorised, taking 14.33 -> 11.82 (-2.51). That is
+2.51 pages of counted body, so the budget was met as specified, with 0.18 page in
+hand against the norm. It was done by moving five TMLR-only blocks into the
+appendix, compressing the TMLR Related Work section to one paragraph, tightening
+the layout, and trimming redundant prose -- **no number changed** and no claim
+left the paper: every moved block keeps a self-contained sentence in the body
+carrying its result and pointing at the appendix. The per-item measurements are in
+the T-LA.32 changelog entry.
 
-**A measured route to 12 pages exists and has not been applied** (T-LA.30).
-Layout tightening plus four block moves reaches 12.18--12.30; moving the Pareto
-figure as well reaches 11.77, leaving slack. See the T-LA.30 changelog entry for
-the measured per-item savings. Do not quote a page number from a source build:
-`measure_counted_pages.py` must be re-run after `assemble_submissions.py`.
+**Do not read a page count from a source build.** `measure_counted_pages.py` must
+be run after `assemble_submissions.py` and `compile_papers.py`, and it counts to
+the References heading on the page it lands on -- so a small edit can move the
+count by a whole line while the PDF total is unchanged. The current figure is
+`11.82` with the heading at y = 652.3 pt of a 792 pt page.
+
+**If the body grows and this number has to come down again, the levers, in the
+order they were measured:** layout (`textwidth`, `textheight`, `\parskip`,
+`\colfigwidth`, `\depthfigwidth` in `main.tex`); then moves of self-contained
+blocks via `ACLMOVE` markers plus `TMLR_APPENDIX` in
+`paper/assemble_submissions.py`; then prose. Layout is the only lever that costs
+nothing scientifically, and it is already near the point where a rendered page
+starts to look denser than a TMLR paper -- check one before tightening further.
 
 ---
 

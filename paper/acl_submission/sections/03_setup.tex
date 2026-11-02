@@ -4,11 +4,9 @@
 \subsection{Data and split}
 \label{sec:data}
 
-We use two tasks. The language task, described here, measures the three arms on
-a realistic vocabulary. The arithmetic task, described in
-\S\ref{sec:arith-task}, is built so that the architecture's own assumption is
-testable: that operation-typed computations deserve separate parameters and
-different amounts of recursion.
+Two tasks. The language task, described here, measures the three arms on a
+realistic vocabulary; the arithmetic task (\S\ref{sec:arith-task}) is built so
+that the architecture's own assumption is testable.
 
 All arms train on WikiText-103 \citep{merity2017wikitext} with a byte-pair
 vocabulary of 8{,}192 tokens and packed sequences of length 256
@@ -39,32 +37,28 @@ intended purpose. The arithmetic task is an instrument built to make that
 testable, not a benchmark: it removes every route by which the structure could be
 faked.
 
-An example is 24 tokens: an operation token, five binary slots carrying the
-operation's iteration count $k$, two 16-bit operands as four hex digits each, a
-separator, an eight-digit (32-bit) result, and an end token. Sixteen independent
-examples are packed into a 384-token row, and rows are group-pure. There is no
-chain of thought: the answer digits follow the operands directly, so any
-sequential computation must happen in the recursion rather than in the token
-stream. The operation's group is never an input---the router sees the operation
-token and must infer the family---and a non-iterated operation carries a null
-$k$, so the layout is identical for every operation and the slot cannot leak the
-group. Only the eight result digits and the end token are scored, 144 of 384
-positions per row.
+A row packs sixteen 24-token examples: an operation token, five binary slots
+carrying the operation's iteration count $k$, two 16-bit operands as four hex
+digits each, a separator, an eight-digit (32-bit) result, and an end token. Rows
+are group-pure. There is no chain of thought---the answer digits follow the
+operands directly---so any sequential computation must happen in the recursion
+rather than in the token stream. The operation's group is never an input, and a
+non-iterated operation carries a null $k$, so the layout is identical for every
+operation and cannot leak the group. Only the eight result digits and the end
+token are scored, 144 of 384 positions per row.
 
 Seven groups, one per expert, come from the task's own manifest: bitwise, shift
 and min--max, add--subtract, multiply, divide and modulo, sort and median, and a
-final group holding greatest-common-divisor together with the iterated
-operation. The iterated operation is a per-nibble recurrence---each digit
-updated from itself and its neighbour, plus a constant, modulo 16---applied $k$
-times to the eight nibbles of the concatenated operands. One application is a
-$256$-case table, so it is learnable at this scale, while the $k$-fold
-composition is not shortcut-able and one application costs about one block
-application, which is what lets $k$ span the seven-step budget instead of
-overshooting it. Training uses $k \in \{1,2,3,4\}$; $k = 5$ is held out inside
-the trained range and $k \in \{6,7\}$ beyond it. There is no depth curriculum: no
-target depth is supervised, so the per-$k$ average depth is a measurement rather
-than a target, and the per-operation depth-allocation error is correctly
-\texttt{N/A}.
+final group holding greatest-common-divisor together with the iterated operation.
+The latter is a per-nibble recurrence---each digit updated from itself and its
+neighbour, plus a constant, modulo 16---applied $k$ times to the eight nibbles of
+the concatenated operands. One application is a $256$-case table, so it is
+learnable at this scale, while the $k$-fold composition cannot be shortcut and
+costs about one block application, which is what lets $k$ span the seven-step
+budget. Training uses $k \in \{1,2,3,4\}$; $k = 5$ is held out inside the trained
+range and $k \in \{6,7\}$ beyond it. No target depth is supervised, so the per-$k$
+average depth is a measurement rather than a target, and the per-operation
+depth-allocation error is correctly \texttt{N/A}.
 
 The training set is 294{,}000 rows, 112.9M tokens, slightly more than
 WikiText-103. The protocol mirrors the language one: three arms, five seeds,
@@ -85,8 +79,7 @@ which enumerates every way of splitting the pooled values into groups of the
 original sizes---$\binom{10}{5} = 252$ at five-versus-five---and counts the
 fraction whose $|$mean difference$|$ is at least the observed one. It is
 exhaustive, hence deterministic: no sampling error, no seed, no normality
-assumption, and no threshold to choose. The superseded $k\times$std heuristic is
-not used anywhere.
+assumption, and no threshold to choose.
 
 The \textbf{resolution floor} of this design --- the smallest $p$ it can return at
 all --- is $2/\binom{n_a+n_b}{n_a}$ for equal arms, which is $2/252 = 0.00794$ at
@@ -95,9 +88,9 @@ invariant under swapping the groups, so extreme regroupings arrive in mirror pai
 and the count at the extreme can never be one.
 The derivation is in Appendix~\ref{app:floor}.
 \textbf{Every headline comparison in this paper sits exactly on that floor}, which
-we phrase as ``as extreme as a five-seed design admits''---a weaker statement than
-significance, and not to be dressed up as a stronger one. Only more seeds can
-strengthen these claims; no larger effect can.
+we phrase as ``as extreme as a five-seed design admits''---weaker than
+significance, and not to be dressed up as stronger: only more seeds can
+strengthen these claims, no larger effect can.
 
 The correction is Holm--Bonferroni over two pre-registered families (predictive quality, $m=4$; adaptive depth, $m=2$), declared before the final arm was trained. Every headline comparison clears its threshold, and would clear plain Bonferroni even with all six declared comparisons pooled into one family ($0.05/6=0.00833$, a margin of 0.0004 over the floor); Appendix~\ref{app:stats} gives the memberships.
 

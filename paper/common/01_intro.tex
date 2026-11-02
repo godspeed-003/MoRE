@@ -45,7 +45,7 @@ paper.
   MoE's inference FLOPs where MoR needs $8.87\times$: $72\%$ of MoR's gain for
   $25\%$ of its compute, roughly $3\times$ the quality per unit compute. Out of
   domain \citep{gao2020pile} the ratio becomes outright \emph{dominance}---MoRE
-  reaches 7.573 nats against MoR's 7.802 at a quarter of the compute, so MoR is
+  reaches 7.212 nats against MoR's 7.423 at a quarter of the compute, so MoR is
   Pareto-dominated---which is the one respect in which composing the mechanisms
   does something neither does alone.
 
@@ -121,48 +121,36 @@ them usable at 5.6M parameters.
 \section{Related Work}
 \label{sec:related}
 
-\paragraph{Sparse expert routing.}
 Conditional mixtures of local experts date to \citet{jacobs1991moe}; the
 sparsely-gated form that made them practical at scale is due to
 \citet{shazeer2017moe}, with Top-1 dispatch, load-balancing auxiliaries and the
 capacity-factor machinery developed in GShard \citep{lepikhin2021gshard}, Switch
-Transformer \citep{fedus2022switch} and ST-MoE \citep{zoph2022stmoe}. The standard
-justification is more parameters at roughly constant per-token FLOPs. That
-argument is unavailable here by construction: we pin all three arms to the same
-parameter count, so what remains of the sparsity case is a quality and robustness
-case, which \S\ref{sec:results} tests directly.
-
-\paragraph{Adaptive depth and weight-tied recursion.}
-Adaptive Computation Time \citep{graves2016act} introduced the learned per-step
-halting unit we use; Universal Transformers \citep{dehghani2019ut} applied it to
-a weight-tied transformer block, and PonderNet \citep{banino2021pondernet}
-reformulated the halting distribution to keep a gradient on the halt head near
-saturation. Early-exit variants place the decision at the layer or token level
-instead \citep{elbayad2020depthadaptive,schuster2022calm,raposo2024mod}. Weight
-tying itself is well established as a parameter-reduction device
-\citep{lan2020albert}. What this literature reports is overwhelmingly
-\emph{mean} step counts and exit-rate histograms. \S\ref{sec:halting} argues that
-neither statistic tests input-dependence, and that the comparison which does---against
-the best uniform depth at the same budget---is rarely made.
-
-\paragraph{Composing the two.}
-Recent work has begun to combine routing with recursion, most directly by using a
-router to assign per-token recursion depth \citep{bae2025mor,raposo2024mod}.
-Those systems route \emph{to depths} over shared weights. MoRE differs in that
-routing selects among genuinely independent expert FFNs and the recursion then
-reuses \emph{that expert's} weights, so the two decisions are made by different
+Transformer \citep{fedus2022switch} and ST-MoE \citep{zoph2022stmoe}. Their
+standard justification is more parameters at roughly constant per-token FLOPs,
+which is unavailable here by construction: we pin all three arms to one parameter
+count, so what remains of the sparsity case is a quality and robustness case,
+which \S\ref{sec:results} tests directly. On the depth axis, Adaptive Computation
+Time \citep{graves2016act} supplies the learned per-step halting unit we use,
+Universal Transformers \citep{dehghani2019ut} applied it to a weight-tied block,
+PonderNet \citep{banino2021pondernet} reformulated the halting distribution to
+keep a gradient on the halt head near saturation, and early-exit variants move the
+decision to the layer or token level
+\citep{elbayad2020depthadaptive,schuster2022calm,raposo2024mod}; weight tying is
+itself well established as a parameter-reduction device \citep{lan2020albert}.
+That literature reports mean step counts and exit histograms almost universally,
+which \S\ref{sec:halting} argues cannot test input-dependence, and the comparison
+that does---against the best uniform depth at the same budget---is rarely made.
+Closest to us, \citet{bae2025mor} and \citet{raposo2024mod} route \emph{to depths}
+over shared weights; MoRE instead routes among independent expert FFNs whose
+weights the recursion then reuses, so the two decisions are made by different
 heads over different objects and a token keeps one expert for its whole
-trajectory. We are not aware of a matched-budget comparison of such a composition
-against each of its components, which is the gap this paper fills. We make no
-novelty claim for the combination itself.
-
-\paragraph{Evaluation at small scale.}
-Minimal-pair benchmarks \citep{warstadt2020blimp} and likelihood-based world
-knowledge probes \citep{ivanova2024ewok} score a \emph{relative} preference within a
-matched pair, so they degrade gracefully with model scale rather than collapsing
-to chance the way multiple-choice knowledge suites do. At 5.6M parameters they are
-the appropriate instrument; \S\ref{sec:results} reports them with the caveat that
-our vocabulary is fitted to the training corpus and absolute accuracies are
-therefore not comparable to published models.
+trajectory. We know of no matched-budget comparison of such a composition against
+each of its components---the gap we fill---and we claim no novelty for the
+combination itself. Finally, minimal-pair benchmarks \citep{warstadt2020blimp} and
+likelihood-based world-knowledge probes \citep{ivanova2024ewok} score a
+\emph{relative} preference within a matched pair, so they degrade gracefully with
+scale and are the appropriate instrument at 5.6M parameters; our vocabulary is
+fitted to the training corpus, so absolute accuracies are not comparable to
+published models.
 
 % <<<TMLRONLY

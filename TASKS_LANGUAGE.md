@@ -1,17 +1,17 @@
-# TASKS_LANGUAGE.md — MoRE on English text
+﻿# TASKS_LANGUAGE.md â€” MoRE on English text
 
 Derived from [plan_language.md](plan_language.md), constrained by
 [updated_rules.md](updated_rules.md) and [updated_objective.md](updated_objective.md).
 Operating rules: [CLAUDE.md](CLAUDE.md). The arithmetic ledger is
-[TASKS.md](TASKS.md) and is **closed** — do not add language tasks there.
+[TASKS.md](TASKS.md) and is **closed** â€” do not add language tasks there.
 
 **Ticking rule.** A box may only be checked when its **Verify** command/criterion
 has actually been executed and passed. Record the observed evidence inline. If a
-gate fails: STOP, report, identify cause, fix, re-run the gate (`plan.md` §20).
+gate fails: STOP, report, identify cause, fix, re-run the gate (`plan.md` Â§20).
 
-**Legend** — `[x]` verified complete · `[~]` in progress · `[ ]` not started ·
-`[!]` blocked · `[✗]` closed WITHOUT running it, with the narrowing decision
-recorded inline. Never convert a `[✗]` to `[x]`.
+**Legend** â€” `[x]` verified complete Â· `[~]` in progress Â· `[ ]` not started Â·
+`[!]` blocked Â· `[âœ—]` closed WITHOUT running it, with the narrowing decision
+recorded inline. Never convert a `[âœ—]` to `[x]`.
 
 **This file is the resume point.** A session that picks the work up with no
 conversational context reads the first `[~]` or `[ ]` in phase order and continues
@@ -20,45 +20,45 @@ the Evidence line of the task that produced it.
 
 **Interpreter.** `C:\Users\vedan\anaconda3\python.exe` for CPU work.
 `D:\res\git\MoRE\.venv_cuda\Scripts\python.exe` for CUDA work (see T-L0.1).
-The `C:\Users\Hp\anaconda3\envs\more_env\python.exe` in CLAUDE.md §9 and
-ARCHITECTURE.md §9 is from the machine the arithmetic POC was developed on and
+The `C:\Users\Hp\anaconda3\envs\more_env\python.exe` in CLAUDE.md Â§9 and
+ARCHITECTURE.md Â§9 is from the machine the arithmetic POC was developed on and
 does not exist here (T-L0.0).
 
 ---
 
-## Phase L-0 — Environment  (`plan_language.md` §12)
+## Phase L-0 â€” Environment  (`plan_language.md` Â§12)
 
-- [x] **T-L0.0 Correct the documented environment.** CLAUDE.md §9 and
-  ARCHITECTURE.md §9 name an interpreter path and a GPU that do not exist on this
+- [x] **T-L0.0 Correct the documented environment.** CLAUDE.md Â§9 and
+  ARCHITECTURE.md Â§9 name an interpreter path and a GPU that do not exist on this
   machine (`C:\Users\Hp\...\more_env`, RTX 4060 Laptop 8 GB). Actual: user
   `vedan`, `C:\Users\vedan\anaconda3\python.exe` (Python 3.12.7), **RTX 3050
   6 GB Laptop GPU**, driver 596.08. Also correct the stale in-source claim in
-  `code/more/metrics.py` that there is "no scipy/sklearn in this environment" —
+  `code/more/metrics.py` that there is "no scipy/sklearn in this environment" â€”
   sklearn 1.3.2 and scipy are both present. The hand-rolled exact Hungarian and
   AMI stay: they are correct, dependency-free, and replacing working exact code
   to use a library is churn, not a fix. Only the justifying comment is wrong.
   **Verify:** both docs name the real interpreter and GPU; the metrics.py comment
   states the real reason (exactness + no new dependency), not a false absence.
-  **Evidence:** `CLAUDE.md` §9 and `ARCHITECTURE.md` §9 now carry both
+  **Evidence:** `CLAUDE.md` Â§9 and `ARCHITECTURE.md` Â§9 now carry both
   interpreters and the RTX 3050 (6143 MiB, cc 8.6, driver 596.08), and link
-  `ENVIRONMENT.md`. The false-absence claim was corrected in three places —
+  `ENVIRONMENT.md`. The false-absence claim was corrected in three places â€”
   `code/more/metrics.py` (the comment above `_to_contingency`),
-  `ARCHITECTURE.md` §T6.3, and `code/test_phase6_routing_metrics.py`'s docstring —
+  `ARCHITECTURE.md` Â§T6.3, and `code/test_phase6_routing_metrics.py`'s docstring â€”
   each now stating the real reason: exact at `E <= 15`, checked against brute
   force, and the metric layer imports nothing beyond torch/numpy. Usage lines in
   `test_phase2_routing.py`, `test_phase3_halting.py`, `test_phase4_balance.py`,
-  `test_phase5_dimensions.py` and `README.md` §6 repointed at the real
+  `test_phase5_dimensions.py` and `README.md` Â§6 repointed at the real
   interpreters; `README.md`'s two `350 checks` references corrected to 356 with
   the derivation. Gate L0 re-run after the edits: **`TOTAL 356 356 0 0`, 5 gates,
   ALL GATES PASS** (gate 1 19, gate 2 31, gate 3 27, gate 4 129, gate 5 150).
   Deliberately **not** changed: the three `automated/*.py` `PYTHON_EXE`
-  constants — those drivers also write a global `results.tsv` /
-  `final_run_metrics.json`, which `CLAUDE.md` §5 prohibits and `run_context.py`
+  constants â€” those drivers also write a global `results.tsv` /
+  `final_run_metrics.json`, which `CLAUDE.md` Â§5 prohibits and `run_context.py`
   refuses, so each got a NOT-RUNNABLE banner instead of a working interpreter
   path. `changelog.md`, `TASKS.md`, `results/results.md` and
   `ARCHITECTURE.md`'s scale caveat keep their `more_env` / RTX 4060 references:
   those record what was true when the arithmetic runs were made, and that is
-  accurate (`CLAUDE.md` §6). The scale caveat gained one clause saying so.
+  accurate (`CLAUDE.md` Â§6). The scale caveat gained one clause saying so.
 
 - [x] **T-L0.1 CUDA-capable torch in a dedicated venv.** Base anaconda has
   torch 2.6.0+**cpu**, so `torch.cuda.is_available()` is False and the whole
@@ -77,12 +77,12 @@ does not exist here (T-L0.0).
   resolve inside the venv (the `--system-site-packages` inheritance held).
   **Evidence:** `torch 2.6.0+cu126`, `cuda_available True`,
   `NVIDIA GeForce RTX 3050 6GB Laptop GPU`, 6143 MiB, compute capability (8, 6);
-  a 512×512 `cuda` matmul executed (so kernels really load, not just
+  a 512Ã—512 `cuda` matmul executed (so kernels really load, not just
   `is_available()`). Inheritance held: datasets 4.6.1, transformers 4.51.3,
   tokenizers 0.21.0, nltk 3.9.1, sklearn 1.3.2, scipy 1.14.1, wandb 0.25.0,
   numpy 1.26.4, matplotlib 3.10.0. Base interpreter confirmed untouched:
   `base torch 2.6.0+cpu cuda False`. pip printed conflict warnings for
-  `google-genai`/`pymilvus`/`s3fs`/`streamlit` — those are unrelated base
+  `google-genai`/`pymilvus`/`s3fs`/`streamlit` â€” those are unrelated base
   packages the venv shadows, not repo dependencies.
 
 - [x] **T-L0.2 Record the environment in the repo, not just in chat.** Add an
@@ -91,22 +91,22 @@ does not exist here (T-L0.0).
   for correctness gates, CUDA interpreter for training*. A resumed session must
   not have to rediscover this. **Verify:** the file exists and a fresh reader can
   pick the right interpreter for a given task from it alone.
-  **Evidence:** `ENVIRONMENT.md`, seven sections. §1 is the
-  which-interpreter rule with a runnable command for each. §2 is the measured
-  version table for both, side by side, from the probe reproduced in §6 — nothing
-  in it is remembered. §3 records two findings that change later phases: the
+  **Evidence:** `ENVIRONMENT.md`, seven sections. Â§1 is the
+  which-interpreter rule with a runnable command for each. Â§2 is the measured
+  version table for both, side by side, from the probe reproduced in Â§6 â€” nothing
+  in it is remembered. Â§3 records two findings that change later phases: the
   **HuggingFace stack is already installed** in both (`datasets 4.6.1`,
   `transformers 4.51.3`, `tokenizers 0.21.0`, `huggingface_hub 0.30.2`,
   `pyarrow 23.0.1`), so L-2 needs no installation and no new pin; and **`nltk
   3.9.1` is present with `averaged_perceptron_tagger` and `punkt` already
   downloaded but `universal_tagset` MISSING**, which decides T-L3.0 in favour of
-  Penn Treebank tags plus an explicit PTB→family map in the repo rather than
+  Penn Treebank tags plus an explicit PTBâ†’family map in the repo rather than
   `pos_tag(tagset="universal")`, whose missing corpus would trigger a network
-  download at dataset-build time. §4 is how the venv was built and why base is
-  untouched; §5 records the two T-L0.3 defects as one class — *filesystem
-  metadata is not experiment metadata*; §7 the shell and worktree rules.
+  download at dataset-build time. Â§4 is how the venv was built and why base is
+  untouched; Â§5 records the two T-L0.3 defects as one class â€” *filesystem
+  metadata is not experiment metadata*; Â§7 the shell and worktree rules.
   Disk recorded because L-2 needs it: `D:` 35 GB free, `C:` 74 GB free (the HF
-  cache is on `C:`, and WikiText is **not** cached yet — T-L2.0 is a real
+  cache is on `C:`, and WikiText is **not** cached yet â€” T-L2.0 is a real
   download). Gate L0 unaffected: `TOTAL 356 356 0 0`, ALL GATES PASS.
 
 - [x] **T-L0.3 Baseline the arithmetic gate before touching anything.** Run the
@@ -115,7 +115,7 @@ does not exist here (T-L0.0).
   "unchanged" is unfalsifiable. **Verify:** `run_correctness_suite.py` prints
   `CORRECTNESS SUITE: ALL GATES PASS` and its totals line is copied into Evidence
   verbatim.
-  **Evidence:** the first run did **not** pass — `TOTAL 340 339 1 0`, with Gate 4
+  **Evidence:** the first run did **not** pass â€” `TOTAL 340 339 1 0`, with Gate 4
   crashed mid-suite and one Gate 5 failure. Both were environment-dependent
   defects in the suite itself, fixed in T-L0.3a and T-L0.3b. After those fixes:
 
@@ -133,7 +133,7 @@ does not exist here (T-L0.0).
   **The Gate L0 reference is therefore 356, not the 350 written in the
   arithmetic-era notes** (+9 in Gate 4 where the seeding suite now runs to
   completion instead of dying at check 51, +5 new provenance checks from
-  T-L0.3b). `plan_language.md` §0/§9/§11 were corrected to 356. Interpreter:
+  T-L0.3b). `plan_language.md` Â§0/Â§9/Â§11 were corrected to 356. Interpreter:
   `C:\Users\vedan\anaconda3\python.exe`, ~4.2 min wall-clock.
 
 - [x] **T-L0.3a Cross-drive `relpath` killed Gate 4.**
@@ -146,16 +146,16 @@ does not exist here (T-L0.0).
   writing anything. Gate 4 died at check 51 having printed no `[FAIL]` marker, so
   the runner could only report "output format not recognised". It passed on the
   machine the POC was developed on solely because repo and temp shared a drive
-  there — a latent defect, not a new one. Fixed with a `_repo_relative()` helper
+  there â€” a latent defect, not a new one. Fixed with a `_repo_relative()` helper
   ([code/more/run_context.py:130](code/more/run_context.py:130)) that keeps the
   relative form when one exists and falls back to the absolute path otherwise. A
   run directory outside the repo is legitimate (a temp-root test, a `runs/` on a
   data disk) and provenance should record where the run actually is; both
   consumers (`export_results.py`, `depth_null_model.py`) only echo the string.
-  The two `pathlib.relative_to` sites were checked and cannot go cross-drive —
+  The two `pathlib.relative_to` sites were checked and cannot go cross-drive â€”
   both write into `ROOT`. **Verify:** Gate 4 passes.
   **Evidence:** `gate 4  129 checks  129 pass  0 fail  0 skip  21.1s  PASS`;
-  the seeding suite went 51 pass + crash → **60 pass, rc=0**.
+  the seeding suite went 51 pass + crash â†’ **60 pass, rc=0**.
 
 - [x] **T-L0.3b Gate 5 was grading pre-fix history, and reported a defect the
   code does not have.** G5.2b failed with `val/routing_accuracy`,
@@ -165,17 +165,17 @@ does not exist here (T-L0.0).
   eleven routing/diversity keys as `"N/A"` (verified directly on
   `runs/t_l03_mor_timing_seed44__fa9339bc`). The fault was the selection key.
   `test_gate5.py` picked `RUN_E1` as the newest single-expert directory **by
-  `os.path.getmtime`** — but `runs/` is tracked (555 files), so `git worktree
+  `os.path.getmtime`** â€” but `runs/` is tracked (555 files), so `git worktree
   add` rewrote all 132 directory mtimes into checkout order (measured spread:
-  01:54:39–02:30:05 on 2026-09-03, i.e. 35 min of checkout, unrelated to when the
-  experiments ran). That put `t83_mor_headfix_seed42__dd11e6dc__r2` last — commit
+  01:54:39â€“02:30:05 on 2026-09-03, i.e. 35 min of checkout, unrelated to when the
+  experiments ran). That put `t83_mor_headfix_seed42__dd11e6dc__r2` last â€” commit
   `e5b0f6df`, i.e. from **before** the T8.1 fix that made those keys
   present-and-`"N/A"`. An audit of all 18 single-expert runs showed 9 satisfying
   the contract (all five `phaseB_mor_seed4*` plus `t81b`/`t81c` at `30831ff6`)
   and 9 pre-fix; `t81_mor` (0 N/A) and `t81b_mor_seed42` (5 N/A) at the *same*
   commit are the before/after pair T8.1 was verified with, so the archive was
   behaving exactly as intended. **mtime is a property of the filesystem, not of
-  the experiment** — any clone, worktree, archive restore or copy destroys it.
+  the experiment** â€” any clone, worktree, archive restore or copy destroys it.
   Two fixes: (1) selection is now by `provenance.code_git_commit == git_commit()`
   with a `_pick()` helper that reports whether the chosen run came from HEAD, and
   the G5.2b contract block **SKIPs with the commit named** rather than grading a
@@ -184,20 +184,20 @@ does not exist here (T-L0.0).
   ahead of it in the same gate instead of falling back to history. T6.7d also
   closes a real blind spot: provenance had only ever been asserted on a `more`
   run, and E=1 / max_depth=1 is exactly where architecture-specific gaps hide
-  (T8.3). Its five checks cover the full `updated_rules.md` §9 field list at E=1
+  (T8.3). Its five checks cover the full `updated_rules.md` Â§9 field list at E=1
   (extracted into `_required_fields()` so one list serves both architectures),
   MoR's `ffn_mult == 24`, and that a legitimately-zero `routing_balance` survives
-  as `0.0` rather than being read as missing — the falsy-zero form of reporting a
+  as `0.0` rather than being read as missing â€” the falsy-zero form of reporting a
   sentinel as a measurement. **Verify:** Gate 5 passes with the contract block
   actually running, not skipping. **Evidence:**
-  `gate 5  150 checks  150 pass  0 fail  0 skip  PASS`; provenance 38 → **43
-  pass**, `test_gate5.py` 38 pass/1 fail → **39 pass**; gate 5's header now
+  `gate 5  150 checks  150 pass  0 fail  0 skip  PASS`; provenance 38 â†’ **43
+  pass**, `test_gate5.py` 38 pass/1 fail â†’ **39 pass**; gate 5's header now
   prints which runs came from HEAD. Cost: one extra 1-epoch MoR run in the suite,
   ~49 s on CPU.
 
 ---
 
-## Phase L-1 — Task axis  (`plan_language.md` §1)
+## Phase L-1 â€” Task axis  (`plan_language.md` Â§1)
 
 - [x] **T-L1.0 `task` in the config layer.** Add `task = arithmetic | language`
   to `load_config_defaults` with default `"arithmetic"`, a `TASKS` tuple beside
@@ -205,7 +205,7 @@ does not exist here (T-L0.0).
   language-specific shape fields (`seq_len`, `vocab_size`, `n_heads`,
   `attention`) exactly as `apply_architecture` stamps the architecture fields.
   `apply_task` **raises** for `task == "language"` with
-  `loss_weights.family_cls != 0.0` (§7.3: the family head is a detached probe on
+  `loss_weights.family_cls != 0.0` (Â§7.3: the family head is a detached probe on
   language and must not be weighted into the trunk). Default-arithmetic is the
   whole point: no existing config, test, or archived resolved config changes
   meaning. **Verify:** a config with no `task` key resolves byte-identically to
@@ -213,26 +213,26 @@ does not exist here (T-L0.0).
 
   **THE BOX'S LITERAL WORDING IS NOT IMPLEMENTABLE, AND THAT IS THE FINDING.**
   "default `arithmetic`" read naturally means
-  `cfg.setdefault("task", TASK_ARITHMETIC)` in `load_config_defaults` — and that
+  `cfg.setdefault("task", TASK_ARITHMETIC)` in `load_config_defaults` â€” and that
   single line fails this box's own Verify criterion. `config_hash` is SHA-256 over
   the resolved config with only `provenance` and `logging` removed
   ([code/more/run_context.py:82](code/more/run_context.py:82)), so injecting a new
-  key — however inert at runtime — moves the identity of **every** run that
+  key â€” however inert at runtime â€” moves the identity of **every** run that
   resolves through it, including the fifteen published canonical Phase-B ones.
   The default is therefore the **ABSENCE of the key**: nothing writes `task`
   unless the operator asks for a non-default task, and
-  [config.py:resolve_task](code/more/config.py:84) maps absence → `arithmetic`.
+  [config.py:resolve_task](code/more/config.py:84) maps absence â†’ `arithmetic`.
   `apply_task(cfg, "arithmetic")` **pops** the key rather than writing it, so an
   explicit `--task arithmetic` and no flag at all produce the same bytes.
   **Evidence:** `code/test_language_task_axis.py`, 72 checks, 0 failed.
   TL1.0c/d: the two resolutions are byte-identical (809 canonical-JSON bytes both,
-  hash `846c6e36…`) and 2077 bytes both through the CLI (TL1.2f). TL1.0g: all
+  hash `846c6e36â€¦`) and 2077 bytes both through the CLI (TL1.2f). TL1.0g: all
   **15** seeded `runs/phaseB_*` directories re-hash from their own stored
   `resolved_config.json` to the `config_hash` they recorded before this axis
-  existed — 0 mismatched. TL1.0h: all 18 still match the hash8 suffix in their
+  existed â€” 0 mismatched. TL1.0h: all 18 still match the hash8 suffix in their
   directory name. **A second finding, recorded because it looked like a
   regression and is not:** the 3 *unseeded* `phaseB_*__seedNA__*` runs do **not**
-  re-derive under today's hash — they reproduce exactly under a `provenance`-only
+  re-derive under today's hash â€” they reproduce exactly under a `provenance`-only
   exclusion, i.e. they predate `logging` joining the exclusion set. TL1.0g2
   asserts that explanation rather than leaving it as a story; those three are
   non-citable under T6.1 anyway (no declared seed).
@@ -241,24 +241,24 @@ does not exist here (T-L0.0).
   must not silently label a language run `canonical`. Extend it so the task
   appears in the variant when it is not arithmetic, and add
   `CANONICAL_RUN_PREFIX_LANGUAGE = "langB"` so run names are
-  `langB_MoE_seed42` (§10) and can never be confused with `phaseB_*` in W&B, in
+  `langB_MoE_seed42` (Â§10) and can never be confused with `phaseB_*` in W&B, in
   `runs/`, or in an exporter table. **Verify:** an unmodified language config
   resolves to a variant naming the task; `canonical_run_name` for
   `(language, moe, 42)` returns `langB_MoE_seed42`.
   **A REAL PRE-EXISTING DEFECT, found by writing the test rather than by
   inspection.** `resolve_variant` compared `loss_weights.family_cls` against the
-  arithmetic canonical `0.5` only. On language `0.0` is *required* (§7.3), so an
+  arithmetic canonical `0.5` only. On language `0.0` is *required* (Â§7.3), so an
   unmodified canonical language config resolved to
-  `variant = "no_family_supervision"` — a canonical run wearing an ablation label,
+  `variant = "no_family_supervision"` â€” a canonical run wearing an ablation label,
   in the exact field that exists to stop an ablation being read as canonical.
   Fixed with `CANONICAL_FAMILY_CLS_WEIGHT_BY_TASK`
   ([code/more/config.py:436](code/more/config.py:436)); the arithmetic behaviour is
   unchanged, and TL1.1f pins it by asserting arithmetic `family_cls = 0.0` still
   tags `no_family_supervision`.
-  **Evidence:** TL1.1a–f — clean language → `"language"`, language + fixed depth →
-  `"language+fixed_depth"`, clean arithmetic → `"canonical"` (unchanged for the 15
+  **Evidence:** TL1.1aâ€“f â€” clean language â†’ `"language"`, language + fixed depth â†’
+  `"language+fixed_depth"`, clean arithmetic â†’ `"canonical"` (unchanged for the 15
   published runs), and the word `canonical` is never emitted for a non-default
-  task. TL1.1g–o — `langB_{MoE,MoR,MoRE}_seed42`, `phaseB_*` unchanged, the two
+  task. TL1.1gâ€“o â€” `langB_{MoE,MoR,MoRE}_seed42`, `phaseB_*` unchanged, the two
   prefixes cannot collide under a glob, and a `run_name` the operator chose (e.g. a
   `dense_routing_ablation` label that `enforce_routing_mode` reads) survives
   `apply_task` untouched: the repair replaces only the exact stamped
@@ -269,21 +269,21 @@ does not exist here (T-L0.0).
   before the override blocks, so an explicit `--family_cls` on a language run
   hits the same refuse-don't-ignore path as every other override rather than
   being quietly overwritten. **Verify:** `--task language --family_cls 0.5` exits
-  non-zero with a refusal naming §7.3; `--task language` alone succeeds.
-  **Evidence:** TL1.2a–q, driving `cli.main()` end to end with only
+  non-zero with a refusal naming Â§7.3; `--task language` alone succeeds.
+  **Evidence:** TL1.2aâ€“q, driving `cli.main()` end to end with only
   `RunContext.create` and `train()` stubbed (the argument contract is fully
   resolved before either runs, and a real call would need the L-2 corpus and the
   L-4 model, and would deposit a `runs/` directory that a later reader could
   mistake for evidence). TL1.2a/b: `rc = 1`, `train()` never reached, `ValueError`
-  naming §7.3 and the detached probe. TL1.2c–e: `--task language` alone succeeds
+  naming Â§7.3 and the detached probe. TL1.2câ€“e: `--task language` alone succeeds
   and resolves to a complete language config named `langB_MoRE`. TL1.2f/g: no
   `--task` and `--task arithmetic` are byte-identical through the CLI (2077 bytes
-  both) and neither carries a `task` key or a language shape field. TL1.2i–n: the
+  both) and neither carries a `task` key or a language shape field. TL1.2iâ€“n: the
   shape flags are **refused on arithmetic rather than ignored** (accepting them
   would write a field into the resolved config, the `config_hash` and the
   provenance record while describing nothing the run did), `--seq_len` overrides
   the provisional 256 that Gate L5 owns, `--seq_len 0` is refused, and
-  `--vocab_size` is bounded at the uint16 ceiling — 65536 accepted, 70000 refused,
+  `--vocab_size` is bounded at the uint16 ceiling â€” 65536 accepted, 70000 refused,
   because the tokenized arrays are `uint16` and id 65536 would wrap to id 0, a
   valid id for a different token, corrupting the corpus with no error anywhere.
   TL1.2p/q: all three arms resolve with attention on, MoR included.
@@ -300,48 +300,48 @@ does not exist here (T-L0.0).
   **THE REFUSAL WAS ALREADY IMPLICIT, AND THAT WAS NOT GOOD ENOUGH.** Because
   T-L1.1 makes `resolve_variant` return `"language"` and never `"canonical"`,
   check 2c of the existing guard already refused a language `canonical_phase_b`
-  claim — but with the message *"variant='language' … this run has at least one
+  claim â€” but with the message *"variant='language' â€¦ this run has at least one
   ablation active"*, which is false and would send the reader hunting for an
   ablation that does not exist. The cross-task claim is now its own first-class
   check with its own message
   ([code/more/run_context.py:370](code/more/run_context.py:370)), and it fires
   **before** the field loop so it cannot be buried under a list of null-field
-  complaints. Each task also gets its own group string —
-  `canonical_phase_b` / `canonical_lang_b` — because `canonical_phase_b` is the
+  complaints. Each task also gets its own group string â€”
+  `canonical_phase_b` / `canonical_lang_b` â€” because `canonical_phase_b` is the
   exact string `export_results.py` filters the headline arithmetic table on, and a
   language row there would put a per-token cross-entropy in nats in a column of
   arithmetic MSEs. The symmetric case (an arithmetic run claiming
   `canonical_lang_b`) is refused too.
-  **`_effective()` had to grow five keys** — `seq_len`, `vocab_size`, `n_heads`,
+  **`_effective()` had to grow five keys** â€” `seq_len`, `vocab_size`, `n_heads`,
   `attention`, `tie_lm_head`. The guard iterates the *spec's* `enforced_fields`,
   so a field the spec lists but `_effective` does not produce reports as
   *"requires 8192, run has None"*: a real check failing for a fake reason. All
   five are read with `.get`, so on arithmetic they are `None` and nothing compares
-  them — `canonical_spec.json` does not list them.
+  them â€” `canonical_spec.json` does not list them.
   **THE NEW SPEC HAS MORE NULLS THAN THIS BOX ASKED FOR, deliberately.** The box
   named eight (`epochs`, `batch_size`, `lr`, `weight_decay`, `seq_len`,
   `max_depth`, `primary_metric_floor`, `ffn_mult.mor`). Three more are null and the
   reasons are in `canonical_spec_language.json:_NULLS_NOTE`: `dropout`
   (0.1 was *inherited* on 70 k records; ~103 M tokens against ~3.2 M parameters
   underfits, so the inherited value points the wrong way), and
-  `routing_balance_weight` + `halting_weight` — T4.2 chose `0.001` because it put
-  the weighted balance term at `0.017×` the task loss, and a per-token
+  `routing_balance_weight` + `halting_weight` â€” T4.2 chose `0.001` because it put
+  the weighted balance term at `0.017Ã—` the task loss, and a per-token
   cross-entropy near `ln(8192) = 9.0` nats at init is two orders of magnitude
   larger than arithmetic's `~0.06` MSE, so the same coefficient would put the
-  balance term at `~1e-4 ×` the task loss — effectively **off**, in the arm whose
+  balance term at `~1e-4 Ã—` the task loss â€” effectively **off**, in the arm whose
   central failure mode is router collapse; and an equally invisible ponder cost
   would silently turn adaptive depth into always-max depth. Every non-null value
   in the file is definitional or protocol, and `frozen_by` says which for each one.
-  **Evidence:** TL1.3a–p. TL1.3a/b: `load_canonical_spec()` with no arguments
+  **Evidence:** TL1.3aâ€“p. TL1.3a/b: `load_canonical_spec()` with no arguments
   still reads the arithmetic spec, whose identity fields (`run_name_template`,
   `dataset_version`, `family_cls_weight = 0.5`) are unchanged and which gained no
   key. TL1.3f: an unregistered task **raises** rather than falling back to another
   task's numbers. TL1.3h: every field the language spec enforces is visible to the
-  guard (`unreadable = []`). TL1.3i–k: the cross-task claim is refused in both
-  directions, naming the task and the right group. TL1.3l–n: a language run
+  guard (`unreadable = []`). TL1.3iâ€“k: the cross-task claim is refused in both
+  directions, naming the task and the right group. TL1.3lâ€“n: a language run
   claiming its *own* group is refused for **unfrozen fields**, not for its group,
   and the message names `canonical_spec_language.json`. TL1.3o: an exploratory
-  label is still free. TL1.3p: the arithmetic guard still refuses router noise —
+  label is still free. TL1.3p: the arithmetic guard still refuses router noise â€”
   `test_phase5_dimensions.py:G4.37`'s exact case, re-checked here because that
   gate's message assertions are what the rewrite could most easily have broken.
 
@@ -352,7 +352,7 @@ does not exist here (T-L0.0).
   three arms are
   unchanged from T-L0.3; a 1-epoch arithmetic run's `metrics.json` matches the
   pre-change run on `task_loss` to full printed precision at the same seed.
-  **Evidence — all three criteria, in order.**
+  **Evidence â€” all three criteria, in order.**
 
   *(1) The suite.* `C:\Users\vedan\anaconda3\python.exe code/run_correctness_suite.py`:
 
@@ -367,15 +367,15 @@ does not exist here (T-L0.0).
   CORRECTNESS SUITE: ALL GATES PASS
   ```
 
-  Plus `test_language_task_axis.py`: **72 passed, 0 failed** (39 → 72 this
+  Plus `test_language_task_axis.py`: **72 passed, 0 failed** (39 â†’ 72 this
   phase). The language suite is deliberately *not* in `run_correctness_suite.py`
-  yet — Gate L0's job is to prove the arithmetic number has not moved, and adding
+  yet â€” Gate L0's job is to prove the arithmetic number has not moved, and adding
   checks to it would make "356" stop meaning what T-L0.3 froze. It joins the
   runner at T-L8.x when the language gates are the thing being defended.
 
   *(2) Parameter counts.* Compared by extracting the T-L0.3 tree with
   `git archive 112809a code` into a scratch dir and building all three arms from a
-  resolved config in both trees — same interpreter, same `config.json`, model
+  resolved config in both trees â€” same interpreter, same `config.json`, model
   constructed exactly as `engine.py:202-229` does. Compared as JSON including a
   **per-tensor `numel` map**, not just the total, because a compensating pair of
   shape changes would leave the total intact:
@@ -388,7 +388,7 @@ does not exist here (T-L0.0).
 
   `diff` of the two JSON dumps: **empty**. (The MoR/MoRE gap is 3,845 params =
   0.12%, the T4.x parameter-matching result, unchanged.) Note `engine.py:220`'s
-  comment cites `6,358,553` — that is the *2-block* figure from before T8.2 set
+  comment cites `6,358,553` â€” that is the *2-block* figure from before T8.2 set
   `num_blocks = 1` as the default, and is not the T-L0.3 baseline; the baseline is
   whatever the T-L0.3 tree produces, which is what was measured here.
 
@@ -397,9 +397,9 @@ does not exist here (T-L0.0).
   `08e90427`, i.e. before the task axis), same CPU interpreter, W&B offline.
   Result stronger than the box asks for:
 
-  - **`config_hash` identical to all 64 hex digits** —
+  - **`config_hash` identical to all 64 hex digits** â€”
     `fa9339bc279495e8b5bb8c604833526d90adf3a6a0808319d0cf927ffed90f73`, which is
-    why the re-run auto-named itself `…__fa9339bc__r3`. The resolved config with
+    why the re-run auto-named itself `â€¦__fa9339bc__r3`. The resolved config with
     `provenance` removed is byte-identical, **2014 bytes both**, and `task` is
     absent from both. This is the absence-means-arithmetic decision of T-L1.0
     demonstrated on a real run rather than on a unit test.
@@ -411,7 +411,7 @@ does not exist here (T-L0.0).
     `train/family_cls_loss = 0.05077054923906242`,
     `train/total_loss = 0.12512240410806277`. Excluded from the comparison:
     `experiment_id` (contains the `__r3` suffix by construction),
-    `perf/throughput_tokens_sec` (wall-clock, 1940 → 1599 tok/s, a machine-load
+    `perf/throughput_tokens_sec` (wall-clock, 1940 â†’ 1599 tok/s, a machine-load
     measurement and not a property of the model), and
     `_non_scalar_keys_omitted`. `nondeterministic_ops_observed = ['none']` in
     both.
@@ -422,7 +422,7 @@ does not exist here (T-L0.0).
   configured`) after `RunContext.create` had already made the directory, leaving
   `runs/t_l03_mor_timing_seed44__fa9339bc__r2` holding a `config.json`,
   `resolved_config.json` and a `stdout.log` with the traceback, but no
-  `metrics.json`. **It is kept, not deleted** — §T-LX.2 and CLAUDE.md §6 say
+  `metrics.json`. **It is kept, not deleted** â€” Â§T-LX.2 and CLAUDE.md Â§6 say
   archive rather than delete, and a directory with no `metrics.json` cannot be
   mistaken for a result. Its `resolved_config.json` is in fact the artifact that
   proves the hash claim above; the `stdout.log` is on-disk only, excluded by the
@@ -435,7 +435,7 @@ does not exist here (T-L0.0).
 
 ---
 
-## Phase L-2 — Data pipeline  (`plan_language.md` §3)
+## Phase L-2 â€” Data pipeline  (`plan_language.md` Â§3)
 
 - [x] **T-L2.0 Fetch WikiText.** `data/lang/build_language_dataset.py` downloads
   `wikitext-103-raw-v1` (canonical) and `wikitext-2-raw-v1` (dev loop) via
@@ -446,9 +446,9 @@ does not exist here (T-L0.0).
   leakage audit meaningful. **Verify:** the three splits load, their line counts
   and byte sizes are recorded in the manifest, and no split contains the literal
   token `<unk>`.
-  **Evidence:** both corpora fetched at HF revision `b08601e04326…` of
+  **Evidence:** both corpora fetched at HF revision `b08601e04326â€¦` of
   `Salesforce/wikitext`, pinned in each manifest. Verified by
-  `code/test_language_data.py` (TL2.0a–m on both corpora):
+  `code/test_language_data.py` (TL2.0aâ€“m on both corpora):
 
   | corpus | split | lines | nonempty | bytes | `<unk>` |
   |---|---|---|---|---|---|
@@ -462,10 +462,10 @@ does not exist here (T-L0.0).
   `<unk>` is **counted**, not asserted away: `raw_stats()` accumulates
   `text.count("<unk>")` per split so the number reaches the manifest whether it is
   zero or not. Zero everywhere confirms the `-raw-` choice empirically rather than
-  on the strength of the dataset card. Train/val byte ratio 9.5× (wikitext-2),
-  471.3× (wikitext-103).
+  on the strength of the dataset card. Train/val byte ratio 9.5Ã— (wikitext-2),
+  471.3Ã— (wikitext-103).
 
-  **FINDING — the two corpora share byte-identical val and test splits.** Not
+  **FINDING â€” the two corpora share byte-identical val and test splits.** Not
   merely equal in size: hashing the raw row text of both corpora in memory gives
   `val sha256 = 8ef749789ca0693435d20b3f81d5638c19edcebc5a68586dcf09bdf47ef9542f`
   and `test sha256 = bbf94c53a05abe9ee670d3b6343608095822c85e26de37c70b24fc571964574a`
@@ -482,14 +482,14 @@ does not exist here (T-L0.0).
   because they are the same 1,144,248 bytes. So dev-loop runs on wikitext-2 may
   answer "does it run, are the shapes right, is the loss finite", and may never be
   cited as an independent replication of a canonical result nor used to pick
-  anything that is then reported on the canonical corpus. `plan_language.md` §3
+  anything that is then reported on the canonical corpus. `plan_language.md` Â§3
   called wikitext-2 the "dev loop" without stating this; it is stated here.
 
 - [x] **T-L2.1 Byte-level BPE, V=8192, fitted on train only.** Two independent
   reasons, both recorded in the script's docstring: (a) fitting a tokenizer on
-  val/test is tokenizer-level leakage — the merge table would encode the held-out
-  text's statistics; (b) a stock GPT-2 vocabulary would put 50257×256 = 12.9 M
-  parameters in the embedding against a 3.2 M expert stack, so the §6 parameter
+  val/test is tokenizer-level leakage â€” the merge table would encode the held-out
+  text's statistics; (b) a stock GPT-2 vocabulary would put 50257Ã—256 = 12.9 M
+  parameters in the embedding against a 3.2 M expert stack, so the Â§6 parameter
   budget would be satisfied by the embedding alone and the MoR/MoRE match would
   be measuring nothing. Byte-level so there is no OOV and no `<unk>`.
   **Verify:** the tokenizer round-trips a held-out paragraph exactly; the fitted
@@ -499,7 +499,7 @@ does not exist here (T-L0.0).
   round-trip exact on an 8,700-byte **val** paragraph (the builder *raises* if it
   is not, so a build cannot complete with an inexact tokenizer). Fit time 18.4 s
   (wikitext-2, 630 documents) and 170.7 s (wikitext-103, 29,445 documents).
-  Tokenizer hashes `2a7147479382…` and `6a1f1477f4d9…`, both re-verified against
+  Tokenizer hashes `2a7147479382â€¦` and `6a1f1477f4d9â€¦`, both re-verified against
   the files by TL2.1b.
 
   The train-only property is checked three ways, none of which trusts the
@@ -510,8 +510,8 @@ does not exist here (T-L0.0).
      globs `*_text.txt` and requires the set to be `{train_text.txt}`), so a
      held-out file cannot have been passed by a path the manifest omits.
      `write_train_text` materializes only the train split for exactly this reason.
-  3. The round-trip probe is drawn from val — held-out text the tokenizer must
-     handle without having been fitted on it — and TL2.1g re-runs an independent
+  3. The round-trip probe is drawn from val â€” held-out text the tokenizer must
+     handle without having been fitted on it â€” and TL2.1g re-runs an independent
      round-trip through the saved file, since the build's own check is the builder
      grading itself.
 
@@ -521,7 +521,7 @@ does not exist here (T-L0.0).
   initial alphabet survived training (TL2.1i).
 
   **Document segmentation is lossless, measured:** `train_text_bytes` equals the
-  independent raw byte scan exactly — 10,914,845 and 539,295,549 — so joining HF
+  independent raw byte scan exactly â€” 10,914,845 and 539,295,549 â€” so joining HF
   rows with `""` reproduces the corpus byte-for-byte and `iter_documents` drops
   nothing. This matters because `_is_doc_start` is a heuristic on ` = title = `
   headings; if it mis-split, the EOT positions would be wrong and this equality is
@@ -533,12 +533,12 @@ does not exist here (T-L0.0).
   `key_padding_mask`, which means the NaN path in attention over a fully-masked
   row is unreachable and the ACT denominators are exact rather than
   mask-conditional. Store as `.npy` `uint16` (V=8192 fits) and memory-map at load
-  — not JSONL, which would re-parse ~100 M tokens every epoch.
+  â€” not JSONL, which would re-parse ~100 M tokens every epoch.
   **Verify:** every stored block has length exactly `seq_len`; the dropped tail is
   `< seq_len` tokens and its size is recorded in the manifest;
   `np.load(mmap_mode="r")` opens without materializing the array.
   **Evidence:** `seq_len = 256`, `uint16`, all three assertions checked on the
-  **stored arrays**, not on the builder's arithmetic — block length from
+  **stored arrays**, not on the builder's arithmetic â€” block length from
   `a.shape[1]`, block count from `a.shape[0]`, and `isinstance(a, np.memmap)`.
 
   | corpus | split | tokens | blocks | dropped tail |
@@ -551,25 +551,25 @@ does not exist here (T-L0.0).
   | wikitext-103 | test | 321,583 | 1,256 | 47 |
 
   Every tail `< 256`, and the accounting identity
-  `tokens == blocks × seq_len + dropped_tail` holds **exactly** for all six
-  split/corpus pairs (TL2.2g) — so nothing is lost except the tail that is
+  `tokens == blocks Ã— seq_len + dropped_tail` holds **exactly** for all six
+  split/corpus pairs (TL2.2g) â€” so nothing is lost except the tail that is
   recorded. Total dropped across the canonical corpus: 325 tokens of 135,340,869,
-  i.e. 2.4 × 10⁻⁶. `dataset_version = lang-wikitext-2-bpe8192-len256-9f870794`
+  i.e. 2.4 Ã— 10â»â¶. `dataset_version = lang-wikitext-2-bpe8192-len256-9f870794`
   and `lang-wikitext-103-bpe8192-len256-800d6154`; per-split SHA-256 recorded and
   re-verified against the files.
 
   Memory behaviour is the reason this task is not cosmetic: the canonical
   `train.npy` is 269 MB and opens as a `numpy.memmap`, and the encode path streams
-  uint16 to a raw `.bin` before reshaping — a Python list of 134.7 M ints would
+  uint16 to a raw `.bin` before reshaping â€” a Python list of 134.7 M ints would
   have been ~3.6 GB. Peak build RSS stayed well inside the 6 GB card's host
   budget. Encode wall-clock 194.6 s for the canonical train split.
 
-  **FINDING — per-token loss is not comparable across the two corpora.** The val
+  **FINDING â€” per-token loss is not comparable across the two corpora.** The val
   and test *text* is byte-identical (see T-L2.0), but each corpus has its own BPE,
   so the same 1,144,248 bytes of val become 284,328 tokens under wikitext-2's
   tokenizer and 281,335 under wikitext-103's: 4.024 vs 4.067 bytes/token, a 1.05%
   difference in the **denominator** of any nats/token figure. The canonical
-  corpus's tokenizer is the more efficient one (fitted on 50× more text), so a
+  corpus's tokenizer is the more efficient one (fitted on 50Ã— more text), so a
   naive cross-corpus comparison flatters wikitext-103 by ~1% for free. Any
   cross-corpus statement must therefore be in **bits per byte**, not nats per
   token. Noted now because it is invisible once the numbers are in a table.
@@ -577,13 +577,13 @@ does not exist here (T-L0.0).
 - [x] **T-L2.3 `MoRELanguageDataset` in `code/more/lang_data.py`.** Returns the
   same-arity tuple shape the engine already consumes, with the language meanings:
   `input_ids [seq_len] long`, `step_mask [seq_len] bool` (all True),
-  `step_experts [seq_len] long` from the POS lookup (`-1` = unmapped → ignore),
+  `step_experts [seq_len] long` from the POS lookup (`-1` = unmapped â†’ ignore),
   `step_ops` = `N/A` for language, plus the LM target derived by shift inside the
   loss rather than stored twice. All shuffling is the DataLoader's; the stored
   block order is fixed so the manifest hash is stable. **Verify:** a batch has the
   documented dtypes and shapes; two DataLoader epochs at the same seed produce the
   same permutation, and different seeds produce different ones.
-  **Evidence:** checks TL2.3a–m, both corpora. The arity is **7**, and TL2.3a reads
+  **Evidence:** checks TL2.3aâ€“m, both corpora. The arity is **7**, and TL2.3a reads
   that number out of `MoREDataset.__getitem__`'s source rather than hard-coding it,
   so a change on the arithmetic side fails here instead of drifting.
 
@@ -592,14 +592,14 @@ does not exist here (T-L0.0).
   | 0 | `x [S,F]` float | `input_ids [256]` | int64, max id 8129 < 8192 |
   | 1 | `step_mask [S]` bool | same | **all True** |
   | 2 | `step_experts [S]` long | same | in `[-1, 5]`, `== token_family[input_ids]` |
-  | 3 | `step_ops [S]` long | same | **all −1** |
-  | 4 | `family` scalar long | same | **−1** |
+  | 3 | `step_ops [S]` long | same | **all âˆ’1** |
+  | 4 | `family` scalar long | same | **âˆ’1** |
   | 5 | `depth` scalar long | same | 256 = `seq_len` |
   | 6 | `target` scalar float | same | **NaN** |
 
   The arity is preserved rather than a new signature introduced because
   `engine.py:438` and the validation loop at 686 both unpack positionally, and a
-  second arity would force a second training loop — which `plan.md` §9 forbids.
+  second arity would force a second training loop â€” which `plan.md` Â§9 forbids.
   Slots with no language meaning carry the documented ignore label instead of being
   dropped.
 
@@ -609,7 +609,7 @@ does not exist here (T-L0.0).
   something collatable, and `0.0` or `-1.0` would let a mis-wired language loss
   train silently against a constant and produce a plausible-looking curve. NaN makes
   that defect surface on the first optimizer step. It is never logged and never
-  reported, so this is not a sentinel presented as a measurement (CLAUDE.md §4) — it
+  reported, so this is not a sentinel presented as a measurement (CLAUDE.md Â§4) â€” it
   is a value that cannot be mistaken for one.
 
   **Determinism is checked on the emitted block CONTENT, not on indices.** An index
@@ -618,7 +618,7 @@ does not exist here (T-L0.0).
   byte-identical first batches; seed 43 differs; with `shuffle=False`, block 0 of the
   loader is block 0 of the file, so the manifest's per-split hash describes exactly
   what the model reads. Reproducibility comes from
-  `seeding.make_generator(seed, "dataloader_shuffle")` unchanged — no new generator
+  `seeding.make_generator(seed, "dataloader_shuffle")` unchanged â€” no new generator
   purpose was added.
 
   **The memory-map is opened per process, keyed on pid.** A `np.memmap` held as an
@@ -626,7 +626,7 @@ does not exist here (T-L0.0).
   spawn every worker would receive its own **269 MB** copy of the canonical train
   split. Opened lazily in `_blocks()` instead. The lookup is validated on load rather
   than trusted: a wrong length means it was built against a different tokenizer, and
-  a family index ≥ 6 would silently widen the oracle label space — the defect T8.3
+  a family index â‰¥ 6 would silently widen the oracle label space â€” the defect T8.3
   fixed on the arithmetic side.
 
   `more/__init__.py` exports `MoRELanguageDataset` and `TRAIN_SPLIT_VERSION`, and
@@ -646,13 +646,13 @@ does not exist here (T-L0.0).
   tokens; a load-balance number read against the wrong denominator is
   uninterpretable. **Verify:** the manifest validates against the documented
   schema and its split hashes reproduce on a second build from the same seed.
-  **Evidence:** checks TL2.4a–d, both corpora. **50 schema keys across 6 build
+  **Evidence:** checks TL2.4aâ€“d, both corpora. **50 schema keys across 6 build
   stages**, all present with the declared type on both corpora; 8 per-split fields
   each carrying exactly `{train, val, test}`; type-level counts over all six family
   labels and token-level counts over all six labels for each of the three splits.
 
   **"The documented schema" is now an object, not prose.**
-  `build_language_dataset.MANIFEST_SCHEMA` maps `key → (stage, type, required)`, so a
+  `build_language_dataset.MANIFEST_SCHEMA` maps `key â†’ (stage, type, required)`, so a
   missing key names *which build stage* failed to write it. `validate_manifest`
   returns a list of problems rather than raising, because the caller wants all of
   them. The `bool`-is-a-subclass-of-`int` trap is handled in both directions: an
@@ -661,7 +661,7 @@ does not exist here (T-L0.0).
 
   The correspondence with the arithmetic manifest is written out in that constant's
   comment rather than left as "mirrors", including the four fields language
-  legitimately lacks — `operation_counts` (no operation axis), `seed`, `train_frac`,
+  legitimately lacks â€” `operation_counts` (no operation axis), `seed`, `train_frac`,
   `test_frac` (nothing is sampled: the splits are author-provided). That last point
   reinterprets the Verify clause: there is **no seed** to rebuild "from the same
   seed" with, so the check is plain determinism, which is the stronger requirement.
@@ -669,8 +669,8 @@ does not exist here (T-L0.0).
   **The rebuild clause is executed, not asserted.** TL2.4d builds wikitext-2 from
   scratch through all three stages into a scratch out-root and compares nine fields.
   All identical: `dataset_version = lang-wikitext-2-bpe8192-len256-9f870794`, all
-  three per-split SHA-256s, all token and block counts, the dropped tails, and —
-  the one that was not guaranteed — **`tokenizer.json` byte-identical**. So on a
+  three per-split SHA-256s, all token and block counts, the dropped tails, and â€”
+  the one that was not guaranteed â€” **`tokenizer.json` byte-identical**. So on a
   fixed `tokenizers` version the BPE fit is deterministic; the `.gitignore` note
   about merge-order tie-breaking is a cross-version caution and now says so. Dev
   corpus only, because the code path is identical and rebuilding wikitext-103 would
@@ -684,24 +684,24 @@ does not exist here (T-L0.0).
   mount 'D:'`. The repository is on `D:`; the scratch out-root is under
   `C:\Users\...\Temp`. It was invisible while every build wrote under `data/lang/`.
   Fixed with a local `_repo_relative()` helper mirroring
-  `more/run_context.py:_repo_relative` — relative form when one exists, absolute
+  `more/run_context.py:_repo_relative` â€” relative form when one exists, absolute
   otherwise. An off-drive rebuild therefore records absolute paths in *its* manifest,
   which is correct, and is why TL2.1d grades only the canonical location.
 
   **A number in this ledger was wrong and is corrected.** T-L2.0's Evidence table
   gave wikitext-2's non-empty line counts as 31,175 / 3,213 / 3,760. The manifest and
   TL2.0l's own output say **23,767 / 2,461 / 2,891**. The test was reading the right
-  values throughout; only the hand-written table was wrong — which is the case for
+  values throughout; only the hand-written table was wrong â€” which is the case for
   `updated_rules.md`'s "never hand-copy numbers into a results table".
 
 - [x] **T-L2.5 Trivial-baseline floors.** Compute, from the train split only and
-  evaluated on val: `uniform_ce = ln(8192) ≈ 9.0109`, `unigram_ce`, and a
+  evaluated on val: `uniform_ce = ln(8192) â‰ˆ 9.0109`, `unigram_ce`, and a
   Katz-backoff `bigram_ce`. The lowest of these is `primary_metric_floor` and is
   written into the manifest. Without it a val loss of 5.4 nats/token is a number
   with no meaning. **Verify:** all three are finite, ordered
-  `uniform ≥ unigram ≥ bigram`, and the unigram/bigram models are fitted on train
+  `uniform â‰¥ unigram â‰¥ bigram`, and the unigram/bigram models are fitted on train
   counts alone (assert the fit never touches the val arrays).
-  **Evidence:** `data/lang/build_baseline_floors.py`, checks TL2.5a–g. All three
+  **Evidence:** `data/lang/build_baseline_floors.py`, checks TL2.5aâ€“g. All three
   finite and correctly ordered on both corpora:
 
   | corpus | uniform | unigram | bigram | floor | bits/token | perplexity |
@@ -711,8 +711,8 @@ does not exist here (T-L0.0).
 
   **The number the whole language study is measured against is 4.9849 nats/token.**
   A canonical language run that does not beat it has learned nothing a two-column
-  count table could not, and on a 10–20 M-parameter budget that is a real
-  possibility rather than a formality — which is why the floor is computed before
+  count table could not, and on a 10â€“20 M-parameter budget that is a real
+  possibility rather than a formality â€” which is why the floor is computed before
   the runs.
 
   `uniform_ce` is checked against the closed form rather than against itself:
@@ -722,8 +722,8 @@ does not exist here (T-L0.0).
   **The train-only property is proved by interception, not asserted.** TL2.5g wraps
   `numpy.load` for the duration of `fit_unigram` *and* `fit_bigram` and records
   every path handed to it: `numpy.load was called 2x, all on ['train.npy']`. So a
-  fit that read val — through any code path, including one the manifest does not
-  mention — shows up. TL2.5f additionally re-derives `unigram_ce` from the arrays
+  fit that read val â€” through any code path, including one the manifest does not
+  mention â€” shows up. TL2.5f additionally re-derives `unigram_ce` from the arrays
   inside the test file and requires agreement to 1e-9 (`7.186473059` vs
   `7.186473059`), which catches a writer that computed one number and recorded
   another. The bigram is deliberately not re-derived: re-implementing its
@@ -732,11 +732,11 @@ does not exist here (T-L0.0).
 
   **Naming, corrected rather than glossed.** The plan says "Katz-backoff". What is
   implemented is the **absolute-discounting** variant of the same backoff structure
-  — `max(c(v,w) − D, 0) / c(v)` for seen bigrams with `λ(v) = D·types_after(v)/c(v)`
-  of leftover mass on the unigram, `D = 0.75` — not Katz's original Good–Turing
+  â€” `max(c(v,w) âˆ’ D, 0) / c(v)` for seen bigrams with `Î»(v) = DÂ·types_after(v)/c(v)`
+  of leftover mass on the unigram, `D = 0.75` â€” not Katz's original Goodâ€“Turing
   discounting. The manifest records
   `bigram_smoothing = "backoff, absolute discounting D=0.75"` so nobody reads
-  "Katz" and assumes Good–Turing. For a floor the difference is far below the
+  "Katz" and assumes Goodâ€“Turing. For a floor the difference is far below the
   precision anyone quotes, and TL2.5e requires the smoothing string to be present.
   Unigram smoothing is chosen by measurement, not by default: 80 of 8192 types are
   unseen in wikitext-103's train split (151 in wikitext-2), so add-1 applies and is
@@ -744,28 +744,28 @@ does not exist here (T-L0.0).
 
   **Block boundaries are not sequence boundaries**, and the bigram model depends on
   it. `pack_split` cuts one contiguous stream, so row *i*'s last token really was
-  adjacent to row *i+1*'s first — the fit and the evaluation both read each split as
+  adjacent to row *i+1*'s first â€” the fit and the evaluation both read each split as
   one flat stream. Treating rows as independent would discard one bigram per block
   and would not match how a trained model sees the data. Canonical train: 134,737,919
-  bigrams over 5,033,639 distinct context–continuation pairs, i.e. **7.5% of the
-  8192² possible pairs are observed**, which is why the backoff mass matters.
+  bigrams over 5,033,639 distinct contextâ€“continuation pairs, i.e. **7.5% of the
+  8192Â² possible pairs are observed**, which is why the backoff mass matters.
 
   Also recorded in `code/canonical_spec_language.json`:
   `protocol.primary_metric_floor` is now **4.98494701553838** rather than null, and
-  its note is corrected — it previously named the *unigram* entropy as the language
-  floor, which the plan's own §3 contradicts. It also had `ln(8192) = 9.0106`, which
+  its note is corrected â€” it previously named the *unigram* entropy as the language
+  floor, which the plan's own Â§3 contradicts. It also had `ln(8192) = 9.0106`, which
   is wrong in the fourth decimal.
 
-- [x] **T-L2.6 Frequency-decile depth table — built, and deliberately unused.**
+- [x] **T-L2.6 Frequency-decile depth table â€” built, and deliberately unused.**
   Produce a `token_target_depth[V]` table from train frequency deciles so
   ablation F (`supervised_curriculum`) is runnable, and write into the module
   docstring that it is **not** part of the canonical configuration and is a design
-  choice rather than a measurement. `plan_language.md` §5 is explicit: canonical
+  choice rather than a measurement. `plan_language.md` Â§5 is explicit: canonical
   language runs invent no depth target. **Verify:** the table exists with one entry
   per vocabulary id; the canonical language config's
   `loss_weights.halting_supervision` is `0.0` and `halt_target_mode` is the pure
   ACT mode.
-  **Evidence:** `data/lang/build_depth_deciles.py`, checks TL2.6a–j. `token_decile.npy`
+  **Evidence:** `data/lang/build_depth_deciles.py`, checks TL2.6aâ€“j. `token_decile.npy`
   is `int8`, length 8192, values exactly `{0..9}` on both corpora, hash recorded and
   re-verified. `canonical_spec_language.json` has `halting_mode = "pure_act"` and
   `family_cls_weight = 0.0`, and its `frozen_by` note states the stronger fact:
@@ -773,8 +773,8 @@ does not exist here (T-L0.0).
   sequence has no per-token complexity label to build a per-item oracle depth from.
 
   **Measurement and choice are in different files, on purpose.** The builder
-  produces `token_decile[V]` — a measured property of the train split. The
-  decile→depth mapping is a design choice and lives in
+  produces `token_decile[V]` â€” a measured property of the train split. The
+  decileâ†’depth mapping is a design choice and lives in
   `lang_families.decile_target_depth(decile, max_depth)`, which takes `max_depth` as
   an argument so the artifact does not hard-code a recursion budget it cannot know
   at dataset-build time. At `max_depth = 7` the map is
@@ -786,11 +786,11 @@ does not exist here (T-L0.0).
 
   | decile | types | tokens | share | count range |
   |---|---|---|---|---|
-  | 0 | **3** | 14,202,737 | 10.54% | 3,630,874–5,600,357 |
-  | 4 | 127 | 13,387,574 | 9.94% | 72,364–155,817 |
-  | 9 | **4,265** | 13,471,820 | 10.00% | 0–5,248 |
+  | 0 | **3** | 14,202,737 | 10.54% | 3,630,874â€“5,600,357 |
+  | 4 | 127 | 13,387,574 | 9.94% | 72,364â€“155,817 |
+  | 9 | **4,265** | 13,471,820 | 10.00% | 0â€“5,248 |
 
-  Three types carry 10.5% of the corpus; 4,265 types — 52% of the vocabulary — carry
+  Three types carry 10.5% of the corpus; 4,265 types â€” 52% of the vocabulary â€” carry
   the last 10%. Equal-type-count deciles would have put ~90% of corpus occurrences
   in the single most-frequent decile, so the "curriculum" would have assigned one
   depth to nearly every token the loss actually weights.
@@ -798,7 +798,7 @@ does not exist here (T-L0.0).
   **The confound is measured, and it is milder than feared.**
   `families.OP_TARGET_DEPTH` was deliberately built so target depth is *not* a
   function of the expert index, so a model could not score well on depth by routing
-  alone. A frequency decile has no such protection — function words are frequent,
+  alone. A frequency decile has no such protection â€” function words are frequent,
   subword pieces are rare. The token-weighted normalized mutual information between
   decile and POS family is **0.2724** on wikitext-103 (0.2811 on wikitext-2):
   `I = 0.4364` nats against `H(decile) = 2.3016`, `H(family) = 1.6021`. So the two
@@ -806,18 +806,18 @@ does not exist here (T-L0.0).
   as carrying real information provided they are quoted against 0.27 rather than
   against 0.
 
-- [x] **T-L2.7 GATE L2 — dataset integrity.** **Verify:** no train/val/test block
+- [x] **T-L2.7 GATE L2 â€” dataset integrity.** **Verify:** no train/val/test block
   overlap by exact-content hash; the tokenizer was fitted on train only; every
-  block is full-length; the unmapped-token share is ≤ 2% (§4.3 budget) and its
+  block is full-length; the unmapped-token share is â‰¤ 2% (Â§4.3 budget) and its
   measured value is published in the manifest; the trivial floors are present and
   finite; the manifest hash is reproducible.
-  **Evidence: GATE L2 PASSES on both corpora.** `code/test_language_data.py` →
-  **133 passed, 0 failed, 0 skipped**; `code/test_language_families.py` →
+  **Evidence: GATE L2 PASSES on both corpora.** `code/test_language_data.py` â†’
+  **133 passed, 0 failed, 0 skipped**; `code/test_language_families.py` â†’
   **57 passed, 0 failed, 2 skipped** (the skips are T-L3.2/T-L3.3, not yet built);
-  `code/test_language_task_axis.py` → **72 passed, 0 failed**. Checks TL2.7a–d.
+  `code/test_language_task_axis.py` â†’ **72 passed, 0 failed**. Checks TL2.7aâ€“d.
 
   **Overlap is checked by exact content, not by hash.** Raw 512-byte block bytes are
-  used as dict keys — 2,354 held-out canonical blocks is 1.2 MB, so exactness costs
+  used as dict keys â€” 2,354 held-out canonical blocks is 1.2 MB, so exactness costs
   nothing and there is no collision argument to make. All **526,320** canonical
   train blocks were streamed against that set (the 269 MB array stays memory-mapped):
   **zero overlap**, and val/test share no block with each other either
@@ -827,23 +827,23 @@ does not exist here (T-L0.0).
 
   **"The manifest hash is reproducible"** is interpreted as the one hash the
   manifest actually publishes: `dataset_version`. TL2.7c re-derives it from the
-  recorded per-split SHA-256 values and requires equality —
+  recorded per-split SHA-256 values and requires equality â€”
   `lang-wikitext-103-bpe8192-len256-800d6154` and
   `lang-wikitext-2-bpe8192-len256-9f870794`. So the version names the exact bytes,
   and a silently rebuilt split changes it.
 
   The five aggregate clauses (TL2.7d): tokenizer fitted on train only; every block
-  full-length; unmapped ≤ 2% (**1.2344%** canonical, 1.3011% dev); the measured
+  full-length; unmapped â‰¤ 2% (**1.2344%** canonical, 1.3011% dev); the measured
   unmapped share published as a float; all four floor keys present and finite.
 
-  **A DEFECT FOUND AND FIXED WHILE RUNNING THIS GATE — a silent manifest clobber.**
+  **A DEFECT FOUND AND FIXED WHILE RUNNING THIS GATE â€” a silent manifest clobber.**
   `build_baseline_floors.py --corpus wikitext-103` finished while
   `build_family_lookup.py --corpus wikitext-103` was still tagging. The lookup then
   called `save_manifest` with the manifest snapshot it had loaded 25 minutes
   earlier, **erasing `uniform_ce`, `unigram_ce`, `bigram_ce` and
   `primary_metric_floor`.** Nothing raised; the JSON stayed valid. It surfaced only
   because TL2.5 reports a missing floor as a `[SKIP]` naming the reason, so the
-  absence was visible in the output rather than merely absent — an argument for
+  absence was visible in the output rather than merely absent â€” an argument for
   skipping loudly instead of conditionally not checking. Fixed by
   `bld.update_manifest(corpus, new_fields)`, which re-reads the on-disk manifest
   immediately before merging, and all three stage builders now use it. The residual
@@ -855,7 +855,7 @@ does not exist here (T-L0.0).
 
 ---
 
-## Phase L-3 — Family lookup and routing semantics  (`plan_language.md` §4)
+## Phase L-3 â€” Family lookup and routing semantics  (`plan_language.md` Â§4)
 
 - [x] **T-L3.0 Six POS families in `code/more/lang_families.py`.** `L1 FUNCTION,
   L2 NOUN, L3 VERB, L4 MODIFIER, L5 PUNCT_SYM, L6 NUM_SUBWORD`, mirroring
@@ -864,14 +864,14 @@ does not exist here (T-L0.0).
   two studies is not a difference in expert count. **Verify:** labels contain no
   `/` (W&B nesting rule); `NUM_FAMILIES == 6`; the module exposes the same
   accessor names `metrics.py` already imports from `families.py`.
-  **Evidence:** `code/test_language_families.py` → **24 passed, 0 failed, 3
+  **Evidence:** `code/test_language_families.py` â†’ **24 passed, 0 failed, 3
   skipped** (the 3 are T-L3.1/3.2/3.3, not yet built). All three Verify clauses
   hold: no label contains `/`, `NUM_FAMILIES == 6`, and every one of the four
   names `metrics.py` imports from `families.py` is present.
 
   Two checks are deliberately not restatements of the module. **TL3.0e/f parse the
   import statements out of `metrics.py` and `__init__.py` with a regex** and
-  require this module to satisfy whatever those files actually ask for today — so
+  require this module to satisfy whatever those files actually ask for today â€” so
   adding an import there fails the check until someone classifies the new name,
   instead of the check silently going out of date. **TL3.0w loads the file by path
   in a clean subprocess** and inspects `sys.modules`, because "the manifest is
@@ -880,7 +880,7 @@ does not exist here (T-L0.0).
 
   **Both of those checks failed on first run, and both failures were real.**
   1. `__init__.py` re-exports **eight** names from `families.py`, and
-     `OP_TO_EXPERT` has no language meaning — it maps the 16 arithmetic op codes to
+     `OP_TO_EXPERT` has no language meaning â€” it maps the 16 arithmetic op codes to
      experts. Defining `OP_TO_EXPERT = {}` for parity was rejected: an empty dict
      makes `OP_TO_EXPERT[op]` raise a bare `KeyError` at whatever line indexes it,
      which reads as a missing operation rather than as a caller that reached for
@@ -893,7 +893,7 @@ does not exist here (T-L0.0).
      `.families` unconditionally, so `from more import OP_TO_EXPERT` still yields
      the arithmetic mapping regardless. Only `lang_families.OP_TO_EXPERT` is
      guarded; making the package export task-conditional is a Phase L-5 change.
-  2. Importing `more.lang_families` pulls in **torch and numpy** — not from this
+  2. Importing `more.lang_families` pulls in **torch and numpy** â€” not from this
      file, but because `more/__init__.py` runs first and imports `engine`/`model`.
      The docstring's "deliberately free of torch" was true of the file and false of
      the import, and a reader would have taken it as "reading this is cheap". Fixed
@@ -902,38 +902,38 @@ does not exist here (T-L0.0).
 
   Design decisions made here, all recorded in the module rather than left implicit:
 
-  - **`ALL_OP_NAMES = []`, `NUM_OP_TYPES = 0`, `op_target_depth_table() → []`.**
+  - **`ALL_OP_NAMES = []`, `NUM_OP_TYPES = 0`, `op_target_depth_table() â†’ []`.**
     Language has no operation axis, and the emptiness is load-bearing:
     `engine.py:803` iterates `enumerate(ALL_OP_NAMES)`, so an empty list yields an
     empty `op_avg_depth` and the metric layer reports *absent* rather than `0.0`
-    (CLAUDE.md §4: no sentinel reported as a measurement). An empty depth table is
-    also stronger than a zero-filled one — it cannot supervise depth whatever
-    weight a later config sets, which is `plan_language.md` §5 made mechanical
+    (CLAUDE.md Â§4: no sentinel reported as a measurement). An empty depth table is
+    also stronger than a zero-filled one â€” it cannot supervise depth whatever
+    weight a later config sets, which is `plan_language.md` Â§5 made mechanical
     instead of merely written down.
-  - **The auxiliary override is the BE paradigm only.** §4.1 puts auxiliary and
+  - **The auxiliary override is the BE paradigm only.** Â§4.1 puts auxiliary and
     copular verbs in L1, but Penn tags them `VB*` like main verbs, so an override
     is unavoidable. It covers `be/am/is/are/was/were/been/being` plus the clitics
-    `'s/'re/'m` — BE has no main-verb use in English other than the copula, so the
+    `'s/'re/'m` â€” BE has no main-verb use in English other than the copula, so the
     override adds no judgement the manifest has not already made. **`have` and
     `do` are deliberately excluded and land in L3 VERB**, because both have
     genuine main-verb uses and deciding between them is exactly the job of
     T-L3.1's type-level majority vote; hard-coding it would bypass the mechanism
     whose purpose is to make that call from the corpus. TL3.0r pins the
     consequence so it cannot be "fixed" later without a decision.
-  - **`not` / `n't` → L1.** Penn tags them `RB`, which would put negation among
-    open-class adverbs; it is a closed-class particle and §4.1's L1 list names
+  - **`not` / `n't` â†’ L1.** Penn tags them `RB`, which would put negation among
+    open-class adverbs; it is a closed-class particle and Â§4.1's L1 list names
     particles.
-  - **`WRB` (how/where/when/why) → L1, `UH` → L1, `LS` → L5, `FW` → −1.** The
+  - **`WRB` (how/where/when/why) â†’ L1, `UH` â†’ L1, `LS` â†’ L5, `FW` â†’ âˆ’1.** The
     L1/L4 boundary is drawn at "closed grammatical class vs open modifier class",
     which puts wh-adverbs with the other wh-words. `FW` is the one tag with no
     English POS at all, so it spends ignore budget rather than assert a class the
     tagger did not find.
-  - **The L6-vs-−1 boundary**, which §4.1 and §4.3 leave overlapping.
+  - **The L6-vs-âˆ’1 boundary**, which Â§4.1 and Â§4.3 leave overlapping.
     `surface_class_family` is consulted only for types the corpus never shows as a
-    standalone word: digits → L6, punctuation-only → L5, contains a letter → L6
-    (the "subword continuation piece" case), everything else → −1 (whitespace-only
+    standalone word: digits â†’ L6, punctuation-only â†’ L5, contains a letter â†’ L6
+    (the "subword continuation piece" case), everything else â†’ âˆ’1 (whitespace-only
     pieces, lone continuation bytes, unused vocabulary entries). Stated as a design
-    choice: sending every no-evidence type to −1 would make the 2% budget check
+    choice: sending every no-evidence type to âˆ’1 would make the 2% budget check
     vacuous, and sending everything to L6 would make L6 a catch-all and reproduce
     E7. T-L3.1 writes the share each branch produces into the manifest so the split
     is auditable.
@@ -955,13 +955,13 @@ does not exist here (T-L0.0).
   V. Type-level, not token-level: a per-occurrence oracle would make the "correct"
   expert depend on context the router cannot see at its own input, so disagreement
   would be measuring the tagger's context sensitivity rather than the router's
-  behaviour. Unmapped → `-1` → **ignored** in the metric, not raised and not
+  behaviour. Unmapped â†’ `-1` â†’ **ignored** in the metric, not raised and not
   routed to a fallback (the arithmetic raise-don't-fallback rule protects a closed
   16-op set; a byte-level BPE vocabulary has no such closure, and a fallback expert
   is exactly the E7 catch-all the rules removed). **Verify:** the lookup has length
   V and dtype int8; the `-1` share matches the manifest; a spot sample of 40 types
   per family is linguistically sane on inspection.
-  **Evidence:** `data/lang/build_family_lookup.py`, checks TL3.1a–q. `int8`,
+  **Evidence:** `data/lang/build_family_lookup.py`, checks TL3.1aâ€“q. `int8`,
   length 8192, values exactly `{-1, 0..5}`, hash recorded and re-verified, EOT
   mapped to `-1` (a document separator is not a lexical class). Both the type-level
   and token-level counts are **recounted from the array and the packed `.npy`
@@ -980,7 +980,7 @@ does not exist here (T-L0.0).
 
   The two columns move in the directions more data should produce: more types earn a
   standalone vote, more of them turn out to be genuinely ambiguous, and the majority
-  becomes *more* stable rather than less — 1.61% of 5,266 types flip between the
+  becomes *more* stable rather than less â€” 1.61% of 5,266 types flip between the
   first and second half of the corpus. Halves rather than an interleaved split
   deliberately: interleaving samples the same distribution twice and would converge
   trivially, hiding any drift across the corpus.
@@ -988,34 +988,34 @@ does not exist here (T-L0.0).
   **Canonical token-level family shares:** L1_FUNCTION 27.8%, L2_NOUN 29.6%,
   L3_VERB 5.7%, L4_MODIFIER 6.5%, L5_PUNCT_SYM 8.7%, L6_NUM_SUBWORD 20.4%.
 
-  **FINDING — the oracle partition is not balanced, and the balance loss is
+  **FINDING â€” the oracle partition is not balanced, and the balance loss is
   therefore in tension with the POS metric in a way it never was on arithmetic.**
   The partition's own normalized load entropy is **H/log(6) = 0.8884** (wikitext-2
-  measurement; largest/smallest family token ratio **5.29×**). A router that
-  perfectly reproduced POS would score 0.8884, not 1.0 — so a router driven to 1.0
+  measurement; largest/smallest family token ratio **5.29Ã—**). A router that
+  perfectly reproduced POS would score 0.8884, not 1.0 â€” so a router driven to 1.0
   by the balance term must *disagree* with POS by construction. Every language
   load-entropy number has to be read against the partition's own entropy, never
   against 1.0. On arithmetic the oracle families were near-uniform by construction,
   so this question did not arise. TL3.1l pins it.
 
-  **CORRECTED BY T-LX.6 — the value above is the DEV corpus's, and the canonical
-  corpus's is different.** wikitext-103 canonical is **0.894156** with a **5.17×**
-  token ratio, against wikitext-2 dev's 0.888442 / 5.29×. The gap is 0.006 and it
+  **CORRECTED BY T-LX.6 â€” the value above is the DEV corpus's, and the canonical
+  corpus's is different.** wikitext-103 canonical is **0.894156** with a **5.17Ã—**
+  token ratio, against wikitext-2 dev's 0.888442 / 5.29Ã—. The gap is 0.006 and it
   still matters, because this constant is a threshold with a direction: a run at
   load entropy 0.890 reads as *below* the partition on canonical (matching the
   balance the data has) and *above* it on dev (buying uniformity the data does not
-  have) — opposite conclusions from the same measurement. Every language run now
+  have) â€” opposite conclusions from the same measurement. Every language run now
   publishes its own corpus's value as `val/routing_pos_partition_load_entropy`;
   quote that, not either literal.
 
   **The type/token divergence T-L2.4 was written to guard against is extreme here:**
-  L1_FUNCTION is **2.6% of types and 27.3% of tokens** — a 10.7× ratio — and
+  L1_FUNCTION is **2.6% of types and 27.3% of tokens** â€” a 10.7Ã— ratio â€” and
   L5_PUNCT_SYM is 0.57% of types and 8.9% of tokens. TL3.1k requires at least one
   family to diverge by more than 10 percentage points, so the manifest's two
   denominators are justified by measurement rather than by hypothesis.
 
   **Whitespace tokenization, chosen by measurement.** `TreebankWordTokenizer` yields
-  1.0251× more tokens on wikitext-2, and the excess is entirely units that **do not
+  1.0251Ã— more tokens on wikitext-2, and the excess is entirely units that **do not
   exist in the byte stream the BPE was fitted on**: it splits WikiText's own `@-@` /
   `@.@` / `@,@` escapes into `@`+`-`+`@` (2,830 occurrences per ~330 k tokens),
   rewrites `"` as Penn's ` `` `, splits `cannot` into `can`+`not`, and strips the
@@ -1023,14 +1023,14 @@ does not exist here (T-L0.0).
   break the word-to-id alignment the vote depends on. WikiText is already
   Moses-tokenized with spaces around punctuation, so whitespace *is* its
   tokenization. Those `@-@` markers are ~0.86% of tokens and got an explicit
-  `CORPUS_MARKER_FORMS → L5` override, because the tagger has no opinion worth
+  `CORPUS_MARKER_FORMS â†’ L5` override, because the tagger has no opinion worth
   having about them: `@-@` is not English, so the perceptron falls back on shape
   features and emits whatever the context suggests.
 
   **How a type earns a vote, and what earns nothing.** Each word is encoded *with
   its leading space* (byte-level BPE distinguishes `" the"` from `"the"`); if it
   encodes to exactly one id, that id gets one vote for the word's family. A word
-  that splits into several pieces votes for **nothing** — its part of speech is a
+  that splits into several pieces votes for **nothing** â€” its part of speech is a
   property of the word, and attributing it to an arbitrary piece would invent
   information. On the canonical corpus 80.2% of word occurrences were single-id and
   19.8% were multi-piece; 0.04% were tag-ignored (`FW`). All three are counted in
@@ -1050,17 +1050,17 @@ does not exist here (T-L0.0).
   some This against may could though And We without my should himself upon above
   must themselves Nor inside Both below Of onto Among Unlike Your unlike`. L3: ` including
   elect want developed meet fight know born taking try constructed proposed`.
-  L5: `! # $ % & ' ( ) + , . / : ; < > @ ' .. ... @-@ @.@ @,@ £`. L6 is exactly
-  what it should be — `re ion ow se ose uc ians ator ilities` alongside ` 1998 1942
+  L5: `! # $ % & ' ( ) + , . / : ; < > @ ' .. ... @-@ @.@ @,@ Â£`. L6 is exactly
+  what it should be â€” `re ion ow se ose uc ians ator ilities` alongside ` 1998 1942
   59 166` and word-initial fragments ` Par Mag Cath Tw Bor Gra Hug Shakespe Celt
   tele prohib`. The 180 `-1` types are **replacement characters (lone UTF-8
-  continuation bytes) and C0 control characters** — precisely §4.3's "fragments that
+  continuation bytes) and C0 control characters** â€” precisely Â§4.3's "fragments that
   have no POS", and nothing else.
 
   Two observations from that inspection, recorded because they look like defects and
   are not:
-  1. `'is'` **without** a leading space → L6_NUM_SUBWORD (2,662 train tokens), while
-     `' is'` → L1_FUNCTION (11,750). Correct: the space-less type is the word-internal
+  1. `'is'` **without** a leading space â†’ L6_NUM_SUBWORD (2,662 train tokens), while
+     `' is'` â†’ L1_FUNCTION (11,750). Correct: the space-less type is the word-internal
      fragment of `basis`/`crisis`/`this`, and the leading-space distinction is doing
      exactly the work it was introduced for.
   2. Negated contraction stems (` wasn`, ` doesn`, ` didn`, ` don`, ` cannot`) land in
@@ -1071,11 +1071,11 @@ does not exist here (T-L0.0).
 
   **A memory defect found and fixed before the canonical build.** The first version
   did `list(iter_chunks(...))` and materialized 1.8 M lines of the 539 MB corpus as
-  Python strings — **measured at 1,013 MB resident before a single word was tagged**,
+  Python strings â€” **measured at 1,013 MB resident before a single word was tagged**,
   and feeding a lazy generator to `imap_unordered` would not have helped, because the
   pool drains its input as fast as it can into an unbounded queue. Workers were a
   second 358 MB each, because importing `more.lang_families` runs `more/__init__.py`
-  and therefore torch — the exact leak TL3.0w documents. Both fixed: the parent now
+  and therefore torch â€” the exact leak TL3.0w documents. Both fixed: the parent now
   passes `(index, start_byte, end_byte)` triples and each worker reads its own slice,
   and the manifest is loaded by path. Measured after: parent **45 MB**, workers
   **161 MB** each, **1,025 MB total against ~3,100 MB before**, and throughput went
@@ -1084,18 +1084,18 @@ does not exist here (T-L0.0).
 
 
 - [x] **T-L3.2 Demote routing accuracy to `routing_agreement_with_pos`.**
-  STRICTER THAN ARITHMETIC (§4.4). On arithmetic, `OP_TO_EXPERT` is ground truth:
+  STRICTER THAN ARITHMETIC (Â§4.4). On arithmetic, `OP_TO_EXPERT` is ground truth:
   the family genuinely is the right answer. A POS partition is a linguistic prior,
-  not a functional one — nothing says the optimal expert split for next-token
+  not a functional one â€” nothing says the optimal expert split for next-token
   prediction is noun-vs-verb. So the key is renamed to state what it measures, and
   the permutation-invariant metrics (Hungarian, AMI, purity) become **primary**
   for language rather than supplementary. **Verify:** no language metric key is
   named `routing_accuracy`; `results.md` for language reports Hungarian/AMI/purity
   in the specialization section before any POS-agreement number; the agreement
   number's caption states it is agreement with a prior, not accuracy.
-  **Evidence:** checks TL3.2a–m (TL3.2n skipped, see below).
-  `code/test_language_families.py` → **89 passed, 0 failed, 1 skipped**. Gate L0
-  after the change: `TOTAL 356 356 0 0`, ALL GATES PASS — the arithmetic path is
+  **Evidence:** checks TL3.2aâ€“m (TL3.2n skipped, see below).
+  `code/test_language_families.py` â†’ **89 passed, 0 failed, 1 skipped**. Gate L0
+  after the change: `TOTAL 356 356 0 0`, ALL GATES PASS â€” the arithmetic path is
   untouched.
 
   **One helper, five call sites.** `metrics.routing_agreement_key(task)` returns
@@ -1103,7 +1103,7 @@ does not exist here (T-L0.0).
   language, and it is the *only* place either string appears: the W&B log dict, the
   console line, the `results.tsv` header and the `metrics.json` `"N/A"` contract all
   resolve through it. TL3.2m asserts `engine.py` no longer hard-codes the key
-  anywhere. The number is unchanged — TL3.2f pins the language value equal to the
+  anywhere. The number is unchanged â€” TL3.2f pins the language value equal to the
   arithmetic one and to the confusion diagonal, to 1e-15. Only the name moved.
 
   **The default is arithmetic, and that is load-bearing.** Gate L0's G5.2b checks
@@ -1119,7 +1119,7 @@ does not exist here (T-L0.0).
 
   **"Primary" is now an object, not a convention.**
   `metrics.LANGUAGE_SPECIALIZATION_ORDER` is
-  `hungarian_accuracy → ami → purity → matched_macro_recall → agreement_with_pos`,
+  `hungarian_accuracy â†’ ami â†’ purity â†’ matched_macro_recall â†’ agreement_with_pos`,
   with the agreement key **last**; TL3.2h pins the order and TL3.2i checks every
   name in it is a key a real language log dict actually emits, so it is consumable
   rather than aspirational. TL3.2n is the one skip: the language `results.md` writer
@@ -1148,24 +1148,24 @@ does not exist here (T-L0.0).
   control has identical per-family type counts to the real partition; both metric
   sets appear side by side for every language run; the difference is reported with
   its uncertainty, not just the raw pair.
-  **Evidence:** `data/lang/build_shuffled_control.py`, checks TL3.3a–l, both
-  corpora. `token_family_shuffled.npy` is `int8` `(10, 8192)` — **ten** independent
+  **Evidence:** `data/lang/build_shuffled_control.py`, checks TL3.3aâ€“l, both
+  corpora. `token_family_shuffled.npy` is `int8` `(10, 8192)` â€” **ten** independent
   draws, not one, because T-L3.3 requires the difference with its uncertainty and a
   single control gives a point estimate with no spread. Seed **20260903**, kept
   separate from the frozen run seeds so a data artifact is never tied to a training
   seed.
 
   **THE VERIFY CLAUSE WAS NOT IMPLEMENTED AS WRITTEN, AND THE DEPARTURE IS THE POINT.**
-  T-L3.3 says "holding the per-family **type** counts fixed". `plan_language.md` §4.4
+  T-L3.3 says "holding the per-family **type** counts fixed". `plan_language.md` Â§4.4
   says "a random type-level 6-way partition with the observed family **token**
   proportions". Those are different partitions, and on this corpus they are far
-  apart: L1_FUNCTION is 2.6% of types and 27.3% of tokens. **§4.4 is the correct
+  apart: L1_FUNCTION is 2.6% of types and 27.3% of tokens. **Â§4.4 is the correct
   specification and this artifact implements it**, because every entry of the routing
   confusion matrix is a *token*, so AMI's and Hungarian accuracy's chance levels
   depend on the token marginals. A type-count-matched control would carry a roughly
-  token-uniform profile against the real partition's 5.29× imbalance *(dev figure;
-  canonical is 5.17× and T-LX.6 made the manifest note compute it per corpus)*, and the
-  comparison would then confound "meaningless" with "differently balanced" — exactly
+  token-uniform profile against the real partition's 5.29Ã— imbalance *(dev figure;
+  canonical is 5.17Ã— and T-LX.6 made the manifest note compute it per corpus)*, and the
+  comparison would then confound "meaningless" with "differently balanced" â€” exactly
   the confusion the control exists to remove. The realised type counts are recorded
   anyway (L1: 243 real vs ~2,506 control on wikitext-103) so the departure is
   visible, and the manifest's
@@ -1177,27 +1177,27 @@ does not exist here (T-L0.0).
   (wikitext-2) and **3.77e-03** (wikitext-103) across all ten draws, recomputed in
   the test from `train.npy` rather than read from the manifest. The quantity that
   actually sets AMI's chance level is the marginal **entropy**, and that agrees to
-  1e-4: 0.894156 real vs 0.894249 ± 2.9e-04 control on the canonical corpus. Unmapped
+  1e-4: 0.894156 real vs 0.894249 Â± 2.9e-04 control on the canonical corpus. Unmapped
   types are **exactly** preserved in every draw (TL3.3c), so both metric sets are
-  computed over the same token population — otherwise the pair is not comparable.
+  computed over the same token population â€” otherwise the pair is not comparable.
 
   **The control DISCRIMINATES, and that is verified now rather than assumed.** Two
   synthetic routers, scored with no trained model in sight:
 
-  | router | AMI vs POS | AMI vs control | Δ |
+  | router | AMI vs POS | AMI vs control | Î” |
   |---|---|---|---|
-  | random 6-way | 0.0000 | −0.0000 ± 0.0000 | **+0.0000** |
+  | random 6-way | 0.0000 | âˆ’0.0000 Â± 0.0000 | **+0.0000** |
   | POS-perfect | 1.0000 | 0.0527 | **+0.9473** (z = 47.5) |
 
   The control behaves as a floor for one and not the other, so it separates a real
-  partition from the metric's chance level — which is its entire job. **And it gives
+  partition from the metric's chance level â€” which is its entire job. **And it gives
   the number the paper needs: the AMI floor for a 6-way partition with these
   marginals is 0.0527, not 0.** An observed AMI of 0.06 against POS would be *at the
   floor*, and without this control it would have read as weak specialization.
 
   **How a draw is made.** Types are visited in seeded random order and each goes to
   whichever family is furthest below its token-mass target; a repair pass then removes
-  the tail. Randomising the visit order is load-bearing — a frequency-ordered pass
+  the tail. Randomising the visit order is load-bearing â€” a frequency-ordered pass
   would rebuild part of the real partition through the frequency-family correlation
   (normalized MI 0.27, T-L2.6). The repair needed a **swap** operation, not just a
   move: canonical draw 0 stalled at 1.4e-02 with one-way moves because the over-family
@@ -1211,7 +1211,7 @@ does not exist here (T-L0.0).
   `real`, `control_mean`, `control_std`, `delta` and `delta_z` for each of
   `raw_accuracy`, `hungarian_accuracy`, `ami`, `purity`.
   `control_comparison_to_wandb` flattens it and **omits** undefined entries rather
-  than writing 0.0 — a 0.0 in a "real minus control" column reads as "the POS
+  than writing 0.0 â€” a 0.0 in a "real minus control" column reads as "the POS
   partition is no better than noise", which is a finding, not a missing value.
   `delta_z` is `None` when the control has no spread, because a z with a zero
   denominator is undefined, not large.
@@ -1219,44 +1219,44 @@ does not exist here (T-L0.0).
 
 ---
 
-## Phase L-4 — Attention  (`plan_language.md` §6)
+## Phase L-4 â€” Attention  (`plan_language.md` Â§6)
 
 - [x] **T-L4.0 One shared causal-attention sublayer per `MoREWrapper`.** The model
-  as it stands has **no attention at all** — it is a per-token FFN mixture with
+  as it stands has **no attention at all** â€” it is a per-token FFN mixture with
   masked mean-pooling and a scalar regression head. Without attention the best
   achievable language model is a unigram model, and the entire MoE/MoR/MoRE matrix
   would be comparing three ways of failing to use context. Add exactly one
   `nn.MultiheadAttention(d_model, n_heads=4, batch_first=True)` per wrapper,
-  **reused at every recursion depth** — a per-depth attention module would break
-  the §2.1 weight-sharing invariant that makes depth "computation through time".
+  **reused at every recursion depth** â€” a per-depth attention module would break
+  the Â§2.1 weight-sharing invariant that makes depth "computation through time".
   Learned absolute position embeddings, frozen and identical across all three arms.
   **Verify:** `sum(p.numel() for p in wrapper.attn.parameters())` appears once per
   wrapper regardless of `max_depth`; the same parameter tensors are used at depth 1
   and depth 7 (assert by identity, `is`, not by shape).
-  **Evidence:** `code/test_lang_causality.py` → **22 passed, 0 failed, 0 skipped**
-  (checks TLC.0a–e, TLC.2a–e, TLC.3a–g, TLC.4a–e). Gate L0 after the change:
+  **Evidence:** `code/test_lang_causality.py` â†’ **22 passed, 0 failed, 0 skipped**
+  (checks TLC.0aâ€“e, TLC.2aâ€“e, TLC.3aâ€“g, TLC.4aâ€“e). Gate L0 after the change:
   `TOTAL 356 356 0 0`, ALL GATES PASS.
 
   One `nn.MultiheadAttention(d_model, n_heads=4, batch_first=True)` plus its own
   `attn_norm`, constructed once in `MoREWrapper.__init__`. At `d_model = 32` the
-  sublayer is **4,224 parameters = 4·d² + 4·d exactly**, and it is the same 4,224 at
-  `max_depth = 4` and `max_depth = 7` — the count does not grow with depth.
+  sublayer is **4,224 parameters = 4Â·dÂ² + 4Â·d exactly**, and it is the same 4,224 at
+  `max_depth = 4` and `max_depth = 7` â€” the count does not grow with depth.
 
   **The weight-sharing invariant is asserted by storage identity, not by shape.**
   TLC.0d hooks `attn.forward` and records `data_ptr()` for `in_proj_weight`,
   `out_proj.weight` and `attn_norm.weight` at every depth step: one distinct set of
   pointers across four steps. Two distinct modules with equal shapes would pass a
-  shape check and silently break `updated_rules.md` §2.1, which is the invariant that
+  shape check and silently break `updated_rules.md` Â§2.1, which is the invariant that
   makes depth "computation through time" rather than a stack of depth-specific
-  networks — i.e. the invariant that makes the MoR and MoRE arms mean what they claim.
+  networks â€” i.e. the invariant that makes the MoR and MoRE arms mean what they claim.
 
   Learned absolute position embeddings live in `MoREModel`, not the wrapper, under the
   same flag: `nn.Embedding(max_seq_len, d_model)`, added **once before the depth
   loop**. Not per step, because position is a property of a token's place in the
   sequence rather than of how much computation it has received, and re-adding it every
   step would make the positional signal grow with depth. `attention=True` **requires**
-  `max_seq_len` and raises without it — a default would silently truncate or oversize
-  the table. Learned-absolute over RoPE/ALiBi per §6.6: both of those modify attention
+  `max_seq_len` and raises without it â€” a default would silently truncate or oversize
+  the table. Learned-absolute over RoPE/ALiBi per Â§6.6: both of those modify attention
   scores, and any positional signal that varied with step count would confound the
   depth analysis, which is the one measurement this study exists to make.
 
@@ -1274,7 +1274,7 @@ does not exist here (T-L0.0).
   checkpoint" check still means what it meant.
 
   **Arithmetic parameter counts are byte-identical to the T-L0.3 baseline**, compared
-  per-tensor rather than by total — a compensating pair of shape changes would leave
+  per-tensor rather than by total â€” a compensating pair of shape changes would leave
   the total intact. `diff` of the two JSON dumps is empty:
 
   | arm | total_params | tensors |
@@ -1290,15 +1290,15 @@ does not exist here (T-L0.0).
   Build the mask explicitly and pass it as `attn_mask`. `is_causal` is a *hint* in
   PyTorch's API: whether it is honoured depends on the backend kernel selected at
   runtime, so a shape/backend change could silently make the model
-  non-causal — i.e. silently leak the target — with no error. An explicit mask is
+  non-causal â€” i.e. silently leak the target â€” with no error. An explicit mask is
   checked by the same code path on every backend. **Verify:** the mask is
   materialized as a bool tensor with the documented triangle orientation; a grep
   shows no `is_causal=True` anywhere in the language path.
   **Evidence:** `MoREWrapper.causal_mask(S, device)` returns
-  `torch.triu(ones(S, S, bool), diagonal=1)` — entry `[i, j]` is `True`
+  `torch.triu(ones(S, S, bool), diagonal=1)` â€” entry `[i, j]` is `True`
   (= disallowed) exactly when `j > i`, verified against an independently constructed
   reference (TLC.2a). The **diagonal is allowed** (TLC.2b): `diagonal=1`, not
-  `diagonal=0`, so a token may attend to itself — excluding the self-position would be
+  `diagonal=0`, so a token may attend to itself â€” excluding the self-position would be
   a different model, not a stricter one. Cached per `(S, device)` in a **plain dict,
   not a registered buffer** (TLC.2c): a buffer would enter `state_dict()` and make a
   language checkpoint structurally dependent on the sequence length it last ran at.
@@ -1314,16 +1314,16 @@ does not exist here (T-L0.0).
   remain visible as a *key/value* to still-active later positions (removing it
   would change the context of tokens that have not halted, coupling their
   predictions to unrelated tokens' halting decisions), while its own state is
-  frozen and never recomputed (§2.2). Attention outputs are therefore computed at
+  frozen and never recomputed (Â§2.2). Attention outputs are therefore computed at
   halted query positions and discarded; that waste is real and must be
   **reported**, not hidden, as `route_stats.attn_query_waste_fraction`.
-  **Verify:** freezing holds bitwise — a halted position's state at depth `d+1`
+  **Verify:** freezing holds bitwise â€” a halted position's state at depth `d+1`
   equals its state at depth `d`; the waste fraction is in `metrics.json` and is a
   measured value, never a sentinel.
-  **Evidence:** checks TLC.3a–g. Freezing is asserted **bitwise with
+  **Evidence:** checks TLC.3aâ€“g. Freezing is asserted **bitwise with
   `torch.equal`** on the state the attention sublayer is handed at each depth step
   (captured with a forward pre-hook): 24 positions, exit depths `{2, 3, 4}` over 4
-  captures, **zero violations**. TLC.3b makes the check non-vacuous — tokens really do
+  captures, **zero violations**. TLC.3b makes the check non-vacuous â€” tokens really do
   halt at three different depths, so there is something frozen to observe; if every
   token halted at `max_depth` the assertion would be empty.
 
@@ -1331,14 +1331,14 @@ does not exist here (T-L0.0).
   early-halting position (position 0 of row 0, halting at depth 2) and requires later
   positions in the same sequence to move: they move by **0.720**, six orders above the
   1e-06 tiling floor. So halting early cannot blind position 40 to the word at
-  position 4 — which would couple one token's prediction to another token's halting
+  position 4 â€” which would couple one token's prediction to another token's halting
   decision. Compared within the position's own batch row deliberately: the other row
   shifts by ~2 ULP through the dispatch path of TLC.4e, which is not the effect under
   test.
 
   **The waste is measured, and it moves.** `route_stats.attn_query_waste_fraction`
   reads **39.58%** (38 of 96 query slots) at `max_depth = 6`, and **exactly 0.0** at
-  `max_depth = 1` where nothing has halted yet (TLC.3f) — so the number is tracking the
+  `max_depth = 1` where nothing has halted yet (TLC.3f) â€” so the number is tracking the
   halted fraction rather than reporting a constant. Deeper recursion wastes strictly
   more (TLC.3g). Aggregated across blocks as one fraction over summed slots, not as a
   mean of per-block fractions, so a block that ran seven depth steps contributes seven
@@ -1346,25 +1346,25 @@ does not exist here (T-L0.0).
 
   **On the arithmetic path the key is ABSENT, not 0.0** (TLC.3e). There is no attention
   sublayer, so there is no waste; a `0.0` would be a sentinel standing in for "not
-  applicable", which CLAUDE.md §4 forbids. Consumers must read absence as N/A, exactly
+  applicable", which CLAUDE.md Â§4 forbids. Consumers must read absence as N/A, exactly
   as they already do for the routing keys at `E == 1`.
 
-- [x] **T-L4.4 GATE L1 — causality and leakage.** The single most important gate
+- [x] **T-L4.4 GATE L1 â€” causality and leakage.** The single most important gate
   in the language migration: it is the direct analogue of the arithmetic
-  target-in-input leakage audit. Perturb `input_ids[b, t+k]` for `k ≥ 1` and assert
+  target-in-input leakage audit. Perturb `input_ids[b, t+k]` for `k â‰¥ 1` and assert
   the logits at position `t` are **bit-identical**. Run it at multiple `t` and `k`,
   for all three architectures, and at both `max_depth = 1` and canonical depth,
   because the ACT loop is the place a future-position value could reach the past
   through the halting statistics. **Verify:** `code/test_lang_causality.py` passes;
-  a deliberately broken variant (mask removed) **fails** it — a leakage test that
+  a deliberately broken variant (mask removed) **fails** it â€” a leakage test that
   has never failed has not been shown to be able to.
-  **Evidence: GATE L1 PASSES — 22 passed, 0 failed, 0 skipped.** Both clauses hold,
+  **Evidence: GATE L1 PASSES â€” 22 passed, 0 failed, 0 skipped.** Both clauses hold,
   and the deliberately-broken variant fails by six orders of magnitude.
 
   **THE VERIFY WORDING NEEDED AMENDING, AND THE AMENDMENT IS THE FINDING.**
-  `plan_language.md` §6.4 specifies **bit-identical** logits at positions `≤ t`.
+  `plan_language.md` Â§6.4 specifies **bit-identical** logits at positions `â‰¤ t`.
   Measured, that holds *exactly* only at `num_experts = 1, max_depth = 1`. Above it
-  there is a residual — and **it is not a causality defect**:
+  there is a residual â€” and **it is not a causality defect**:
 
   | configuration | masked | mask removed |
   |---|---|---|
@@ -1373,8 +1373,8 @@ does not exist here (T-L0.0).
   | E=6, depth 1 / 4 / 7 | 2.4e-07 (2 ULP) | 0.37 / 0.51 / 0.51 |
 
   The cause is **grouped Top-1 dispatch**. When a perturbation flips the perturbed
-  token's expert, the per-expert row counts change — measured
-  `[9,6,4,3,2,0] → [8,7,5,2,2,0]` — so two `nn.Linear` GEMMs get different shapes and
+  token's expert, the per-expert row counts change â€” measured
+  `[9,6,4,3,2,0] â†’ [8,7,5,2,2,0]` â€” so two `nn.Linear` GEMMs get different shapes and
   tile differently, moving the shared rows in their last one or two bits. The same
   happens for `E = 1` at depth > 1, where a changed halt decision changes `N_active`.
 
@@ -1385,36 +1385,36 @@ does not exist here (T-L0.0).
   So the gate is three parts, which together assert *more* than a bare `torch.equal`
   could: **TLC.4a** exact bit-identity where the confound is absent; **TLC.4b** an
   8-ULP bound (9.5e-07) for every architecture, worst observed 2.4e-07; **TLC.4c** the
-  mask-removed variant exceeding that bound by ≥ 1e5 in all five configurations
+  mask-removed variant exceeding that bound by â‰¥ 1e5 in all five configurations
   (smallest ratio **2.1e+06**). A bare `torch.equal` would have been either
-  unachievable or — if the tolerance had been loosened without this explanation —
+  unachievable or â€” if the tolerance had been loosened without this explanation â€”
   unfalsifiable. Marked `[x]` rather than `[!]` because the scientific requirement is
   met and strengthened; the ledger's and plan's wording is what was imprecise, and
-  §6.4 now carries the amendment.
+  Â§6.4 now carries the amendment.
 
   All three architectures are covered as required: MoE (E=6, depth 1), MoR (E=1, depth
   7), MoRE (E=6, depth 7), plus MoRE at depth 4 and an attention-only E=1 depth-4 arm.
-  **MoR keeps attention** — `updated_objective.md` §4 defines it as recursion without
-  multiple experts, not as no context — and is just as causal. TLC.4d records that
+  **MoR keeps attention** â€” `updated_objective.md` Â§4 defines it as recursion without
+  multiple experts, not as no context â€” and is just as causal. TLC.4d records that
   `attention=False` is causal for a *different* reason worth separating: absence of any
   cross-position path, so it could not leak even with a broken mask.
 
 
 ---
 
-## Phase L-5 — Heads and the language loss  (`plan_language.md` §7)
+## Phase L-5 â€” Heads and the language loss  (`plan_language.md` Â§7)
 
 - [x] **T-L5.0 Token embedding + weight-tied LM head.** `nn.Embedding(V, d_model)`
   on input, and an output projection whose weight **is** the embedding weight.
-  Tying halves the embedding parameter cost and keeps the §6 parameter budget a
-  statement about the expert stack rather than about two independent V×d_model
+  Tying halves the embedding parameter cost and keeps the Â§6 parameter budget a
+  statement about the expert stack rather than about two independent VÃ—d_model
   tables. **Verify:** the two weights are the same tensor object (`is`); the tied
   head's gradient accumulates from both the input and output paths.
-  **Evidence:** `code/test_lang_heads.py` → **25 passed, 0 failed, 0 skipped**
-  (TLH.0a–f, TLH.1a–d, TLH.2a–f, TLH.3a–d, TL5.4a–e). Gate L0 after the change:
+  **Evidence:** `code/test_lang_heads.py` â†’ **25 passed, 0 failed, 0 skipped**
+  (TLH.0aâ€“f, TLH.1aâ€“d, TLH.2aâ€“f, TLH.3aâ€“d, TL5.4aâ€“e). Gate L0 after the change:
   `TOTAL 356 356 0 0`, ALL GATES PASS.
 
-  `lm_head.weight is tok_embed.weight` → **True** (identity, not equality — a copy
+  `lm_head.weight is tok_embed.weight` â†’ **True** (identity, not equality â€” a copy
   kept in sync would drift the moment either was updated in place), and the head has
   **no bias**: a bias would be a per-token logit offset with no counterpart in the
   embedding, so the head would stop being the transpose of the input map.
@@ -1437,7 +1437,7 @@ does not exist here (T-L0.0).
   to branch on the task to decide which heads exist, and `config.py` imports
   `model.py` and never the reverse (`run_context.py:52`). So `TASK_ARITHMETIC` and
   `TASK_LANGUAGE` moved *down* into `model.py` and `config.py` re-exports them
-  unchanged — the alternative was duplicating two string literals across two modules,
+  unchanged â€” the alternative was duplicating two string literals across two modules,
   which is against the one-manifest principle. No call site moved, and Gate L0 covers
   `config.py`.
 
@@ -1446,30 +1446,30 @@ does not exist here (T-L0.0).
   input_ids[:, 1:].reshape(-1))` in **nats/token**; `perplexity = exp(task_loss)`
   reported and never optimized. Nats because every other loss term in the assembly
   is in nats and a bits/nats mix in one weighted sum is a silent scaling bug.
-  **Verify:** at initialization `task_loss ≈ ln(8192) ≈ 9.011` (the uniform floor —
+  **Verify:** at initialization `task_loss â‰ˆ ln(8192) â‰ˆ 9.011` (the uniform floor â€”
   a strong check that the shift, the reshape and the vocabulary agree); perplexity
   equals `exp(task_loss)` to floating-point tolerance.
   **Evidence:** at initialization, over the five frozen seeds,
-  `task_loss = 9.0277 … 9.0898` against `ln(8192) = 9.0109` — **worst relative error
-  0.88%**. Perplexity 8,331 … 8,864 against `V = 8,192`, and equals `exp(task_loss)`
+  `task_loss = 9.0277 â€¦ 9.0898` against `ln(8192) = 9.0109` â€” **worst relative error
+  0.88%**. Perplexity 8,331 â€¦ 8,864 against `V = 8,192`, and equals `exp(task_loss)`
   to 1e-9. The unit is checked against the closed form rather than against a comment:
   9.0567 is near `ln(V) = 9.0109`, not near `log2(V) = 13.0000`.
 
   **THAT CHECK EARNED ITS PLACE IMMEDIATELY. With `nn.Embedding`'s default `N(0, 1)`
-  the measured initial loss was 167.6 nats** — an 18× overshoot of the uniform floor,
-  perplexity ≈ 1e73. Weight tying makes the *embedding's* init scale an *output-logit*
+  the measured initial loss was 167.6 nats** â€” an 18Ã— overshoot of the uniform floor,
+  perplexity â‰ˆ 1e73. Weight tying makes the *embedding's* init scale an *output-logit*
   scale: `logits = h @ W.T`, so with `h` at unit RMS the logit spread is
-  `std(W) · sqrt(d_model) = 1 × 16`, and a 16-nat spread over 8,192 classes is a
+  `std(W) Â· sqrt(d_model) = 1 Ã— 16`, and a 16-nat spread over 8,192 classes is a
   confidently wrong distribution rather than a uniform one. A model starting there
   spends its first epochs undoing its own initialization, which appears as a
   suspiciously steep early loss curve and never as an error. Fixed with
-  `std = 0.02` (the GPT-2 convention) on both `tok_embed` and `pos_embed` — the same
+  `std = 0.02` (the GPT-2 convention) on both `tok_embed` and `pos_embed` â€” the same
   scale on both because they are *added*, so an `N(0,1)` positional table beside an
-  `N(0,0.02)` token table would make position 50× louder than identity at init.
+  `N(0,0.02)` token table would make position 50Ã— louder than identity at init.
 
   **A second measured number worth having (TLH.1d): a mis-shifted language run would
-  report ~5.6 nats at epoch 0.** Scoring the *unshifted* target gives **5.5552** —
-  3.46 nats below the uniform floor, before any training — because a tied head over a
+  report ~5.6 nats at epoch 0.** Scoring the *unshifted* target gives **5.5552** â€”
+  3.46 nats below the uniform floor, before any training â€” because a tied head over a
   residual trunk already peaks `logits_i` at `x_i`. That is the copy shortcut tying
   gives for free, and it is what a wrongly-shifted run would show while looking like
   it had learned instantly. Gate L1 detects the general case; this pins the magnitude,
@@ -1478,30 +1478,30 @@ does not exist here (T-L0.0).
 - [x] **T-L5.2 Retire the regression head on the language path.** `regression_head`
   and the masked mean-pool exist for the scalar arithmetic answer and have no
   meaning for next-token prediction. They must be absent on the language path, not
-  merely unused with a zero weight — an unused head still contributes parameters to
+  merely unused with a zero weight â€” an unused head still contributes parameters to
   the budget comparison and still invites a future reader to weight it.
   **Verify:** a language model's `state_dict` contains no `regression_head.*` key;
   an arithmetic model's still does.
   **Evidence:** both clauses hold (TLH.2a/b). A language `state_dict` has **zero**
   `regression_head.*` keys; an arithmetic one still has all six. Going further than
-  the box asked, **five** arithmetic-only modules are absent as attributes too —
-  `regression_head`, `cls_head`, `step_cls_head`, `step_proj`, `op_embed` (TLH.2c) —
+  the box asked, **five** arithmetic-only modules are absent as attributes too â€”
+  `regression_head`, `cls_head`, `step_cls_head`, `step_proj`, `op_embed` (TLH.2c) â€”
   and the four language-only ones (`tok_embed`, `lm_head`, `family_probe`,
   `pos_embed`) are absent on arithmetic (TLH.2d).
 
   `op_embed` is the one that mattered most to drop: on language it would have been
-  `nn.Embedding(0, d_model)`, because `lang_families.NUM_OP_TYPES` is 0 — legal to
+  `nn.Embedding(0, d_model)`, because `lang_families.NUM_OP_TYPES` is 0 â€” legal to
   build, and raising only when indexed. That is the worst kind of latent trap.
 
   **The tuple arity stays 13** so `engine.py` needs no second training loop
-  (`plan.md` §9). Slot 0 carries `[B, S, V]` logits, slot 1 is **None** (a packed LM
+  (`plan.md` Â§9). Slot 0 carries `[B, S, V]` logits, slot 1 is **None** (a packed LM
   block has no whole-sequence family, so the head is not constructed and the engine
   emits a structural zero), slot 2 is the probe at `[B, S, 6]`. **No pooling**: every
   position is a prediction, so collapsing the sequence would throw the task away
   (TLH.2f).
 
 - [x] **T-L5.3 `family_probe` reads `h.detach()`.** STRICTER THAN ARITHMETIC
-  (§7.3). On arithmetic, `family_cls` at weight 0.5 shapes the trunk, which
+  (Â§7.3). On arithmetic, `family_cls` at weight 0.5 shapes the trunk, which
   permanently qualifies the specialization claim there: some of the observed
   expert structure could be the family head's gradient rather than the router's own
   behaviour. On language the head becomes a **read-only probe** on a detached
@@ -1509,12 +1509,12 @@ does not exist here (T-L0.0).
   being able to create that decodability. Its loss weight is documented as
   scientifically inert. **Verify:** `assert not h_probe.requires_grad` at the probe
   input; zeroing vs. setting the probe weight produces **bit-identical** trunk
-  gradients (the real test — a detached tensor that still routes gradient through a
+  gradients (the real test â€” a detached tensor that still routes gradient through a
   second path would pass a naive `requires_grad` check).
   **Evidence:** both clauses hold, and the second is the one that matters.
-  `requires_grad` at the probe input is **False** (TLH.3a — kept because it is cheap,
+  `requires_grad` at the probe input is **False** (TLH.3a â€” kept because it is cheap,
   not because it is sufficient). **The real test: trunk gradients are BITWISE
-  identical at probe weight 0.0, 0.5 and 1.0 — 47 tensors compared with
+  identical at probe weight 0.0, 0.5 and 1.0 â€” 47 tensors compared with
   `torch.equal`, zero differences** (TLH.3b). So no value of the probe's loss weight
   can move a single trunk gradient, which makes "scientifically inert" a measured fact
   rather than an intention.
@@ -1525,7 +1525,7 @@ does not exist here (T-L0.0).
 
   What this buys, stated plainly: on arithmetic `family_cls` sits in the objective at
   weight 0.5 and shapes the trunk, so "MoRE's representation separates operation
-  families" is permanently weaker there — some of the observed structure could be that
+  families" is permanently weaker there â€” some of the observed structure could be that
   head's gradient rather than the router's behaviour, which is why the arithmetic study
   needs the labelled `no_family_supervision` ablation. **Language does not inherit the
   confound at all.** Every routing / Hungarian / AMI / purity number on the language
@@ -1535,17 +1535,17 @@ does not exist here (T-L0.0).
 
 - [x] **T-L5.4 Engine metric namespace and `results.tsv` extension.** Add
   `val/task_loss` in nats, `val_perplexity`, and `depth_rho_model_loss` by
-  **appending** columns to `results.tsv` — never reordering, because the existing
+  **appending** columns to `results.tsv` â€” never reordering, because the existing
   arithmetic readers and the archived files index by position.
   **Verify:** an arithmetic `results.tsv` parses identically before and after; the
   new language columns are populated for language runs and absent-or-`N/A`, never
   `0.0`, for arithmetic runs.
-  **Evidence:** checks TL5.4a–e, verified against a `results.tsv` that Gate 5 wrote
+  **Evidence:** checks TL5.4aâ€“e, verified against a `results.tsv` that Gate 5 wrote
   during this session's suite run
   (`runs/t67_provenance_check_seed44__6b711a59__r19`). The **ten pre-L5 columns are
-  unchanged in position** — `epoch`, `train_task_loss`, `val_loss`,
+  unchanged in position** â€” `epoch`, `train_task_loss`, `val_loss`,
   `expert_entropy_normalized`, `avg_depth`, `mean_cos_sim`, `max_cos_sim`,
-  `routing_accuracy`, `routing_hungarian_acc`, `routing_ami` — and the three new ones
+  `routing_accuracy`, `routing_hungarian_acc`, `routing_ami` â€” and the three new ones
   are **appended**: `val_perplexity`, `nats_below_bigram_floor`,
   `depth_rho_model_loss`. On the arithmetic row all three read **`N/A`**, never `0.0`:
   `exp()` of an MSE is not a perplexity, and a `0.0` in a perplexity column is a
@@ -1556,7 +1556,7 @@ does not exist here (T-L0.0).
   published columns.
 
   `depth_rho_model_loss` is Phase L-6's measurement. The column is reserved now so the
-  header never has to be reordered later, and it reads `N/A` until L-6 computes it —
+  header never has to be reordered later, and it reads `N/A` until L-6 computes it â€”
   the honest value for "not measured yet".
 
   New W&B keys on the language path only: `val/perplexity`, `val/bits_per_token`, and
@@ -1565,20 +1565,20 @@ does not exist here (T-L0.0).
   via `MoRELanguageDataset.primary_metric_floor` rather than from a config literal, so
   a run cannot quote a floor measured on a different corpus. Absent, not `0.0`, when
   the dataset supplies none. The probe CE is published as **`probe/family_ce`** on
-  language and `train/step_cls_ce` on arithmetic — the same tensor under two names,
+  language and `train/step_cls_ce` on arithmetic â€” the same tensor under two names,
   because on one task it is a read-only measurement and on the other it trains the
   trunk.
 
 
 ---
 
-## Phase L-6 — Depth measurement without an invented target  (`plan_language.md` §5)
+## Phase L-6 â€” Depth measurement without an invented target  (`plan_language.md` Â§5)
 
 - [x] **T-L6.0 `depth/allocation_error_*` is `N/A` on language.** There is no
   per-token ground-truth depth for English, and inventing one and then reporting
-  agreement with it would be circular — the metric would measure the curriculum,
+  agreement with it would be circular â€” the metric would measure the curriculum,
   not the model. The arithmetic keys must therefore emit `N/A`, not `0.0` and not
-  `-1` (§8 sentinel rule). **Verify:** the language `metrics.json` carries `N/A`
+  `-1` (Â§8 sentinel rule). **Verify:** the language `metrics.json` carries `N/A`
   for every allocation-error key; the exporter renders it as `N/A`.
 
 - [x] **T-L6.1 Substitute correlational depth metrics.** `depth/spearman_vs_logfreq`
@@ -1586,7 +1586,7 @@ does not exist here (T-L0.0).
   counts), `depth/spearman_vs_model_loss` (the model's own per-token loss), plus
   `depth/mean_by_family` and `depth/hist`. These are non-circular in a way an
   invented curriculum is not: the first two are properties of the training corpus
-  fixed before any model runs, and the third is a genuine question — does the model
+  fixed before any model runs, and the third is a genuine question â€” does the model
   spend more computation where it is less certain? **Verify:** each correlation is
   computed over the identical token set, ties handled explicitly, with the token
   count and a permutation-based null band reported next to each rho.
@@ -1604,58 +1604,58 @@ does not exist here (T-L0.0).
   parameter-matched MoR solution. `CANONICAL_FFN_MULT` for arithmetic is
   `{moe: 4, mor: 24, more: 4}`; the language value must be recomputed, not copied.
   **Verify:** `abs(P_MoR - P_MoRE) / P_MoRE < 0.05` on **both** the total count and
-  the count excluding embeddings — the second is the one that is actually about the
-  expert stack, and with a tied 8192×256 embedding the first alone is too easy to
+  the count excluding embeddings â€” the second is the one that is actually about the
+  expert stack, and with a tied 8192Ã—256 embedding the first alone is too easy to
   satisfy.
 
-- [x] **T-L6.4 GATE L3 / GATE L4 — recursion and halting under attention.**
+- [x] **T-L6.4 GATE L3 / GATE L4 â€” recursion and halting under attention.**
   Attention is the change most likely to break the two invariants that took the
   longest to get right in the arithmetic POC. **Verify (L3):** identical block
   parameters at every depth (by object identity); halted states frozen bitwise;
   forced exit at max depth; balance loss depth-invariant after normalization
   (measure at depth 1 vs canonical and compare). **Verify (L4):** a real gradient
-  reaches every halt head under the language loss — `halt_head.weight.grad` is
+  reaches every halt head under the language loss â€” `halt_head.weight.grad` is
   non-`None` with nonzero norm for every expert, from `task_loss` alone with the
   ponder weight set to zero, which is the only version of this test that proves the
   task path (not the ponder regularizer) supplies the gradient.
 
-  **Evidence for T-L6.0 – T-L6.4** (one block, because the five share their
-  measurements). `code/test_lang_recursion.py` → **11 passed, 0 failed** (GATE L3 +
+  **Evidence for T-L6.0 â€“ T-L6.4** (one block, because the five share their
+  measurements). `code/test_lang_recursion.py` â†’ **11 passed, 0 failed** (GATE L3 +
   GATE L4); Gate L0 unchanged at `TOTAL 356 356 0 0`.
 
   **T-L6.0.** `val/depth_allocation_error_abs` and `_rel` are written as the string
-  `"N/A"` on language rather than left absent. They are *structurally* undefined —
+  `"N/A"` on language rather than left absent. They are *structurally* undefined â€”
   `lang_families.op_target_depth_table()` is empty by construction, so
-  `val_depth_err_n` is 0 and the arithmetic branch never fires — and writing `"N/A"`
-  makes the absence a statement. A 0.0 or −1 there would read as perfect allocation
-  against a curriculum that does not exist, which §5.1 calls the single most misleading
+  `val_depth_err_n` is 0 and the arithmetic branch never fires â€” and writing `"N/A"`
+  makes the absence a statement. A 0.0 or âˆ’1 there would read as perfect allocation
+  against a curriculum that does not exist, which Â§5.1 calls the single most misleading
   number this migration could produce.
 
   **T-L6.1.** `metrics.spearman_rho` is hand-rolled with **averaged ties** and
   **matches `scipy.stats.spearmanr` to 1.7e-16** over 200 trials, one third of them
   heavily tied. Not a formality: exit depth is an integer, so on a collapsed-depth model
   almost every value is tied, and `argsort().argsort()` would break ties by array
-  position and manufacture a confident rho out of batch arrival order — the arithmetic
-  POC put 93–97% of tokens at exactly 2 steps. It returns **`None`, not 0.0**, when
+  position and manufacture a confident rho out of batch arrival order â€” the arithmetic
+  POC put 93â€“97% of tokens at exactly 2 steps. It returns **`None`, not 0.0**, when
   either side is constant, because a 0.0 would read as "measured no relationship". Both
   frozen difficulty vectors derive from a new hash-recorded artifact
   `token_train_count.npy`, so `log_freq` and `unigram_surprisal` cannot disagree about
   smoothing; `log1p` rather than a masked log, because 80 of 8192 canonical types are
   unseen and `log(0)` in a rank vector is a NaN generator rather than an extreme value.
 
-  **T-L6.2 — the null band works, measured on synthetic depth vectors:**
+  **T-L6.2 â€” the null band works, measured on synthetic depth vectors:**
 
   | depth vector | rho | null band | exceeds? |
   |---|---|---|---|
-  | 100% at depth 2 | **None** | — | undefined, correctly |
-  | 97% at depth 2 (the POC's regime) | −0.0277 | [−0.0448, +0.0381] | **No** |
-  | genuinely correlated | +0.8577 | [−0.0374, +0.0342] | **Yes** |
+  | 100% at depth 2 | **None** | â€” | undefined, correctly |
+  | 97% at depth 2 (the POC's regime) | âˆ’0.0277 | [âˆ’0.0448, +0.0381] | **No** |
+  | genuinely correlated | +0.8577 | [âˆ’0.0374, +0.0342] | **Yes** |
 
   So a near-constant allocation's rho is correctly identified as indistinguishable from
   its own marginal paired at random. The null permutes only the pairing, so the tie
   structure that causes the problem is preserved exactly.
 
-  **T-L6.3 — re-derived, and it lands on 24, which is also the arithmetic value.**
+  **T-L6.3 â€” re-derived, and it lands on 24, which is also the arithmetic value.**
   `code/derive_lang_ffn_mult.py`, table in `code/lang_ffn_mult_derivation.json`. MoRE
   reference at E=6, ffn_mult 4: **5,584,908** total / **3,422,220** non-embedding.
 
@@ -1668,43 +1668,43 @@ does not exist here (T-L0.0).
   Only 23/24/25 satisfy both criteria and 24 is best on the non-embedding gap. **The
   coincidence with arithmetic is structural, not a copy:** attention (~263 K) and the
   tied 2,097,152-element embedding are added *equally* to every arm and cancel in
-  `P_MoR − P_MoRE`, leaving the expert-stack condition 6 experts at mult 4 against 1 at
-  mult 24 — unchanged. Note `rel(non-emb) > rel(total)` at every row, which confirms
+  `P_MoR âˆ’ P_MoRE`, leaving the expert-stack condition 6 experts at mult 4 against 1 at
+  mult 24 â€” unchanged. Note `rel(non-emb) > rel(total)` at every row, which confirms
   this task's premise that the shared embedding makes the total-count criterion too
   easy. Also measured: **completely insensitive to `seq_len`** (128/256/512/1024 all
   give 24), so this field and Gate L5's `seq_len` are independent. Frozen into
   `canonical_spec_language.json` and `config.CANONICAL_FFN_MULT_LANGUAGE`.
 
-  **T-L6.4 — GATE L3 PASSES.** One block object, 5 recursion calls, **1 distinct object
-  id** (identity, not tensor equality — a stack of independently-initialised blocks
-  could satisfy equality for a single step). Halting suppressed → all tokens force-exit
-  at `max_depth` with `early_exits = 0`; halting saturated → all tokens exit at depth 1
+  **T-L6.4 â€” GATE L3 PASSES.** One block object, 5 recursion calls, **1 distinct object
+  id** (identity, not tensor equality â€” a stack of independently-initialised blocks
+  could satisfy equality for a single step). Halting suppressed â†’ all tokens force-exit
+  at `max_depth` with `early_exits = 0`; halting saturated â†’ all tokens exit at depth 1
   with `forced_exits = 0`. The two extremes bracket the mechanism, so a depth that never
-  varied would fail one of them. Balance term across a **9× depth range** (1/3/5/9):
-  −0.7400 / −0.7056 / −0.6082 / −0.6082, relative spread **19.8%** — it does not scale
+  varied would fail one of them. Balance term across a **9Ã— depth range** (1/3/5/9):
+  âˆ’0.7400 / âˆ’0.7056 / âˆ’0.6082 / âˆ’0.6082, relative spread **19.8%** â€” it does not scale
   with the budget, which is the T4.1 property re-measured under attention. Two eval
   passes give bit-identical logits and exit markers, so no halted state is being
   rewritten by a still-active neighbour's attention output.
 
-  **T-L6.4 — GATE L4 PASSES, in the strong form.** With **`ponder_weight = 0`**, so the
+  **T-L6.4 â€” GATE L4 PASSES, in the strong form.** With **`ponder_weight = 0`**, so the
   backward pass carries no explicit function of the halt probabilities, every one of the
   six halt heads has a non-`None` weight gradient with nonzero norm:
   `E1 8.42e-03, E2 1.52e-02, E3 1.12e-02, E4 1.04e-02, E5 1.15e-02, E6 5.40e-03`. The
   bias gradients are nonzero too, so the halt threshold is learnable. Separately the
-  ponder cost alone also reaches every head (`3.14e-02 … 7.26e-02`), so the two are
+  ponder cost alone also reaches every head (`3.14e-02 â€¦ 7.26e-02`), so the two are
   independent paths rather than one wearing two names, and
-  `expected_depth.requires_grad` is True — a boolean threshold drives dispatch but the
+  `expected_depth.requires_grad` is True â€” a boolean threshold drives dispatch but the
   objective keeps a differentiable route to the halt head. **The naive version of this
-  test — ponder weight left at its canonical value — passes on a model whose task path
+  test â€” ponder weight left at its canonical value â€” passes on a model whose task path
   is entirely disconnected from halting**, which is why it is run this way.
 
 - [x] **T-L6.5 Induced per-block TOPIC partition, as a SECOND reference axis.**
-  `plan_language.md` §4.1a. Build `block_topic[n_blocks]` from the
+  `plan_language.md` Â§4.1a. Build `block_topic[n_blocks]` from the
   ` = Title = `-delimited documents `iter_documents` already segments: TF-IDF over
   documents, k-means at **k = 6** with a recorded seed, then each packed block takes
   the topic of the document that supplies most of its tokens. Six so the topic axis is
   directly comparable with the POS axis and with the arithmetic router width.
-  **Labelled induced, not ground truth** — WikiText ships no topic labels, so this is
+  **Labelled induced, not ground truth** â€” WikiText ships no topic labels, so this is
   our construction and is reported as such, exactly like the shuffled control.
   **Verify:** the label array has one entry per stored block; the six clusters are
   non-degenerate (no cluster below 2% of blocks); the top TF-IDF terms per cluster are
@@ -1753,7 +1753,7 @@ does not exist here (T-L0.0).
   | T5 | game, team, games, season, league, player, match, players, football | sport |
 
   Five of six are clean; T4 genuinely mixes biology, weather and roads and should be
-  described that way rather than named. The set lands close to the categories §4.1a was
+  described that way rather than named. The set lands close to the categories Â§4.1a was
   asked about (military, media, geography, science).
 
   **A SECOND SCOPE DECISION, and it is a loosening, so it is flagged.** The floor is
@@ -1777,7 +1777,7 @@ does not exist here (T-L0.0).
   small recursive MoE organize by" rather than presupposing POS. **Verify:** both
   agreement numbers and both null bands appear for every language run; a synthetic
   router that routes by topic scores above the topic null and near the POS null, and
-  vice versa — i.e. the two axes are shown to be separable before either is quoted.
+  vice versa â€” i.e. the two axes are shown to be separable before either is quoted.
   **Evidence (every-run clause, EXECUTED).** `runs/langB_MoRE_seed44__2ce26c0d` (MoRE,
   wikitext-2, 1 epoch, batch 96, seed 44, CPU) wrote **21 POS-axis keys and 20 topic-axis
   keys**, no `routing_control_error`. So both agreement numbers and both null bands appear
@@ -1785,48 +1785,48 @@ does not exist here (T-L0.0).
 
   **What the run measured, and it is informative in both directions.**
 
-  *POS axis — the partition carries POS information, the labelling does not.*
-  AMI 0.1041 against a control mean of **0.0069** → delta **+0.097**, z 28.5. Hungarian
+  *POS axis â€” the partition carries POS information, the labelling does not.*
+  AMI 0.1041 against a control mean of **0.0069** â†’ delta **+0.097**, z 28.5. Hungarian
   0.3617 vs 0.2937 (+0.068), purity 0.3687 vs 0.2998 (+0.069). But raw agreement 0.1424
-  against a control of 0.2403 → delta **−0.098**. That is the raw-versus-Hungarian gap
-  `updated_rules.md` §8.3 exists for: the router's *partition* aligns with POS above
+  against a control of 0.2403 â†’ delta **âˆ’0.098**. That is the raw-versus-Hungarian gap
+  `updated_rules.md` Â§8.3 exists for: the router's *partition* aligns with POS above
   chance while its *index assignment* is worse than chance, so quoting raw agreement alone
   would have reported the opposite conclusion.
 
-  *Topic axis — no article-level preference at all, and the machinery says so cleanly.*
-  AMI **−9.7e-16**, delta **0.0**, `control_std` **0.0**; purity and Hungarian both
+  *Topic axis â€” no article-level preference at all, and the machinery says so cleanly.*
+  AMI **âˆ’9.7e-16**, delta **0.0**, `control_std` **0.0**; purity and Hungarian both
   **0.6351351351**, which is exactly the largest val topic's block share
   (0.6351351351351351) to the last digit. The block-majority expert is **constant across
-  all 1,110 val blocks**. Note this is *not* token-level collapse — the token load entropy
-  is 0.832 and `routing_collapsed_experts = none` — so the router does vary within a
+  all 1,110 val blocks**. Note this is *not* token-level collapse â€” the token load entropy
+  is 0.832 and `routing_collapsed_experts = none` â€” so the router does vary within a
   block while having no article-level preference whatsoever. That is a direct, measured
   answer to "did the right article go to the right expert" after one epoch: **no.**
 
   **A DEFECT THE RUN EXPOSED, fixed in the same commit.** `delta_z` was guarded on
   `control_std > 0`, which is not sufficient: with a constant prediction every control
-  draw scores identically, so the "spread" is floating-point residue — measured at
-  **2.1e-31** — and a delta of −2e-31 became **z = −0.95**. A z near one from a 1e-31
+  draw scores identically, so the "spread" is floating-point residue â€” measured at
+  **2.1e-31** â€” and a delta of âˆ’2e-31 became **z = âˆ’0.95**. A z near one from a 1e-31
   denominator is not a small effect, it is no effect, and it reads as the former. Now
   guarded on a `1e-12` floor and reported as `None` below it.
 
   **A CORRECTION to an earlier framing.** The 0.0527 figure from T-L3.3 is the AMI a
-  *POS-perfect* router scores against the control — it is not a universal floor. The
+  *POS-perfect* router scores against the control â€” it is not a universal floor. The
   control mean depends on **both** partitions, so the right baseline is the run's own
   control mean, which here was 0.0069. Comparing any run's AMI against a fixed 0.0527 by
   hand is wrong, and now unnecessary: the per-run band is in `metrics.json`.
 
-  **Evidence (separability, executed).** `code/test_language_families.py` → **114 passed,
-  0 failed, 1 skipped**, checks TL6.6a–i. Three synthetic routers, scored on both axes:
+  **Evidence (separability, executed).** `code/test_language_families.py` â†’ **114 passed,
+  0 failed, 1 skipped**, checks TL6.6aâ€“i. Three synthetic routers, scored on both axes:
 
-  | router | topic AMI (Δ vs null) | POS AMI (Δ vs null) | concentration |
+  | router | topic AMI (Î” vs null) | POS AMI (Î” vs null) | concentration |
   |---|---|---|---|
   | routes by topic | **1.0000** (+0.9963) | 0.0012 | 1.000 |
   | routes by POS | 0.0227 (+0.0231) | **1.0000** (+0.9473) | 0.325 |
-  | random | −0.0029 (−0.0066) | 0.0000 (−0.0000) | 0.199 |
+  | random | âˆ’0.0029 (âˆ’0.0066) | 0.0000 (âˆ’0.0000) | 0.199 |
 
   So each axis is beaten by its own router and not by the other's, and a random router is
-  at chance on both — neither axis scores anything highly by default. **The POS router's
-  topic Δ is +0.023, small but not zero: the two axes are separable without being
+  at chance on both â€” neither axis scores anything highly by default. **The POS router's
+  topic Î” is +0.023, small but not zero: the two axes are separable without being
   orthogonal**, because different subjects use different noun/verb mixes. That has to be
   stated rather than rounded away, or a genuine topic result could be partly POS leakage.
 
@@ -1839,7 +1839,7 @@ does not exist here (T-L0.0).
 
   **The topic null is EXACT here, unlike T-L3.3's.** Every stored block holds exactly
   `seq_len` tokens, so a permutation of block labels preserves each topic's token mass
-  precisely — none of the mass-matching repair the per-type control needed.
+  precisely â€” none of the mass-matching repair the per-type control needed.
 
   **One implementation, two callers.** `partition_agreement_vs_control(oracle, predicted,
   control_oracles, num_experts)` was factored out of `specialization_vs_control`, and
@@ -1851,18 +1851,18 @@ does not exist here (T-L0.0).
   `token_family_shuffled.npy` and `block_topic_val.npy` once per run and writes both
   comparisons under `val/routing_control_pos/*` and `val/routing_control_topic/*`. A
   missing artifact prints a named warning to stderr and skips that axis rather than
-  writing a zero. `updated_rules.md` §8's first-step routing decision is the signal used,
+  writing a zero. `updated_rules.md` Â§8's first-step routing decision is the signal used,
   so it is the same one the confusion matrix is built from rather than a second opinion.
 
 - [x] **T-L6.8 Family labels must follow the TASK, and the duplicate depth metrics
   must be reconciled.** Both defects were found in the first completed language run,
   `runs/langB_MoRE_seed42__91c9bba1`, which is what a real run buys over a suite.
   (a) **FIXED in this commit:** the run published
-  `recursion/avg_depth_by_family/E1_ADD_SUB` — *arithmetic* labels on language values —
+  `recursion/avg_depth_by_family/E1_ADD_SUB` â€” *arithmetic* labels on language values â€”
   because `expert_labels` is imported from `.families` at engine module scope. Right
   numbers, wrong study's row names, and exactly the kind of thing that reaches a paper
   table unnoticed. The engine now resolves the label helper from the task.
-  (b) **STILL OPEN:** two keys measure "mean exit depth by family" and disagree —
+  (b) **STILL OPEN:** two keys measure "mean exit depth by family" and disagree â€”
   `recursion/avg_depth_by_family/*` (2.0034485) and the new
   `depth/mean_by_family/*` (2.0034746). Different populations (mine excludes the last
   position, which has no next-token target) and different passes. Likewise
@@ -1908,7 +1908,7 @@ does not exist here (T-L0.0).
 
 - [x] **T-L6.9 Wire `specialization_vs_control` into the validation pass.** T-L3.3 built
   and unit-tested the shuffled control, but nothing calls it from `engine.py`, so
-  `metrics.json` carries `routing_ami` with **no null band beside it** — the same class of
+  `metrics.json` carries `routing_ami` with **no null band beside it** â€” the same class of
   gap as the dataset wiring (T-L7.4), and it matters immediately: the first language run
   reported `routing_ami = 0.0181`, which is BELOW the 0.0527 chance level measured on
   synthetic routers with these marginals. Without the per-run band, that number reads as
@@ -1936,7 +1936,7 @@ does not exist here (T-L0.0).
   "not measured" while 0.0 would mean "POS is no better than noise".
 
 - [x] **T-L6.10 Rule out the embedding-norm confound before any depth claim.** Both
-  smoke runs show `depth/spearman_vs_logfreq` **positive** — frequent tokens receive MORE
+  smoke runs show `depth/spearman_vs_logfreq` **positive** â€” frequent tokens receive MORE
   recursion (MoR +0.392, MoRE +0.095), and per-family MoR gives L1_FUNCTION 1.85 steps
   against L2_NOUN 1.11. That is the opposite direction to the hypothesis the metric was
   built to test, and there is a mundane explanation that must be excluded first: a tied
@@ -1946,28 +1946,28 @@ does not exist here (T-L0.0).
   initialization artifact, not adaptive computation. **Verify:** the frequency-depth
   correlation is re-measured with the per-token embedding norm partialled out (or
   equivalently, rho between depth and log-frequency *within* norm deciles); and the
-  correlation is tracked across epochs — an artifact should weaken as training equalises
+  correlation is tracked across epochs â€” an artifact should weaken as training equalises
   the norms, a real behaviour should not. Until this is done, no depth-allocation claim
   may be made in either direction.
   **Status: BOTH clauses executed.** The partial-correlation machinery is verified on
   synthetic cases and the across-epoch trend is measured on an 8-epoch GPU run; see below.
   The no-depth-claim embargo is **lifted**, with the direction stated as measured.
 
-  **Evidence (partialling, executed).** `code/test_lang_heads.py` → **42 passed, 0 failed,
-  3 skipped**, checks TL6.10a–h. `metrics.partial_spearman(depth, logfreq, norm)` uses the
+  **Evidence (partialling, executed).** `code/test_lang_heads.py` â†’ **42 passed, 0 failed,
+  3 skipped**, checks TL6.10aâ€“h. `metrics.partial_spearman(depth, logfreq, norm)` uses the
   rank partial-correlation identity, and on synthetic cases:
 
-  | case | raw ρ | partial ρ |
+  | case | raw Ï | partial Ï |
   |---|---|---|
   | fully mediated by norm | +0.9993 | **+0.0156** |
   | genuine, norm unrelated | +0.9781 | **+0.9781** |
-  | constant depth | — | **None** (undefined, not 1.0) |
+  | constant depth | â€” | **None** (undefined, not 1.0) |
 
   So it kills a fully mediated correlation, leaves a genuine one untouched, and returns
   `None` in exactly the collapsed-depth case the seed-42 run produced (99.5% of tokens at
   one depth). The engine now passes `model.tok_embed.weight.detach().norm(dim=1)` at each
   validation epoch, and the report publishes `depth_vs_norm`, `logfreq_vs_norm`,
-  `logfreq_partial_norm`, `surprisal_partial_norm` and the binned cross-check — so a reader
+  `logfreq_partial_norm`, `surprisal_partial_norm` and the binned cross-check â€” so a reader
   sees **the confound's strength beside the corrected number**, not just the corrected one.
 
   **THIS TASK'S OWN VERIFY LINE CONTAINS A FALSE EQUIVALENCE, AND IT IS MEASURED.** It
@@ -1976,12 +1976,12 @@ does not exist here (T-L0.0).
 
   | n_bins | 10 ("deciles") | 50 | 200 |
   |---|---|---|---|
-  | within-bin ρ | **+0.941** | +0.451 | +0.106 |
+  | within-bin Ï | **+0.941** | +0.451 | +0.106 |
 
   Binning removes only *between*-bin variation, so with a continuous mediator and a tight
-  relationship the residual within-bin variation still carries the confound — **at ten bins
+  relationship the residual within-bin variation still carries the confound â€” **at ten bins
   it would have passed a fully mediated correlation straight through.** It does not
-  over-correct a genuine one (+0.978 raw → +0.975 at 50 bins), so a *low* value from it is
+  over-correct a genuine one (+0.978 raw â†’ +0.975 at 50 bins), so a *low* value from it is
   informative while a *high* one is not conclusive. Resolution: `partial_spearman` is
   primary, the binned version is a secondary assumption-free cross-check (it makes no
   monotonicity assumption where the partial formula does), the default bin count is
@@ -1989,11 +1989,11 @@ does not exist here (T-L0.0).
   trusted alone.
 
   **THE ACROSS-EPOCH TREND IS NOW MEASURED, AND IT REJECTS THE ARTIFACT HYPOTHESIS.**
-  `runs/langB_MoRE_seed44__22474619` — 8 epochs, wikitext-2, batch 64, seed 44, on the
+  `runs/langB_MoRE_seed44__22474619` â€” 8 epochs, wikitext-2, batch 64, seed 44, on the
   RTX 3050 (the CUDA venv works on this machine; a GPU epoch is ~90 s against tens of
   minutes on CPU, so this did not need the 4060 after all).
 
-  | epoch | val_loss | vs dev floor 5.3983 | avg_depth | **partial ρ** | AMI |
+  | epoch | val_loss | vs dev floor 5.3983 | avg_depth | **partial Ï** | AMI |
   |---|---|---|---|---|---|
   | 2 | 5.3342 | **+0.064** | 2.30 | **+0.193** | 0.147 |
   | 4 | 4.9622 | **+0.436** | 3.57 | **+0.411** | 0.162 |
@@ -2002,26 +2002,26 @@ does not exist here (T-L0.0).
 
   This task's own criterion was "an artifact should weaken as training equalises the norms,
   a real behaviour should not". **The partial correlation STRENGTHENS monotonically,
-  +0.193 → +0.473.** So the frequency-depth relationship is a **learned behaviour, not an
+  +0.193 â†’ +0.473.** So the frequency-depth relationship is a **learned behaviour, not an
   initialization residue**, and the embargo lifts.
 
-  Final epoch: raw ρ +0.5505, partial +0.4731, with `depth_vs_norm` +0.4275 and
-  `logfreq_vs_norm` +0.3509 — the mediator is real and accounts for only ~0.08 of the
+  Final epoch: raw Ï +0.5505, partial +0.4731, with `depth_vs_norm` +0.4275 and
+  `logfreq_vs_norm` +0.3509 â€” the mediator is real and accounts for only ~0.08 of the
   correlation.
 
   **The direction is still contrary to the original hypothesis and is reported as measured:
-  frequent tokens receive MORE recursion.** That is interpretable rather than paradoxical —
+  frequent tokens receive MORE recursion.** That is interpretable rather than paradoxical â€”
   deciding what follows `of the` requires more contextual integration than continuing a rare
-  proper noun whose completion is nearly determined — but it is an interpretation, and the
-  measurement is the ρ.
+  proper noun whose completion is nearly determined â€” but it is an interpretation, and the
+  measurement is the Ï.
 
   **TWO EARLIER CLAIMS OF MINE ARE RETRACTED BY THIS RUN.**
   1. **"Depth collapsed" was an under-training artifact, not the architecture's
-     behaviour.** `avg_depth` climbs 1.96 → 5.16 of a 7 budget and `depth/std` reaches
+     behaviour.** `avg_depth` climbs 1.96 â†’ 5.16 of a 7 budget and `depth/std` reaches
      **1.174**, against 0.071 in the 1-epoch CPU run. The 99.5%-at-one-step histogram I
      reported was epoch 1 of a model that had not trained.
   2. **The margin over the floor is not thin.** +0.042 nats at 1 epoch became **+0.666** at
-     8 — perplexity 113.6 against the dev bigram's 221.0.
+     8 â€” perplexity 113.6 against the dev bigram's 221.0.
 
   `depth/by_document/between_share` stays at **0.0102** across the whole run, so T-L6.7's
   answer is robust: even as depth grows and spreads, allocation is **within**-passage, not
@@ -2029,7 +2029,7 @@ does not exist here (T-L0.0).
 
   **A DEAD COLUMN FOUND BY THIS RUN, fixed.** `results.tsv`'s `depth_rho_model_loss` read
   `N/A` in all eight rows while `depth/spearman_vs_model_loss = 0.1338` sat in
-  `metrics.json` the whole time — the column was reserved under a key
+  `metrics.json` the whole time â€” the column was reserved under a key
   (`val/depth_rho_model_loss`) that T-L6.1 never published. A reserved column that can never
   populate is worse than no column, because eight `N/A` rows read as "measured, nothing
   there".
@@ -2037,7 +2037,7 @@ does not exist here (T-L0.0).
 - [x] **T-L6.11 `total_params` must reach `metrics.json`.** Gate L6 publishes the three
   arms' parameter counts as a table and checks the MoR/MoRE gap on both the total and the
   non-embedding count, but the smoke runs' `metrics.json` carries **no parameter key at
-  all** — the count is printed to `stdout.log`, which is git-ignored, so on a pushed run
+  all** â€” the count is printed to `stdout.log`, which is git-ignored, so on a pushed run
   it is unrecoverable. **Verify:** every run's `metrics.json` carries `total_params` and
   `non_embedding_params`; the L6 table is built from those keys rather than from a
   console line.
@@ -2049,7 +2049,7 @@ does not exist here (T-L0.0).
   MoR-MoRE gap is **0.0688%** on real runs, matching the T-L6.3 derivation's rel(total)
   exactly.
 
-  What was genuinely absent is `non_embedding_params` — and that is the criterion T-L6.3
+  What was genuinely absent is `non_embedding_params` â€” and that is the criterion T-L6.3
   says is the one actually about the expert stack, so its absence mattered more than the
   thing I had flagged. Both counts now go to provenance, to the W&B config, and to
   `metrics.json` (a second copy of two integers, cheaper than a cross-file join in the
@@ -2064,9 +2064,9 @@ does not exist here (T-L0.0).
   The embedding block is **identical across all three arms**, which is exactly why the
   total-count criterion is the easy one: 2,162,688 sits in both the numerator and the
   denominator of a relative gap. Gap on the total 0.069%, on the non-embedding count
-  **0.112%** — both inside Gate L6's 5%, and the second is the one to quote.
+  **0.112%** â€” both inside Gate L6's 5%, and the second is the one to quote.
 
-- [x] **T-L6.7 Span-level depth reporting.** `plan_language.md` §4.1b. Per-token
+- [x] **T-L6.7 Span-level depth reporting.** `plan_language.md` Â§4.1b. Per-token
 
   recursion is kept, but "does the model spend more computation on harder *passages*"
   is answered as a measurement: `depth/mean_by_document`, and the within-document
@@ -2108,13 +2108,13 @@ does not exist here (T-L0.0).
 
 ---
 
-## Phase L-7 — Calibration and protocol freeze  (`plan_language.md` §10, Gate L5)
+## Phase L-7 â€” Calibration and protocol freeze  (`plan_language.md` Â§10, Gate L5)
 - [x] **T-L7.0 Measure throughput and memory on the RTX 3050 (6 GB).** The
   arithmetic protocol's `batch_size = 768` is meaningless for `[B, S, V]` logits;
   6 GB is the binding constraint and must be measured, not estimated. Sweep batch
   size and `seq_len` on wikitext-2 for a fixed small step count, recording
   tokens/s, peak VRAM, and whether the step OOMs. **Verify:** a recorded table of
-  (batch, seq_len) → tokens/s, peak MiB, OOM yes/no, taken with the CUDA
+  (batch, seq_len) â†’ tokens/s, peak MiB, OOM yes/no, taken with the CUDA
   interpreter on the real GPU.
   **Evidence:** `code/measure_lang_throughput.py`, full table in
   `code/lang_throughput_more.json`. NVIDIA GeForce RTX 3050 6GB Laptop GPU, 6.00 GiB,
@@ -2127,34 +2127,34 @@ does not exist here (T-L0.0).
   | 128 | **128** | 16,384 | **36,855** | 4,063 | 66.1% | no |
   | 256 | 32 | 8,192 | 29,399 | 2,091 | 34.0% | no |
   | 256 | **64** | 16,384 | **33,831** | 4,115 | 67.0% | no |
-  | 256 | 128 | 32,768 | 8,674 | 8,194 | 133.4% | no — **thrashing** |
+  | 256 | 128 | 32,768 | 8,674 | 8,194 | 133.4% | no â€” **thrashing** |
   | 512 | **32** | 16,384 | **29,804** | 4,187 | 68.1% | no |
-  | 512 | 64 | 32,768 | 8,528 | 8,249 | 134.3% | no — **thrashing** |
-  | 512 | 128 | 65,536 | — | — | — | **YES** |
+  | 512 | 64 | 32,768 | 8,528 | 8,249 | 134.3% | no â€” **thrashing** |
+  | 512 | 128 | 65,536 | â€” | â€” | â€” | **YES** |
   | 1024 | **16** | 16,384 | **23,795** | 4,212 | 68.6% | no |
-  | 1024 | 32 | 32,768 | 5,353 | 8,252 | 134.3% | no — **thrashing** |
-  | 1024 | 64 | 65,536 | — | — | — | **YES** |
+  | 1024 | 32 | 32,768 | 5,353 | 8,252 | 134.3% | no â€” **thrashing** |
+  | 1024 | 64 | 65,536 | â€” | â€” | â€” | **YES** |
 
   **Three findings, and the second is the one a naive sweep would have missed.**
 
-  1. **Peak VRAM is a function of `batch × seq_len`, not of either alone.** 16,384
+  1. **Peak VRAM is a function of `batch Ã— seq_len`, not of either alone.** 16,384
      tokens/step costs 4,063 / 4,115 / 4,187 / 4,212 MiB at seq_len 128 / 256 / 512 / 1024
-     — within 4% across an 8× range of sequence length. The binding constraint is **tokens
+     â€” within 4% across an 8Ã— range of sequence length. The binding constraint is **tokens
      per step**, which makes the (batch, seq_len) split a scientific choice rather than a
      memory one.
   2. **There is a SOFT CLIFF before the hard OOM, and "did it OOM?" alone walks into it.**
-     At 32,768 tokens/step the reported peak is 8.2 GiB on a 6 GiB card — the driver falls
-     back to shared/host memory, **nothing raises**, and throughput collapses **4×**
-     (33,831 → 8,674 tok/s at seq_len 256). A sweep recording only OOM yes/no would have
+     At 32,768 tokens/step the reported peak is 8.2 GiB on a 6 GiB card â€” the driver falls
+     back to shared/host memory, **nothing raises**, and throughput collapses **4Ã—**
+     (33,831 â†’ 8,674 tok/s at seq_len 256). A sweep recording only OOM yes/no would have
      accepted batch 128 / seq_len 256 and then run the entire matrix four times slower.
-  3. **At a fixed token budget, shorter sequences are faster** — 36,855 tok/s at seq_len
-     128 against 23,795 at 1024, both at 16,384 tokens/step. Attention is O(S²), so
+  3. **At a fixed token budget, shorter sequences are faster** â€” 36,855 tok/s at seq_len
+     128 against 23,795 at 1024, both at 16,384 tokens/step. Attention is O(SÂ²), so
      `seq_len` costs throughput rather than memory.
 
-  **Recommendation for T-L7.1, not a decision:** ~16,384 tokens/step at ≈67% VRAM is the
+  **Recommendation for T-L7.1, not a decision:** ~16,384 tokens/step at â‰ˆ67% VRAM is the
   sweet spot on this card, and `seq_len = 256, batch_size = 64` gives 33,831 tok/s at the
   length the corpus is already packed at. **Ayan's 4060 has 8 GiB, so its cliff sits higher
-  and the numbers must be re-measured there before anything is frozen** — this table is the
+  and the numbers must be re-measured there before anything is frozen** â€” this table is the
   6 GB one.
 
   **The tokens/s figures are an UPPER BOUND.** Synthetic ids are used so the grid can visit
@@ -2170,9 +2170,9 @@ does not exist here (T-L0.0).
   `num_blocks`, `d_model`, `n_heads`, `ffn_mult` per arm, and the loss weights are
   written into `code/canonical_spec_language.json` **together**, in a single
   commit, from the T-L7.0 measurements. They start `null` precisely so the existing
-  proxy guard refuses every canonical claim until this task runs — that refusal is
+  proxy guard refuses every canonical claim until this task runs â€” that refusal is
   the mechanism working, not a bug to route around. One resolved protocol for all
-  three arms (§ canonical hyperparameter principle); the only per-arm difference is
+  three arms (Â§ canonical hyperparameter principle); the only per-arm difference is
   what is needed to instantiate MoE/MoR/MoRE plus the T-L6.3 `ffn_mult`.
   **Verify:** no `null` remains in the spec; a language run with the frozen config
   is accepted as canonical; the same run with any single protocol field perturbed
@@ -2181,17 +2181,17 @@ does not exist here (T-L0.0).
   L7.1-language-frozen`; `code/config_language.json` is the new operator-facing
   defaults file. `code/test_language_spec_freeze.py`: **59 passed, 0 failed, 0
   skipped** on the CPU interpreter. `code/test_language_task_axis.py`: **74 passed,
-  0 failed** (72 → 74; TL1.3l/m/n asserted the spec *had* nulls and were rewritten
-  to the post-freeze invariant, with TL1.3n2/n3 added — the assertion moved rather
+  0 failed** (72 â†’ 74; TL1.3l/m/n asserted the spec *had* nulls and were rewritten
+  to the post-freeze invariant, with TL1.3n2/n3 added â€” the assertion moved rather
   than being deleted, and the comment there records why).
 
   Both directions of the Verify are covered explicitly. **Accepted:** TL7.1g/h/i
-  build the config through `cli.py`'s own call order (`load_config` →
-  `apply_architecture` → `apply_task` → `stamp_language_dataset_versions`) and
+  build the config through `cli.py`'s own call order (`load_config` â†’
+  `apply_architecture` â†’ `apply_task` â†’ `stamp_language_dataset_versions`) and
   `assert_not_silent_proxy` returns `canonical_lang_b` on all three arms, resolving
   to `variant = language`. **Refused:** TL7.1j perturbs each of the **17** enforced
   fields *individually* and requires the refusal message to NAME the offending
-  field — not merely to refuse, because a refusal that does not say why sends the
+  field â€” not merely to refuse, because a refusal that does not say why sends the
   operator to the wrong file. TL7.1k asserts that only `halting_mode`,
   `task_weight` and `family_cls_weight` are unreachable through a config section.
   TL7.1n refuses seed 99 (outside the frozen set).
@@ -2199,7 +2199,7 @@ does not exist here (T-L0.0).
   | field | frozen value | set by |
   |---|---|---|
   | `epochs` | 3 | average depth still moving between epochs 2 and 3 at every calibration point |
-  | `batch_size` | 48 | per-arm VRAM measurement: MoR peaks 5,342 MiB of 6,143; batch 64 crosses into the T-L7.0 soft cliff (1.03 → 2.31 h/epoch) |
+  | `batch_size` | 48 | per-arm VRAM measurement: MoR peaks 5,342 MiB of 6,143; batch 64 crosses into the T-L7.0 soft cliff (1.03 â†’ 2.31 h/epoch) |
   | `seq_len` / `vocab_size` | 256 / 8192 | the packed corpus |
   | `lr` | 0.001 | best of {5e-4, 1e-3, 2e-3} *and* the only value stable across both dropout settings (2e-3 + dropout 0.1 diverges to 7.1957 with depth pinned at the 7.0 ceiling) |
   | `weight_decay` | 1e-4 | carried, recorded as carried |
@@ -2210,7 +2210,7 @@ does not exist here (T-L0.0).
 
   **THE HEADLINE RESULT OF THIS TASK IS A REJECTION, and it is paper-level rather
   than a tuning detail.** This file's own `_NULLS_NOTE` predicted that the
-  arithmetic `0.001`, chosen so the weighted balance term sat at 0.017× the task
+  arithmetic `0.001`, chosen so the weighted balance term sat at 0.017Ã— the task
   loss, would be "effectively OFF" against a ~5-nat cross-entropy and would
   "silently turn adaptive depth into always-max depth". **Both predictions are
   false**, measured on the dev corpus at seed 44, 3 epochs per point
@@ -2219,7 +2219,7 @@ does not exist here (T-L0.0).
   | balance weight (halting 0.001) | val_loss | AMI (control 0.0621) | load entropy |
   |---|---|---|---|
   | **0.001** | **5.2406** | **0.2907** | **0.8571** |
-  | 0.05 | 5.2991 | 0.3070 | — |
+  | 0.05 | 5.2991 | 0.3070 | â€” |
   | 0.21 *(ratio-matched)* | 5.3097 | 0.2688 | 0.99+ |
   | 1.0 | 5.3458 | 0.1807 | 0.99+ |
 
@@ -2232,7 +2232,7 @@ does not exist here (T-L0.0).
 
   The ratio-matched weights **switch off both behaviours the study exists to
   measure**: depth collapses to 1.49 of a 7 budget and routing structure vanishes
-  (AMI 0.2907 → 0.0025, against a control floor of 0.0621 — i.e. *below* chance).
+  (AMI 0.2907 â†’ 0.0025, against a control floor of 0.0621 â€” i.e. *below* chance).
   A matrix run at those weights would have produced a clean-looking Outcome C that
   was an artifact of a loss weight. **The invariant that transfers across tasks is
   absolute gradient magnitude, not the ratio to the task loss.**
@@ -2241,10 +2241,10 @@ does not exist here (T-L0.0).
   1. 0.001 sits at load entropy **0.8571, just below the oracle POS partition's own
      0.8884** (T-L2.3), while every higher weight overshoots to 0.99+. Entropy and
      AMI move in **opposite** directions across this sweep, which is exactly the
-     situation `CLAUDE.md` §2 forbids tuning toward maximal entropy for.
-  2. Raising the **halting** weight destroys **routing** structure (AMI 0.2907 →
+     situation `CLAUDE.md` Â§2 forbids tuning toward maximal entropy for.
+  2. Raising the **halting** weight destroys **routing** structure (AMI 0.2907 â†’
      0.0025 at 0.107). **Depth and expert differentiation are not independent knobs
-     in MoRE** — a coupling worth its own paragraph in the paper.
+     in MoRE** â€” a coupling worth its own paragraph in the paper.
 
   **Every number in this task is dev-corpus (wikitext-2) and may never be quoted as
   a result.** T-L2.0 established that wikitext-2 shares its val split byte-for-byte
@@ -2254,12 +2254,12 @@ does not exist here (T-L0.0).
   **Also fixed under this task (T-L7.1a, the provenance defect).** All 14 pre-fix
   language runs on disk record the *arithmetic* `dataset_version` while having
   consumed WikiText. `export_results.py` filters admitted rows on that field, so
-  those runs cannot be cited — their measured numbers are not wrong, their label
+  those runs cannot be cited â€” their measured numbers are not wrong, their label
   is. No published result is affected because the canonical matrix had not started.
   Fixed by `lang_data.corpus_versions()` + `config.stamp_language_dataset_versions()`,
   called twice: once inside `apply_task` and again from `cli.py` after `--corpus`
   resolves, because the corpus is not known at the first call. Regression-tested by
-  TP1–TP7 in `test_language_spec_freeze.py`, which cover that wikitext-103 stamps
+  TP1â€“TP7 in `test_language_spec_freeze.py`, which cover that wikitext-103 stamps
   its own id, that `--corpus wikitext-2` **re-stamps** it, that an unbuilt corpus
   yields `(None, None)` and that the `None` then *blocks* the canonical claim, that
   the arithmetic path never reaches the stamper and its `config_hash` is stable at
@@ -2272,31 +2272,31 @@ does not exist here (T-L0.0).
   invisible to the hash and must be caught by reading the field. The old wrong text
   is quoted inside the correction.
 
-- [x] **T-L7.2 GATE L6 / GATE L7 — parameter budget and floor.**
+- [x] **T-L7.2 GATE L6 / GATE L7 â€” parameter budget and floor.**
   **Verify (L6):** the MoR/MoRE parameter difference is < 5% on both the total and
   the non-embedding count, and the three arms' counts are published as a table.
   **Verify (L7):** a single short language run beats `primary_metric_floor` from
   T-L2.5. If it does not, the architecture matrix is not yet worth running and the
-  gate-failure protocol applies — that is the whole point of having a floor.
-  **STATUS: GATE L6 PASSED. GATE L7 PASSED — the number landed.** L7 cannot be
+  gate-failure protocol applies â€” that is the whole point of having a floor.
+  **STATUS: GATE L6 PASSED. GATE L7 PASSED â€” the number landed.** L7 cannot be
   discharged by an assertion: a floor is beaten by a training run or not at all. The
   run is MoRE, 1 epoch, seed 42, on the **canonical** corpus (`langB_gate_l7`,
   deliberately non-canonical group because `epochs 3` is a frozen field and "short"
   means non-canonical by definition), measured against
   `primary_metric_floor = 4.98494701553838`. **Do not substitute the dev-corpus
-  figure 5.398304166059712 for it** — T-L2.0 established that wikitext-2 shares its
+  figure 5.398304166059712 for it** â€” T-L2.0 established that wikitext-2 shares its
   val split byte-for-byte with wikitext-103, so a dev number would be the same split
   scored against the wrong floor.
   **Evidence (L7), `runs/langB_MoRE_seed42__1304961e__r4/metrics.json`:
-  `val/task_loss` = 3.7843224898062116 against the floor 4.98494701553838 — the floor
+  `val/task_loss` = 3.7843224898062116 against the floor 4.98494701553838 â€” the floor
   is beaten by 1.2006245257321688 nats/token** (perplexity 44.006, 5.4596 bits/token).
-  The recorded `val/nats_below_bigram_floor` reproduces `floor − val/task_loss` to
+  The recorded `val/nats_below_bigram_floor` reproduces `floor âˆ’ val/task_loss` to
   `<1e-12`, which is the same identity the exporter re-derives and refuses on. Run
   provenance: `experiment_group = langB_gate_l7`, `architecture = more`, `seed = 42`,
   `dataset_version = lang-wikitext-103-bpe8192-len256-800d6154`,
   `code_git_commit = 82e521d`, resolved `epochs = 1`. Its `total_params` /
   `non_embedding_params` are 5,584,908 / 3,422,220, matching the L6 table below
-  exactly — so the model that beat the floor is the model whose budget was gated,
+  exactly â€” so the model that beat the floor is the model whose budget was gated,
   not a differently-shaped one.
   - **This is one epoch and one seed, and is therefore a GATE, not a result.** It
     licenses spending 39 GPU-hours on the matrix; it may not be quoted as MoRE's
@@ -2304,16 +2304,16 @@ does not exist here (T-L0.0).
     Its group is non-canonical precisely so the proxy guard refuses it.
   - **An earlier attempt at this same run was interrupted.**
     `runs/langB_MoRE_seed42__1304961e/` holds `config.json` + `resolved_config.json` +
-    `stdout.log` and **no `metrics.json`** — the signature of a killed run. It is kept,
-    not deleted (`CLAUDE.md` §6), and it is exactly the case
+    `stdout.log` and **no `metrics.json`** â€” the signature of a killed run. It is kept,
+    not deleted (`CLAUDE.md` Â§6), and it is exactly the case
     `run_language_matrix.py --all` treats as incomplete and re-runs: a directory with
     no finished metrics is an interrupted run, and a checkpoint at an unknown epoch is
     the kind of artifact that ends up in a table by accident.
-  - **First run to publish `val/routing_pos_partition_load_entropy`** — it records
+  - **First run to publish `val/routing_pos_partition_load_entropy`** â€” it records
     0.8941557591319386, this corpus's own partition entropy, read from the manifest
     rather than from any document. That is the T-LX.6 fix working end to end on a real
     run: the constant now travels with the measurement.
-  **Evidence (L6):** `code/test_language_gate_l6_l7.py` — **28 passed, 0 failed, 0
+  **Evidence (L6):** `code/test_language_gate_l6_l7.py` â€” **28 passed, 0 failed, 0
   skipped**; table also written to `code/lang_param_budget.json` so no number is
   hand-copied. Counts are built through the **same** kwargs mapping the trainer uses
   (`engine.py:263`) from the frozen `config_language.json`, not through a
@@ -2327,9 +2327,9 @@ does not exist here (T-L0.0).
   | MoRE | 6 | 7 | 4 | 5,584,908 | 2,162,688 | 3,422,220 |
 
   MoR vs MoRE: **0.0688%** on the total, **0.1124%** on the non-embedding count,
-  against the 5% tolerance. The non-embedding number is 1.6× the total-based one
-  from the same two models, which is why T-L6.3 asks for both — the tied 8192×256
-  token table plus the 256×256 positional table are identical across arms and so sit
+  against the 5% tolerance. The non-embedding number is 1.6Ã— the total-based one
+  from the same two models, which is why T-L6.3 asks for both â€” the tied 8192Ã—256
+  token table plus the 256Ã—256 positional table are identical across arms and so sit
   in both the numerator and the denominator of a relative gap, shrinking it for free.
   The embedding block is asserted **bit-identical in size** (not merely close) before
   those gaps are read, since otherwise they would be computed against different
@@ -2339,24 +2339,24 @@ does not exist here (T-L0.0).
   and that is a structural fact worth stating in the paper rather than a coincidence:
   weight sharing means recursion depth costs no parameters.** Those two arms differ
   *only* in how much computation they do, which makes MoE-vs-MoRE the cleanest
-  contrast in the study — the depth axis with the parameter axis held exactly, not
+  contrast in the study â€” the depth axis with the parameter axis held exactly, not
   approximately, fixed.
 
   Both anchors are pinned as assertions (`5,584,908` / `5,581,063`), so a future shape
   change must be a deliberate re-derivation rather than a silent drift.
 
-- [x] **T-L7.3 Input-parity test across the three arms.** §4's bit-identical-input
+- [x] **T-L7.3 Input-parity test across the three arms.** Â§4's bit-identical-input
   invariant is trivially checkable on language because all three arms consume the
   same `input_ids`: assert the tensors are equal for the same record index under
   all three configs. **Verify:** `torch.equal` on the input batch across MoE/MoR/
   MoRE at the same seed and index.
   **Evidence:** in `code/test_language_gate_l6_l7.py` (same 28-check run, 0 failed).
   Parity is checked at **three levels, because they fail independently**:
-  1. the **dataset tuple** at a fixed index (137) — all 7 slots bit-identical across
+  1. the **dataset tuple** at a fixed index (137) â€” all 7 slots bit-identical across
      arms, with slot 6 compared under equal-NaN semantics rather than exempted, since
      an exemption would also excuse a real difference;
   2. the **first batch out of a seeded DataLoader** built exactly as `engine.py`
-     builds it (`make_generator(seed, "dataloader_shuffle")`, `seed_worker`) — this
+     builds it (`make_generator(seed, "dataloader_shuffle")`, `seed_worker`) â€” this
      is the level that catches an architecture-dependent *shuffle order*, which a
      per-index check cannot see: identical datasets visited in different orders would
      feed the arms different data while every level-1 check passed;
@@ -2365,9 +2365,9 @@ does not exist here (T-L0.0).
      reading different corpora and then agreeing about a batch by coincidence.
 
   Two further assertions make the parity check non-vacuous. `input_ids` are all legal
-  vocabulary indices (`min 66, max 8046 < V = 8192`), so nothing expert-shaped — a
-  family id, an oracle expert index — has been packed into the token stream, which is
-  the concrete form §3's prohibition takes on language. And a **different** seed (43)
+  vocabulary indices (`min 66, max 8046 < V = 8192`), so nothing expert-shaped â€” a
+  family id, an oracle expert index â€” has been packed into the token stream, which is
+  the concrete form Â§3's prohibition takes on language. And a **different** seed (43)
   must produce a **different** first batch: without that, the parity above would also
   pass on a loader that ignored its generator entirely, and would prove nothing.
 
@@ -2378,7 +2378,7 @@ does not exist here (T-L0.0).
   + `--ignore-installed torch==2.6.0 --index-url .../cu126` recipe from T-L0.1, which is
   the step most likely to be got wrong), a **dataset rebuild command** because
   `data/lang/**/*.npy` is not tracked, and a single entry point that runs the whole arm
-  and writes only into `runs/<experiment_id>/`. W&B needs settling first — a canonical
+  and writes only into `runs/<experiment_id>/`. W&B needs settling first â€” a canonical
   run will die in `wandb.init` with `UsageError: No API key configured` exactly as
   T-L1.4's re-run did, and it will leave a directory-shaped artifact behind when it does.
   **Verify:** on a machine that has never seen this repo, `git clone` + the documented
@@ -2387,27 +2387,27 @@ does not exist here (T-L0.0).
   one in the T-L7.0 table for the arms actually run there.
   **Evidence:** `code/run_language_matrix.py`. `SETUP.md` and `HANDOFF.md` rewritten
   for the frozen protocol. Verified on this machine end to end:
-  `run_language_matrix.py --preflight` → clean (9 checks); `--all --dry-run` → the
-  correct 15 commands in arm order; `--smoke` → **exit 0 in 7.6 min**, a real CUDA
+  `run_language_matrix.py --preflight` â†’ clean (9 checks); `--all --dry-run` â†’ the
+  correct 15 commands in arm order; `--smoke` â†’ **exit 0 in 7.6 min**, a real CUDA
   MoRE run writing `runs/langB_MoRE_seed44__d915d7de/` with
   `Total parameters: 5,584,908` and `val = 6.2367` after one epoch on the dev corpus.
-  (6.2367 is *above* the dev floor 5.3983 and that is expected — 219 optimizer steps
+  (6.2367 is *above* the dev floor 5.3983 and that is expected â€” 219 optimizer steps
   at batch 48. The smoke run's job is to prove the machine trains and writes a run
   directory, not to beat a floor; Gate L7 is T-L7.2's.)
 
   **The one command is `--all`, and it does five things a documented `train.py` line
   cannot.**
   1. **Preflight refuses instead of warning.** CUDA usability is established by
-     actually running a matmul, not by reading `torch.cuda.is_available()` — a driver
+     actually running a matmul, not by reading `torch.cuda.is_available()` â€” a driver
      that reports True and then cannot launch a kernel is a real failure mode on this
-     project (`ENVIRONMENT.md` §4). It also checks the corpus manifest, the POS
+     project (`ENVIRONMENT.md` Â§4). It also checks the corpus manifest, the POS
      lookup (without which the run trains fine and reports `N/A` for every routing
      metric the study exists to measure), that the spec has no nulls, that
      `assert_not_silent_proxy` **accepts** the frozen config on all three arms, that
      W&B is either logged in or explicitly offline, and disk headroom for 15
      checkpoints sized from a real checkpoint on disk rather than guessed.
   2. **It removes the two quiet failure modes of a hand-typed launch.** Omitting
-     `--experiment_group canonical_lang_b` does not fail — the run completes, writes a
+     `--experiment_group canonical_lang_b` does not fail â€” the run completes, writes a
      full directory, is stamped `exploratory`, and is then silently absent from the
      headline table until the export comes up short. Omitting
      `--config config_language.json` resolves against the *arithmetic* defaults, which
@@ -2417,34 +2417,34 @@ does not exist here (T-L0.0).
      checkpoints.** A 39 h matrix on a laptop will be interrupted. A run counts as
      complete only with all four of: the right arm, the right seed, the canonical
      group stamp, and a finished `metrics.json`. A directory holding a checkpoint but
-     no metrics is treated as **interrupted and re-run**, deliberately — its
+     no metrics is treated as **interrupted and re-run**, deliberately â€” its
      checkpoint is a partially-trained model at an unknown epoch, which is exactly
      the artifact that reaches a results table by accident.
-  4. **It stops at the first failure rather than looping around it** (`plan.md` §20),
+  4. **It stops at the first failure rather than looping around it** (`plan.md` Â§20),
      and names the run that died. Completed runs stay intact and are skipped on
      resume.
   5. **It reads results back rather than computing them.** The summary table is read
      out of each `metrics.json` and prints `N/A`, never a sentinel, for a missing
      value; it then points at `seed_stats.py` / `export_results.py` for aggregation.
      The driver deliberately does **not** become a second, weaker path to a results
-     table — those two refuse to mix dataset versions and config hashes, and this
+     table â€” those two refuse to mix dataset versions and config hashes, and this
      does not.
 
   Two things the runner refuses to offer: any flag that could change a frozen
   protocol field, and a retry loop. `--smoke` is the only non-canonical path and it
-  cannot contaminate the matrix — wikitext-2 carries its own `dataset_version`, so the
+  cannot contaminate the matrix â€” wikitext-2 carries its own `dataset_version`, so the
   guard would refuse it as canonical even if the group label were wrong.
 
   **Two defects in this driver were found by running it rather than by reading it,
   and both would have been invisible.** (a) The summary read `depth/mean` under the
-  name `depth/avg`, which does not exist — `.get()` would have printed `N/A` in every
+  name `depth/avg`, which does not exist â€” `.get()` would have printed `N/A` in every
   row of every matrix, a missing-key bug that looks exactly like a legitimately
   unmeasured metric. Verified against a real language `metrics.json` and corrected.
   (b) The VRAM check refused any card under 7,000 MiB, which would have refused the
   6,143 MiB 3050 that the **entire calibration phase ran on**. Split into a hard
   refusal below 5,800 MiB (the measured 5,342 MiB peak of the MoR arm plus margin)
-  and a **warning** in the 5,800–7,000 range that names the two real consequences —
-  nothing else may use the GPU, and expect ~1.5× the epoch time of the 4060.
+  and a **warning** in the 5,800â€“7,000 range that names the two real consequences â€”
+  nothing else may use the GPU, and expect ~1.5Ã— the epoch time of the 4060.
 
   **The 8 GB re-measurement is left to the machine that has the card**, recorded in
   `HANDOFF.md` as the first thing to write down. The 6 GB figures are labelled as
@@ -2457,7 +2457,7 @@ does not exist here (T-L0.0).
   Only Ayan's machine can discharge that clause, by running `--preflight` then
   `--smoke` on a fresh clone and confirming the dataset rebuild reproduces the tracked
   manifest hashes. Ticking it from here would be asserting a result about a machine
-  that has not run yet — which is the exact failure mode the Evidence convention
+  that has not run yet â€” which is the exact failure mode the Evidence convention
   exists to prevent.
 
 - [ ] **T-L7.5 Push after every gate that a REAL RUN validated.** Standing
@@ -2470,37 +2470,37 @@ does not exist here (T-L0.0).
 
 ---
 
-## Phase L-8 — Canonical language matrix  (`plan_language.md` §9)
+## Phase L-8 â€” Canonical language matrix  (`plan_language.md` Â§9)
 
-- [ ] **T-L8.0 15 canonical runs: {MoE, MoR, MoRE} × seeds {42,43,44,45,46}.**
+- [ ] **T-L8.0 15 canonical runs: {MoE, MoR, MoRE} Ã— seeds {42,43,44,45,46}.**
   Attention in all three arms; one frozen protocol; `langB_*` run names; per-run
-  directories. Checkpoint selection is the **final epoch**, per T11.0b — best-val
+  directories. Checkpoint selection is the **final epoch**, per T11.0b â€” best-val
   is an order statistic whose downward bias scales with each arm's validation
   noise, so with unmatched noise across arms it silently favours the noisiest one.
   **Verify:** 15 `runs/langB_*` directories each with `config.json`,
   `resolved_config.json`, `metrics.json`, `results.tsv`, `checkpoint.pt`,
-  `stdout.log`; every one stamped with the full §9 provenance list; all 15 sharing
+  `stdout.log`; every one stamped with the full Â§9 provenance list; all 15 sharing
   one `config_hash` modulo architecture and seed.
 
-- [ ] **T-L8.1 Seed statistics via `seed_stats.py`.** mean ± std per arm for
+- [ ] **T-L8.1 Seed statistics via `seed_stats.py`.** mean Â± std per arm for
   val task loss, perplexity, average depth, normalized entropy, Hungarian/AMI/
   purity, the depth correlations, and throughput. Then the exact two-sided
   randomization test between arms with Bonferroni correction, and the resolution
   floor stated: at 5-vs-5 the smallest attainable two-sided p is **0.00794**
-  (`2/C(10,5)`, corrected at T-LX.18 — not 0.0040, which was the one-sided
+  (`2/C(10,5)`, corrected at T-LX.18 â€” not 0.0040, which was the one-sided
   count), so no pairwise claim can be made below it no matter how large the
   effect looks. Both headline language comparisons sit exactly AT that floor.
   **Verify:** the statistics are computed by the existing script from the run
-  directories — never hand-copied — and the floor is printed alongside every p.
+  directories â€” never hand-copied â€” and the floor is printed alongside every p.
 
-- [ ] **T-L8.2 GATE L8 — provenance.** **Verify:** every figure and table in the
+- [ ] **T-L8.2 GATE L8 â€” provenance.** **Verify:** every figure and table in the
   language results traces to explicit run ids; the exporter refuses a mixed
   `dataset_version` or `config_hash`; no arithmetic run appears in a language table
   and vice versa; nothing invalidated is silently reused.
 
 ---
 
-## Phase L-9 — Ablations  (`plan_language.md` §9, A–G)
+## Phase L-9 â€” Ablations  (`plan_language.md` Â§9, Aâ€“G)
 
 Each is a labelled variant, never a canonical claim. Run at a reduced seed set
 where compute forces it, and say so in the caption rather than presenting a
@@ -2511,14 +2511,14 @@ where compute forces it, and say so in the caption rather than presenting a
   string; matched protocol otherwise.
 - [ ] **T-L9.B Learned routing vs POS-oracle routing.** Upper-bound/capacity
   diagnostic only; must never replace the learned-router result in the headline
-  (§ required ablations). **Verify:** `oracle_routing` in the variant string; the
+  (Â§ required ablations). **Verify:** `oracle_routing` in the variant string; the
   headline table contains only the learned-router run.
 - [ ] **T-L9.C One recursive block vs two.** **Verify:** `num_blocks_2` in the
   variant string; balance loss still depth- and block-invariant at 2 blocks.
 - [ ] **T-L9.D Parameter-matched MoR.** Uses the T-L6.3 `ffn_mult`. **Verify:** the
   < 5% bound holds on both counts and is restated in the caption.
 - [ ] **T-L9.E Dense routing vs canonical top-1.** **Verify:**
-  `dense_routing_ablation` appears in the run label — `enforce_routing_mode`
+  `dense_routing_ablation` appears in the run label â€” `enforce_routing_mode`
   refuses `dense_blend` without it, so this is enforced, not remembered.
 - [ ] **T-L9.F Supervised frequency-decile curriculum.** Uses T-L2.6's table.
   **Verify:** `supervised_curriculum` in the variant string; the caption states the
@@ -2526,8 +2526,8 @@ where compute forces it, and say so in the caption rather than presenting a
 - [ ] **T-L9.G POS vs shuffled control.** Evaluation-time only (T-L3.3), zero extra
   training runs. **Verify:** both metric sets reported for every language run.
 
-- [ ] **T-L9.H Router noise — deferred by default.** `[✗]` unless a measured
-  collapse motivates it. Canonical is `router_noise = none` (§7) and the rules
+- [ ] **T-L9.H Router noise â€” deferred by default.** `[âœ—]` unless a measured
+  collapse motivates it. Canonical is `router_noise = none` (Â§7) and the rules
   forbid adding several routing regularizers at once; adding noise without an
   observed pathology to fix would be tuning. **Narrowing decision to record here
   if closed:** the measured normalized entropy and `max_load_fraction` that show no
@@ -2535,7 +2535,7 @@ where compute forces it, and say so in the caption rather than presenting a
 
 ---
 
-## Phase L-10 — Reporting  (`plan_language.md` §14)
+## Phase L-10 â€” Reporting  (`plan_language.md` Â§14)
 
 - [x] **T-L10.0a The exporter can target the language matrix at all.** Prerequisite
   for T-L10.0, split out because it turned out to be *unbuilt* rather than merely
@@ -2547,24 +2547,24 @@ where compute forces it, and say so in the caption rather than presenting a
   `--group` flag; it ignored the argument, read `canonical_spec.json` at module
   level (`SPEC_PATH = CODE / "canonical_spec.json"`, `CANONICAL_GROUP =
   SPEC["canonical_group"]`, line 93 before the fix) and exported the **arithmetic**
-  matrix into `results/` — `scanned 241 directories, admitted: 15, refused: 226`,
+  matrix into `results/` â€” `scanned 241 directories, admitted: 15, refused: 226`,
   every refusal `experiment_group='exploratory' != 'canonical_phase_b'`. An operator
   who had just spent 39 GPU-hours would have read 15 rows of mean squared error as
   their language result.
-  **Verify:** `python code/test_language_export.py` → 60 passed, 0 failed, 0 skipped;
+  **Verify:** `python code/test_language_export.py` â†’ 60 passed, 0 failed, 0 skipped;
   `python code/export_results.py --task language --check` names the language spec and
   refuses (nothing canonical exists yet); `python code/export_results.py` still
   produces a byte-identical `results/results_aggregate.csv`.
   **Evidence (2026-09-07, CPU interpreter):**
-  - `test_language_export.py` → **60 passed, 0 failed, 0 skipped**. It synthesizes 15
+  - `test_language_export.py` â†’ **60 passed, 0 failed, 0 skipped**. It synthesizes 15
     fixture runs from the *newest* real language `metrics.json` on disk (221 scalar
     keys, 54 under `depth/`, `depth_key_provenance` present) and puts them through
     the shipped `admit`/`consistency_errors`/`aggregate`/`cell`/`pairwise`/`derived`
     and all four writers. The first version of that fixture drew the *oldest* run
     (`langB_MoRE_seed42__91c9bba1`, 158 scalars, no depth registry) and so tested the
-    exporter against history rather than the contract — hence newest-by-mtime plus an
+    exporter against history rather than the contract â€” hence newest-by-mtime plus an
     explicit registry assertion.
-  - `export_results.py --task language --check` → `task = language`,
+  - `export_results.py --task language --check` â†’ `task = language`,
     `spec = canonical_spec_language.json (L7.1-language-frozen)`,
     `canonical group = canonical_lang_b   variant = language`,
     `output dir = results\language`, `admitted: 0     refused: 241`,
@@ -2577,22 +2577,22 @@ where compute forces it, and say so in the caption rather than presenting a
   - Four defects found *by running it*, all fixed: (1) the arithmetic Phase 10
     ablation file was ingested unconditionally and would have printed arithmetic MSE
     gaps into a cross-entropy document, through a path with no run directory to
-    refuse; (2) `1 - loss/floor` was labelled `R^2` for both tasks — on language the
+    refuse; (2) `1 - loss/floor` was labelled `R^2` for both tasks â€” on language the
     floor is a bigram cross-entropy and that expression is not a variance ratio, so a
     reviewer reading "R^2 = 0.10" would be reading a fabricated statistic;
     (3) `variant != "canonical"` was hard-coded and refuses every language run, which
     are stamped `variant = language`; (4) `_write_md_depth` printed "every depth
     number in this document is a TRAINING-TIME measurement", which is an arithmetic
-    statement — the language depth block is validation-pass and records its own
+    statement â€” the language depth block is validation-pass and records its own
     per-key provenance.
   - Two checks added that did not exist: a run stamped `task = arithmetic` is refused
     from the language export even when group, variant, seed and dataset_version are
     all canonical; and the run-recorded `val/nats_below_bigram_floor` must reproduce
-    `spec floor − val/task_loss` exactly, which catches a spec floor edited without
+    `spec floor âˆ’ val/task_loss` exactly, which catches a spec floor edited without
     rebuilding the corpus (dev 5.3983 vs canonical 4.9849 = 0.41 nats, larger than
     any architecture gap this study can resolve).
   - `code/seed_stats.py` gained a `__main__` block that prints the right command and
-    exits 2. It stays a library — reading `runs/` is the exporter's job — but a
+    exits 2. It stays a library â€” reading `runs/` is the exporter's job â€” but a
     library that exits 0 printing nothing is worse than one that errors.
 
 - [ ] **T-L10.0 `results/language/{results.csv,results.json,results.md}`.** All 17
@@ -2608,18 +2608,18 @@ where compute forces it, and say so in the caption rather than presenting a
   paper-facing `results.md` are the remaining work and both need real numbers.
 
 - [ ] **T-L10.1 Paper-safe claims and explicitly unsupported claims.** Write both
-  lists. Specifically forbidden (§13): calling the depth correlations "complexity
+  lists. Specifically forbidden (Â§13): calling the depth correlations "complexity
   discovery"; calling POS agreement "routing accuracy"; comparing this perplexity
   to published WikiText numbers (different vocabulary, different tokenizer,
-  different parameter scale — the comparison is meaningless in both directions);
+  different parameter scale â€” the comparison is meaningless in both directions);
   claiming orthogonality from cosine similarity. **Verify:** both lists exist and
   every headline sentence in `results.md` appears in the paper-safe list.
 
 - [ ] **T-L10.2 Cross-task comparison, carefully.** The arithmetic study concluded
-  **Outcome C** with MoR marginally best (MoR 0.062706 ± 0.000112 vs MoRE
-  0.063186 ± 0.000249 vs MoE 0.063260 ± 0.000153). Whether language reproduces that
+  **Outcome C** with MoR marginally best (MoR 0.062706 Â± 0.000112 vs MoRE
+  0.063186 Â± 0.000249 vs MoE 0.063260 Â± 0.000153). Whether language reproduces that
   ordering is the interesting question, and it must be reported as two separate
-  studies on one engine — not merged, not averaged, not presented as a trend across
+  studies on one engine â€” not merged, not averaged, not presented as a trend across
   two points. **Verify:** the section names both dataset versions and both config
   hashes and makes no claim that requires the two to be commensurable.
 
@@ -2633,32 +2633,32 @@ where compute forces it, and say so in the caption rather than presenting a
   accepted as `canonical_lang_b`, W&B settled, disk headroom); `--smoke` was executed
   end to end. **Every one of the 39 numbers written into the two documents was
   re-read programmatically from `data/lang/{wikitext-103,wikitext-2}/dataset_meta.json`
-  rather than transcribed** — split and token counts, all three floors, both partition
+  rather than transcribed** â€” split and token counts, all three floors, both partition
   entropies, the imbalance ratio, all six family type counts and all six token shares.
-  - **README §3b "The language corpus"** — splits (526,320 / 1,098 / 1,256 blocks ×
+  - **README Â§3b "The language corpus"** â€” splits (526,320 / 1,098 / 1,256 blocks Ã—
     256; 134,737,951 train tokens) and the point that they are the **corpus author's
     own**, so there is no split seed to get wrong; BPE-8192 trained on train text
     alone; `eot_id = 0` packing with 31 / 247 / 47 dropped tail tokens;
     `dataset_version` derived from the split-array SHAs alone. The three floors as a
-    table, with the dev corpus's 5.398304 named as **0.41 nats away — larger than any
+    table, with the dev corpus's 5.398304 named as **0.41 nats away â€” larger than any
     architecture gap this study can resolve**. The six families with type counts and
     token shares, and the caveat that governs every routing number on this task: the
     partition is a **prior, not ground truth** (3,508 contested types, 1.23% UNMAPPED
     against a 2% budget), hence `val/routing_agreement_with_pos` rather than
     "accuracy", hence 0.894156 rather than 1.0 as the load-entropy reference, hence
     the shuffled control and the induced topics as falsifiers.
-  - **README §6 "Running the language task"** — the five build commands, `--preflight`,
+  - **README Â§6 "Running the language task"** â€” the five build commands, `--preflight`,
     `--smoke`, a single run, and `export_results.py --task language`. Two traps are
     stated inline **because both produce a plausible wrong answer rather than an
     error**: omitting `--task language` from the exporter yields the *arithmetic*
     matrix under a heading that looks like your result, and calling `train.py` directly
     without `--config config_language.json` takes the language data path with
-    arithmetic-shaped hyperparameters. Also states that the `±` is a sample (n−1) std
+    arithmetic-shaped hyperparameters. Also states that the `Â±` is a sample (nâˆ’1) std
     and must come from the exporter (T-LX.7).
-  - **README §5** gains rows for `canonical_spec_language.json`, `data/lang/<corpus>/`,
-    `results/language/` and `SETUP.md`/`HANDOFF.md`; **§7** gains four language-only
+  - **README Â§5** gains rows for `canonical_spec_language.json`, `data/lang/<corpus>/`,
+    `results/language/` and `SETUP.md`/`HANDOFF.md`; **Â§7** gains four language-only
     metric rules.
-  - **ARCHITECTURE §4a "The `task` axis, and the language data contract"** — the axis
+  - **ARCHITECTURE Â§4a "The `task` axis, and the language data contract"** â€” the axis
     is orthogonal to `architecture` and selects dataset and heads, never a model;
     **absence of a `task` key MEANS arithmetic**, which is what preserves all 15
     published arithmetic `config_hash` values. The language 7-tuple is the *same*
@@ -2668,7 +2668,7 @@ where compute forces it, and say so in the caption rather than presenting a
     attention's fully-masked-row NaN path unreachable and the ACT denominators exact.
     The attention sublayer is documented as **one module constructed once and reused at
     every depth** (a per-depth module would make depth a stack of depth-specific
-    networks), with halted tokens **attendable but frozen** — both halves necessary —
+    networks), with halted tokens **attendable but frozen** â€” both halves necessary â€”
     and `is_causal=True` deliberately unused because PyTorch may silently ignore the
     hint, and an ignored causality hint is a non-causal LM that still reports a
     plausible loss.
@@ -2701,9 +2701,9 @@ where compute forces it, and say so in the caption rather than presenting a
   Already enforced rather than merely intended: `canonical_spec_language.json` pins
   `step_routing_weight = 0.0` in **all three** architecture blocks, and
   `config.resolve_variant` tags any non-zero value `oracle_routing`, which is not equal
-  to `language` and is therefore refused the canonical group by the proxy guard. §7.4
-  notes the ablation is *more* interesting on language than on arithmetic — it measures
-  how much achievable loss is given up by forcing a POS partition — and it still may
+  to `language` and is therefore refused the canonical group by the proxy guard. Â§7.4
+  notes the ablation is *more* interesting on language than on arithmetic â€” it measures
+  how much achievable loss is given up by forcing a POS partition â€” and it still may
   never share a table with canonical runs. **Verify:** all three arms show
   `step_routing_weight = 0.0`; a run with a non-zero value is refused
   `canonical_lang_b`.
@@ -2711,9 +2711,9 @@ where compute forces it, and say so in the caption rather than presenting a
 - [x] **T-LX.5 `N/A` stays in the machine record; the PAPER renderer drops
   all-`N/A` columns.** These are different requests and conflating them would undo a
   fix. `metrics.json` and `results.tsv` must keep `"N/A"`, because an exporter joining
-  MoE/MoR/MoRE rows on a common column set has to decide what a *missing* column means —
+  MoE/MoR/MoRE rows on a common column set has to decide what a *missing* column means â€”
   that is the defect the `"N/A"` contract closed (see the changelog entry on the eleven
-  flat routing keys), and CLAUDE.md §4 forbids the 0.0 that would otherwise fill the
+  flat routing keys), and CLAUDE.md Â§4 forbids the 0.0 that would otherwise fill the
   gap. What should not carry dead columns is the human-facing table: the language
   `results.md` writer drops any column that is `N/A` for **every** row in the table it is
   rendering, and says in a footnote which ones it dropped and why. **Verify:** a
@@ -2723,7 +2723,7 @@ where compute forces it, and say so in the caption rather than presenting a
   failed, 0 skipped**, of which 12 are this task. `export_results.py:dead_rows`
   classifies each all-`N/A` key and `_write_md_tail` renders the survivors plus a
   named footnote.
-  - **On language, 20 of the 222 union keys are dead in all three columns** — 15
+  - **On language, 20 of the 222 union keys are dead in all three columns** â€” 15
     categorical and 5 structural. Four of the structural five are the allocation-error
     keys the Verify line names: `depth/allocation_error_abs`,
     `depth/allocation_error_rel`, `val/depth_allocation_error_abs`,
@@ -2737,14 +2737,14 @@ where compute forces it, and say so in the caption rather than presenting a
   - **The fifth structural key is `train/halting_supervision_loss`**, and it is the one
     worth noticing: it is `N/A` on all three arms because the language protocol runs
     **pure ACT with halt supervision OFF** (`halting: ponder_weight=0.001,
-    supervision=OFF`, printed by every run). That is a protocol fact, not a gap — the
+    supervision=OFF`, printed by every run). That is a protocol fact, not a gap â€” the
     key exists in the loss assembly and would carry a number if supervision were ever
     switched on, so a `0.0` there would read as "supervision was applied and cost
     nothing".
   - **Verify-line correction, recorded rather than silently reinterpreted.** The clause
     says "a language `results.tsv` still contains `depth_allocation_error_*` as
     `N/A`". `results.tsv` is the per-epoch scalar log and has **never** carried those
-    columns — checked on `runs/langB_MoRE_seed44__d915d7de/results.tsv`, which has zero
+    columns â€” checked on `runs/langB_MoRE_seed44__d915d7de/results.tsv`, which has zero
     columns matching `allocation`. The machine record that does carry them is
     `metrics.json` (four keys, each `"N/A"`) and the exported `results.csv`, and the
     invariant is discharged against those. `results.tsv` is untouched by this change in
@@ -2754,7 +2754,7 @@ where compute forces it, and say so in the caption rather than presenting a
     which is the asymmetry `metric_keys()` takes the union instead of the intersection
     to show. Only rows dead in all three columns at once are elided.
   - **Two reasons are distinguished, because lumping them would print a falsehood.**
-    A row like `| routing_mode | N/A | N/A | N/A |` is not "unmeasured" — every run
+    A row like `| routing_mode | N/A | N/A | N/A |` is not "unmeasured" â€” every run
     records `routing_mode = top1_sparse`; it is a categorical label that `cell()` maps
     to `N/A` because it is not a number. Since `N/A` is *defined* in this document as
     "does not exist or was refused", that row asserts the opposite of the truth. The
@@ -2763,21 +2763,21 @@ where compute forces it, and say so in the caption rather than presenting a
     the quantity).
   - **The contrast between the two tasks is itself the check that the classifier is
     doing real work**: arithmetic has **13 dead keys, all categorical and 0 structural**
-    — `depth_allocation_error` is genuinely measured there against the operation-
-    complexity curriculum — while language has **15 categorical and 5 structural**. The
+    â€” `depth_allocation_error` is genuinely measured there against the operation-
+    complexity curriculum â€” while language has **15 categorical and 5 structural**. The
     structural explanatory paragraph is emitted only when a structural key exists, so
     the arithmetic document does not carry a paragraph about a case it does not have.
   - **No published arithmetic number moved:** `results/results.csv` and
     `results/results_aggregate.csv` are byte-identical after the change
     (`git diff --quiet` passes on both); the three pairwise verdicts are unchanged
-    (MoRE−MoE p=0.6587, MoRE−MoR p=0.0159, MoE−MoR p=0.0079). Only `results_tables.md`
+    (MoREâˆ’MoE p=0.6587, MoREâˆ’MoR p=0.0159, MoEâˆ’MoR p=0.0079). Only `results_tables.md`
     and `results.json` differ, which is exactly the human-facing/machine-record split
     this task is about.
 
 
 - [x] **T-LX.6 A per-corpus constant may not live in prose.** The oracle POS
   partition's own normalized load entropy was written into five documents as the single
-  number `0.8884` — *"read every language load-entropy figure against the partition's
+  number `0.8884` â€” *"read every language load-entropy figure against the partition's
   own 0.8884, not against 1.0"*. That is the **wikitext-2 dev** measurement. The
   **canonical wikitext-103** value is **0.894156**, and the documents quoting 0.8884
   were describing canonical runs. **Verify:** no module computes against a hard-coded
@@ -2793,11 +2793,11 @@ where compute forces it, and say so in the caption rather than presenting a
     `shuffled_control_marginal_entropy_real` is **0.888442277795757** (wikitext-2) and
     **0.894155759131938** (wikitext-103); recomputing `H/log(6)` from each manifest's
     own `family_counts_tokens["train"]["by_family"]` reproduces both to `<1e-9`
-    (asserted by TL2.3p). The largest/smallest family token ratio is **5.2855×** dev
-    and **5.1704×** canonical — so the widely-quoted **5.29×** is also the dev figure.
+    (asserted by TL2.3p). The largest/smallest family token ratio is **5.2855Ã—** dev
+    and **5.1704Ã—** canonical â€” so the widely-quoted **5.29Ã—** is also the dev figure.
   - **WHY 0.006 MATTERS: this constant is a threshold with a direction, not a
     tolerance.** T-L7.1 justified `routing_balance_weight = 0.001` on the reading that
-    its load entropy 0.857 sits *just below* the partition's own value — matching the
+    its load entropy 0.857 sits *just below* the partition's own value â€” matching the
     balance the data actually has, where every higher weight overshoots to 0.99+ and
     buys uniformity the corpus does not contain. A canonical run measuring **0.890**
     therefore reads as *below* the partition against 0.8942 (weight behaving as
@@ -2808,27 +2808,27 @@ where compute forces it, and say so in the caption rather than presenting a
   - **No run is invalidated.** The constant was never an operand: it appeared in
     comments, captions, a ledger finding, `HANDOFF.md`, and as a recorded field in the
     dev-corpus calibration JSON. Nothing computed with it, so no loss, metric, weight
-    or verdict changes. What was wrong was the *instruction to readers* — and the
+    or verdict changes. What was wrong was the *instruction to readers* â€” and the
     calibration runs it guided were themselves on wikitext-2, where 0.8884 is correct.
   - **The fix is structural, so no document can go stale again.**
     `lang_data.MoRELanguageDataset` exposes `pos_partition_load_entropy` beside
     `primary_metric_floor`, `engine.py` reads it with `getattr` and publishes
-    `val/routing_pos_partition_load_entropy` at every validation — absent rather than
+    `val/routing_pos_partition_load_entropy` at every validation â€” absent rather than
     substituted when a corpus has no shuffled-control stage. TLX.6c asserts no
     `0.888`/`0.894` literal survives in engine *code* (comments are exempt: they are the
     rationale, and a whole-file substring check would push the next person to delete the
     explanation to make a test pass).
   - **`build_shuffled_control.py` had the same defect in the justification it writes
-    into the manifest** — the note said "the real partition's 5.29x imbalance" on both
+    into the manifest** â€” the note said "the real partition's 5.29x imbalance" on both
     corpora. It now computes the ratio from that corpus's own marginals and records it as
     `shuffled_control_real_token_imbalance_ratio`. **Both frozen control artifacts were
     rebuilt and reproduce byte-identically**: `token_family_shuffled_sha256` is
-    `53da4423…1807c00` (wikitext-2) and `d48db113…81a2fead` (wikitext-103) before and
+    `53da4423â€¦1807c00` (wikitext-2) and `d48db113â€¦81a2fead` (wikitext-103) before and
     after, so only the prose and the new numeric key changed. `dataset_version` is
     derived from the split arrays alone and is unmoved (TL2.7c).
   - **`calibrate_lang_weights.py` now reads both of its corpus constants from the
-    manifest** rather than pasting them. The literals were *correct* there — that script
-    pins `CORPUS = "wikitext-2"` — but they were correct by coincidence of which corpus
+    manifest** rather than pasting them. The literals were *correct* there â€” that script
+    pins `CORPUS = "wikitext-2"` â€” but they were correct by coincidence of which corpus
     the script happens to point at, which is precisely how 0.8884 escaped into five
     documents about a different one. Re-derived values are identical to the frozen
     literals: floor `5.398304166059712`, entropy `0.888442277795757`.
@@ -2838,13 +2838,13 @@ where compute forces it, and say so in the caption rather than presenting a
     `metrics.py` caption now name both corpora and point at the per-run key.
 
 
-- [x] **T-LX.7 The `±` is the sample std, and no arm's aggregate is computed by
-  hand.** The first finished canonical arm (MoE, seeds 42–46, wikitext-103, reported in
+- [x] **T-LX.7 The `Â±` is the sample std, and no arm's aggregate is computed by
+  hand.** The first finished canonical arm (MoE, seeds 42â€“46, wikitext-103, reported in
   the untracked `moe_batch1_results.md`) was summarised by hand, and **all six of its
-  `±` figures used the population std** (`statistics.pstdev` — also `numpy.std`'s
+  `Â±` figures used the population std** (`statistics.pstdev` â€” also `numpy.std`'s
   default and a spreadsheet's `STDEVP`) while `code/seed_stats.py::mean_std` and every
-  table in the arithmetic study use the **sample** std (`statistics.stdev`, n−1).
-  **Verify:** the suite asserts `mean_std` is n−1, that the two conventions differ by
+  table in the arithmetic study use the **sample** std (`statistics.stdev`, nâˆ’1).
+  **Verify:** the suite asserts `mean_std` is nâˆ’1, that the two conventions differ by
   exactly `sqrt((n-1)/n)` at n=5, that n=1 yields `std=None` not `0.0`, and that the
   **exporter's own published aggregate** reproduces `statistics.stdev` over its own
   raw per-seed vector.
@@ -2853,9 +2853,9 @@ where compute forces it, and say so in the caption rather than presenting a
   0, ALL GATES PASS**.
   - **The measured error.** Recomputed from the report's own per-seed table with
     `seed_stats.mean_std`, every mean reproduced exactly and every std was low by the
-    factor `sqrt(4/5) = 0.894427` — a **10.6 % understatement of seed variance**:
+    factor `sqrt(4/5) = 0.894427` â€” a **10.6 % understatement of seed variance**:
 
-    | quantity | mean | reported ± (n) | correct ± (n−1) |
+    | quantity | mean | reported Â± (n) | correct Â± (nâˆ’1) |
     |---|---|---|---|
     | `val/task_loss` | 3.9483 | 0.0216 | **0.024194** |
     | `val/routing_load_entropy_norm` | 0.6003 | 0.1186 | **0.132599** |
@@ -2864,71 +2864,71 @@ where compute forces it, and say so in the caption rather than presenting a
     | AMI (shuffled control) | 0.0364 | 0.0096 | **0.010697** |
     | mean pairwise cosine | 0.0304 | 0.0038 | **0.004269** |
 
-    Every per-seed derived quantity in the report was itself correct — `exp(val)`
-    reproduces each perplexity, `val/ln 2` each bits/token, `4.98494701553838 − val`
+    Every per-seed derived quantity in the report was itself correct â€” `exp(val)`
+    reproduces each perplexity, `val/ln 2` each bits/token, `4.98494701553838 âˆ’ val`
     each margin. The defect is confined to dispersion.
   - **WHY THIS IS NOT A ROUNDING CONCERN: the error is asymmetric in its
     consequence.** An arm reported with the n denominator looks *more stable* than an
-    arm reported with n−1, so a table mixing the conventions can **invert the
-    seed-variance ranking** between MoE, MoR and MoRE — and "low seed variance" is one
-    of the three conditions Outcome A is defined on (`CLAUDE.md` §8). It also breaks
-    comparability with the arithmetic study this one extends, whose tables are all n−1.
+    arm reported with nâˆ’1, so a table mixing the conventions can **invert the
+    seed-variance ranking** between MoE, MoR and MoRE â€” and "low seed variance" is one
+    of the three conditions Outcome A is defined on (`CLAUDE.md` Â§8). It also breaks
+    comparability with the arithmetic study this one extends, whose tables are all nâˆ’1.
     The verdicts themselves are unaffected: `perm_test` is an exact randomization test
     over the raw vectors and never forms a variance estimate at all
     (`seed_stats.py:74` notes `se_of_difference` is "for reporting only").
   - **No run is invalidated and no number in `runs/` is wrong.** The arm's
     `metrics.json` files hold per-seed scalars; the aggregation happened afterwards, by
     hand, outside the tooling. Re-running `export_results.py --task language` over the
-    same directories yields the corrected `±` with no retraining.
+    same directories yields the corrected `Â±` with no retraining.
   - **The structural half of the fix is a refusal to accept hand-aggregation.**
-    `HANDOFF.md` §"Recording results" gains two subsections: *"Do not compute the ±
+    `HANDOFF.md` Â§"Recording results" gains two subsections: *"Do not compute the Â±
     yourself (T-LX.7)"*, which names the denominator, quantifies the 10.6 %, gives the
     corrected table above, and says to quote `results_aggregate.csv`; and *"A hand-written
     summary is not the record"*, because the same batch also arrived **without its five
-    `runs/langB_MoE_seed4*__<hash>/` directories** — `git ls-files runs/ | grep langB_MoE`
+    `runs/langB_MoE_seed4*__<hash>/` directories** â€” `git ls-files runs/ | grep langB_MoE`
     is empty. Absent those, `export_results.py` cannot admit the arm, the proxy guard
-    cannot check `config_hash` or `dataset_version`, and `CLAUDE.md` §5 forbids
+    cannot check `config_hash` or `dataset_version`, and `CLAUDE.md` Â§5 forbids
     hand-copying the numbers into a table regardless of how carefully they were
     transcribed. A prose report is narration *over* the record, never a substitute.
-  - **TLX.7d is the check that actually binds.** TLX.7a–c pin the library, but a
+  - **TLX.7d is the check that actually binds.** TLX.7aâ€“c pin the library, but a
     library can be correct while the published table is not; TLX.7d re-derives the
     exporter's own emitted `std` from the raw vector it emitted alongside it, so the
-    `±` in `results_tables.md` cannot silently become a population std.
-  - **The same report also quotes `0.884` as the POS partition entropy** — the
+    `Â±` in `results_tables.md` cannot silently become a population std.
+  - **The same report also quotes `0.884` as the POS partition entropy** â€” the
     wikitext-2 dev constant, beside canonical wikitext-103 runs whose value is
     `0.894156`. That is the first real-world instance of the T-LX.6 defect, and it
     confirms the structural fix was the right one: once those directories exist, the run
     publishes `val/routing_pos_partition_load_entropy` from its own corpus and the
     number cannot be quoted from the wrong one.
   - **What the arm actually measured, pending its directories.** Val task loss
-    **3.9483 ± 0.0242** nats/token against the canonical backoff-bigram floor
-    4.98494701553838 — a **+1.0366** nat margin, every seed clearing it. Routing beats
-    its own permutation control on **all five seeds** (AMI margin **+0.1273 ± 0.0400**,
-    range +0.0740 to +0.1862). Normalized load entropy is **0.6003 ± 0.1326** with a
-    per-seed range **0.3709–0.7049**, i.e. **0.2939 below** the canonical partition's own
+    **3.9483 Â± 0.0242** nats/token against the canonical backoff-bigram floor
+    4.98494701553838 â€” a **+1.0366** nat margin, every seed clearing it. Routing beats
+    its own permutation control on **all five seeds** (AMI margin **+0.1273 Â± 0.0400**,
+    range +0.0740 to +0.1862). Normalized load entropy is **0.6003 Â± 0.1326** with a
+    per-seed range **0.3709â€“0.7049**, i.e. **0.2939 below** the canonical partition's own
     0.894156, and the worst-balanced seed (43, 0.3709) is simultaneously the worst on
-    val loss (3.9829) and on AMI (0.1066) — a signal that `routing_balance_weight =
+    val loss (3.9829) and on AMI (0.1066) â€” a signal that `routing_balance_weight =
     0.001` may be under-regularized for MoE on the full corpus. Recorded here as an
     observation about an arm that is **not yet admissible**, not as a result.
 
 - [x] **T-LX.8 `perf/throughput_tokens_sec` counted batch ITEMS, not tokens, and a
-  15-day capacity estimate was built on the 256× error.** `engine.py`'s epoch loop
+  15-day capacity estimate was built on the 256Ã— error.** `engine.py`'s epoch loop
   accumulated `total_tokens += bs`, where `bs` is the **batch dimension**. On
   arithmetic an item *is* a record, so the key was right by accident and README:392
   reads it as records/s. On **language** an item is a packed block of
   `data.seq_len = 256` tokens, so every language run published a token rate low by
-  exactly 256×. **Verify:** `test_language_task_axis.py` asserts, over the emitted
+  exactly 256Ã—. **Verify:** `test_language_task_axis.py` asserts, over the emitted
   `metrics.json` of every run carrying both keys, that
-  `perf/throughput_tokens_sec == perf/throughput_items_sec × tokens_per_item`
+  `perf/throughput_tokens_sec == perf/throughput_items_sec Ã— tokens_per_item`
   (`seq_len` on language, 1 on arithmetic); that at least one **language** run carries
   both, so the check cannot pass vacuously; that no language run reports below
   1 k tok/s; and that an arithmetic run's two keys are equal.
   **Evidence (2026-09-13, CPU interpreter): `test_language_task_axis.py` 79 passed / 0
-  failed** (was 74; TLX.8a–e are this task). Gate L0 **TOTAL 356 356 0 0, ALL GATES
+  failed** (was 74; TLX.8aâ€“e are this task). Gate L0 **TOTAL 356 356 0 0, ALL GATES
   PASS**.
   - **The end-to-end proof is a run, not an assertion.** `runs/langB_MoRE_seed44__d915d7de__r3/`
     (post-fix smoke) emits `perf/throughput_tokens_sec = 25887.73423518508` and
-    `perf/throughput_items_sec = 101.12396185619171` — ratio **256.0 exactly**. Its
+    `perf/throughput_items_sec = 101.12396185619171` â€” ratio **256.0 exactly**. Its
     pre-fix twin `__r2` emits `104.81153234709336` under the tokens key and **no items
     key at all**. That pair is why the check reads run directories instead of source
     text: a source-level assertion is satisfiable by editing a comment, and the number
@@ -2936,15 +2936,15 @@ where compute forces it, and say so in the caption rather than presenting a
   - **WHY THIS IS THE MOST EXPENSIVE UNIT BUG IN THE PROJECT SO FAR.** Gate L7's MoRE
     run reported `64.66` under a key named *tokens*/sec. A downstream cost model on the
     other machine (`cloud_gpu_costing_and_onboarding.md`, authored off these logs) read
-    those 53–65 figures as real token rates and costed the remaining 10-run canonical
-    matrix at **15 days** of GPU time. The true rate is `64.66 × 256 = 16,553 tok/s`,
-    putting the same matrix near **35–50 h**. Three remedies were on the table because
+    those 53â€“65 figures as real token rates and costed the remaining 10-run canonical
+    matrix at **15 days** of GPU time. The true rate is `64.66 Ã— 256 = 16,553 tok/s`,
+    putting the same matrix near **35â€“50 h**. Three remedies were on the table because
     of that number, and **each one would have re-frozen an `enforced_field` and
     invalidated the five finished MoE runs**: cut the corpus to 68 M tokens (= 0.5
-    epoch, so `epochs` 3 → 1); shrink `d_model` 256 → 128 (a 0.86 M-param model);
+    epoch, so `epochs` 3 â†’ 1); shrink `d_model` 256 â†’ 128 (a 0.86 M-param model);
     rent an H100 at ~$2.7/hr. A mislabeled unit nearly rewrote the frozen spec.
   - **Why multiply at the accumulator and not at the log site.** `total_tokens` is read
-    twice — once for `perf/throughput_tokens_sec` and once as the denominator of
+    twice â€” once for `perf/throughput_tokens_sec` and once as the denominator of
     `items_per_sec`. Scaling at the log site leaves the variable's *name* lying about
     its contents for the next reader, which is the exact failure being fixed.
   - **Why `perf/throughput_items_sec` is published rather than the old key being
@@ -2955,41 +2955,41 @@ where compute forces it, and say so in the caption rather than presenting a
     since on arithmetic the two keys are equal by construction.
   - **This does not touch any `config_hash`.** `perf/*` are emitted metrics, not config
     fields; the proxy guard reads `enforced_fields`, and no enforced field moved. The
-    five MoE runs remain admissible, and the Gate L7 run's *scientific* content —
-    `train/avg_recursion_steps = 6.9388` of 7, `val/forced_exit_rate = 0.9628` — is
+    five MoE runs remain admissible, and the Gate L7 run's *scientific* content â€”
+    `train/avg_recursion_steps = 6.9388` of 7, `val/forced_exit_rate = 0.9628` â€” is
     unaffected. Only the wall-clock projection built on top of it was wrong.
   - **The finding the corrected number exposes is a scientific one, not a logistical
     one.** At 16.5 k tok/s the matrix is affordable on hardware the project already
     owns, so the open question is no longer *where to rent* but whether MoRE running at
     depth 6.94/7 with 96.3 % forced exit is measuring adaptive computation at all.
-    `halting_weight = 0.001` was calibrated on wikitext-2 (50× smaller) where depth
+    `halting_weight = 0.001` was calibrated on wikitext-2 (50Ã— smaller) where depth
     landed at 2.63. Recalibrating it is uniquely cheap in spec terms because
     `halting_weight` lives in `architecture_variants.{mor,more}` and the guard consults
-    only the arm's own block — MoE's block is `0.0` by definition, so its five runs
+    only the arm's own block â€” MoE's block is `0.0` by definition, so its five runs
     survive. Any such sweep is a **separately labelled ablation** and must pre-register
     "depth interior to the budget" as its selection rule; selecting on val loss would be
-    tuning toward a conclusion (`CLAUDE.md` §6).
+    tuning toward a conclusion (`CLAUDE.md` Â§6).
 
 - [x] **T-LX.9 The training loop retained every routing index tensor of the epoch,
   and MoR paid ~7.4 GiB for a statistic it reports as `N/A`.** The epoch loop kept
   `epoch_all_expert_idx`, a list of every `[N_active]` int64 argmax tensor, for every
-  depth step, of every batch, alive until the epoch ended — solely to feed
+  depth step, of every batch, alive until the epoch ended â€” solely to feed
   `compute_expert_load_entropy` once. On canonical language that is
   `7 depths x 12,288 tokens x 8 B x 10,965 batches = ~7.4 GiB` of **live** tensors in
   ~77 k separate allocations. **MoR OOM'd on a rented 16 GB V100 at the first backward
   of epoch 2**, and MoR has `num_experts = 1`, where T6.4 makes the entropy `None` by
-  definition — so the arm was paying 7.4 GiB to feed a number it never reports.
+  definition â€” so the arm was paying 7.4 GiB to feed a number it never reports.
   **Verify:** `test_lang_recursion.py` asserts the entropy computed from the
   incrementally accumulated count vector is **bit-identical** to the entropy computed
   from the retained index tensors, at E = 1 (both `None`), 2 and 6, using the engine's
   own float32 accumulation order; that no `epoch_all_expert_idx` accumulator survives
   in executable engine code; and that the engine emits per-epoch peak GPU memory.
   **Evidence (2026-09-14, CPU interpreter): `test_lang_recursion.py` 17 passed / 0
-  failed / 0 skipped** (was 11; TLX.9a–d are this task), bit-identity at E=2
+  failed / 0 skipped** (was 11; TLX.9aâ€“d are this task), bit-identity at E=2
   `0.9997463226318359` and E=6 `0.9999266266822815` on both paths. Gate L0 **TOTAL 356
   356 0 0, ALL GATES PASS**.
   - **Why `.cpu()` on the retained tensors is not the fix.** The obvious one-line patch
-    — `epoch_all_expert_idx.extend(t.detach().cpu() for t in batch_expert_idx)` — moves
+    â€” `epoch_all_expert_idx.extend(t.detach().cpu() for t in batch_expert_idx)` â€” moves
     the same 7.4 GiB into host RAM, on a box with 21 GB, and leaves ~77 k Python objects
     and a CPU-side `(idx == e)` scan per expert per tensor at epoch end. It relieves the
     symptom on the GPU and keeps the redundancy. **The list has no reader that the
@@ -3006,10 +3006,10 @@ where compute forces it, and say so in the caption rather than presenting a
     reinterpreted. `perf/*` and metric keys are not config fields, so **no
     `config_hash` moves and the five finished MoE runs stay admissible.**
   - **The empty-epoch branch had to be preserved explicitly.** The old guard was
-    `if epoch_all_expert_idx:` — falsy when nothing was routed. With the list gone the
+    `if epoch_all_expert_idx:` â€” falsy when nothing was routed. With the list gone the
     guard is `epoch_expert_counts.sum() > 0`. Without it, an unrouted epoch would report
     `-0.000000` rather than `N/A`, which is exactly the sentinel-as-measurement failure
-    CLAUDE.md §4 forbids; TLX.9b pins that all-zero counts produce a finite number and
+    CLAUDE.md Â§4 forbids; TLX.9b pins that all-zero counts produce a finite number and
     therefore that the guard, not a NaN, is what yields N/A.
   - **`perf/gpu_peak_alloc_gib` and `perf/gpu_peak_reserved_gib`, reset per epoch.** The
     OOM had to be diagnosed from a traceback and an arithmetic estimate because **no run
@@ -3018,7 +3018,7 @@ where compute forces it, and say so in the caption rather than presenting a
     GPU hour. Both keys are needed and they answer different questions: `allocated` is
     live tensor bytes (a **rising** series across epochs = retention), `reserved` is what
     the caching allocator holds from the driver, and the gap between them is
-    fragmentation — an OOM can be caused by either and the remedies differ.
+    fragmentation â€” an OOM can be caused by either and the remedies differ.
   - **What was ruled out, so the next OOM is not re-diagnosed from scratch.**
     `torch.save(model.state_dict(), ...)` saves and discards, retaining nothing.
     `depth_hist` is a CPU tensor. `epoch_halt_stats`, `epoch_route_stats` and
@@ -3029,7 +3029,7 @@ where compute forces it, and say so in the caption rather than presenting a
     log="gradients", log_freq=50)` is deliberately left in place**: it is part of the
     logging pipeline, removing it changes what a canonical run records, and it is not
     implicated by a per-epoch growth pattern. If the instrumented run shows a rising
-    `perf/gpu_peak_alloc_gib` with this fix in, `wandb.watch` is the next thing to test —
+    `perf/gpu_peak_alloc_gib` with this fix in, `wandb.watch` is the next thing to test â€”
     as a labelled variant, never as a silent edit.
   - **Batch size was not touched.** `batch_size = 48` is a shared `enforced_field` frozen
     for the 8 GB card (T-L7.0/T-L7.1); lowering it to fit memory would invalidate the
@@ -3040,7 +3040,7 @@ where compute forces it, and say so in the caption rather than presenting a
   row and a single-commit provenance claim the exporter's own data contradicted.** The
   15 canonical cells themselves audited clean (all present, all four artifacts each, all
   conforming to `canonical_spec_language.json`); the two defects were in the package
-  built around them, and both were of the class CLAUDE.md §5 exists to prevent — a
+  built around them, and both were of the class CLAUDE.md Â§5 exists to prevent â€” a
   number that means one thing being presented as though it meant another. **Verify:**
   `test_language_export.py` 77 passed / 0 failed / 0 skipped; Gate L0 **TOTAL 356 356 0
   0, ALL GATES PASS**; the regenerated `results/language/results_tables.md` shows a
@@ -3054,7 +3054,7 @@ where compute forces it, and say so in the caption rather than presenting a
     so their `718.8116 +- 7.2022` is items/s. It was published beside MoR's
     `44485.5120` and MoRE's `43145.8525` tokens/s in a single row, reading as MoE being
     ~62x slower than MoR when the truth is ~4x faster (718.81 x 256 ~ 183,976 tok/s).
-    **This is the T-LX.8 defect — the one that produced the 15-day cost estimate —
+    **This is the T-LX.8 defect â€” the one that produced the 15-day cost estimate â€”
     resurfacing inside the results package**, which is why the fix belongs in the
     exporter and not in a note.
   - **The version test needs no commit archaeology.** T-LX.8 began publishing
@@ -3066,10 +3066,10 @@ where compute forces it, and say so in the caption rather than presenting a
     units**: `results.csv`, `results_aggregate.csv`, `results.json`, the Markdown and the
     pairwise tests all read the repaired dict.
   - **The value is relabelled, never rescaled.** Multiplying by `seq_len` would recover
-    the tokens figure exactly — it is the identical arithmetic the fixed engine performs,
-    and `seq_len` is a frozen `enforced_field` — but the product appears in no run's
+    the tokens figure exactly â€” it is the identical arithmetic the fixed engine performs,
+    and `seq_len` is a frozen `enforced_field` â€” but the product appears in no run's
     `metrics.json`, and a reader who greps the artifact would find `718.8116` under a key
-    the table renders as `183,976`. CLAUDE.md §5 requires `N/A` over synthesis. The
+    the table renders as `183,976`. CLAUDE.md Â§5 requires `N/A` over synthesis. The
     relabelling costs nothing analytically because MoR and MoRE publish items/s too, so
     the items row is complete and unit-consistent across all three arms and is the row a
     throughput comparison should be read from; a Markdown footnote in section 3 says so,
@@ -3079,13 +3079,13 @@ where compute forces it, and say so in the caption rather than presenting a
     read `- git commit of the admitted runs: \`29fe5892...\` (dirty=True)`, and the
     console printed `consistency: ... one commit, ...`. The matrix spans four:
     `29fe5892` (MoE x5), `079de08a` (MoR s42), `f464c966` (MoR s43-46), `ba60b0b8`
-    (MoRE x5). **Neither claim was ever checked** — `consistency_errors()` verifies
+    (MoRE x5). **Neither claim was ever checked** â€” `consistency_errors()` verifies
     duplicate cells, one `dataset_version`, one `train_split_version`, seed-blind config
     equality within each arm, and floor-margin consistency, and has never examined
     `code_git_commit`.
   - **Removing commit from the seed-blind check was correct; the reporting simply never
     followed.** A 15-run matrix trained over several days across two machines cannot
-    share one revision and still be a matrix — what holds the arms comparable is
+    share one revision and still be a matrix â€” what holds the arms comparable is
     `canonical_spec_language.json` plus the seed-blind config equality check, not a code
     hash. The header now enumerates every distinct commit with its arm/seed cells, and
     the console line states only what `consistency_errors()` actually enforces, then
@@ -3100,27 +3100,27 @@ where compute forces it, and say so in the caption rather than presenting a
   adaptive depth never appeared.** `self.moe_block(...)` sat *inside*
   `for depth in range(1, max_depth+1)`, so `argmax` re-decided a token's expert at every
   step, and because the halt heads are per-expert and indexed by that same `expert_idx`,
-  the halting policy was re-drawn with it — no halt head ever observed one token's whole
+  the halting policy was re-drawn with it â€” no halt head ever observed one token's whole
   trajectory. Measured consequence in the published MoRE cells: `halt/forced_exit_rate`
   **0.9789**, `val/forced_exit_rate` **0.9830**, 97.9% of tokens exiting at step 7.
-  Diagnosis only — no model change, the 15 canonical cells byte-unchanged. **Verify:**
+  Diagnosis only â€” no model change, the 15 canonical cells byte-unchanged. **Verify:**
   `diag_route_stability.py`; Gate L0 **TOTAL 356 356 0 0**. **Full write-up: the
   `## T-LX.11` section below** (commit `18f0438`, 2026-09-16).
 
 - [x] **T-LX.12 Canonical language MoRE now routes once per token and recurses inside
-  that expert, as CLAUDE.md §1 defines it.** The router fires once per token per forward;
+  that expert, as CLAUDE.md Â§1 defines it.** The router fires once per token per forward;
   **both** the argmax *and* the selected gate probability are cached at depth 1 and
-  replayed at every deeper step. Persisting the index alone is not enough — the router
+  replayed at every deeper step. Persisting the index alone is not enough â€” the router
   can then shrink the persisted expert's gate toward zero and make the block a near-no-op
   while `routing_persistence` metrics still read 1.000, which is re-routing through the
   back door. The cached gate is **not** detached, so task gradient still reaches the
   router. One routing decision means **one** balance term: `b_loss`/`router_logits`
   return `None` on persisted-route calls and those steps are excluded from `bal_calls`,
   because returning `0.0` would divide one real term by `max_depth` and silently weaken
-  the auxiliary 7×. Gated behind `model.routing_persistence`; legacy `per_step` is the
+  the auxiliary 7Ã—. Gated behind `model.routing_persistence`; legacy `per_step` is the
   default and the key is **absent** from every arm but language MoRE, following the
   `cfg.setdefault("task", ...)` precedent, so no existing `config_hash` moves.
-  Spec `L7.1-language-frozen` → **`L7.2-TLX.12-route-persistence`**. **Verify — by
+  Spec `L7.1-language-frozen` â†’ **`L7.2-TLX.12-route-persistence`**. **Verify â€” by
   running, not only by test:** Gate L0 **TOTAL 356 356 0 0 / ALL GATES PASS**;
   `test_route_persistence.py` 37 passed / 0 failed; `test_language_spec_freeze.py` 64;
   `test_phase4_balance.py` 27; `test_phase2_routing.py` 19. And a **real GPU training
@@ -3133,17 +3133,17 @@ where compute forces it, and say so in the caption rather than presenting a
 - [x] **T-LX.13 A 15-cell matrix could not be checked for having run on one card,
   because every cell recorded only `device: "cuda"`.** Seed variance is only seed
   variance if the silicon is constant; `perf/*` and peak memory are comparable within one
-  card and meaningless across two, and `CLAUDE.md` §9 already refuses to split a matrix
-  across machines — but nothing in the artifact let a reader *verify* that it had not
+  card and meaningless across two, and `CLAUDE.md` Â§9 already refuses to split a matrix
+  across machines â€” but nothing in the artifact let a reader *verify* that it had not
   happened. `engine.py` now records `gpu_name`, `gpu_total_mem_gib`, `gpu_capability`,
   `torch_version` and `torch_cuda_version` beside `device`, into both sinks (the W&B
   config and `resolved_config.json`) from one dict, so the two cannot drift.
-  **No `config_hash` moves** — `run_context.py` strips `provenance` before hashing — so
+  **No `config_hash` moves** â€” `run_context.py` strips `provenance` before hashing â€” so
   this is safe to add to a matrix already in flight. CPU records the literal string
-  `"N/A"`, per CLAUDE.md §4: absent hardware is not measurable, and `0`/`None` would be a
+  `"N/A"`, per CLAUDE.md Â§4: absent hardware is not measurable, and `0`/`None` would be a
   sentinel reported as a measurement. The fields ride the existing T6.7c/T6.7d
   provenance assertions rather than adding `check()` calls, which would move the frozen
-  356. **Verify — by running:** Gate L0 **TOTAL 356 356 0 0 / ALL GATES PASS**, and a
+  356. **Verify â€” by running:** Gate L0 **TOTAL 356 356 0 0 / ALL GATES PASS**, and a
   real GPU run (`runs/langB_MoRE_seed44__16aaf2cb__r2`) whose `resolved_config.json`
   carries `gpu_name = "NVIDIA GeForce RTX 3050 6GB Laptop GPU"`, `gpu_capability = "8.6"`,
   `torch_version = "2.6.0+cu126"`, `torch_cuda_version = "12.6"`,
@@ -3153,43 +3153,43 @@ where compute forces it, and say so in the caption rather than presenting a
     arm lands on a different torch than they did, that belongs in threats-to-validity.
 
 - [x] **T-LX.14 The halt heads are trained 285x harder by the task loss than by the
-  ponder cost — so the absent adaptive depth is not a missing gradient, it is a task
+  ponder cost â€” so the absent adaptive depth is not a missing gradient, it is a task
   loss that wants maximum depth.** Reviewer 652J (NeurIPS workshop, concern 1) could not
   find the ACT output aggregation in the paper and inferred the halt head sees only a
   discrete state, predicting "a near-constant policy". The aggregation exists
   (`model.py:995`, `accumulator += updated * step_weight`, weights summing to exactly 1),
-  and their `c_t + p_t` "double count" is paper notation, not a defect — `c_t` is
+  and their `c_t + p_t` "double count" is paper notation, not a defect â€” `c_t` is
   strictly-prior mass, so the test is standard Graves 2016. But the *prediction* is
   correct, which is why the question is dominance, not existence.
   **Measured** on the converged 30-epoch checkpoint `runs/langB_MoRE_seed44__68d032ba`:
   task-loss gradient at `expert_halt_heads` **7.786e-02**, ponder **2.734e-04**,
   ratio **285x task-dominated**; `routing_balance` and `step_routing` exact structural
-  zeros (no graph path), labelled as measurements rather than sentinels per CLAUDE.md §4.
-  Depth and val loss move *together* over training — depth 1.96 → 6.82 while val
-  5.68 → 4.63 — so the task loss is pulling depth up, not failing to hold it down.
-  Per-family depth spread is only 6.80–6.94 across six families and
+  zeros (no graph path), labelled as measurements rather than sentinels per CLAUDE.md Â§4.
+  Depth and val loss move *together* over training â€” depth 1.96 â†’ 6.82 while val
+  5.68 â†’ 4.63 â€” so the task loss is pulling depth up, not failing to hold it down.
+  Per-family depth spread is only 6.80â€“6.94 across six families and
   `depth/by_document/between_share` is 0.0008: there is nothing for the policy to be
   adaptive about at this scale. **This is the mechanism-bearing form of Outcome C**, and
-  it predicts the V100 MoRE re-run will land near the cap — that rental buys
+  it predicts the V100 MoRE re-run will land near the cap â€” that rental buys
   architectural correctness, not a depth result.
-  **Verify — by running, not only by test:** Gate L0 **TOTAL 356 356 0 0 / ALL GATES
+  **Verify â€” by running, not only by test:** Gate L0 **TOTAL 356 356 0 0 / ALL GATES
   PASS**, and the diagnostic run against a real trained checkpoint, artifact
   `halt_gradient_attribution.json` in that run directory.
   **Full write-up: `changelog.md` T-LX.14.**
 
-- [x] **T-LX.15 "Compute-matched" had never been measured — the repository contained no
+- [x] **T-LX.15 "Compute-matched" had never been measured â€” the repository contained no
   FLOPs accounting at all.** Only two comments marked the hole (`engine.py:1458`,
   `metrics.py:1647`). Reviewer 652J concern 3 made it a condition of acceptance:
   *"MoRE versus MoR needs an iso-FLOP or iso-latency control."*
   `code/flops_accounting.py` measures a real forward with `FlopCounterMode` from each
-  arm's own `resolved_config.json` — so attention, positional table and the 8192-way LM
-  head are counted, which every hand derivation had dropped — sweeps depth with
+  arm's own `resolved_config.json` â€” so attention, positional table and the 8192-way LM
+  head are counted, which every hand derivation had dropped â€” sweeps depth with
   `fixed_depth`, and **verifies** the `base + (d-1)*per_step` fit against a third measured
   point rather than assuming linearity (>0.1% residual raises).
   At each arm's own measured `depth/mean`: MoE **10.751** GFLOPs, MoR **97.506**,
-  MoRE **23.565** → MoR/MoRE **4.14x**, MoR/MoE **9.07x**, MoRE/MoE **2.19x**.
+  MoRE **23.565** â†’ MoR/MoRE **4.14x**, MoR/MoE **9.07x**, MoRE/MoE **2.19x**.
   MoE's marginal-step cell is `N/A`, not 0.
-  **The trap:** that 4.14x buys nothing in wall-clock — MoR 173.8 vs MoRE 168.5 items/s,
+  **The trap:** that 4.14x buys nothing in wall-clock â€” MoR 173.8 vs MoRE 168.5 items/s,
   a 3% deficit for MoRE on the same card, because top-1 dispatch spends the saving on
   gather/scatter. FLOPs and latency point in opposite directions; every claim must name
   which axis it rests on.
@@ -3197,7 +3197,7 @@ where compute forces it, and say so in the caption rather than presenting a
   iso-latency *already holds* (MoR vs MoRE within 3%), so the published matrix contains
   the control that was asked for and the failure was in the reporting. iso-FLOP is not
   matched and cannot be, jointly with iso-parameter, in this family: matching MoR's active
-  width means `ffn_mult 24 → 4`, which drops its FFN parameters to a sixth. An iso-FLOP
+  width means `ffn_mult 24 â†’ 4`, which drops its FFN parameters to a sixth. An iso-FLOP
   MoR is a *second* control, not a replacement.
   **Supersedes** the ~3.7x / ~25x multipliers quoted in session chat before this module
   existed; those were FFN-only and are wrong.
@@ -3411,7 +3411,7 @@ python code/run_correctness_suite.py           # Gate L0: TOTAL 356 356 0 0
 
 ---
 
-## T-LX.12 — routing persists through recursion: canonical language MoRE routes once per token
+## T-LX.12 â€” routing persists through recursion: canonical language MoRE routes once per token
 
 **Status: IMPLEMENTED and verified on CPU. The fix is in the code and frozen in the spec;
 the canonical MoRE matrix has NOT been re-run yet, so every language MoRE number currently
@@ -3428,7 +3428,7 @@ held fixed, and only the re-routing moves.
 | value | meaning | where it is canonical |
 |---|---|---|
 | `per_token` | the router fires once per token per forward; the decision is reused at depths 2..max_depth | language MoRE (frozen, L7.2) |
-| `per_step` | the router fires at every depth — the legacy behaviour T-LX.11 diagnosed | the default everywhere else; a labelled ablation for language MoRE |
+| `per_step` | the router fires at every depth â€” the legacy behaviour T-LX.11 diagnosed | the default everywhere else; a labelled ablation for language MoRE |
 
 ### Mechanism
 
@@ -3442,7 +3442,7 @@ dispatching on a misaligned route would mix tokens' experts silently.
 
 **Both halves of the decision are cached, and that is not belt-and-braces.** Persisting
 only the argmax leaves the router running each depth to re-derive the gate, and the router
-can then drive the persisted expert's gate toward 0 at depths >= 2 — the expert output is
+can then drive the persisted expert's gate toward 0 at depths >= 2 â€” the expert output is
 multiplied by ~0, the block becomes a near-no-op, and the model is re-routing through the
 back door while `expert_idx` reports a fixed index and every persistence metric reads
 1.000. The cached gate is **not** detached, so task gradient still reaches the router
@@ -3451,7 +3451,7 @@ through it.
 **One routing decision is one balance term.** `bal_calls` counts only the calls that
 routed, so `total_bal_loss` under `per_token` is that single term. Returning `0.0` instead
 of `None` from a persisted call would divide one real balance term by `max_depth` and
-weaken the auxiliary 7x — the CLAUDE.md §2 depth-coupling defect, mirrored. `MoREModel`
+weaken the auxiliary 7x â€” the CLAUDE.md Â§2 depth-coupling defect, mirrored. `MoREModel`
 aggregates with `_bal_term_sum` / `_bal_term_blocks` so a non-reporting block contributes
 nothing rather than a zero.
 
@@ -3464,7 +3464,7 @@ second counter the fix is not checkable from an artifact.
 ### Verification (seeded, CPU, forward-only, `code/test_route_persistence.py`)
 
 A 64-dim toy model, `fixed_depth=True` so all seven depths run over a constant active set,
-run twice on **identical weights and identical input** — the two rows differ only in
+run twice on **identical weights and identical input** â€” the two rows differ only in
 persistence. Random weights, so these numbers describe the architecture and may never be
 quoted about a trained model.
 
@@ -3474,7 +3474,7 @@ quoted about a trained model.
 | `per_token` | 7 | **1** | 1.000 1.000 1.000 1.000 1.000 1.000 1.000 | -0.4442 (1 term, undivided) | **56.06** |
 
 The gradient column is the one that rules out the quiet failure: had the cached gate been
-detached, the router would have been left with the balance loss as its only supervision —
+detached, the router would have been left with the balance loss as its only supervision â€”
 load balance optimised in isolation, i.e. collapse dressed up as specialization.
 
 **The halt head now follows the persisted expert.** Probe: zero every halt head's weight,
@@ -3488,16 +3488,16 @@ fully determined by the depth-1 expert.
 
 **Every invariant is paired with the legacy control on the same weights.** A persistence
 test that checks only `per_token` passes vacuously if the loop stops re-routing for an
-unrelated reason — a shape bug collapsing the active set, an argmax over a constant
+unrelated reason â€” a shape bug collapsing the active set, an argmax over a constant
 tensor. If a control ever starts passing, the result beside it has stopped being evidence.
 
 ### Config identity: who gets the key, and why the others must not
 
 `config_hash` is a SHA-256 over the resolved config minus `provenance` / `logging`
 (`code/more/run_context.py:117`), so **any** key written into `model` moves the hash of
-every run that receives it. The key is therefore stamped only for `(language, more)` —
+every run that receives it. The key is therefore stamped only for `(language, more)` â€”
 sparse table `CANONICAL_ROUTING_PERSISTENCE` plus `stamp_routing_persistence` in
-`code/more/config.py` — and is absent everywhere else:
+`code/more/config.py` â€” and is absent everywhere else:
 
 - **language MoE / MoR**: absent. The axis cannot affect them (`max_depth = 1` leaves no
   second depth to persist to; `num_experts = 1` makes the argmax constant), so writing a
@@ -3525,16 +3525,16 @@ absent. The stamp therefore runs at the end of `apply_architecture` **and** in
 `L7.1-language-frozen` -> **`L7.2-TLX.12-route-persistence`** with a `spec_version_history`
 block.
 
-No protocol field moved — epochs, batch_size, lr, seq_len, vocab_size, loss weights and
-`ffn_mult` are byte-identical — so **MoE and MoR remain canonical without qualification**
+No protocol field moved â€” epochs, batch_size, lr, seq_len, vocab_size, loss weights and
+`ffn_mult` are byte-identical â€” so **MoE and MoR remain canonical without qualification**
 and their 10 cells are untouched. Parameter count is unchanged (MoRE 5,584,908, the Gate L6
 anchor): persistence adds no parameters.
 
 **The intended asymmetry, recorded so nobody "fixes" it.** The 5 published L7.1 MoRE cells
 store `variant = "language"`; resolving that architecture today gives
 `variant = "language+route_per_step"`, because the canonical value for that arm has moved.
-That is what marks them as the labelled per-step ablation (CLAUDE.md §6). Their artifacts
-are preserved unedited, and a per-step MoRE can no longer claim `canonical_lang_b` — the
+That is what marks them as the labelled per-step ablation (CLAUDE.md Â§6). Their artifacts
+are preserved unedited, and a per-step MoRE can no longer claim `canonical_lang_b` â€” the
 proxy guard refuses it **by name**.
 
 ### Pre-registered predictions for the MoRE re-run
@@ -3553,24 +3553,24 @@ Adding a 6th return value and a `route=` parameter to `MoEBlock.forward` breaks 
 distinct classes of caller, and Gate L0 failed on each in turn rather than on both at once.
 
 **Wrappers.** Three places monkeypatch `MoEBlock.forward` to record per-call values. The old
-`(self, x)` signature raises `TypeError` the moment a `per_token` model runs —
+`(self, x)` signature raises `TypeError` the moment a `per_token` model runs â€”
 `test_phase4_balance.py` did exactly that and took Gate L0 from `TOTAL 356 356 0 0` to
 `GATE FAILURE` with **0 tests executed**, which is a louder failure than a wrong count and
 easy to misread as unrelated. The worse variant is a wrapper that accepts `route` and drops
 it: every model then looks like the legacy per-step one, so the recorder "verifies" an
-architecture the caller never built. All three now forward it and skip — never zero-fill —
+architecture the caller never built. All three now forward it and skip â€” never zero-fill â€”
 non-reporting calls: `code/test_phase4_balance.py:82`, `code/diag_route_stability.py:140`,
 `code/test_route_persistence.py:197`. TLX12k5 asserts the keyword by name.
 
 **Direct callers.** `code/test_phase2_routing.py` unpacked the block's return as a 5-tuple in
 three places and raised `ValueError: too many values to unpack (expected 5)` at the first,
 which reported as gate 1 `EMPTY`, `TOTAL 337 337 0 0`, and a second `GATE FAILURE`. Now
-explicit 6-tuple unpacks — **not** `*rest`, so a future arity change raises at the unpack
+explicit 6-tuple unpacks â€” **not** `*rest`, so a future arity change raises at the unpack
 rather than binding the wrong tensor to `stats`. Repo-wide audit: only four files construct
 a `MoEBlock`; `model.py` and `test_phase4_balance.py` hold no positional dependency and
 `test_phase5_dimensions.py` reads `out[2]` by index. T2.1d additionally `assert`s that the
 gate the block *returns* equals the selected softmax probability re-derived from the
-logits — a bare `assert`, not a 20th `check(...)`, so the frozen 356 baseline does not move
+logits â€” a bare `assert`, not a 20th `check(...)`, so the frozen 356 baseline does not move
 for a contract the language suite already covers by name.
 
 ### Also landed here
@@ -3604,23 +3604,23 @@ explaining why MoE/MoR/arithmetic are deliberately excluded. Gate 0's read of th
 
 ---
 
-## T-LX.13 — hardware identity in provenance, so a matrix can be checked for one card
+## T-LX.13 â€” hardware identity in provenance, so a matrix can be checked for one card
 
 **Status: LANDED and verified by running (Gate L0 `TOTAL 356 356 0 0`, plus a real GPU
 smoke whose `resolved_config.json` carries the new fields).**
 
 Prompted by the V100 re-rental decision, not by a test failure. Deciding *whether* the
 MoRE re-run has to happen on a V100 required knowing what the kept MoE and MoR cells ran
-on — and the repository could not answer. `"device": "cuda"` is all fifteen canonical
+on â€” and the repository could not answer. `"device": "cuda"` is all fifteen canonical
 language cells record.
 
 ### Why the field matters scientifically, not clerically
 
 Three published quantities are only comparable within one card: `perf/throughput_items_sec`,
 per-epoch hours, and `perf/gpu_peak_alloc_gib` / `perf/gpu_peak_reserved_gib`. This project
-has run language work on four different GPUs. `CLAUDE.md` §9 already refuses to split the
+has run language work on four different GPUs. `CLAUDE.md` Â§9 already refuses to split the
 canonical matrix across two cards, on the grounds that a per-machine confound would sit
-inside the seed variance the study reports — and then the run record kept no field that
+inside the seed variance the study reports â€” and then the run record kept no field that
 would let a reader verify the rule was obeyed. An unverifiable rule is a claim.
 
 ### What is recorded
@@ -3628,7 +3628,7 @@ would let a reader verify the rule was obeyed. An unverifiable rule is a claim.
 Six fields, in `resolved_config.json`'s `provenance` block **and** the W&B config:
 `device`, `gpu_name`, `gpu_total_mem_gib`, `gpu_capability`, `torch_version`,
 `torch_cuda_version`. Built once as `_hw_provenance` in `code/more/engine.py` and merged
-into both sinks — `device` used to be written to the JSON only and was absent from W&B
+into both sinks â€” `device` used to be written to the JSON only and was absent from W&B
 entirely, so the two records of one run disagreed about which fields existed.
 
 `gpu_capability` earns its place separately from `gpu_name`: it is what decides whether a
@@ -3642,13 +3642,13 @@ kernel path is even available, and it is how a V100 (`7.0`) is distinguished fro
    canonical cells on disk. This is the opposite of `model.routing_persistence` (T-LX.12),
    which had to be stamped for exactly one arm because it *does* move hashes.
 2. **`"N/A"` on a CPU interpreter,** not `0`, `""` or `None`. "This run had no GPU" is a
-   fact about the run, and CLAUDE.md §4 forbids spelling a fact as a sentinel. It also
+   fact about the run, and CLAUDE.md Â§4 forbids spelling a fact as a sentinel. It also
    keeps the completeness check below live on the gate machine rather than skipped there.
 
 ### Contract
 
 The six fields are appended to `_required_fields()` in `code/test_phase6_provenance.py`,
-which already feeds an "every field present and not None" check that runs twice — on a
+which already feeds an "every field present and not None" check that runs twice â€” on a
 `more` run and on a `mor` run at `E = 1`. **Not** six new `check(...)` calls: the Gate L0
 total is frozen at 356 and a provenance field does not justify moving a frozen baseline.
 A free consequence: `_required_fields` also feeds the seed-invariance comparison, so two
@@ -3658,7 +3658,7 @@ cells of one matrix that disagree on `gpu_name` now fail there.
 
 It does not retrofit the 15 existing canonical cells; their `gpu_name` is absent and stays
 absent, and the 10 kept MoE/MoR cells' torch build is **not recoverable from the repo at
-all**. Do not backfill the field by hand — a hand-written provenance value is
+all**. Do not backfill the field by hand â€” a hand-written provenance value is
 indistinguishable from a measured one, which is the failure mode this task closes. The
 consequence is recorded where it will be acted on: `RUNBOOK_V100.md` says to re-rent a V100
 so the MoRE re-run matches the kept cells' silicon, and says the torch difference is a
@@ -3675,32 +3675,32 @@ python code/run_language_matrix.py --smoke        # then read the new run's reso
 
 `code/more/engine.py`, the `_hw_provenance` dict immediately above `wandb_config`, and the
 `ctx.resolved_cfg["provenance"].update(_hw_provenance)` beside it. The contract and the
-reasoning for keeping these fields out of `updated_rules.md` §9:
+reasoning for keeping these fields out of `updated_rules.md` Â§9:
 `_required_fields`' docstring in `code/test_phase6_provenance.py`. Full change record:
 `changelog.md` T-LX.13.
 
 ---
 
-- [x] **T-LX.16 — evaluate on the held-out test split without retraining.**
+- [x] **T-LX.16 â€” evaluate on the held-out test split without retraining.**
   Reviewer 652J concern 4 (validation reported as though it were test) is the only
   objection that can invalidate a published number. Established that
   `data/test.jsonl` (5,250 records) was **never touched**, on two independent
   grounds: `engine.py` has no test loader at all in the arithmetic path (it reads
   only `train_path`/`jsonl_path` at `engine.py:179` and `val_path` at
   `engine.py:201`; `SPLITS` with `"test"` exists only at `lang_data.py:68`), and
-  whole-line SHA-1 gives train∩test = 0, val∩test = 0, train∩val = 0 across
+  whole-line SHA-1 gives trainâˆ©test = 0, valâˆ©test = 0, trainâˆ©val = 0 across
   59,500 / 5,250 / 5,250 records. So the fix is one forward pass, not ~5.6 h of
-  retraining — and retraining would produce a *different* model than the paper
+  retraining â€” and retraining would produce a *different* model than the paper
   reports. Added `code/eval_test_split.py`, which mirrors the engine's validation
   reduction exactly (`engine.py:999-1002`) so `test/task_loss` is comparable to
   the published `val/task_loss`, with five hard guards (train/val path identity,
   re-verified record disjointness, test-file SHA-256 in the sidecar, routing
-  accuracy vs confusion diagonal to 1e-9 per CLAUDE.md §4, and `"N/A"` never
+  accuracy vs confusion diagonal to 1e-9 per CLAUDE.md Â§4, and `"N/A"` never
   `0.0`). Writes only a `test_split_metrics.json` sidecar, so no canonical
   artifact changes and no `config_hash` moves.
 
   **Blocked, but not on compute.** The 15 canonical `phaseB_*` cells have no
-  `checkpoint.pt` in this worktree — `.gitignore:21` and `:47` exclude them, so
+  `checkpoint.pt` in this worktree â€” `.gitignore:21` and `:47` exclude them, so
   they were never committed, and they live on Ayan's machine. **Fetch them; do
   not retrain.** The script's `FileNotFoundError` says so in its message.
 
@@ -3710,7 +3710,7 @@ reasoning for keeping these fields out of `updated_rules.md` §9:
   it from `data` with a default of 8. Now reads `model` first and **raises** when
   absent in both. The same inert wrong default remains in `diag_halt_gradient.py`
   and `flops_accounting.py`, where it cannot bite because the language model has
-  no `step_proj` — verified against the language checkpoint's keys, so the
+  no `step_proj` â€” verified against the language checkpoint's keys, so the
   T-LX.14 and T-LX.15 results stand.
 
   ### Verify
@@ -3722,39 +3722,39 @@ reasoning for keeping these fields out of `updated_rules.md` §9:
   ```
 
   Executed: test 0.069772 vs published val 0.073807, delta +0.004035, disjointness
-  0/0, on an **exploratory** (not canonical) checkpoint — proves the harness, not
+  0/0, on an **exploratory** (not canonical) checkpoint â€” proves the harness, not
   the matrix.
 
   ### Where to look
 
-  `code/eval_test_split.py` — `verify_disjoint` and the path-identity check in
-  `evaluate` are the leak guards; `_ROUTING_TOL` is the CLAUDE.md §4 cross-check.
-  Full record: `changelog.md` T-LX.16. Agenda: `PAPER_REVISION.md` §2.3.
+  `code/eval_test_split.py` â€” `verify_disjoint` and the path-identity check in
+  `evaluate` are the leak guards; `_ROUTING_TOL` is the CLAUDE.md Â§4 cross-check.
+  Full record: `changelog.md` T-LX.16. Agenda: `PAPER_REVISION.md` Â§2.3.
 
-- [x] **T-LX.17 — reframe the reviewer output as a revision agenda, not a rebuttal.**
+- [x] **T-LX.17 â€” reframe the reviewer output as a revision agenda, not a rebuttal.**
   There is no author-response phase: the rejection is final and the paper goes to
   another venue, so the reviews are an expert defect list. Rewrote
-  `PAPER_REVISION.md` accordingly — priority is now "how much it improves the
+  `PAPER_REVISION.md` accordingly â€” priority is now "how much it improves the
   paper" rather than "how loudly a reviewer raised it", and every fix must stand
   as ordinary good practice in the paper's own text, since the next reviewer will
   not have seen these reviews. Recorded the **7-seed rationale**, which the naive
   reading gets wrong: no reviewer asked for seeds; the binding constraint is
   test-family size. At 5 seeds the permutation floor is 0.00794 while Bonferroni
   at 7 tests is 0.00714, so past six tests *nothing* can be significant at any
-  effect size — and the revision's own controls (the fixed-depth sweep alone is up
+  effect size â€” and the revision's own controls (the fixed-depth sweep alone is up
   to 7 comparisons) would therefore destroy the significance of the results the
   paper already has. 7 seeds moves the floor to 0.00058 (~85 tests of headroom).
   Also recorded that 7 seeds will **not** rescue MoRE vs MoR (p = 0.405, a genuine
   null), so the extension cannot be mistaken for a fishing expedition. Cost
-  measured, not guessed: ~22 min per arithmetic run, so 2 extra seeds × 3 arms
-  ≈ 2.2 h locally with no rental. Seeds 42–46 remain frozen in
-  `canonical_spec.json`; extending to 42–48 is a spec amendment that must be
+  measured, not guessed: ~22 min per arithmetic run, so 2 extra seeds Ã— 3 arms
+  â‰ˆ 2.2 h locally with no rental. Seeds 42â€“46 remain frozen in
+  `canonical_spec.json`; extending to 42â€“48 is a spec amendment that must be
   recorded **before** the runs execute.
 
   ### Where to look
 
-  `PAPER_REVISION.md` §2.5 (seed argument, resolution correction), §6 (GPU split),
-  §7 (venue). Full record: `changelog.md` T-LX.17.
+  `PAPER_REVISION.md` Â§2.5 (seed argument, resolution correction), Â§6 (GPU split),
+  Â§7 (venue). Full record: `changelog.md` T-LX.17.
 
 ## T-LA.27 - DEFERRED: the parameter-matched MoR and its canonical companion (TMLR submission scope)
 
@@ -3838,7 +3838,7 @@ arithmetic), `paper/common/06_limitations.tex` (the scoping paragraph),
 `code/canonical_spec_language.json` (`architecture_variants.mor.ffn_mult = 24`),
 `results/language/results.json` (the admitted cells the companion must match).
 
-## T-LA.28 - remove §7.4 "What was declared and not run" (user request)
+## T-LA.28 - remove Â§7.4 "What was declared and not run" (user request)
 
 **Date.** 2026-10-21. **Machine.** Vedant's RTX 3050 6 GB. **Status.** DONE,
 both venues reassembled, pushed.
@@ -3846,7 +3846,7 @@ both venues reassembled, pushed.
 The subsection and its `\label{sec:declared}` are deleted from
 `paper/common/06_limitations.tex`; the three unrun exploratory controls it
 listed (fixed-depth sweep from scratch, shuffled-depth control,
-depth–input mutual information) went with it — they remain recorded in
+depthâ€“input mutual information) went with it â€” they remain recorded in
 `results/language/results.md` ("What this study does NOT establish") and in
 this file, so nothing measured is lost. ONE sentence survives: the unrun
 depth-matched control still consumes its **Holm slot**, relocated into
@@ -3864,7 +3864,7 @@ reference in `04_results.tex` was reworded to drop the dead label.
   forward-ref phrasing absent, relocated sentence present.
 
 Known pre-existing and NOT from this change: `acl_submission` reports undefined
-`\ref{app:disclosures}` — the disclosures appendix is TMLR-only while ACL keeps
+`\ref{app:disclosures}` â€” the disclosures appendix is TMLR-only while ACL keeps
 the citing prose; proven on an unmodified tree, and `assemble_submissions.py`
 forbids the fix by moving the block back. Full record: `changelog.md` T-LA.28;
 commits `2a31b36` + `f75c4f7` (now on `main`).
@@ -4014,3 +4014,77 @@ different instruments.
 - `python code/measure_counted_pages.py --venue tmlr` -> **14.33** (norm 12);
   `--venue acl` -> **11.88** (hard 8; still the deferred blocker).
 - `python code/check_latex_lint.py`: 24 files clean.
+
+## T-LA.32 - the TMLR body is cut to 11.82 counted pages (2.51 pages removed)
+
+**Date.** 2026-11-02. **Machine.** Ayan's RTX 4060 8 GB. **Status.** DONE. No
+training run; **no measured number changed**; no claim left the paper.
+
+### What changed
+
+The user authorised the reduction that T-LA.30 measured but deliberately left
+unapplied: "cut the content before the references by 2.5 pages strict". Starting
+point 14.33 counted pages (norm 12), finishing point **11.82** (-2.51).
+
+Five TMLR-only block moves, each registered in `APPENDIX`, `TMLR_APPENDIX` and
+`TMLR_ONLY_APPENDIX` so ACL's body is untouched, and each with a self-contained
+body sentence carrying the result and pointing at the appendix:
+
+1. `oodprovenance` -> "The out-of-domain set, and the version it replaces"
+   (`app:ood-provenance`). Body keeps 943 documents / <=512 tokens and the
+   earlier-set numbers (7.573 / 7.802 / 8.272).
+2. `pareto` -> "The loss--compute plane" (`app:pareto`). The figure; the body
+   keeps the frontier and dominance reading with its numbers.
+3. `arithdepth` -> "Depth control on the arithmetic task" (`app:arith-depth`).
+   Table 4; the body keeps both margins (0.842 / 0.837 matched, 0.095 / 0.221
+   best-uniform) and the bracket caveat.
+4. `arithlimits` -> "The four arithmetic limits in full" (`app:arith-limits`).
+   Body keeps a five-line `Four limits` paragraph naming all four with numbers.
+5. The TMLR Related Work section compressed from four `\paragraph` blocks to one
+   flowing paragraph (ACL's own Related Work block is unchanged).
+
+Layout (TMLR only, `paper/tmlr_submission/main.tex`): `textwidth` 6.9 -> 7.1 in,
+`textheight` 9.7 -> 9.8 in with `\headsep` -0.1 in so the bottom margin stays at
+0.575 in, `\parskip` 4.2 -> 2.4 pt, `\colfigwidth` 0.6 -> 0.46, `\dispsize`
+`\large` -> `\normalsize`, and a new `\depthfigwidth` macro (TMLR 0.66, ACL 0.92)
+so the forced-depth curve is no longer set at 0.92 of a 7.1-in measure.
+
+Prose: ~20 paragraphs tightened by one to three lines each - the two FLOPs reading
+paragraph, `Table~\ref{tab:main}`'s caption, the arithmetic-task layout
+description, the `Three things follow` signpost (stale: it introduced four
+items), the mechanism section's direction/level preamble and its duplicated
+one-seed caveat, the scale and evaluation-caveat paragraphs, the conclusions and
+the future-work sentence.
+
+### Two real defects found while cutting
+
+- **The introduction quoted the superseded OOD set.** It gave MoRE 7.573 against
+  MoR 7.802, which are the *unconstrained* draw's numbers; every other place in
+  the paper reports the capped set (7.212 / 7.423, `tab:main` and S4.3). Fixed to
+  the capped numbers. This is a consistency correction, not a measurement change:
+  both sets stay in the paper, the earlier one in the appendix block.
+- **The conclusion's mechanism sentence had no main verb** ("The language
+  mechanism is not the obvious one---...---but a competition for one per-token
+  budget, ..."). Rewritten as "is a competition for one per-token budget, not the
+  obvious dilution or trapping accounts: ...".
+
+### Why not cut content
+
+The arithmetic task stays a full body section by decision, `opdiff-v4` stays the
+sole arithmetic study, and no sentence that carries a number or a falsifiable
+claim was deleted - it was either moved with a body summary or compressed. The
+only deletions are restatements already made elsewhere (the axis-substitution
+sentence, the duplicated paging note in S7 that repeats S4, the perplexity
+paragraph merged into the evaluation caveat).
+
+### Verify
+
+- `python paper/assemble_submissions.py`: both trees self-contained.
+- `python code/compile_papers.py`: TMLR 20 pp, ACL 20 pp, 0 errors.
+- `python code/measure_counted_pages.py --venue tmlr` -> **11.82** (norm 12,
+  OK; References heading at y = 652.3 pt of 792). `--venue acl` -> **11.66**
+  (hard 8; still the deferred blocker, and it improved because the trimmed
+  sources are shared).
+- `python code/check_overflow.py`: 0 overfull hbox/vbox in both.
+- `python code/check_latex_lint.py`: 24 files clean.
+

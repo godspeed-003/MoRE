@@ -62,18 +62,23 @@
         \addr Anonymous Institution}
 
 % \dispsize -- the size display math and the Section-6 tables are set at.
-% Single-column TMLR leaves wide margins either side of a display, so the
-% default size reads small and wastes that space; \large uses it. ACL defines
-% this as a no-op because a two-column measure has no horizontal slack.
-\newcommand{\dispsize}{\large}
+% T-LA.32 set this to \normalsize: the display tables are already \small inside,
+% and \large here cost more page than it bought in legibility. ACL defines this
+% as a no-op because a two-column measure has no horizontal slack.
+\newcommand{\dispsize}{\normalsize}
 
 % \colfigwidth -- the width a figure drawn for ACL's narrow column is set at.
-% TMLR is single-column, so \linewidth is 6.5in; the architecture drawing and the
-% Pareto panel were drawn for a 3.35in measure and rendered with labels larger
-% than the body text, the architecture figure alone costing 43% of a page
-% (T-LA.22). 0.6\linewidth is close to their native scale and still legible.
-% ACL defines this as \linewidth: it is already column-width there.
-\newcommand{\colfigwidth}{0.6\linewidth}
+% TMLR is single-column, so \linewidth is 7.1in; the architecture drawing was
+% made for a 3.35in measure and rendered with labels larger than the body text
+% when set full width (43% of a page, T-LA.22). 0.46\linewidth is close to its
+% native scale and still legible; T-LA.32 reduced it from 0.6 after the text
+% block widened. ACL defines this as \linewidth: it is already column-width there.
+\newcommand{\colfigwidth}{0.46\linewidth}
+
+% \depthfigwidth -- the forced-depth curve. Drawn wide; 0.92\linewidth is what
+% ACL's spanning figure* uses. TMLR is single-column and the same 0.92 of a 6.9in
+% measure makes a half-page float, so this file overrides it down (T-LA.32).
+\newcommand{\depthfigwidth}{0.66\linewidth}
 
 % ---------------------------------------------------------------------------
 % VENUE LAYOUT OVERRIDES (T-LA.24). tmlr.sty is left byte-identical to the
@@ -86,16 +91,18 @@
 % user's decision was to reclaim the page from whitespace before cutting
 % content, so nothing below removes a sentence.
 %
-% TEXT BLOCK. 6.5in -> 6.9in wide, 9.0in -> 9.3in tall, symmetric (-0.2in on
-% both side margins, so the page stays centred). Margins go 1.0in -> 0.8in
-% horizontally and 1.25in -> 1.10in vertically. Deliberately modest: TMLR
-% specifies no margin, but a body noticeably denser than the template's stops
-% reading as a TMLR paper, and the gain is ~7% of the text area.
+% TEXT BLOCK. 6.5in -> 7.1in wide, 9.0in -> 9.8in tall, symmetric (-0.3in on
+% both side margins, so the page stays centred; \headsep is pulled 0.1in so the
+% extra height comes off the top, not off the bottom margin, which is 0.575in and
+% must stay clear of the page furniture). Horizontal margins are 1.0in -> 0.7in
+% and vertical 1.25in -> 0.60in. T-LA.24 took this to 6.9/9.7 at 0.8in; T-LA.32
+% took the last step to 7.1/9.8, which is dense for a TMLR paper but still
+% readable at 100 dpi -- check a rendered page before tightening further.
 %
 % PARAGRAPH SPACING. tmlr.sty sets \parskip .5pc (~6pt) with \parindent 0pt,
-% which is generous for a single-column body. 4.5pt keeps paragraphs visibly
-% separated while recovering roughly a line every three paragraphs across a
-% 12-page body.
+% which is generous for a single-column body. 2.4pt keeps paragraphs separated
+% (a blank-line gap is still visible) while recovering roughly a line every two
+% paragraphs; T-LA.24 had 4.2pt, T-LA.32 2.4pt.
 %
 % FLOAT PACKING. The gap the user flagged after Figure 3 is float stranding:
 % \topfraction .7 means LaTeX will not fill more than 70% of a page with a
@@ -104,13 +111,14 @@
 % below are the standard remedy and are what actually closes that gap --
 % shrinking \parskip alone does not move it.
 % ---------------------------------------------------------------------------
-\setlength{\textwidth}{6.9in}
-\setlength{\oddsidemargin}{-0.2in}
-\setlength{\evensidemargin}{-0.2in}
-\setlength{\textheight}{9.4in}
+\setlength{\textwidth}{7.1in}
+\setlength{\oddsidemargin}{-0.3in}
+\setlength{\evensidemargin}{-0.3in}
+\setlength{\textheight}{9.8in}
 \addtolength{\topmargin}{-0.15in}
+\addtolength{\headsep}{-0.1in}
 
-\setlength{\parskip}{4.2pt plus 0.5pt minus 0.5pt}
+\setlength{\parskip}{2.4pt plus 0.4pt minus 0.4pt}
 
 \renewcommand{\topfraction}{0.92}
 \renewcommand{\bottomfraction}{0.75}
@@ -140,10 +148,9 @@ number of recursion steps under learned halting. On the language task all three
 arms sit on the quality/compute trade-off, and the composition buys the most
 quality per unit of compute. It improves on MoE by $7.9\%$ validation loss at
 $2.19\times$ MoE's inference FLOPs, where recursion alone needs $8.87\times$.
-Both ratios share an identical output projection worth $79.9\%$ of MoE's
-per-token compute; excluding it, the composition's advantage over recursion
-\emph{grows}, to $17\%$ of its compute and $4.2\times$ the quality per unit
-compute. Out of domain the composition is stronger still, reaching lower loss
+Excluding the output projection all three share, those become $17\%$ of
+recursion's compute and $4.2\times$ the quality per unit compute. Out of domain
+the composition is stronger still, reaching lower loss
 than recursion alone at under a fifth of its compute; that comparison is
 exploratory and carries no significance verdict.
 
@@ -191,12 +198,11 @@ than through deployment: we report a negative result about an architecture
 combination, and a diagnostic---scoring any learned depth policy against a
 depth-matched uniform policy before describing it as adaptive---that should save
 compute otherwise spent on a mechanism that is not paying for itself. The
-asymmetric risk is the one worth naming: a null obtained at 5.6M parameters could
-discourage work that would succeed at scale, which is why
-\S\ref{sec:limitations} states the scale objection as a falsifiable prediction
-with the measurement that would overturn it rather than as a hedge. The corpus
-inherits the demographic and topical biases of Wikipedia, which we did not
-measure and which bear on any downstream use of these checkpoints.
+asymmetric risk is worth naming: a null at 5.6M parameters could discourage work
+that would succeed at scale, which is why \S\ref{sec:limitations} states the
+scale objection as a falsifiable prediction rather than a hedge. The corpus
+inherits the biases of Wikipedia, which we did not measure and which bear on any
+downstream use of these checkpoints.
 
 % ---------------------------------------------------------------------
 % Reproducibility. Every fact below already appears in the body (seeds in
@@ -208,12 +214,11 @@ measure and which bear on any downstream use of these checkpoints.
 % ---------------------------------------------------------------------
 \section*{Reproducibility Statement}
 
-Reproducibility details---seeds, data identifiers, model and optimiser
-parameters, compute budget, hardware, statistical protocol and provenance
-caveats---appear in \S\ref{sec:engine}--\ref{sec:stats} and
-\S\ref{sec:limitations}. The language specification is frozen and ships with the
-code; the arithmetic protocol is reported with its unfrozen status and its
-dataset fingerprint.
+Seeds, data identifiers, model and optimiser parameters, compute budget, hardware,
+statistical protocol and provenance caveats appear in
+\S\ref{sec:engine}--\ref{sec:stats} and \S\ref{sec:limitations}. The language
+specification is frozen and ships with the code; the arithmetic protocol is
+reported as unfrozen.
 
 % T-LA.14. APPENDIX. TMLR sets no hard page limit but its author guide
 % recommends 12 pages of main content, and the body measured ~14.4 -- note that
