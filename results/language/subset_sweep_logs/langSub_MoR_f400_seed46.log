@@ -1,0 +1,54 @@
+[Train] no shuffled control at C:\Users\Hp\Desktop\MoRE\data\lang\wikitext-103\token_family_shuffled.npy: routing_ami will be published WITHOUT its null band. Build it with data/lang/build_shuffled_control.py.
+[Train] no topic partition at C:\Users\Hp\Desktop\MoRE\data\lang\wikitext-103\block_topic_val.npy: the second reference axis is skipped. Build it with data/lang/build_block_topics.py.
+wandb: WARNING Using a boolean value for 'reinit' is deprecated. Use 'return_previous' or 'finish_previous' instead.
+wandb: Tracking run with wandb version 0.28.0
+wandb: W&B syncing is set to `offline` in this directory. Run `wandb online` or set WANDB_MODE=online to enable cloud syncing.
+wandb: Run data is saved locally in C:\Users\Hp\Desktop\MoRE\code\wandb\offline-run-20261026_200329-nb53c0jl
+wandb: View this run in the terminal with `wandb leet`
+C:\Users\Hp\anaconda3\envs\more_env\lib\site-packages\torch\autograd\graph.py:825: UserWarning: Memory Efficient attention defaults to a non-deterministic algorithm. To explicitly enable determinism call torch.use_deterministic_algorithms(True, warn_only=False). (Triggered internally at C:\cb\pytorch_1000000000000\work\aten\src\ATen\native\transformers\cuda\attention_backward.cu:657.)
+  return Variable._execution_engine.run_backward(  # Calls into the C++ engine to run the backward pass
+C:\Users\Hp\anaconda3\envs\more_env\lib\site-packages\wandb\integration\torch\wandb_torch.py:187: UserWarning: _histc_cuda does not have a deterministic implementation, but you set 'torch.use_deterministic_algorithms(True, warn_only=True)'. You can file an issue at https://github.com/pytorch/pytorch/issues to help us prioritize adding deterministic support for this operation. (Triggered internally at C:\cb\pytorch_1000000000000\work\aten\src\ATen\Context.cpp:95.)
+  flat.histc(bins=self._num_bins)
+wandb: 
+wandb: Run summary:
+wandb:               depth/by_document/between 0.00985
+wandb:         depth/by_document/between_share 0.02358
+wandb:           depth/by_document/n_documents 61
+wandb: depth/by_document/per_document_mean_max 3.31276
+wandb: depth/by_document/per_document_mean_min 2
+wandb: depth/by_document/per_document_mean_std 0.18255
+wandb:     depth/by_document/sum_matches_total 1
+wandb:                 depth/by_document/total 0.41774
+wandb:                depth/by_document/within 0.40789
+wandb:              depth/distinct_exit_depths 4
+wandb:                                    +105 ...
+wandb: 
+wandb: You can sync this run to the cloud by running:
+wandb: wandb sync C:\Users\Hp\Desktop\MoRE\code\wandb\offline-run-20261026_200329-nb53c0jl
+wandb: Find logs at: .\wandb\offline-run-20261026_200329-nb53c0jl\logs
+[Run] architecture   = mor
+[Run] experiment_id   = langSub_MoR_f400_seed46__97a62068
+[Run] experiment_group= subset_lang_sweep
+[Run] output directory= C:\Users\Hp\Desktop\MoRE\runs\langSub_MoR_f400_seed46__97a62068
+[Seed] seed=46  determinism=warn_only  streams=random+numpy+torch_cpu+torch_cuda+dataloader_generator+dataloader_worker
+[Seed] cudnn.deterministic=True  cudnn.benchmark=False  deterministic_algorithms=True  CUBLAS_WORKSPACE_CONFIG=:4096:8
+[Train] Device: cuda
+[Train] Effective settings: epochs=3, lr=0.001, routing_balance=0.0, step_routing=0.0, subset_fraction=0.4, subset_seed=46
+[Dataset] MoRELanguageDataset(wikitext-103/train: 526,320 blocks x 256 tokens, V=8192, lang-wikitext-103-bpe8192-len256-800d6154)
+[Dataset] floor = 4.98494701553838 nats/token (bigram, T-L2.5) | train_split_version = wikitext-author-splits-v1
+[Dataset] Using deterministic train subset: 210528 samples (0.400), seed=46
+[Dataset] MoRELanguageDataset(wikitext-103/val: 1,098 blocks x 256 tokens, V=8192, lang-wikitext-103-bpe8192-len256-800d6154)
+[Model] Total parameters: 5,581,063  (embedding 2,162,688, non-embedding 3,418,375)
+[Train] task=language: the confusion diagonal is published as val/routing_agreement_with_pos
+[Train] AGREEMENT WITH A PRIOR, NOT ACCURACY. mean(predicted_expert == token_family[input_id]) against a majority-POS partition, which is a linguistic hypothesis about a useful expert split rather than a functional ground truth. A router may be better for next-token prediction and still score low here. Read the permutation-invariant metrics first (see LANGUAGE_SPECIALIZATION_ORDER), and read load entropy against this corpus's own partition entropy -- published per run as val/routing_pos_partition_load_entropy, ~0.89 and NOT 1.0. It differs between corpora (dev 0.8884, canonical 0.8942), so use the run's value.
+[Train] halting: ponder_weight=0.001, supervision=OFF (pure ACT)
+[Epoch 001 Batch 0] Router grad norm: 0.000000 | router_noise=none scales: ['0.0000']
+[Epoch 001/3] task=4.7721  step_route=0.6459  bal=N/A  halt=0.2869  val=4.1795  route_acc=N/A  route_hung=N/A  route_ami=N/A  entropy_norm=N/A  cos_max=N/A  tok/s=48808
+[Epoch 002 Batch 0] Router grad norm: 0.000000 | router_noise=none scales: ['0.0000']
+[Epoch 002/3] task=4.1454  step_route=0.6273  bal=N/A  halt=0.3563  val=3.9140  route_acc=N/A  route_hung=N/A  route_ami=N/A  entropy_norm=N/A  cos_max=N/A  tok/s=38940
+[Epoch 003 Batch 0] Router grad norm: 0.000000 | router_noise=none scales: ['0.0000']
+[Epoch 003/3] task=3.9356  step_route=0.6265  bal=N/A  halt=0.3967  val=3.7710  route_acc=N/A  route_hung=N/A  route_ami=N/A  entropy_norm=N/A  cos_max=N/A  tok/s=35105
+
+[Train] Complete. Best val_loss = 3.770979
+[Seed] ops without a deterministic implementation were used in this run: _histc_cuda. Losses may not reproduce bitwise; this is recorded in provenance rather than hidden.
+[Run] metrics written to C:\Users\Hp\Desktop\MoRE\runs\langSub_MoR_f400_seed46__97a62068\metrics.json

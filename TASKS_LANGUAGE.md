@@ -1,4 +1,4 @@
-﻿# TASKS_LANGUAGE.md â€” MoRE on English text
+# TASKS_LANGUAGE.md â€” MoRE on English text
 
 Derived from [plan_language.md](plan_language.md), constrained by
 [updated_rules.md](updated_rules.md) and [updated_objective.md](updated_objective.md).
@@ -4081,10 +4081,17 @@ paragraph merged into the evaluation caveat).
 
 - `python paper/assemble_submissions.py`: both trees self-contained.
 - `python code/compile_papers.py`: TMLR 20 pp, ACL 20 pp, 0 errors.
-- `python code/measure_counted_pages.py --venue tmlr` -> **11.82** (norm 12,
-  OK; References heading at y = 652.3 pt of 792). `--venue acl` -> **11.66**
+- `python code/measure_counted_pages.py --venue tmlr` -> **11.80** (norm 12,
+  OK; References heading at y = 634.3 pt of 792). `--venue acl` -> **11.63**
   (hard 8; still the deferred blocker, and it improved because the trimmed
   sources are shared).
 - `python code/check_overflow.py`: 0 overfull hbox/vbox in both.
 - `python code/check_latex_lint.py`: 24 files clean.
 
+**Page numbers.** The stock `tmlr.sty` prints none (`\pagestyle{fancy}` +
+`\fancyhead{}` + only `\lhead`), so the TMLR layout block adds
+`\fancyfoot[C]{\thepage}`. A footer needs room: at `\textheight` 9.8in the
+default 30pt `\footskip` drew the number past the paper edge and it vanished
+silently. `\textheight` is 9.70in, `\headsep` -0.28in (lifts the block so no body
+line is lost) and `\footskip` 22pt, which puts the number 19pt from the edge
+and 12pt below the last text line. Costs no counted body: 11.82 -> 11.80.

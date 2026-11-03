@@ -9,15 +9,15 @@ Measured on the last clean build (`python code/compile_papers.py`):
 | | value |
 |---|---|
 | PDF total | **20 pages** |
-| counted main content (to References) | **11.82 pages** against the ~12-page norm |
+| counted main content (to References) | **11.80 pages** against the ~12-page norm |
 | LaTeX errors | **0** |
 | overfull boxes (content outside the text block) | **0** |
 | undefined references / citations | **0** |
-| page numbers | **yes** — right header on every page (`\rhead{\thepage}` in `main.tex`; the stock `tmlr.sty` prints none) |
+| page numbers | **yes** — centred footer on every page (`\fancyfoot[C]{\thepage}` in `main.tex`; the stock `tmlr.sty` prints none). The footer is why `\textheight` is 9.70in and `\footskip` 22pt: at 9.8in the number is drawn off the paper edge and silently vanishes |
 | bibliography entries rendered | **18 of 18** |
 
-**The body is now under the norm: 11.82 against 12.** T-LA.32 applied the
-2.5-page reduction the user authorised, taking 14.33 -> 11.82 (-2.51). That is
+**The body is now under the norm: 11.80 against 12.** T-LA.32 applied the
+2.5-page reduction the user authorised, taking 14.33 -> 11.80 (-2.53). That is
 2.51 pages of counted body, so the budget was met as specified, with 0.18 page in
 hand against the norm. It was done by moving five TMLR-only blocks into the
 appendix, compressing the TMLR Related Work section to one paragraph, tightening
@@ -30,7 +30,7 @@ the T-LA.32 changelog entry.
 be run after `assemble_submissions.py` and `compile_papers.py`, and it counts to
 the References heading on the page it lands on -- so a small edit can move the
 count by a whole line while the PDF total is unchanged. The current figure is
-`11.82` with the heading at y = 652.3 pt of a 792 pt page.
+`11.80` with the heading at y = 634.3 pt of a 792 pt page.
 
 **If the body grows and this number has to come down again, the levers, in the
 order they were measured:** layout (`textwidth`, `textheight`, `\parskip`,

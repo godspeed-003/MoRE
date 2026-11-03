@@ -1,4 +1,4 @@
-﻿# VERIFY_BEFORE_SUBMIT.md â€” ACL Rolling Review (ARR)
+# VERIFY_BEFORE_SUBMIT.md â€” ACL Rolling Review (ARR)
 
 **Read this before uploading. Four items are blockers, and the first is a
 desk-rejection risk.** Everything here is something the LaTeX build will *not*

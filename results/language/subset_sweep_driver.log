@@ -1,0 +1,116 @@
+
+=== preflight ===
+  [ok  ] train.npy shape dtype  -- (526320, 256) uint16, want (526320, 256)
+  [ok  ] train.npy sha256  -- 5e3749d39938
+  [ok  ] val.npy shape dtype  -- (1098, 256) uint16, want (1098, 256)
+  [ok  ] val.npy sha256  -- 992661126e77
+  [ok  ] test.npy shape dtype  -- (1256, 256) uint16, want (1256, 256)
+  [ok  ] test.npy sha256  -- e42b234a15f3
+  [ok  ] nesting seed42 at n=526320  -- 13158/52632/210528 blocks
+  [ok  ] nesting seed43 at n=526320  -- 13158/52632/210528 blocks
+  [ok  ] nesting seed44 at n=526320  -- 13158/52632/210528 blocks
+  [ok  ] nesting seed45 at n=526320  -- 13158/52632/210528 blocks
+  [ok  ] nesting seed46 at n=526320  -- 13158/52632/210528 blocks
+  [ok  ] WANDB_MODE offline/disabled  -- offline
+  [ok  ] disk headroom  -- need ~1.0 GiB, free 378.7 GiB
+  [FAIL] langSub_* does not collide with existing dirs  -- 6 pre-existing
+
+45 cells queued, launching
+  [skip] langSub_MoE_f025_seed42__7a6fbfaf__r2 already complete
+  [skip] langSub_MoE_f025_seed43__0cd6da4f already complete
+  [skip] langSub_MoE_f025_seed44__05cd1c5e already complete
+  [skip] langSub_MoE_f025_seed45__3ab2c46b already complete
+  [skip] langSub_MoE_f025_seed46__1574e2b6 already complete
+  [skip] langSub_MoR_f025_seed42__99b7586c already complete
+  [skip] langSub_MoR_f025_seed43__833ec236 already complete
+  [skip] langSub_MoR_f025_seed44__6a216287 already complete
+  [skip] langSub_MoR_f025_seed45__5ca10cc6 already complete
+  [skip] langSub_MoR_f025_seed46__c2a8899a already complete
+  [skip] langSub_MoRE_f025_seed42__3f4ec3e0 already complete
+  [skip] langSub_MoRE_f025_seed43__f7ad2747 already complete
+  [skip] langSub_MoRE_f025_seed44__02b10e3f already complete
+  [skip] langSub_MoRE_f025_seed45__8962921c already complete
+  [skip] langSub_MoRE_f025_seed46__77e7fcd1 already complete
+  [skip] langSub_MoE_f100_seed42__87091bf2 already complete
+  [skip] langSub_MoE_f100_seed43__e5bd63ed already complete
+  [skip] langSub_MoE_f100_seed44__7baa7e9d already complete
+  [skip] langSub_MoE_f100_seed45__b92a5c4d already complete
+  [skip] langSub_MoE_f100_seed46__f0cd63b2 already complete
+  [skip] langSub_MoR_f100_seed42__d542601c already complete
+  [skip] langSub_MoR_f100_seed43__fefe58ef already complete
+  [skip] langSub_MoR_f100_seed44__504175d4 already complete
+  [skip] langSub_MoR_f100_seed45__7535a3e1 already complete
+  [skip] langSub_MoR_f100_seed46__448686bc already complete
+  [skip] langSub_MoRE_f100_seed42__5a53cc0a already complete
+  [skip] langSub_MoRE_f100_seed43__7cfa8e4b already complete
+  [skip] langSub_MoRE_f100_seed44__f6c0fc4a already complete
+  [skip] langSub_MoRE_f100_seed45__623185b7 already complete
+  [skip] langSub_MoRE_f100_seed46__3a7e555d already complete
+  [skip] langSub_MoE_f400_seed42__5cc0d02c already complete
+  [skip] langSub_MoE_f400_seed43__1d82756a already complete
+  [skip] langSub_MoE_f400_seed44__6ab703da already complete
+  [skip] langSub_MoE_f400_seed45__85f2e85a already complete
+  [skip] langSub_MoE_f400_seed46__2c360cf5 already complete
+
+==============================================================================
+  MoR  f=0.400  seed 42
+  C:\Users\Hp\Desktop\MoRE\code\train.py --config C:\Users\Hp\Desktop\MoRE\code\config_language.json --task language --architecture mor --seed 42 --subset_fraction 0.4 --run_name langSub_MoR_f400 --experiment_group subset_lang_sweep
+==============================================================================
+  val/task_loss = 3.663723738467107   depth = 6.731301117897067   2.32 h   langSub_MoR_f400_seed42__e813baf0__r2
+
+==============================================================================
+  MoR  f=0.400  seed 43
+  C:\Users\Hp\Desktop\MoRE\code\train.py --config C:\Users\Hp\Desktop\MoRE\code\config_language.json --task language --architecture mor --seed 43 --subset_fraction 0.4 --run_name langSub_MoR_f400 --experiment_group subset_lang_sweep
+==============================================================================
+  val/task_loss = 3.849209905322132   depth = 2.000175006250223   1.08 h   langSub_MoR_f400_seed43__3d6d59e8
+
+==============================================================================
+  MoR  f=0.400  seed 44
+  C:\Users\Hp\Desktop\MoRE\code\train.py --config C:\Users\Hp\Desktop\MoRE\code\config_language.json --task language --architecture mor --seed 44 --subset_fraction 0.4 --run_name langSub_MoR_f400 --experiment_group subset_lang_sweep
+==============================================================================
+  val/task_loss = 3.6924173910109723   depth = 6.649866066645237   2.26 h   langSub_MoR_f400_seed44__d21d8da3
+
+==============================================================================
+  MoR  f=0.400  seed 45
+  C:\Users\Hp\Desktop\MoRE\code\train.py --config C:\Users\Hp\Desktop\MoRE\code\config_language.json --task language --architecture mor --seed 45 --subset_fraction 0.4 --run_name langSub_MoR_f400 --experiment_group subset_lang_sweep
+==============================================================================
+  val/task_loss = 3.6821145151482253   depth = 6.641780063573699   2.12 h   langSub_MoR_f400_seed45__3b0ac9a5
+
+==============================================================================
+  MoR  f=0.400  seed 46
+  C:\Users\Hp\Desktop\MoRE\code\train.py --config C:\Users\Hp\Desktop\MoRE\code\config_language.json --task language --architecture mor --seed 46 --subset_fraction 0.4 --run_name langSub_MoR_f400 --experiment_group subset_lang_sweep
+==============================================================================
+  val/task_loss = 3.770978719158902   depth = 3.122682952962606   1.31 h   langSub_MoR_f400_seed46__97a62068
+
+==============================================================================
+  MoRE  f=0.400  seed 42
+  C:\Users\Hp\Desktop\MoRE\code\train.py --config C:\Users\Hp\Desktop\MoRE\code\config_language.json --task language --architecture more --seed 42 --subset_fraction 0.4 --run_name langSub_MoRE_f400 --experiment_group subset_lang_sweep
+==============================================================================
+  val/task_loss = 3.712244681321858   depth = 6.953801921497196   2.10 h   langSub_MoRE_f400_seed42__105137c4
+
+==============================================================================
+  MoRE  f=0.400  seed 43
+  C:\Users\Hp\Desktop\MoRE\code\train.py --config C:\Users\Hp\Desktop\MoRE\code\config_language.json --task language --architecture more --seed 43 --subset_fraction 0.4 --run_name langSub_MoRE_f400 --experiment_group subset_lang_sweep
+==============================================================================
+  val/task_loss = 3.76487554878485   depth = 6.948373156184149   2.09 h   langSub_MoRE_f400_seed43__64b81e5c
+
+==============================================================================
+  MoRE  f=0.400  seed 44
+  C:\Users\Hp\Desktop\MoRE\code\train.py --config C:\Users\Hp\Desktop\MoRE\code\config_language.json --task language --architecture more --seed 44 --subset_fraction 0.4 --run_name langSub_MoRE_f400 --experiment_group subset_lang_sweep
+==============================================================================
+  val/task_loss = 3.7785419857567124   depth = 6.949523197257045   2.11 h   langSub_MoRE_f400_seed44__59518f8e
+
+==============================================================================
+  MoRE  f=0.400  seed 45
+  C:\Users\Hp\Desktop\MoRE\code\train.py --config C:\Users\Hp\Desktop\MoRE\code\config_language.json --task language --architecture more --seed 45 --subset_fraction 0.4 --run_name langSub_MoRE_f400 --experiment_group subset_lang_sweep
+==============================================================================
+  val/task_loss = 3.7491814191224146   depth = 6.947987428122433   2.14 h   langSub_MoRE_f400_seed45__dbb182aa
+
+==============================================================================
+  MoRE  f=0.400  seed 46
+  C:\Users\Hp\Desktop\MoRE\code\train.py --config C:\Users\Hp\Desktop\MoRE\code\config_language.json --task language --architecture more --seed 46 --subset_fraction 0.4 --run_name langSub_MoRE_f400 --experiment_group subset_lang_sweep
+==============================================================================
+  val/task_loss = 3.7783963615125646   depth = 6.9493481910068216   2.19 h   langSub_MoRE_f400_seed46__37b4e108
+
+finished: 10 new, 35 skipped, 19.72 h wall
+progress -> C:\Users\Hp\Desktop\MoRE\results\language\subset_sweep_progress.tsv

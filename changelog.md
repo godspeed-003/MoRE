@@ -11268,18 +11268,41 @@ perplexity paragraph merged into the evaluation caveat.
 errors, 0 overfull hbox/vbox, 0 undefined refs or citations, 24 .tex files lint
 clean.
 
-**Page numbers (follow-up, same task).** The TMLR PDF carried **no page numbers
-anywhere**, which is the official template's behaviour rather than a regression:
-`tmlr.sty` sets `\pagestyle{fancy}`, clears the header with `\fancyhead{}`, sets
-only `\lhead{Under review as submission to TMLR}`, and never defines `\rhead`,
-`\cfoot` or `\thepage`. A reviewer cannot then cite a page. Fixed in the TMLR
-layout block with `\rhead{\thepage}` — the right header, not the footer, because
-at a 0.575in bottom margin the footer baseline would sit ~11pt from the paper
-edge. `\maketitle` sets no page style, so page 1 is numbered too. ACL is
-unaffected: its template already numbers pages (A4, ~48pt from the bottom).
-Confirmed by reading back all 20 rendered pages: the number is present on every
-one, and the counted body is unchanged at 11.82 because a header costs no
-vertical space.
+**Page numbers -- centred footer (follow-up, same task).** The TMLR PDF carried
+**no page numbers anywhere**, which is the official template's behaviour rather
+than a regression: `tmlr.sty` sets `\pagestyle{fancy}`, clears the header with
+`\fancyhead{}`, sets only `\lhead{Under review as submission to TMLR}`, and
+never defines `\rhead`, `\cfoot` or `\thepage`. A reviewer cannot then cite a
+page. First fix was `\rhead{\thepage}`; the user asked for the number at the
+bottom, so it is now `\fancyfoot[C]{\thepage}` in the TMLR layout block.
+
+**A footer needs vertical room the old geometry did not have, and the failure is
+silent.** Declaring a footer is not enough: with `\textheight` 9.8in the text
+block ended 42pt from the paper edge, and TeX places the footer baseline at
+`\footskip` (default 30pt) below the text block -- i.e. 12pt *past* the edge, so
+the number was drawn off the page and simply did not print. The geometry is
+therefore three coupled numbers, not one:
+
+| field | value | why |
+|---|---|---|
+| `\textheight` | 9.70in (was 9.8in) | gives back 0.10in at the foot for the footer |
+| `\headsep` | -0.28in (was -0.1in) | lifts the text block 0.18in at the top so the lost height costs no body lines; body now starts ~50pt from the top |
+| `\footskip` | 22pt (default 30pt) | footer baseline 22pt below the text block |
+
+Measured on the rendered page: at `\textheight` 9.68in and `\footskip` 14pt the
+number sat at y 754--764 of a 792pt page (4pt below the last text line, too
+tight); the final settings put it at y 763--773 -- **19pt clear of the paper edge
+and 12pt below the last text line**, which is the intended band. `\maketitle` sets no page style, so page 1 is
+numbered too. ACL is unaffected: its template already numbers pages in a footer
+(A4, ~48pt off the bottom); that was checked by rendering the footer region
+rather than by trusting the style file, because its page numbers sit at a
+y-coordinate that looks off-page until you notice the PDF is A4 (842pt), not
+letter.
+
+**Net cost to the body: none.** Counted body 11.82 -> **11.80** (still under the
+12-page norm; the 1pt of `\textheight` plus the 0.18in the block was lifted at
+the top absorbed the footer band), ACL 11.66 -> **11.63**. Reading back all 20 rendered pages
+confirms the number is present on every one.
 
 **Where to look.** `paper/assemble_submissions.py` (`APPENDIX`,
 `TMLR_APPENDIX`, `TMLR_ONLY_APPENDIX` — the three lists must agree or a block

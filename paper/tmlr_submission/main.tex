@@ -91,13 +91,15 @@
 % user's decision was to reclaim the page from whitespace before cutting
 % content, so nothing below removes a sentence.
 %
-% TEXT BLOCK. 6.5in -> 7.1in wide, 9.0in -> 9.8in tall, symmetric (-0.3in on
-% both side margins, so the page stays centred; \headsep is pulled 0.1in so the
-% extra height comes off the top, not off the bottom margin, which is 0.575in and
-% must stay clear of the page furniture). Horizontal margins are 1.0in -> 0.7in
-% and vertical 1.25in -> 0.60in. T-LA.24 took this to 6.9/9.7 at 0.8in; T-LA.32
-% took the last step to 7.1/9.8, which is dense for a TMLR paper but still
-% readable at 100 dpi -- check a rendered page before tightening further.
+% TEXT BLOCK. 6.5in -> 7.1in wide, 9.0in -> 9.70in tall, symmetric (-0.3in on
+% both side margins, so the page stays centred). \headsep is pulled 0.28in so the
+% height is taken off the top and a band stays free at the bottom for the page
+% number, whose footer would otherwise run off the paper. Horizontal margins are
+% 1.0in -> 0.7in; the body now starts ~50pt from the top and ends ~42pt from the
+% bottom. T-LA.24 took this to 6.9/9.7 at 0.8in; T-LA.32 took the width to 7.1in
+% and the height to 9.8in, then gave 0.10in back vertically for the footer. The
+% width is dense for a TMLR paper but still readable at 100 dpi -- check a
+% rendered page before tightening further.
 %
 % PARAGRAPH SPACING. tmlr.sty sets \parskip .5pc (~6pt) with \parindent 0pt,
 % which is generous for a single-column body. 2.4pt keeps paragraphs separated
@@ -114,20 +116,26 @@
 \setlength{\textwidth}{7.1in}
 \setlength{\oddsidemargin}{-0.3in}
 \setlength{\evensidemargin}{-0.3in}
-\setlength{\textheight}{9.8in}
+\setlength{\textheight}{9.70in}
 \addtolength{\topmargin}{-0.15in}
-\addtolength{\headsep}{-0.1in}
+\addtolength{\headsep}{-0.28in}
 
 \setlength{\parskip}{2.4pt plus 0.4pt minus 0.4pt}
 
 % PAGE NUMBERS (T-LA.32). tmlr.sty sets \pagestyle{fancy}, clears the headers
 % with \fancyhead{} and sets only \lhead{Under review as submission to TMLR}; it
 % never defines a page number in the header or the footer, so the official
-% template prints none and a reviewer cannot cite a page ("see p. 7"). The right
-% header is deliberate: the footer would sit at 0.575in - 0.42in footskip, i.e.
-% ~11pt from the paper edge, which the printer margin can eat. This costs no
-% vertical space. \maketitle sets no page style, so it applies to page 1 too.
-\rhead{\thepage}
+% template prints none and a reviewer cannot cite a page ("see p. 7").
+% Bottom centre, as requested. The footer needs vertical room, and at the old
+% \textheight 9.8in the text block ran to within 42pt of the paper edge, so the
+% default 30pt \footskip put the number past the edge and it silently did not
+% print. \textheight is 9.70in with \headsep -0.28in (which lifts the block at the
+% top so no body line is lost) and \footskip 22pt, giving a footer baseline ~772pt
+% down a 792pt page: 20pt clear of the edge and 12pt below the last text line.
+% \maketitle sets no page style, so page 1 is numbered too.
+\fancyhead[R]{}
+\fancyfoot[C]{\thepage}
+\setlength{\footskip}{22pt}
 
 \renewcommand{\topfraction}{0.92}
 \renewcommand{\bottomfraction}{0.75}
