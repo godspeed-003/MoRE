@@ -1,0 +1,102 @@
+% =====================================================================
+%  MoRE -- TMLR submission (Transactions on Machine Learning Research)
+%
+%  BUILD:  pdflatex main -> bibtex main -> pdflatex main -> pdflatex main
+%          (Overleaf: set the compiler to pdfLaTeX; it runs this for you)
+%
+%  MODE:   bare \usepackage{tmlr} == ANONYMOUS SUBMISSION.
+%          TMLR review is double-blind and submissions MUST be anonymised
+%          (jmlr.org/tmlr/author-guide.html). The \author block below is
+%          ignored in this mode and replaced by "Anonymous authors / Paper
+%          under double-blind review" -- do not remove it, and do not add
+%          the [accepted] or [preprint] option until the paper is accepted
+%          or you are deliberately posting a non-anonymous preprint.
+%
+%  PAGE BUDGET: TMLR imposes NO fixed page limit -- "submissions may be any
+%          length, but a paper's length should be justified by its content",
+%          and unusually long papers risk reviewing delays. The practical
+%          norm is ~12 pages of main body. References and appendices sit
+%          outside that judgement. This draft is single-column.
+%
+%  BROADER IMPACT: conditionally required -- only if the work "carries a
+%          significant risk of harm". A 5.6M-parameter architecture study on
+%          public text does not, so the statement is omitted deliberately
+%          rather than forgotten. Revisit if the claim set changes.
+%
+%  BEFORE SUBMITTING: read VERIFY_BEFORE_SUBMIT.md in this folder. One
+%          bibliography entry is knowingly unverified and must be fixed or
+%          removed; the build will not warn you about it.
+% =====================================================================
+\documentclass{article}
+
+\usepackage{tmlr}            % no option == anonymous double-blind submission
+% \usepackage[accepted]{tmlr} % camera-ready: reveals authors, adds the header
+% \usepackage[preprint]{tmlr} % non-anonymous preprint
+
+% -- tmlr.sty already loads: fancyhdr, natbib, fontenc(T1), lmodern, eso-pic
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath}         % align/equation; load before \begin{document}
+\usepackage{amssymb}
+\usepackage{booktabs}        % \toprule \midrule \bottomrule
+\usepackage{graphicx}
+\usepackage{enumitem}        % \begin{itemize}[leftmargin=...]
+\usepackage{microtype}
+\usepackage{url}
+
+\graphicspath{{fig/}}
+
+\title{Routing and Recursion Compete: A Parameter-Matched\\
+Decomposition of Conditional Computation in Small Language Models}
+
+% Ignored under the anonymous (default) option; fill in for camera-ready.
+\author{\name Anonymous Author(s) \email anonymous@example.com \\
+        \addr Anonymous Institution}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+Conditional computation is pursued along two axes: sparse mixture-of-experts
+(MoE) chooses \emph{which} parameters process a token, and adaptive-depth
+weight-tied recursion (MoR) chooses \emph{how much} computation it receives.
+The axes are orthogonal, so composing them---routing a token to a specialised
+expert and then recursively reusing \emph{that expert's} weights for a learned
+number of steps---should inherit both benefits. We test that directly: one
+engine, three configurations, parameters matched to 0.069\% ($\approx$5.58M),
+bit-identical inputs, five seeds, exact randomisation tests with a
+pre-registered correction, on WikiText-103. The composition does not inherit
+both. Recursion alone attains the lowest validation loss (3.515 nats/token
+against the composition's 3.637 and MoE's 3.948), and adding routing does not
+improve routing quality over MoE alone. The sharpest contrast is in adaptive
+computation: measured against a \emph{depth-matched} uniform policy, recursion
+alone buys 1.47 nats while the composition buys 0.06---a factor of 24---because
+the composed model's halting collapses to running to its budget on 97\% of
+tokens. We then exclude two explanations. Capacity dilution is arithmetically
+ruled out: tokens per parameter are identical across arms by construction, and
+once recursion is counted the composed arm receives slightly \emph{more} updates
+per parameter than recursion alone. Subspace trapping is falsified three ways:
+the recursive arms expand rather than collapse representational dimensionality,
+settle rather than oscillate, and update near-orthogonally rather than
+rescaling. What the evidence supports is a competition for one per-token
+budget---tuning toward adaptive depth destroys expert differentiation, and
+preserving differentiation saturates depth. The composition is not uniformly
+worse: it is the most robust arm out of domain, beating both components on
+held-out text from a different distribution, and it converts compute into
+quality roughly three times more efficiently than recursion alone. We report
+this as a negative result at this scale, with a falsifiable prediction for the
+data scale at which it should reverse.
+\end{abstract}
+
+\input{sections/01_intro}
+\input{sections/02_method}
+\input{sections/03_setup}
+\input{sections/04_results}
+\input{sections/05_mechanism}
+\input{sections/06_limitations}
+\input{sections/07_conclusion}
+
+\bibliographystyle{tmlr}
+\bibliography{refs}
+
+\end{document}

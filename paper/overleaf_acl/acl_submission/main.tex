@@ -1,0 +1,148 @@
+% =====================================================================
+%  MoRE -- ACL Rolling Review (ARR) submission
+%
+%  BUILD:  pdflatex main -> bibtex main -> pdflatex main -> pdflatex main
+%          (Overleaf: set the compiler to pdfLaTeX)
+%
+%  MODE:   \usepackage[review]{acl} == ANONYMISED REVIEW VERSION.
+%          ARR uses two-way anonymised review: no author names, no
+%          affiliations, and self-citations must be phrased without
+%          revealing identity. [review] also turns on line numbers and
+%          page numbers, which reviewers expect. Switch to [final] only
+%          for camera-ready, [preprint] for a non-anonymous preprint.
+%          Links to trackable services (Dropbox, Google Drive) are BANNED;
+%          use an anonymised repository if you link code.
+%
+%  PAGE BUDGET -- THIS IS A DESK-REJECTION RISK AND IT IS NOT YET VERIFIED.
+%          Long papers are limited to EIGHT (8) pages of content. The
+%          following do NOT count: the Limitations section, an optional
+%          Ethical Considerations section, references, and appendices.
+%          This body was written for TMLR, which has no page limit, so it
+%          is very likely OVER eight pages here. No LaTeX toolchain was
+%          available where this was assembled, so the page count could not
+%          be measured. COMPILE THIS FIRST, BEFORE EDITING ANYTHING ELSE.
+%
+%          If it overruns, cut in this order -- the argument survives all
+%          four, and each is a block move to the appendix, not a rewrite:
+%            1. Section 4 "Experimental Setup" subsections on statistics and
+%               integrity checks  -> appendix. (~0.75 page; the claims they
+%               support are restated in one sentence each where used.)
+%            2. Section 6.4, the refuted subspace-trapping probe -> appendix.
+%               (~0.5 page. Keep one sentence in 6.3 saying it was tested
+%               and falsified, with a pointer.)
+%            3. The stratified-loss figure and its subsection -> appendix.
+%               (~0.5 page. It is corroborating, not load-bearing.)
+%            4. Section 2 "Related Work" -> compress to one paragraph.
+%          Do NOT cut: the headline table, the depth-curve figure, the
+%          depth-matched comparison, or the dilution arithmetic. Those four
+%          are the paper.
+%
+%  MANDATORY SECTIONS. A dedicated section titled "Limitations" is REQUIRED
+%          and its absence is a desk rejection. It is \section*{} (starred,
+%          unnumbered) and sits AFTER the conclusion, BEFORE the references
+%          -- which is exactly how assemble_submissions.py arranges it; do
+%          not move it back into the numbered body. The Responsible NLP
+%          Checklist is also mandatory but is submitted through the ARR
+%          form, not in this file.
+%
+%  BEFORE SUBMITTING: read VERIFY_BEFORE_SUBMIT.md in this folder. One
+%          bibliography entry is knowingly unverified; the build will not
+%          warn you about it.
+% =====================================================================
+\documentclass[11pt]{article}
+
+\usepackage[review]{acl}     % anonymised review version
+% \usepackage[final]{acl}    % camera-ready
+% \usepackage[preprint]{acl} % non-anonymous preprint
+
+% -- the ACL template's own standard includes --
+\usepackage{times}
+\usepackage{latexsym}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{microtype}
+\usepackage{inconsolata}
+\usepackage{graphicx}
+
+% -- added: each is load-bearing for this body --
+\usepackage{amsmath}         % align/equation
+\usepackage{amssymb}
+\usepackage{booktabs}        % \toprule \midrule \bottomrule
+\usepackage{enumitem}        % \begin{itemize}[leftmargin=...]
+
+\graphicspath{{fig/}}
+
+\title{Routing and Recursion Compete: A Parameter-Matched Decomposition\\
+of Conditional Computation in Small Language Models}
+
+% Anonymised under [review]; fill in for camera-ready.
+\author{Anonymous ARR Submission}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+Conditional computation is pursued along two axes: sparse mixture-of-experts
+(MoE) chooses \emph{which} parameters process a token, and adaptive-depth
+weight-tied recursion (MoR) chooses \emph{how much} computation it receives.
+The axes are orthogonal, so composing them---routing a token to a specialised
+expert and then recursively reusing \emph{that expert's} weights for a learned
+number of steps---should inherit both benefits. We test that directly: one
+engine, three configurations, parameters matched to 0.069\% ($\approx$5.58M),
+bit-identical inputs, five seeds, exact randomisation tests with a
+pre-registered correction, on WikiText-103. The composition does not inherit
+both. Recursion alone attains the lowest validation loss (3.515 nats/token
+against the composition's 3.637 and MoE's 3.948), and adding routing does not
+improve routing quality over MoE alone. The sharpest contrast is in adaptive
+computation: against a \emph{depth-matched} uniform policy, recursion alone buys
+1.47 nats while the composition buys 0.06---a factor of 24---because the
+composed model's halting collapses to running to its budget on 97\% of tokens.
+We then exclude two explanations. Capacity dilution is arithmetically ruled out:
+tokens per parameter are identical across arms by construction, and once
+recursion is counted the composed arm receives slightly \emph{more} updates per
+parameter than recursion alone. Subspace trapping is falsified three ways: the
+recursive arms expand rather than collapse representational dimensionality,
+settle rather than oscillate, and update near-orthogonally rather than
+rescaling. What the evidence supports is a competition for one per-token
+budget---tuning toward adaptive depth destroys expert differentiation, and
+preserving differentiation saturates depth. The composition is not uniformly
+worse: it is the most robust arm out of domain and converts compute into quality
+roughly three times more efficiently than recursion alone. We report this as a
+negative result at this scale, with a falsifiable prediction for the data scale
+at which it should reverse.
+\end{abstract}
+
+\input{sections/01_intro}
+\input{sections/02_method}
+\input{sections/03_setup}
+\input{sections/04_results}
+\input{sections/05_mechanism}
+\input{sections/07_conclusion}
+
+% ---------------------------------------------------------------------
+% MANDATORY and page-limit-exempt, in this order: Limitations, then the
+% optional Ethical Considerations, then references. Omitting Limitations
+% is a desk rejection.
+% ---------------------------------------------------------------------
+\input{sections/06_limitations}
+
+\section*{Ethical Considerations}
+This work trains 5.6M-parameter language models on WikiText-103, a public corpus
+derived from Wikipedia, and evaluates them on public benchmarks. No human
+subjects, no annotation, and no personally identifying data are involved, and the
+models produced are far below the scale at which generative misuse is a practical
+concern. The realistic effect of the work runs through other researchers'
+decisions rather than through deployment: we report a negative result about an
+architecture combination, and a diagnostic---scoring any learned depth policy
+against a depth-matched uniform policy before describing it as adaptive---that
+should save compute otherwise spent on a mechanism that is not paying for itself.
+The symmetric risk is that a null obtained at 5.6M parameters discourages work
+that would succeed at scale; the Limitations section scopes the conclusion
+for exactly that reason and states the measurement that would overturn it. The
+corpus inherits the demographic and topical biases of Wikipedia, which we did not
+measure and which bear on any downstream use of these checkpoints.
+
+\bibliographystyle{acl_natbib}
+\bibliography{refs}
+
+\end{document}

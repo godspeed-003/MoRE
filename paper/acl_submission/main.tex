@@ -1,0 +1,187 @@
+% =====================================================================
+%  MoRE -- ACL Rolling Review (ARR) submission
+%
+%  BUILD:  pdflatex main -> bibtex main -> pdflatex main -> pdflatex main
+%          (Overleaf: set the compiler to pdfLaTeX)
+%
+%  MODE:   \usepackage[review]{acl} == ANONYMISED REVIEW VERSION.
+%          ARR uses two-way anonymised review: no author names, no
+%          affiliations, and self-citations must be phrased without
+%          revealing identity. [review] also turns on line numbers and
+%          page numbers, which reviewers expect. Switch to [final] only
+%          for camera-ready, [preprint] for a non-anonymous preprint.
+%          Links to trackable services (Dropbox, Google Drive) are BANNED;
+%          use an anonymised repository if you link code.
+%
+%  PAGE BUDGET -- THIS IS A DESK-REJECTION RISK AND IT IS NOT YET VERIFIED.
+%          Long papers are limited to EIGHT (8) pages of content. The
+%          following do NOT count: the Limitations section, an optional
+%          Ethical Considerations section, references, and appendices.
+%          This body was written for TMLR, which has no page limit, so it
+%          is very likely OVER eight pages here. No LaTeX toolchain was
+%          available where this was assembled, so the page count could not
+%          be measured. COMPILE THIS FIRST, BEFORE EDITING ANYTHING ELSE.
+%
+%          If it overruns, cut in this order -- the argument survives all
+%          four, and each is a block move to the appendix, not a rewrite:
+%            1. Section 4 "Experimental Setup" subsections on statistics and
+%               integrity checks  -> appendix. (~0.75 page; the claims they
+%               support are restated in one sentence each where used.)
+%            2. Section 6.4, the refuted subspace-trapping probe -> appendix.
+%               (~0.5 page. Keep one sentence in 6.3 saying it was tested
+%               and falsified, with a pointer.)
+%            3. The stratified-loss figure and its subsection -> appendix.
+%               (~0.5 page. It is corroborating, not load-bearing.)
+%            4. Section 2 "Related Work" -> compress to one paragraph.
+%          Do NOT cut: the headline table, the depth-curve figure, the
+%          depth-matched comparison, or the dilution arithmetic. Those four
+%          are the paper.
+%
+%  MANDATORY SECTIONS. A dedicated section titled "Limitations" is REQUIRED
+%          and its absence is a desk rejection. It is \section*{} (starred,
+%          unnumbered) and sits AFTER the conclusion, BEFORE the references
+%          -- which is exactly how assemble_submissions.py arranges it; do
+%          not move it back into the numbered body. The Responsible NLP
+%          Checklist is also mandatory but is submitted through the ARR
+%          form, not in this file.
+%
+%  BEFORE SUBMITTING: read VERIFY_BEFORE_SUBMIT.md in this folder. One
+%          bibliography entry is knowingly unverified; the build will not
+%          warn you about it.
+% =====================================================================
+\documentclass[11pt]{article}
+
+\usepackage[review]{acl}     % anonymised review version
+% \usepackage[final]{acl}    % camera-ready
+% \usepackage[preprint]{acl} % non-anonymous preprint
+
+% -- the ACL template's own standard includes --
+\usepackage{times}
+\usepackage{latexsym}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{microtype}
+\usepackage{inconsolata}
+\usepackage{graphicx}
+% tikz dropped with the TikZ architecture figure; see the note in
+% paper/tmlr_submission/main.tex. The figure is now a generated PNG and zero
+% tikzpicture environments remain.
+
+% -- added: each is load-bearing for this body --
+\usepackage{amsmath}         % align/equation
+\usepackage{amssymb}
+\usepackage{booktabs}        % \toprule \midrule \bottomrule
+\usepackage{enumitem}        % \begin{itemize}[leftmargin=...]
+
+\graphicspath{{fig/}}
+
+\title{MoRE: Mixture of Recursive Experts}
+
+% Anonymised under [review]; fill in for camera-ready.
+\author{Anonymous ARR Submission}
+
+
+% \dispsize -- see the TMLR preamble. A two-column measure has no horizontal
+% slack, so enlarging display math would overflow it; this is deliberately a
+% no-op and the shared sources in paper/common/ ask for it either way.
+\newcommand{\dispsize}{}
+
+% \colfigwidth -- see the TMLR preamble. A two-column measure is already narrow,
+% so the figures are set at column width here; in TMLR the same drawings are held
+% to 0.6\linewidth because they were drawn for this scale (T-LA.22).
+\newcommand{\colfigwidth}{\linewidth}
+
+% \depthfigwidth -- see the TMLR preamble. Unchanged here: 0.92\linewidth of a
+% spanning figure* is the scale this drawing was made for (T-LA.32).
+\newcommand{\depthfigwidth}{0.92\linewidth}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+Conditional computation chooses either \emph{which} parameters process a token
+---sparse mixture-of-experts (MoE)---or \emph{how much} computation it receives
+---adaptive-depth weight-tied recursion (MoR). Composing them should inherit
+both. We test whether it pays: one engine, three configurations, parameters
+matched to 0.069\% ($\approx$5.58M on language), bit-identical inputs, five
+seeds, exact randomisation tests, on WikiText-103 and on an arithmetic task
+built to make routing and recursion separately testable.
+
+We call the composition \emph{Mixture of Recursive Experts} (MoRE): a token is
+routed once, from its post-embedding state, to one of $E$ independent expert
+FFNs, and that expert's weights---never another's---are reused for an adaptive
+number of recursion steps under learned halting. On the language task all three
+arms lie on the quality/compute frontier, and the composition buys the most
+quality per unit of compute: $7.9\%$ better validation loss than MoE at
+$2.19\times$ its inference FLOPs where recursion alone needs $8.87\times$---$72\%$
+of recursion's gain for $25\%$ of its compute. Out of domain it \emph{dominates}
+recursion alone, reaching lower loss at a quarter of the compute. On that task
+it is not lowest-loss: recursion alone leads by $0.1216$ nats, and routing
+improves neither in-domain quality nor routing quality over MoE, so we keep the
+quality and compute axes separate. We trace the deficit to a competition for one
+per-token budget, excluding two rival explanations.
+
+Most transferably, a mean step count and an exit histogram cannot establish
+input-dependent depth, since a uniform policy forced to the learned mean
+reproduces both---and scoring against that control separates our language arms
+by a factor of 24.
+
+On the arithmetic task, at its fixed three-epoch budget, the ordering reverses.
+There the composition is the lowest-loss arm: $0.190$ nats against $0.245$ for
+recursion alone and $0.430$ for MoE, lower in four of five seeds and with a
+$4.8\times$ tighter spread than recursion. Routing is what stabilises recursion, and a fixed depth recovers most
+of what the learned policy buys ($0.095$ nats against the best uniform depth),
+so the halting head is input-dependent but not load-bearing.
+\end{abstract}
+
+\input{sections/01_intro}
+\input{sections/02_method}
+\input{sections/03_setup}
+\input{sections/04_results}
+\input{sections/05_mechanism}
+\input{sections/07_conclusion}
+
+% ---------------------------------------------------------------------
+% MANDATORY and page-limit-exempt, in this order: Limitations, then the
+% optional Ethical Considerations, then references. Omitting Limitations
+% is a desk rejection.
+% ---------------------------------------------------------------------
+\input{sections/06_limitations}
+
+\section*{Ethical Considerations}
+This work trains 5.6M-parameter language models on WikiText-103, a public corpus
+derived from Wikipedia, and evaluates them on public benchmarks. No human
+subjects, no annotation, and no personally identifying data are involved, and the
+models produced are far below the scale at which generative misuse is a practical
+concern. The realistic effect of the work runs through other researchers'
+decisions rather than through deployment: we report a negative result about an
+architecture combination, and a diagnostic---scoring any learned depth policy
+against a depth-matched uniform policy before describing it as adaptive---that
+should save compute otherwise spent on a mechanism that is not paying for itself.
+The symmetric risk is that a null obtained at 5.6M parameters discourages work
+that would succeed at scale; the Limitations section scopes the conclusion
+for exactly that reason and states the measurement that would overturn it. The
+corpus inherits the demographic and topical biases of Wikipedia, which we did not
+measure and which bear on any downstream use of these checkpoints.
+
+% acl.sty ALREADY issues \bibliographystyle{acl_natbib} (acl.sty:195), and the
+% official ACL template calls only \bibliography. Declaring it again here put a
+% SECOND \bibstyle into main.aux; bibtex answered "Illegal, another \bibstyle
+% command", skipped the rest of it, and silently dropped one of seventeen
+% citations -- with 0 LaTeX errors and nothing in the .log pointing at the cause.
+% Do not add it back. (TMLR is the opposite case: tmlr.sty does NOT set it, so
+% the TMLR main.tex must declare it.)
+\bibliography{refs}
+
+% ---------------------------------------------------------------------
+% Appendices sit AFTER the references, keep the two-column format, and do
+% not count toward the 8-page content limit. 08_appendix.tex is GENERATED
+% by assemble_submissions.py from the ACLMOVE-marked blocks in the shared
+% sources -- do not edit it here, it is overwritten on every rebuild.
+% Reviewers are under no obligation to read it, so nothing load-bearing
+% may live here: each block leaves a self-contained summary in the body.
+% ---------------------------------------------------------------------
+\appendix
+\input{sections/08_appendix}
+
+\end{document}

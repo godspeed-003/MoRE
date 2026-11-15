@@ -1,0 +1,142 @@
+\section*{Limitations}
+\label{sec:limitations}
+
+\subsection*{Scale, stated as a falsifiable prediction}
+
+The study operates at 5.6M parameters, $d_{\text{model}} = 256$, one block, a
+vocabulary of 8{,}192, and three epochs of WikiText-103. Sparse-MoE benefits are
+known to emerge with scale, so a reviewer can reasonably say the negative result
+may be an artefact of operating below the regime where sparsity pays. \textbf{That
+objection is correct and cannot be answered with the runs that exist.}
+
+Rather than hedge it, we convert it into the paper's forward claim. The account in
+\S\ref{sec:dilution} is that routing divides the \emph{diversity} of data each
+parameter block sees, not its update budget---which the arithmetic there shows is
+matched exactly. That account predicts a specific crossover: as the corpus grows at
+fixed parameters, each expert's router-selected slice comes to contain enough of
+the distribution's shared structure that the re-learning penalty amortises, so
+\textbf{the MoR$-$MoRE gap should narrow monotonically with training data and the
+ordering should eventually invert in favour of the composition}. The out-of-domain
+result (\S\ref{sec:ood}) is weak early evidence in this direction, since MoRE is
+already the better arm on data it was not trained on.
+
+The measurement that would falsify it: hold parameters, depth budget and optimiser
+fixed; sweep training tokens over at least a decade; and report the MoR$-$MoRE gap
+as a function of tokens per expert. If the gap is flat or widening, the diversity
+account is wrong and the composition's deficit is structural. We did not run that
+sweep, and a second model size---the single most valuable follow-up---is likewise
+unrun.
+
+\subsection*{Budget, not convergence}
+
+Three epochs is a compute budget, and no arm is trained to convergence
+(\S\ref{sec:protocol}). This interacts badly with exactly the mechanism the paper
+studies: \S\ref{sec:saturation} shows depth allocation is demonstrably
+budget-dependent, so the behaviour at 10 epochs is genuinely unknown and might
+differ in the direction that matters. Every arm receives the identical budget, so
+the comparison is internally valid; the generalisation to trained-to-convergence
+models is not established.
+
+Relatedly, one hyperparameter configuration per arm was frozen from a grid run on a
+corpus roughly 60$\times$ smaller, and \S\ref{sec:saturation} demonstrates that at
+least one weight---the ponder penalty---did not transfer. We did not re-tune per
+arm, so the headline ordering could in principle be re-ordered by a per-architecture
+search. Given the gaps involved (0.12 nats between the recursive arms), we regard
+that as a real risk for the MoR--MoRE comparison and a small one for the comparisons
+against MoE.
+
+\subsection*{Statistical resolution}
+
+$n = 5$ seeds puts every headline comparison exactly on the design's resolution
+floor of $p = 0.00794$ (\S\ref{sec:stats}). ``As extreme as a five-seed design
+admits'' is the strongest statement available, and it is weaker than significance.
+No larger effect could produce a smaller $p$ here; only more seeds could. Cohen's
+$d$ values are reported alongside every gap precisely because a large $d$ on a
+small gap is the misreading to avoid---across our own re-exports, $d$ has moved by
+a factor of 1.5 while the underlying gap moved by less than 0.005 nats.
+
+\subsection*{What was declared and not run}
+
+One comparison in the pre-registered Family A, a depth-matched fixed-depth control,
+was declared before results existed and \emph{still consumes its Holm slot}: we do
+not delete it to loosen the thresholds on the survivors. The forced-depth sweep in
+\S\ref{sec:halting} answers the same question using inference passes over the
+canonical checkpoints rather than a trained control arm, so we report it as an
+exploratory mechanism result and leave the declared slot consumed and unfilled. A
+fixed-depth sweep trained from scratch, a shuffled-depth control, and a
+depth--input mutual-information analysis were all declared exploratory and are
+unrun.
+
+\subsection*{Evaluation caveats}
+
+BLiMP and EWoK are scored with the tokenizer fitted to our training corpus
+(8{,}192 BPE merges), so \textbf{absolute accuracies are not comparable to
+published models} using 32k--50k vocabularies; only the cross-arm comparison is
+valid. EWoK sits within noise of its 50\% chance floor for every arm, which we
+report as a scale limitation rather than a result---at 5.6M parameters a world
+knowledge probe is below its useful range. All evaluations outside the two declared
+families are uncorrected and carry no significance verdict in the abstract or
+conclusions.
+
+The perplexities in Table~\ref{tab:main} are intra-study quantities for the same
+reason and should not be compared to published WikiText-103 numbers.
+
+\subsection*{Disclosures}
+\label{sec:honesty}
+
+Several facts about this study would count against it if a reader discovered them
+independently, so we state them.
+
+\textbf{An earlier version of the composed arm was not the architecture we define,
+and fixing it made our headline worse.} It re-routed at every recursion step,
+letting a token traverse up to seven \emph{different} expert FFNs---a heterogeneous
+seven-layer network, not one block iterated, and strictly more expressive than the
+specification allows. That arm scored 3.5031 and was statistically indistinguishable
+from MoR. The architecturally-correct route-once arm reported here scores 3.6370,
+\textbf{0.134 nats worse}. The earlier arm's apparent parity with MoR was an
+artefact of a specification violation. We retain it unmodified as a labelled
+ablation.
+
+\textbf{The pre-registration is partial and the registration file says so itself.}
+MoE and MoR were already trained when the test families were declared, so only the
+comparisons involving the composed arm are genuinely pre-result. The MoR-versus-MoE
+comparison was specified after its data existed, and we do not describe the
+registration as complete.
+
+\textbf{We recorded a prediction before the run and it was confirmed.} Before
+re-training the route-once arm we predicted in writing that its depth would land
+near the cap, specifically so the prediction could not be retrofitted. It came in
+at 6.955 of 7.
+
+\textbf{We published a diagnosis that was wrong, and withdrew it.} We initially
+read the composed arm's near-maximal per-token router entropy as a balance-loss
+pathology and proposed lowering the balance weight. A subsequent sweep refuted
+this: at balance weight zero the expert load \emph{collapses} onto one expert and
+specialisation goes to zero, so the prescription had the sign backwards. The
+underlying error was conflating two quantities---per-token router entropy (0.9999)
+with aggregate load entropy (0.9582)---which the tables here keep separate. The
+diagnosis is withdrawn and \S\ref{sec:competition} reports what the sweep actually
+shows.
+
+\textbf{Provenance is imperfect and we did not retrofit it.} The matrix spans four
+code revisions, all with uncommitted working-tree changes at run time;
+comparability rests on a frozen specification and a seed-blind configuration-equality
+check, not on a single revision. Ten of the fifteen cells predate the fields that
+record GPU identity and carry nulls; we did not backfill them, because a provenance
+field invented after the fact is worse than an absent one.
+
+\textbf{The matrix spans two GPUs.} Two arms were retrained on one card after the
+original checkpoints were lost; the composed arm remains on the original hardware.
+We have direct evidence this is benign rather than merely assuming it: both
+retrained arms reproduced their published means to $-0.117\sigma$ and $-0.119\sigma$
+respectively---agreement to the third decimal across arms that share no
+parameters, which is a small \emph{common-mode} offset rather than sampling noise,
+and a common-mode shift cancels in the between-arm gaps that carry every verdict
+(the MoE$-$MoR gap moved by 0.000185 nats). Per-seed values do \emph{not} reproduce
+and we do not claim they do: the seed fixes initialisation, data order and dropout,
+but not non-deterministic kernel reduction order. The reproducible quantity is the
+arm mean.
+
+\textbf{We report no per-token depth-allocation error.} English supplies no
+ground-truth depth per token, so that metric is \texttt{N/A}---not zero. A zero
+would read as perfect allocation against a curriculum that does not exist.

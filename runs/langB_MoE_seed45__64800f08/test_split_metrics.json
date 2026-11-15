@@ -1,0 +1,24 @@
+{
+  "run": "langB_MoE_seed45__64800f08",
+  "task": "language",
+  "architecture": "moe",
+  "seed": 45,
+  "experiment_group": "canonical_lang_b",
+  "test_split": {
+    "source": "wikitext-103:test"
+  },
+  "n_test_items": 1256,
+  "test/task_loss": 3.9354521909337135,
+  "test/routing_accuracy": 0.13902913965201033,
+  "test/confusion_diagonal_fraction": 0.13902913965201033,
+  "test/depth_mean": 1.0,
+  "test/early_exit_rate": "N/A",
+  "test/forced_exit_rate": 1.0,
+  "test/exit_histogram": {
+    "step_1": 321536
+  },
+  "device": "cpu",
+  "torch": "2.6.0+cpu",
+  "published_val_task_loss": 3.931128384637051,
+  "val_minus_test": -0.0043238062966626245
+}

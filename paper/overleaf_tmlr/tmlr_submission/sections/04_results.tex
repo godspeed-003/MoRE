@@ -1,0 +1,219 @@
+\section{Results}
+\label{sec:results}
+
+\subsection{Predictive quality}
+\label{sec:quality}
+
+Table~\ref{tab:main} is the headline. Recursion alone is lowest-loss. MoR beats
+MoE by $0.4329$ nats and beats MoRE by $0.1216$. Both recursive arms beat MoE
+decisively, and the composition lands between them---the premise that routing
+would \emph{add} to recursion in domain is not supported.
+
+\begin{table}[t]
+\centering
+\small
+\caption{Canonical results, 5 seeds each, mean$\,\pm\,$std. Primary metric is
+final-epoch validation task loss; \emph{best} is the minimum over evaluated
+epochs and equals \emph{last} on all 15 cells, so no model selection occurred.
+$\Delta$ floor is the margin below the bigram baseline of 4.9849 nats
+(positive \emph{beats} it). FLOPs are inference FLOPs/token at each arm's
+measured mean depth, from \texttt{results/flops\_language.json}. Pairwise, on the
+primary metric: MoRE$-$MoE $-0.3113$ ($d\,{-}15.9$, $p\,0.0079$); MoRE$-$MoR
+$+0.1216$ ($d\,{+}4.7$, $p\,0.0079$); MoE$-$MoR $+0.4329$ ($d\,{+}14.7$,
+$p\,0.0079$). Exact two-sided randomization test, floor $p_{\min} = 0.00794$;
+every headline comparison sits on it.}
+\label{tab:main}
+\vspace{2pt}
+\begin{tabular}{lrrrrrr}
+\toprule
+& Params & val task loss & PPL & $\Delta$ floor & FLOPs/tok & items/s \\
+\midrule
+MoE  & 5{,}584{,}908 & 3.9483\,$\pm$\,0.0242 & 51.9 & $+1.0366$ & 5.25\,M & 724 \\
+MoR  & 5{,}581{,}063 & \textbf{3.5154\,$\pm$\,0.0340} & \textbf{33.6} & $+1.4695$ & 47.6\,M & 170 \\
+MoRE & 5{,}584{,}908 & 3.6370\,$\pm$\,0.0134 & 38.0 & $+1.3480$ & 11.5\,M & 170 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Two features of the table deserve to be read together. First, MoE and MoRE are
+parameter-\emph{identical} at 5{,}584{,}908 while MoR sits $0.069\%$ lower at
+5{,}581{,}063, the residual being the router MoR does not have---and that residual
+runs \emph{against} the headline, since the arm with fewer parameters is the one
+that wins. Second, MoRE has by far the tightest seed spread (std 0.0134 against
+MoR's 0.0340), and we flag that we do not know what to make of it: it is the one
+axis on which the composition is unambiguous, and the runs that exist cannot
+separate a genuinely stabilising effect from the simpler account that a model whose
+halting has collapsed to a constant has less to vary across seeds.
+
+Fig.~\ref{fig:depth-curve} and the forced-depth sweep sharpen this. Both arms scale
+with forced depth up to a point, in opposite directions:
+
+\begin{itemize}[leftmargin=1.4em,itemsep=1.5pt,topsep=2pt]
+\item \textbf{MoR} improves from 7.36 nats at depth 1 to a minimum of 4.06 at
+  depth 4, then \emph{degrades} to 4.99 at depth 7. It has a genuine interior
+  optimum.
+\item \textbf{MoRE} improves monotonically all the way to depth 7 (3.70), never
+  turning over within the budget. It wants more depth than it has.
+\end{itemize}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.92\linewidth]{fig_depth_curve.pdf}
+\caption{Validation loss against forced uniform recursion depth, five seeds. Lines
+are the forced-depth sweep; stars mark each arm's \emph{learned} policy at its own
+measured mean depth. MoR's learned policy sits far below its own best uniform depth
+(3.515 vs 4.056); MoRE's sits just below its forced-depth-7 endpoint (3.637 vs
+3.697). The dotted line is MoE, which has no recursion. This is the paper's central
+contrast: adaptive depth buys MoR a great deal and MoRE very little.}
+\label{fig:depth-curve}
+\end{figure}
+
+\subsection{Is recursion actually adaptive?}
+\label{sec:halting}
+
+The mechanism claim rests on comparing each learned policy against a \emph{uniform}
+policy at the same compute, which is the cheapest competitor that ignores its input
+and therefore the minimum bar an adaptive-depth claim must clear. Two comparisons
+matter, and they give different answers for the two arms.
+
+\textbf{Against the best uniform depth anywhere} (the strongest competitor): MoR's
+learned policy at 3.5154 beats its best forced depth (4.0558 at $d{=}4$) by
+\textbf{0.540 nats}. MoRE's learned policy at 3.6370 beats its best forced depth
+(3.6971 at $d{=}7$) by \textbf{0.060 nats}.
+
+\textbf{Against a depth-matched uniform policy}---forced to exactly the arm's own
+measured mean depth of 6.955, so the comparison isolates \emph{where} the compute
+goes rather than \emph{how much} there is: MoR's adaptive policy beats forced-$d7$
+(4.9863) by \textbf{1.471 nats}; MoRE's beats forced-$d7$ (3.6971) by
+\textbf{0.060 nats}.
+
+The depth-matched comparison is the one that licenses a mechanism claim, because
+best-depth comparison conflates adaptivity with the average compute spent. On it,
+both arms' halting is doing something real and measurable---but MoR's buys 1.47
+nats where MoRE's buys 0.06, a factor of roughly 24. The honest summary is not that
+MoRE's depth mechanism is inert; it is that adding routing left it almost entirely
+without effect.
+
+The exit statistics say why. MoR early-exits $18.8\% \pm 15.1\%$ of validation
+tokens with mean depth $6.730$ and a halt remainder of $0.175$;
+MoRE force-exits $97.3\% \pm 0.8\%$ at the ceiling with mean depth $6.955$ and
+remainder $0.655$. MoRE's halting has collapsed to ``run to budget''.
+
+\textbf{The depth--difficulty correlation is reported next to those rates because
+it is only interpretable alongside them.} MoR's per-token depth correlates with
+per-token model loss at $\rho = +0.2985 \pm 0.0654$, positive on \textbf{5/5}
+seeds. MoRE's is $-0.0230 \pm 0.0115$---but with $97.3\%$ of tokens exiting at the
+ceiling and a per-token depth standard deviation of 0.43, that correlation is
+computed against a near-constant. We report it as \emph{uninformative}, not as
+evidence that MoRE allocates depth badly. This distinction is the paper's most
+load-bearing methodological point: a near-zero correlation with a constant is not
+a finding about allocation.
+
+MoR's early-exit rate is the seed-unstable quantity ($6.4\%$--$42.2\%$ across
+seeds), and its instability is informative. The two seeds that exit most are the
+two with the \emph{worst} loss, and the three that exit least are the best. So the
+\emph{alignment} of depth with difficulty is robust while the \emph{amount} of
+compute skipped is seed-unstable and costs loss---which is why the mean is reported
+with its standard deviation rather than as a single depth budget.
+
+\subsection{Where the composition does pay: robustness and efficiency}
+\label{sec:ood}
+
+Out of domain the ordering inverts. Table~\ref{tab:evals} evaluates all three arms
+on the same checkpoints, and scores each against the inference FLOPs it costs.
+
+\begin{table}[t]
+\centering
+\small
+\caption{Evaluation battery, five seeds. Every cell is
+\emph{score (difference vs MoE, inference FLOPs$\times$ vs MoE, difference per
+FLOPs-multiplier)}; lower is better for loss rows, higher for accuracy rows.
+``diff/$\times$'' is how much score each unit of extra compute bought, so higher is
+more efficient. \textbf{These are exploratory}: they sit outside both declared
+families, are uncorrected, and carry no significance verdict.}
+\label{tab:evals}
+\vspace{2pt}
+\begin{tabular}{llll}
+\toprule
+Eval & MoE & MoR & MoRE \\
+\midrule
+Val loss (nats) & 3.948 (1.00$\times$) & 3.515 ($-0.433$, 9.07$\times$, 0.048) & 3.637 ($-0.311$, 2.19$\times$, \textbf{0.142}) \\
+Test loss (nats) & 3.947 (1.00$\times$) & 3.513 ($-0.435$, 9.07$\times$, 0.048) & 3.621 ($-0.326$, 2.19$\times$, \textbf{0.149}) \\
+OOD loss (nats) & 8.272 (1.00$\times$) & 7.802 ($-0.470$, 9.07$\times$, 0.052) & \textbf{7.573} ($-0.699$, 2.19$\times$, \textbf{0.319}) \\
+BLiMP (acc) & 56.63 (1.00$\times$) & \textbf{58.74} ($+2.11$, 9.07$\times$, 0.233) & 58.36 ($+1.73$, 2.19$\times$, \textbf{0.791}) \\
+EWoK (acc) & 49.62 (1.00$\times$)$^{*}$ & 50.33 ($+0.72$, 9.07$\times$, 0.079)$^{*}$ & 49.95 ($+0.33$, 2.19$\times$, 0.152)$^{*}$ \\
+\bottomrule
+\end{tabular}
+\\[3pt]
+{\footnotesize $^{*}$EWoK is within noise of the 50\% chance floor for every arm,
+so its rankings are not meaningful---a scale limitation, reported for completeness.}
+\end{table}
+
+Three things follow.
+
+\textbf{MoRE is the most robust arm out of domain.} On held-out Pile blocks
+\citep{gao2020pile} it reaches 7.573 nats against MoR's 7.802 and MoE's 8.272---a
+$0.699$-nat advantage over MoE against MoR's $0.470$. The in-domain ordering
+inverts: the composition is the \emph{worst} recursive arm in domain and the
+\emph{best} out of it. That is a real and reportable property, and it is the one
+respect in which composing the two mechanisms does something neither does alone.
+
+\textbf{It gets there far more cheaply.} MoR attains the lowest in-domain loss but
+pays $9.07\times$ MoE's inference FLOPs; MoRE pays $2.19\times$. Per unit of extra
+compute MoRE buys $0.142$ nats against MoR's $0.048$---roughly $3\times$ the
+efficiency in its gain over MoE, and $6\times$ on the OOD row. FLOPs, not
+wall-clock, is the compute measure; the throughput column is reported so the
+latency cost stays visible, and it shows MoRE no faster than MoR in wall-clock
+(170 items/s each) despite doing $4\times$ less arithmetic, because its per-token
+expert dispatch is latency-bound.
+
+\textbf{Grammatical competence is real but modest, and routing does not buy it.}
+On BLiMP \citep{warstadt2020blimp}, 67{,}000 minimal pairs, both recursive arms beat
+MoE (58.74\% and 58.36\% against 56.63\%) and MoR is not distinguishable from MoRE
+($p = 0.71$). Every arm is above the 50\% floor, so recursion buys measurable
+syntactic sensitivity at this scale; adding routing does not add more of it. The
+gains concentrate on long-distance agreement phenomena---anaphor agreement and
+determiner--noun agreement---which is where a shared iterative block would be
+expected to help. On EWoK \citep{leong2023ewok} all three arms sit at chance, which
+is a scale limitation and not a finding.
+
+\subsection{Stratified loss: the advantage concentrates on hard tokens}
+\label{sec:stratified}
+
+Fig.~\ref{fig:stratified} groups validation loss by the frequency decile of the
+\emph{target} token---difficulty being a property of what must be predicted, not of
+the input---and by position within the block.
+
+Both recursive arms improve most where prediction is hardest. The MoRE$-$MoE
+advantage grows monotonically from $-0.147$ nats on the rarest-decile tokens to
+$-0.374$ on the most frequent; MoR's from $-0.188$ to $-0.527$. Neither
+architecture's gain is a uniform shift, which is what a pure capacity effect would
+look like.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.98\linewidth]{fig_stratified.pdf}
+\caption{(a) Validation loss by target-token frequency decile. (b) Each recursive
+arm's advantage over MoE, which widens as tokens get harder. Exploratory,
+uncorrected.}
+\label{fig:stratified}
+\end{figure}
+
+\textbf{A prediction this does not support.} If recursion were doing what the
+adaptive-computation premise suggests---spending steps where context is thin---the
+recursive arms should gain most at the \emph{start} of a block. They do the
+opposite: MoRE's advantage over MoE is $-0.047$ nats in the first 8 positions and
+$-0.359$ in the last 128; MoR's goes from $-0.250$ to $-0.465$. Both recursive arms
+gain most where context is \emph{longest}. We report this because it disconfirms a
+mechanism we would otherwise have asserted, and because it is consistent with the
+capacity account in \S\ref{sec:mechanism}: a shared block iterated is accumulating
+representation, not compensating for missing context.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.98\linewidth]{fig_ood.pdf}
+\caption{The ordering inverts out of domain: MoRE is worst in domain (a) and best
+on the Pile (b). Same three entities and colours in both panels. Exploratory,
+uncorrected.}
+\label{fig:ood}
+\end{figure}

@@ -1,0 +1,157 @@
+\section{Introduction}
+\label{sec:intro}
+
+Conditional computation is motivated by one accounting argument---most tokens do
+not need the whole model---made in two places that answer different questions.
+Sparse mixture-of-experts (MoE) layers
+\citep{jacobs1991moe,shazeer2017moe,fedus2022switch} decide \emph{which}
+computation module processes a token; recursive weight-tied architectures with
+learned halting \citep{graves2016act,dehghani2019ut,banino2021pondernet} decide
+\emph{how much} computation it receives, reusing one block for a variable number
+of steps. The decisions are over different objects, so they are orthogonal in
+principle and composing them is an obvious thing to try: route a token to a
+specialised expert, then reuse \emph{that expert's} weights for as many steps as
+it appears to need. The composition inherits an efficiency argument from each
+side. What it does not inherit is evidence---whether it beats either component at
+a matched budget has not, to our knowledge, been isolated. We isolate it below,
+at a matched parameter and compute budget.
+
+We call this composition \emph{Mixture of Recursive Experts} (MoRE): a token is
+routed once, from its post-embedding state, to one of $E$ independent expert
+FFNs, and that expert's weights---never another's---are reused for an adaptive
+number of recursion steps under learned halting.
+
+% The architecture diagram is a GENERATED PNG (code/make_architecture_figure.py),
+% not TikZ. The TikZ version positioned nodes in a 0--100 coordinate space while
+% sizing their text in points, so the text overflowed its nodes at native scale
+% and \resizebox preserved the overlap -- unreadable in single-column and
+% collapsed into fragments in two-column. TikZ overlap raises no overfull-hbox
+% warning, so the compile reported zero problems throughout. Unstarred on
+% purpose: one column in ACL. \colfigwidth is \linewidth there and 0.46\linewidth
+% in single-column TMLR, where full width rendered this 3.35-in drawing at 6.5 in
+% -- 43% of a page, with labels larger than the body text (T-LA.22).
+%
+% T-LA.33. The figure moved from the Method section to the Introduction: it had
+% no \ref anywhere in the paper, i.e. it floated as an orphan, and a reader
+% meeting "one block, routed once, reused" needs the drawing there rather than
+% three pages later. The \clearpage comes BEFORE the float, not after it: a top
+% float plus \clearpage after it gets its own float page (the figure alone on a
+% page, measured at +0.79 counted page), whereas breaking page 1 first puts the
+% figure at the top of page 2 with the citing paragraph directly below it. TMLR
+% only: in ACL's two-column intro the forced break would strand half a column.
+\begin{figure}[t]
+\centering
+\includegraphics[width=\colfigwidth]{fig_architecture.png}
+\caption{The MoRE block. A token is routed \emph{once} from its post-embedding
+state to one of $E$ independent expert FFNs, and \emph{that expert's}
+weights---never another's---are reused for an adaptive number of recursion steps
+under ACT halting. Only the selected expert is evaluated, and its output is
+scaled by the gate $g_{e^\star}$. Setting $T=1$ recovers MoE exactly and setting
+$E=1$ recovers MoR; the input representation is bit-identical in all three cases,
+and all three are configurations of one engine.}
+\label{fig:architecture}
+\end{figure}
+
+Fig.~\ref{fig:architecture} draws the block, and one training engine implements
+the three configurations differing only
+in the fields their definitions require: routing without recursion (MoE, six
+experts on the language task, depth 1), recursion without routing (MoR, one
+shared block, depth up to 7), and the composition (MoRE, six experts, depth up to
+7). All three sit at
+$\approx$5.58M parameters, share a bit-identical input representation, and train
+on the same fixed split of WikiText-103 \citep{merity2017wikitext}, with the data
+and budget specified in \S\ref{sec:data}--\S\ref{sec:protocol}, so a difference
+between arms cannot be a difference in the harness, the data, or the parameter
+count. A second task---arithmetic with seven operation groups, its own manifest
+and a matched budget within that task---is defined in \S\ref{sec:arith-task} and
+reported in \S\ref{sec:arithmetic}; it uses the same engine and is built so that
+routing and recursion both have something to do.
+
+\paragraph{What we find.} The composition occupies the compute-efficient point of
+the three, and the honest accounting of what it does and does not buy is the
+paper.
+
+\begin{itemize}[leftmargin=1.4em,itemsep=1.5pt,topsep=2pt]
+\item \textbf{On the language task, all three arms sit on the quality/compute
+  frontier, and the composition buys the most quality per unit of compute.} MoRE
+  improves on MoE by
+  $7.9\%$ validation loss ($3.948 \rightarrow 3.637$ nats/token) at $2.19\times$
+  MoE's inference FLOPs where MoR needs $8.87\times$: $72\%$ of MoR's gain for
+  $25\%$ of its compute, roughly $3\times$ the quality per unit compute. Out of
+  domain \citep{gao2020pile} the ratio becomes outright \emph{dominance}---MoRE
+  reaches 7.212 nats against MoR's 7.423 at a quarter of the compute, so MoR is
+  Pareto-dominated---which is the one respect in which composing the mechanisms
+  does something neither does alone.
+
+\item \textbf{But on the language task recursion alone remains the lowest-loss
+  arm.} MoR reaches 3.515 against MoRE's 3.637: the composition trades $0.1216$
+  nats, significant at our resolution floor, for a $4\times$ inference-FLOP
+  saving. These are two axes and we never substitute one for the other. On that
+  task, adding routing improves neither in-domain quality over MoR nor routing
+  quality over MoE.
+
+\item \textbf{Recursion's adaptive depth is real on the language task; the
+  composition's barely survives there.} Against a \emph{depth-matched} uniform
+  policy---forced to the learned policy's own mean depth, so total compute is
+  fixed---MoR's halting buys 1.47 nats and MoRE's 0.06, a factor of 24. MoRE's
+  halting has collapsed to running to budget on $97.3\%$ of tokens.
+
+\item \textbf{On an arithmetic task built to give routing and recursion each a
+  distinct job, the composition has the lowest mean loss.} Seven operation
+  groups, no group label in the input, and a difficulty axis written into the
+  input: MoRE reaches $0.190$ nats against $0.245$ for recursion alone and
+  $0.430$ for MoE, lower in four of five seeds and with a $4.8\times$ tighter
+  spread than recursion. Routing, not halting, is what stabilises recursion; the
+  gap to recursion itself is not resolvable at five seeds, and the halting head
+  is input-dependent but replaceable by a fixed depth ($0.095$ nats against the
+  best uniform depth).
+
+\item \textbf{A diagnostic this literature is missing: the depth-matched uniform
+  control.} A mean step count and an exit histogram---what this literature almost
+  always reports---do \emph{not} establish input-dependent depth, since a policy
+  that ignores its input reproduces both. Forcing the \emph{same trained weights}
+  to a fixed depth equal to the policy's own mean, and scoring the same tokens,
+  does test it: one inference pass, no retraining, and it separates our two arms,
+  which are otherwise indistinguishable (1.47 against 0.06 nats). It is necessary
+  rather than sufficient---a small gap shows the policy does little work, a large
+  one bounds what it contributes---and \S\ref{sec:halting} derives both bounds.
+
+\item \textbf{The two mechanisms compete for one budget, and two rival
+  explanations are excluded.} A sweep that recovers adaptive depth by raising the
+  ponder penalty destroys expert differentiation, while the arm that preserves
+  differentiation saturates depth. Capacity dilution is ruled out
+  arithmetically---tokens per parameter are identical by construction---and
+  subspace trapping is falsified three ways (\S\ref{sec:mechanism}).
+
+\end{itemize}
+
+We report this as a trade-off measured at this scale, not a verdict on either
+mechanism in general. The contribution is the decomposition: because MoE
+\emph{is} MoRE with the depth budget set to one and all three arms are
+parameter-matched from one codebase within each task, each contrast varies one
+thing.
+
+\section{Related Work}
+\label{sec:related}
+
+Conditional mixtures of experts date to \citet{jacobs1991moe}; the sparsely-gated
+form is due to \citet{shazeer2017moe}, with the Top-1 dispatch and load-balancing
+machinery of GShard \citep{lepikhin2021gshard}, Switch Transformer
+\citep{fedus2022switch} and ST-MoE \citep{zoph2022stmoe}---whose standard
+justification, more parameters at constant FLOPs, is unavailable here since we
+pin all three arms to one parameter count. On the depth axis, Adaptive
+Computation Time \citep{graves2016act} supplies the halting unit we use,
+Universal Transformers \citep{dehghani2019ut} applied it to a weight-tied block,
+PonderNet \citep{banino2021pondernet} reformulated the halting distribution to
+keep a gradient near saturation, and early-exit variants place the decision at
+the layer or token level \citep{elbayad2020depthadaptive,schuster2022calm,raposo2024mod}.
+That literature reports mean step counts and exit histograms almost universally,
+which \S\ref{sec:halting} argues cannot test input-dependence. Closest to us,
+\citet{bae2025mor} and \citet{raposo2024mod} route \emph{to depths} over shared
+weights; MoRE instead routes among independent expert FFNs whose weights the
+recursion then reuses, and we know of no matched-budget comparison of such a
+composition against each of its components---the gap we fill. We claim no novelty
+for the combination itself. Minimal-pair and likelihood probes
+\citep{warstadt2020blimp,ivanova2024ewok} score a \emph{relative} preference
+within a matched pair, so they degrade gracefully with scale, which is what makes
+them usable at 5.6M parameters.

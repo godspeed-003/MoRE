@@ -1,0 +1,200 @@
+\section{Why the Composition Fails}
+\label{sec:mechanism}
+
+Four accounts, labelled by evidential status: what is measured, and what is
+hypothesis consistent with the measurement.
+
+\subsection{Routing divides the data, not the update budget}
+\label{sec:dilution}
+
+\textbf{[Ordering MEASURED; arithmetic MEASURED; mechanism HYPOTHESIS.]} The
+obvious account of the ordering is capacity dilution: MoR's single block sees
+100\% of tokens while MoE and MoRE split the same FFN budget across six experts,
+so each expert is trained less. \textbf{That account is arithmetically false
+here, and ruling it out is what makes the surviving hypothesis worth stating.}
+
+The budgets are matched by construction, and the matching cancels. Each MoE/MoRE
+expert FFN holds $2 \cdot 4 \cdot d^2 = 524{,}288$ weights and MoR's single FFN
+holds $2 \cdot 24 \cdot d^2 = 3{,}145{,}728$, exactly six times as many
+(\S\ref{sec:engine}). A run sees $404.2$M tokens. So:
+
+\begin{center}
+\begin{tabular}{lccc}
+\toprule
+per FFN parameter & MoE expert & MoR block & MoRE expert \\
+\midrule
+tokens seen        & 128.5 & 128.5 & 128.5 \\
+FFN applications   & 128   & 865   & \textbf{894} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Tokens per parameter is \emph{identical} across all three arms---the token split
+and the parameter split are both by $E$, so they cancel exactly. And once
+recursion is counted, applications per parameter slightly \emph{favours} MoRE
+(894) over MoR (865), because MoRE runs marginally deeper. Whatever costs MoRE
+0.12 nats against MoR, it is not that its parameters are trained less.
+
+That comparison also explains the easy half of the ordering. MoRE gets
+$894/128 \approx 7\times$ the FFN applications per parameter that MoE gets, which
+is simply what recursion buys, and MoRE beats MoE by 0.311 nats. The recursive
+multiply is real and it is the entire source of MoRE's advantage over MoE.
+
+\textbf{What remains, once update count is excluded, is the \emph{diversity} of
+what each parameter block sees.} MoR's block is exposed to the whole token
+distribution; each MoE/MoRE expert is exposed only to the router-selected slice
+that reaches it, which is both narrower and systematically biased, since the
+router selects it. Structure shared across the whole distribution---the bulk of
+what a language model must learn at this scale---can be learned once by MoR's
+block but has to be re-learned independently inside all six experts. Six partial
+copies of shared structure fit in the same parameter budget as one complete copy
+only by making each copy worse.
+
+This is a hypothesis, not an isolated effect, and we label it as one: separating
+it from the remaining differences needs a width sweep or a controlled
+manipulation of routing diversity, and we ran neither. It earns its place because
+it is the only account left after the arithmetic above excludes the update-count
+version, because it predicts the stratified result---MoRE's advantage over MoE
+grows with token difficulty (\S\ref{sec:stratified}), which is where an
+incompletely-learned shared structure should hurt most---and because it generates
+the falsifiable scale prediction in \S\ref{sec:limitations}: as the corpus grows,
+each expert's slice eventually contains enough of the shared structure for the
+re-learning penalty to amortise, so the MoR$-$MoRE gap should close with data
+scale at fixed parameters.
+
+\subsection{Depth saturation is a data-scale effect, not an architectural limit}
+\label{sec:saturation}
+
+\textbf{[MEASURED, four points at fixed hyperparameters.]} MoRE's halting sits at
+the ceiling on the full corpus (97.3\% forced-exit, mean depth 6.955 of 7). It is
+tempting to read that as the architecture being unable to learn adaptive depth. A
+subset sweep falsifies that reading.
+
+\begin{center}
+\begin{tabular}{lcc}
+\toprule
+training data & mean depth & forced-exit rate \\
+\midrule
+2.5\% of the corpus & 2.43 & $\approx 0$ \\
+10\% & 1.92 & $\approx 0$ \\
+40\% & 1.97 & $\approx 0$ \\
+100\% (canonical) & 6.96 & 0.973 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+At every reduced-data point the same model, at the same ponder weight, allocates
+depth adaptively---exit rates near zero, mean depth between 1.9 and 2.4, inside a
+budget of 7. The collapse appears only at full scale. \textbf{So the failure is a
+calibration finding, not an architectural one}: the ponder penalty that produces
+adaptive depth on a small corpus cannot hold depth down at this one.
+
+We state the limit of that claim precisely, because the sweep is exploratory
+(single seed, subset fraction below 1, and it may never be quoted as a canonical
+result). The subset axis is \emph{not} cleanly monotone---2.5\% gives 2.43 but 40\%
+gives 1.97---so the honest phrasing is that \emph{saturation emerges somewhere
+between 40\% and 100\% of the data}, not that depth is monotone in training steps.
+The mechanism is consistent: the ponder term is linear in expected depth, while the
+task gradient grows as the model fits, so the fixed penalty is outpaced. Once the
+halting sigmoid saturates, its gradient vanishes and the linear-penalty ACT scheme
+cannot recover on its own \citep{graves2016act}. \citet{banino2021pondernet}
+replaces the linear penalty with a KL divergence against a geometric prior, which
+keeps a gradient on the halt head near saturation, and is the principled fix; we
+did not run it, and it is named as future work rather than as a result.
+
+\subsection{The two mechanisms compete for one budget}
+\label{sec:competition}
+
+\textbf{[MEASURED on a calibration grid; the canonical-corpus form is measured on
+the balance axis.]} This is the paper's central claim, and it is the one that
+explains why the composition does not merely fail to add but subtracts.
+
+Depth and specialisation are not independent knobs in MoRE the way they are in MoR
+and MoE separately. On the calibration grid, recovering adaptive depth by raising
+the halting weight destroys expert differentiation:
+
+\begin{center}
+\begin{tabular}{lccc}
+\toprule
+halting weight & mean depth & AMI & val loss \\
+\midrule
+0.001 (frozen) & 2.698 & \textbf{0.2851} & 5.2352 \\
+0.107 & 1.476 & \textbf{0.0025} & 5.3346 \\
+0.500 & 1.072 & 0.0207 & 5.3306 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+AMI of 0.0025 is statistically indistinguishable from the shuffled-label control.
+The mechanism is direct: fewer recursion steps means fewer expert applications per
+token, which means fewer opportunities for experts to differentiate. \textbf{Tune
+toward adaptive depth and specialisation collapses; preserve specialisation and
+depth saturates.} Both mechanisms draw on the same per-token compute budget, and at
+this parameter and data budget neither gets enough. (This grid is on a smaller dev
+corpus at one seed; it is a mechanism demonstration and carries that caveat.)
+
+The competition has a second face on the canonical corpus, along a different axis.
+The routing balance term is load-bearing and cannot be traded away for depth
+either: setting it to zero \emph{collapses} the expert load onto a single expert
+(load entropy 0.0001) and drives AMI to zero. A near-uniform per-token router
+distribution coexisting with balanced load and above-chance specialisation is
+therefore not a pathology to be tuned out---and we note that we initially read it
+as one before the sweep refuted us (\S\ref{sec:honesty}).
+
+Specialisation itself is real, and measured against per-run controls rather than
+against chance. MoRE's AMI is $0.1803 \pm 0.0246$ against a permutation control of
+$0.0249$, a controlled z of $13.43$; Hungarian-matched accuracy is $0.3592 \pm
+0.0271$ against a control of $0.2464$. MoE's AMI is $0.1637 \pm 0.0478$ against a
+control of $0.0364$ ($z = 6.82$), Hungarian $0.3616$ against $0.2966$. Both
+six-expert arms find substantial above-chance structure---and, read together, the
+two arms are not distinguishable from each other. Routing quality is approximately
+the same with recursion as without it, which is the routing half of the
+interference result: recursion does not improve routing, and routing does not
+preserve adaptive depth, in the same architecture.
+
+\subsection{A plausible mechanism, refuted}
+\label{sec:trapping}
+
+\textbf{[MEASURED; hypothesis falsified.]} The natural explanation for MoRE's
+collapse is \emph{subspace trapping}: routing a token once confines its recursion
+to a single expert's parameter subspace, and repeated application of one block
+within that subspace drives the state toward a fixed point rather than refining it.
+It is an appealing account and it is wrong. We tested it three ways.
+
+\begin{center}
+\begin{tabular}{lccc}
+\toprule
+probe & MoE & MoR & MoRE \\
+\midrule
+final-state participation ratio & $41.5 \pm 1.6$ & $\mathbf{70.3 \pm 5.6}$ & $57.3 \pm 2.8$ \\
+between-expert mean cosine & $0.630$ & \textsc{n/a} & $0.916$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\textbf{(i) Trapping predicts lower participation ratio in the composed arm;
+it is higher.} If recursion were collapsing the state onto a low-dimensional
+subspace, the composed model's final-state PR should fall below MoE's, since MoE
+has no recursion at all. It does not: MoRE's PR is $57.3$ against MoE's $41.5$,
+and MoR's---with no routing---is higher still at $70.3$. Recursion \emph{expands}
+the effective dimensionality, and routing contracts it somewhat without collapsing
+it. The ordering refutes the prediction.
+
+\textbf{(ii) Trapping predicts oscillating or fixed-point dynamics; velocity
+decays smoothly.} Measuring the L2 norm of consecutive post-norm states across
+depth, both recursive arms decay monotonically---MoR from 11.06 at step 2 to 5.71
+at step 7, MoRE from 9.09 to 3.49---which is the signature of settling, not of
+vibrating around an attractor.
+
+\textbf{(iii) Trapping predicts that successive updates rescale the state;
+they are near-orthogonal.} The mean cosine between a step's update and the state
+it updates from is negative in both arms ($-0.26$ to $-0.06$), i.e. updates push
+into new directions rather than amplifying existing ones. A rescaling collapse
+would show positive collinearity approaching $+1$.
+
+The recursion in this architecture is dynamically healthy: it travels, it settles,
+and it adds dimensions. The failure is not a broken iterated map. That rules out
+the most attractive explanation and leaves the budget competition
+(\S\ref{sec:competition}) as the account the data supports---which is a stronger
+position than an unexplained null, because we can say which of the obvious
+mechanisms it is \emph{not}.
